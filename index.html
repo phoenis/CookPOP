@@ -270,7 +270,36 @@ const STAPLE_KEYWORDS = [
 ];
 function isStaple(ingrediente){
   const s = (ingrediente||'').toLowerCase();
-  return STAPLE_KEYWORDS.some(k => s.includes(k));
+  // parola intera, non sottostringa: altrimenti "pepe" intercetta anche "Peperoni"
+  return STAPLE_KEYWORDS.some(k => new RegExp(`\\b${k}\\b`).test(s));
+}
+
+// Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
+// nome (non nome+quantità: altrimenti lo stesso ingrediente con una qta scritta
+// in modo leggermente diverso da una ricetta all'altra compariva due volte).
+// Usata sia dalla lista della spesa sia dalla Dispensa (per mostrare quelli
+// confermati come "già in casa").
+function computeStapleList(){
+  const flat = [];
+  DATA.week1.forEach((d,i)=>{
+    const name = effectiveRecipeName(i);
+    getIngredientsFor(name).forEach((it,idx)=>{
+      if(isStaple(it.ingrediente)) flat.push({ key:`d${i}_${idx}`, ingrediente:it.ingrediente, qta:it.qta, context:`${d.giorno} · ${name}` });
+    });
+  });
+  DATA.generalShopping.forEach((it,idx)=>{
+    if(isStaple(it.ingrediente)) flat.push({ key:`gen_${idx}`, ingrediente:it.ingrediente, qta:it.qta, context:'Ogni settimana' });
+  });
+  const merged = {};
+  flat.forEach(it=>{
+    const mergeKey = (it.ingrediente||'').trim().toLowerCase();
+    if(!merged[mergeKey]) merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, keys: [it.key], contexts: [it.context] };
+    else{
+      merged[mergeKey].keys.push(it.key);
+      if(!merged[mergeKey].contexts.includes(it.context)) merged[mergeKey].contexts.push(it.context);
+    }
+  });
+  return Object.values(merged);
 }
 
 function classifyDept(ingrediente){
@@ -723,7 +752,6 @@ function renderSpesa(){
   });
 
   const mainFlat = flat.filter(it => !it.staple);
-  const stapleFlat = flat.filter(it => it.staple);
 
   const total = mainFlat.length;
   const done = mainFlat.filter(it=>state.shopChecked[it.key]).length;
@@ -740,19 +768,12 @@ function renderSpesa(){
     </label>`;
   }
 
-  // sezione basilari: unisco per nome+quantità così "Sale" o "Olio EVO" compaiono una volta sola
-  const stapleMerged = {};
-  stapleFlat.forEach(it=>{
-    const mergeKey = (it.ingrediente||'').trim().toLowerCase() + '|' + (it.qta||'').trim().toLowerCase();
-    if(!stapleMerged[mergeKey]) stapleMerged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, keys: [it.key] };
-    else stapleMerged[mergeKey].keys.push(it.key);
-  });
-  const stapleList = Object.values(stapleMerged);
+  const stapleList = computeStapleList();
   const staplesHtml = stapleList.length ? `
     <div class="staples-block">
       <div class="staples-title">🏠 Di solito li hai già</div>
-      <p class="staples-hint">Spuntali se non ti servono — restano fuori dalla lista qui sopra.</p>
-      ${stapleList.map(it=>itemRow(it.keys, it.ingrediente, it.qta, '', '')).join('')}
+      <p class="staples-hint">Spuntali se non ti servono — restano fuori dalla lista qui sopra, e compaiono in Dispensa come confermati.</p>
+      ${stapleList.map(it=>itemRow(it.keys, it.ingrediente, it.qta, '', it.contexts.join(' + '))).join('')}
     </div>` : '';
 
   let body = '';
@@ -990,6 +1011,16 @@ function renderDispensa(){
     const rows = items.map(it=>`<div class="pantry-item"><span>${escapeHtml(it.elemento)}</span><span class="situ">${escapeHtml(it.situazione)}</span></div>`).join('');
     return `<div class="pantry-cat">${escapeHtml(cat)}</div>${rows}`;
   }).join('');
+
+  // basilari spuntati in Spesa come "li hai già": compaiono qui in autonomia,
+  // senza doverli riscrivere a mano.
+  const confirmedStaples = computeStapleList().filter(it => it.keys.some(k=>state.shopChecked[k]));
+  const confirmedStaplesHtml = confirmedStaples.length ? `
+    <div class="staples-block">
+      <div class="staples-title">🏠 Confermati dalla lista della spesa</div>
+      <p class="staples-hint">Spuntati come "li hai già" nel menù di questa settimana.</p>
+      ${confirmedStaples.map(it=>`<div class="pantry-item"><span>${escapeHtml(it.ingrediente)}</span><span class="situ">${escapeHtml(it.contexts.join(', '))}</span></div>`).join('')}
+    </div>` : '';
   const drawersHtml = [1,2,3].map(n=>{
     const d = state.freezer[n] || {};
     return `
@@ -1009,6 +1040,7 @@ function renderDispensa(){
     <h2 class="section-title">Dispensa</h2>
     <p class="section-sub">Cosa avete normalmente in casa</p>
     ${pantryHtml}
+    ${confirmedStaplesHtml}
     <h2 class="section-title" style="margin-top:26px;">Freezer</h2>
     <p class="section-sub">3 cassetti — inventario semplice, sempre aggiornato</p>
     <div class="freezer-drawers">${drawersHtml}</div>
