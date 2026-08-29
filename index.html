@@ -611,16 +611,13 @@ function renderMenu(){
     // tempo: se cambiata (a mano o generata) e in catalogo, usa il tempo della nuova ricetta; altrimenti quello originale del giorno
     const timeDisplay = (isChanged && rec) ? rec.tempo : d.tempo;
 
-    // note/pranzo: se cambiata, ricostruite dalla ricetta scelta; altrimenti quelle originali del foglio
+    // note: se cambiata, ricostruite dalla ricetta scelta; altrimenti quelle originali del foglio
     let metaLines = [];
-    let pranzoLine = d.pranzo;
     if(isChanged){
       if(rec){
-        pranzoLine = rec.avanzi === 'Sì' ? 'Possibile avanzo' : 'Nessun avanzo previsto per questa ricetta';
         if(rec.prep && rec.prep !== 'No') metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
         if(rec.freezer === 'Sì') metaLines.push(`<b>Nota:</b> congela bene — valuta doppia dose per il freezer`);
       } else {
-        pranzoLine = '—';
         metaLines.push(`<b>Nota:</b> ricetta non presente nel catalogo, dettagli non disponibili`);
       }
     } else {
@@ -691,7 +688,6 @@ function renderMenu(){
         <span class="day-menu" data-toggle-day="${i}">${escapeHtml(name)}</span>
       </div>
       <div class="day-meta">
-        <div><b>Pranzo Mara:</b> ${escapeHtml(pranzoLine)}</div>
         ${metaLines.map(l=>`<div>${l}</div>`).join('')}
       </div>
       ${soakChip}
