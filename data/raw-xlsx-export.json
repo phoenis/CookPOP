@@ -1,0 +1,2269 @@
+{
+ "Come usarlo": {
+  "header": [
+   "QUADERNO DELLA CUCINA — Mara & Ste",
+   null
+  ],
+  "rows": [
+   [
+    "Obiettivo",
+    "Mangiare in modo vario e piacevole, senza rinunciare a lasagne, fritti e ricette goduriose."
+   ],
+   [
+    "Metodo",
+    "Decidere le cene in anticipo e usare il menù anche per ricordare ammolli, scongelamenti e preparazioni."
+   ],
+   [
+    "Pranzo Mara",
+    "Normalmente avanzi della cena precedente."
+   ],
+   [
+    "Pranzo Ste",
+    "Non pianificato: mangia fuori durante il lavoro."
+   ],
+   [
+    "Tempo disponibile",
+    "Circa 30 minuti nelle sere normali; 1–2 ore nel weekend e, ogni tanto, dopo cena per preparare i giorni successivi."
+   ],
+   [
+    "Freezer",
+    "3 cassetti. Tenere un inventario semplice con contenuto, porzioni e data di congelamento."
+   ],
+   [
+    "Regola d'oro",
+    "Quando una ricetta lunga congela bene, valutare una doppia produzione."
+   ]
+  ]
+ },
+ "Ricette": {
+  "header": [
+   "Ricetta",
+   "Categoria",
+   "Preferenza",
+   "Tempo indicativo",
+   "Preparazione anticipata",
+   "Freezer",
+   "Avanzi/pranzo ufficio",
+   "Stagione"
+  ],
+  "rows": [
+   [
+    "Pasta al pesto",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta tonno e limone",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Spaghetti con pomodorini",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta a cacio e pepe",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Meglio fresca",
+    "Tutto l'anno"
+   ],
+   [
+    "Ragù",
+    "Base/Primo",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta fredda",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Risotto alla zucca",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Risotto agli asparagi",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Primavera"
+   ],
+   [
+    "Minestra",
+    "Primo",
+    "❤️",
+    "30–60 min",
+    "Dipende",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Vellutata di zucca",
+    "Primo/verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Bistecca",
+    "Carne",
+    "❤️",
+    "≤20 min",
+    "No",
+    "No",
+    "Meglio fresca",
+    "Tutto l'anno"
+   ],
+   [
+    "Pollo alla senape",
+    "Carne",
+    "❤️",
+    "30 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Frittata con avanzi",
+    "Uova",
+    "❤️",
+    "≤30 min",
+    "Dipende",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pollo alla piastra",
+    "Carne",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pollo alla valdostana",
+    "Carne",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Trancio di salmone al forno",
+    "Pesce",
+    "❤️",
+    "30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpette al sugo",
+    "Carne",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpette al forno",
+    "Carne",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Saltimbocca alla romana",
+    "Carne",
+    "❤️",
+    "30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Scaloppine al limone",
+    "Carne",
+    "😐",
+    "30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Scaloppine ai funghi",
+    "Carne",
+    "😐",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno"
+   ],
+   [
+    "Straccetti di manzo rucola e grana",
+    "Carne",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Involtini di carne",
+    "Carne",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pollo alla cacciatora",
+    "Carne",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pollo al forno con patate e rosmarino",
+    "Carne",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Cotoletta alla milanese",
+    "Carne",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Meglio fresca",
+    "Tutto l'anno"
+   ],
+   [
+    "Salsiccia al forno con patate e peperoni",
+    "Carne",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate/Autunno"
+   ],
+   [
+    "Arista o arrosto di maiale al latte",
+    "Carne",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Spezzatino di manzo con patate",
+    "Carne",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Brasato al vino rosso",
+    "Carne/progetto",
+    "❤️",
+    ">2 ore",
+    "Weekend",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Uova al tegamino con pomodoro",
+    "Uova",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Uova in purgatorio",
+    "Uova",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Frittata di zucchine e parmigiano",
+    "Uova",
+    "❤️",
+    "≤30 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Frittata di patate",
+    "Uova",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Parmigiana di melanzane",
+    "Verdure/progetto",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Frittata al forno con verdure e formaggio",
+    "Uova",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta e ceci",
+    "Legumi",
+    "❤️",
+    "45–60 min",
+    "Ceci in ammollo",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta e fagioli",
+    "Legumi",
+    "❤️",
+    "45–60 min",
+    "Fagioli in ammollo",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta e lenticchie",
+    "Legumi",
+    "❤️",
+    "30–45 min",
+    "No/variabile",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Ceci in umido al pomodoro e rosmarino + pane",
+    "Legumi",
+    "❤️",
+    "45 min",
+    "Ceci in ammollo",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Lenticchie in umido + uovo/pane",
+    "Legumi",
+    "❤️",
+    "30–45 min",
+    "No/variabile",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Fagioli all'uccelletto + pane/salsiccia",
+    "Legumi",
+    "❤️",
+    "45 min",
+    "Fagioli in ammollo",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Zuppa di legumi e cereali",
+    "Legumi",
+    "❤️",
+    "45–60 min",
+    "Variabile",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Farinata di ceci con verdure/formaggi",
+    "Legumi",
+    "❤️",
+    "45 min",
+    "Riposo pastella",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Salmone al cartoccio con limone ed erbe",
+    "Pesce",
+    "❤️",
+    "30–40 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Salmone con zucchine",
+    "Pesce",
+    "❤️",
+    "30 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Orata/branzino al forno con patate",
+    "Pesce",
+    "😐",
+    "45 min",
+    "No",
+    "No",
+    "Meglio fresco",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpette di tonno e patate",
+    "Pesce",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Filetti di merluzzo gratinati",
+    "Pesce",
+    "❤️",
+    "30–40 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pesce al forno alla mediterranea",
+    "Pesce",
+    "😐",
+    "30–40 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Zucchine ripiene",
+    "Verdure",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Zucchine gratinate al forno",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Peperonata",
+    "Verdure",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Peperoni ripieni",
+    "Verdure",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Asparagi al forno con uovo e parmigiano",
+    "Verdure",
+    "❤️",
+    "30–40 min",
+    "No",
+    "No",
+    "Sì",
+    "Primavera"
+   ],
+   [
+    "Melanzane ripiene",
+    "Verdure",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Verdure miste al forno con patate",
+    "Verdure",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Cavolfiore gratinato",
+    "Verdure",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Amatriciana",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Gricia",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Carbonara",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Meglio fresca",
+    "Tutto l'anno"
+   ],
+   [
+    "Puttanesca",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta con crema di zucchine e parmigiano",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta al forno",
+    "Primo",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Cannelloni ricotta e spinaci",
+    "Primo/progetto",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Gnocchi alla romana",
+    "Primo",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pollo al limone e rosmarino",
+    "Carne",
+    "❤️",
+    "≤30 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pollo con peperoni",
+    "Carne",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pollo al forno con senape e miele",
+    "Carne",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Straccetti di manzo ai funghi",
+    "Carne",
+    "😐",
+    "30 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno"
+   ],
+   [
+    "Straccetti di manzo al balsamico",
+    "Carne",
+    "❤️",
+    "≤25 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Tagliata di manzo con rucola, grana e pomodorini",
+    "Carne",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Meglio fresca",
+    "Estate"
+   ],
+   [
+    "Hamburger fatti in casa",
+    "Carne",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpette in bianco",
+    "Carne",
+    "😐",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpette alla pizzaiola",
+    "Carne",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Involtini alla siciliana",
+    "Carne",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Salsiccia e friarielli",
+    "Carne",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Salsiccia al sugo + polenta/pane",
+    "Carne",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Maiale in agrodolce con mele/cipolle",
+    "Carne",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Lonza di maiale al forno con mele e rosmarino",
+    "Carne",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Costine al forno",
+    "Carne/progetto",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Ossobuco alla milanese + risotto allo zafferano",
+    "Carne/progetto",
+    "😐",
+    "Progetto",
+    "Weekend",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Gateau di patate",
+    "Piatto rustico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Torta salata patate e speck",
+    "Piatto rustico",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Torta salata ricotta e spinaci",
+    "Piatto rustico",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Sformato di verdure e formaggio",
+    "Piatto rustico",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpettone ripieno",
+    "Carne/progetto",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpettone al sugo",
+    "Carne",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Patate ripiene al forno",
+    "Piatto rustico",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Patate alla pizzaiola",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Uova al forno con patate e mozzarella",
+    "Piatto rustico",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pizzaiola",
+    "Carne",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Melanzane alla pizzaiola",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Melanzane ripiene alla calabrese",
+    "Verdure",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Zucchine alla scapece",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "Riposo consigliato",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Zucchine ripiene di ricotta e parmigiano",
+    "Verdure",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Peperoni gratinati con pangrattato, olive e capperi",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Peperoni con mollica e acciughe",
+    "Verdure",
+    "😐",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Caponata siciliana",
+    "Verdure",
+    "❤️",
+    "45–60 min",
+    "Riposo consigliato",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Ratatouille",
+    "Verdure",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Patate e peperoni in padella",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Patate al forno schiacciate con rosmarino e parmigiano",
+    "Verdure",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Carciofi alla romana",
+    "Verdure",
+    "😐",
+    "30–45 min",
+    "Pulizia carciofi",
+    "No",
+    "Sì",
+    "Inverno/Primavera"
+   ],
+   [
+    "Carciofi ripieni",
+    "Verdure",
+    "😐",
+    "45–60 min",
+    "Pulizia carciofi",
+    "Sì",
+    "Sì",
+    "Inverno/Primavera"
+   ],
+   [
+    "Fagiolini al pomodoro",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Piselli al prosciutto",
+    "Verdure",
+    "❤️",
+    "≤30 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Primavera"
+   ],
+   [
+    "Spinaci al burro e parmigiano",
+    "Verdure",
+    "❤️",
+    "≤20 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Bietole gratinate",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Broccoli gratinati con besciamella",
+    "Verdure",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Cavolfiore alla pizzaiola",
+    "Verdure",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pomodori gratinati",
+    "Verdure",
+    "❤️",
+    "30–40 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pomodori ripieni di riso",
+    "Piatto rustico",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta alla carrettiera",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta con salsiccia e funghi",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno"
+   ],
+   [
+    "Pasta salsiccia e broccoli",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta con zucchine e speck",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta con melanzane e ricotta salata",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta con ricotta, spinaci e parmigiano",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta con crema di peperoni",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta con peperoni e salsiccia",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta con patate",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta e patate con provola",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta con fagiolini, patate e pesto",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta al forno bianca con besciamella, prosciutto e mozzarella",
+    "Primo",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Cannelloni di carne",
+    "Primo/progetto",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Timballo di pasta",
+    "Primo/progetto",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta gratinata con verdure e formaggio",
+    "Primo",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Risotto ai funghi",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno"
+   ],
+   [
+    "Risotto alla milanese",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Risotto radicchio e taleggio",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Risotto zucchine e speck",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Risotto salsiccia e rosmarino",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Gnocchi al forno con pomodoro e mozzarella",
+    "Primo",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta e patate",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Riso al forno con mozzarella, pomodoro e carne",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Riso al forno con verdure e formaggio",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Gnocchi alla sorrentina",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Gnocchi al ragù",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "Ragù pronto utile",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Gnocchi gorgonzola e noci",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Meglio fresca",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta con patate e pancetta",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta con zucca e salsiccia",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta con zucca e taleggio",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta con broccoli e salsiccia",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta con cavolfiore, acciughe e pangrattato",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Pasta con ricotta e pomodoro",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta con crema di melanzane e mozzarella",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta con stracchino e zucchine",
+    "Primo",
+    "❤️",
+    "≤30 min",
+    "No",
+    "No",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Risotto zucca e taleggio",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Risotto pere e taleggio",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Risotto salsiccia e funghi",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno"
+   ],
+   [
+    "Risotto radicchio e salsiccia",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Risotto ai quattro formaggi",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "No",
+    "Meglio fresca",
+    "Tutto l'anno"
+   ],
+   [
+    "Polenta con ragù",
+    "Piatto unico",
+    "❤️",
+    "30–45 min",
+    "Ragù pronto utile",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Polenta con salsiccia e funghi",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Polenta con gorgonzola e speck",
+    "Piatto unico",
+    "❤️",
+    "30 min",
+    "No",
+    "No",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Polenta con brasato",
+    "Piatto unico",
+    "❤️",
+    "Progetto",
+    "Brasato pronto",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Polenta pasticciata al forno",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Teglia di patate, salsiccia e verdure",
+    "Piatto unico",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Teglia di pollo, patate e peperoni",
+    "Piatto unico",
+    "❤️",
+    "45–60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate/Autunno"
+   ],
+   [
+    "Parmigiana di zucchine",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Parmigiana di patate",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Torta di patate e carne",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Moussaka italiana di melanzane e carne",
+    "Piatto unico",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Estate"
+   ],
+   [
+    "Pasta e zucca",
+    "Primo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Vellutata di zucca + crostini + formaggio",
+    "Piatto caldo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Zuppa di patate, porri e parmigiano",
+    "Piatto caldo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Zuppa di ceci e zucca",
+    "Legumi",
+    "❤️",
+    "45–60 min",
+    "Ceci in ammollo",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Zuppa di lenticchie e patate",
+    "Legumi",
+    "❤️",
+    "30–45 min",
+    "No/variabile",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Minestrone ricco con legumi",
+    "Legumi",
+    "❤️",
+    "45–60 min",
+    "Variabile",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Polenta e funghi",
+    "Piatto caldo",
+    "❤️",
+    "30–45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Autunno/Inverno"
+   ],
+   [
+    "Salmone in crosta",
+    "Pesce",
+    "❤️",
+    "45 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Salmone con patate al forno",
+    "Pesce",
+    "❤️",
+    "45 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Salmone gratinato con pangrattato, prezzemolo e limone",
+    "Pesce",
+    "❤️",
+    "30–40 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Merluzzo alla mediterranea",
+    "Pesce",
+    "😐",
+    "30–40 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Merluzzo gratinato con patate",
+    "Pesce",
+    "❤️",
+    "45 min",
+    "No",
+    "No",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Polpette di tonno, ricotta e parmigiano",
+    "Pesce",
+    "❤️",
+    "45 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Gnocchi di patate fatti in casa",
+    "Progetto",
+    "❤️",
+    ">60 min",
+    "Weekend",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pasta fresca fatta in casa",
+    "Progetto",
+    "❤️",
+    ">60 min",
+    "Occasione speciale",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Ravioli/tortelli fatti in casa",
+    "Progetto",
+    "❤️",
+    ">2 ore",
+    "Weekend",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pizza fatta in casa",
+    "Progetto",
+    "❤️",
+    ">60 min",
+    "Lievitazione",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Focaccia",
+    "Progetto",
+    "❤️",
+    ">60 min",
+    "Lievitazione",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Arancini",
+    "Progetto",
+    "❤️",
+    ">60 min",
+    "Meglio preparazioni già pronte",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Olive all'ascolana",
+    "Progetto",
+    "❤️",
+    ">60 min",
+    "No",
+    "Sì",
+    "Sì",
+    "Tutto l'anno"
+   ],
+   [
+    "Pollo fritto",
+    "Progetto",
+    "❤️",
+    "30–60 min",
+    "No",
+    "No",
+    "Meglio fresco",
+    "Tutto l'anno"
+   ],
+   [
+    "Verdure in pastella",
+    "Progetto",
+    "❤️",
+    "30–60 min",
+    "No",
+    "No",
+    "Meglio fresco",
+    "Tutto l'anno"
+   ]
+  ]
+ },
+ "Settimana 1": {
+  "header": [
+   "Giorno",
+   "Cena",
+   "Tempo",
+   "Da ricordare prima",
+   "Pranzo Mara",
+   "Nota"
+  ],
+  "rows": [
+   [
+    "Lunedì",
+    "Pasta alla Norma + insalata",
+    "~40 min",
+    "Dopo cena: mettere i ceci in ammollo",
+    "Possibile avanzo",
+    "Cena estiva"
+   ],
+   [
+    "Martedì",
+    "Pasta e ceci + verdura",
+    "~45–60 min",
+    "Usare ceci ammollati",
+    "Avanzo per mercoledì",
+    "Fare più porzioni; eventuale extra freezer"
+   ],
+   [
+    "Mercoledì",
+    "Salmone gratinato + zucchine + patate",
+    "~40 min",
+    "Niente",
+    "Eventuale avanzo",
+    "Cena semplice"
+   ],
+   [
+    "Giovedì",
+    "Straccetti di manzo al balsamico + peperoni + pane",
+    "~25 min",
+    "Niente",
+    "Se avanzano",
+    "Serata rapida"
+   ],
+   [
+    "Venerdì",
+    "Pollo alla senape e miele + patate al forno + insalata",
+    "~45 min",
+    "Niente",
+    "Avanzo sabato",
+    "Fare più pollo"
+   ],
+   [
+    "Sabato",
+    "Pizza fatta in casa",
+    "Variabile",
+    "Preparare impasto secondo lievitazione scelta",
+    "—",
+    "Progetto del weekend"
+   ],
+   [
+    "Domenica",
+    "Parmigiana di melanzane + insalata",
+    ">60 min",
+    "Valutare teglia abbondante",
+    "Avanzo per lunedì",
+    "Perfetta per freezer"
+   ]
+  ]
+ },
+ "Spesa settimana 1": {
+  "header": [
+   "Dove",
+   "Ingrediente",
+   "Da controllare/comprare",
+   "Per cosa",
+   "Note"
+  ],
+  "rows": [
+   [
+    "Rossetto",
+    "Melanzane",
+    "6–8 medie",
+    "Norma + parmigiana",
+    null
+   ],
+   [
+    "Rossetto",
+    "Zucchine",
+    "5–6",
+    "Salmone/contorni",
+    null
+   ],
+   [
+    "Rossetto",
+    "Peperoni",
+    "3–4",
+    "Straccetti",
+    null
+   ],
+   [
+    "Rossetto",
+    "Patate",
+    "1,5–2 kg",
+    "Salmone + pollo",
+    null
+   ],
+   [
+    "Rossetto",
+    "Insalata",
+    "2 acquisti/cespi",
+    "Contorni",
+    "Ste la vuole spesso"
+   ],
+   [
+    "Rossetto",
+    "Pomodori/passata",
+    "Controllare scorta",
+    "Norma + parmigiana",
+    null
+   ],
+   [
+    "Rossetto",
+    "Basilico",
+    "1 mazzetto",
+    "Norma",
+    null
+   ],
+   [
+    "Rossetto",
+    "Salmone",
+    "2 tranci",
+    "Mercoledì",
+    null
+   ],
+   [
+    "Rossetto",
+    "Manzo per straccetti",
+    "Per 2 + eventuale avanzo",
+    "Giovedì",
+    null
+   ],
+   [
+    "Rossetto",
+    "Pollo",
+    "Per 4 porzioni circa",
+    "Venerdì + pranzo",
+    null
+   ],
+   [
+    "Rossetto",
+    "Mozzarella",
+    "Per parmigiana",
+    "Domenica",
+    null
+   ],
+   [
+    "Rossetto",
+    "Ricotta salata",
+    "1 pezzo",
+    "Norma",
+    null
+   ],
+   [
+    "Rossetto",
+    "Ceci secchi",
+    "Controllare scorta",
+    "Martedì",
+    "Ammollo lunedì"
+   ],
+   [
+    "Rossetto",
+    "Pangrattato",
+    "Controllare scorta",
+    "Salmone/parmigiana",
+    null
+   ],
+   [
+    "Rossetto",
+    "Farina e lievito",
+    "Controllare scorta",
+    "Pizza",
+    null
+   ],
+   [
+    "Rossetto",
+    "Senape e miele",
+    "Controllare scorta",
+    "Pollo",
+    null
+   ],
+   [
+    "Rossetto",
+    "Aceto balsamico",
+    "Controllare scorta",
+    "Straccetti",
+    null
+   ],
+   [
+    "Fruttivendolo",
+    "Frutta e verdura di stagione",
+    "Secondo consumo",
+    "Scorta weekend",
+    null
+   ],
+   [
+    "Conad",
+    "Piccole integrazioni",
+    "Solo se serve",
+    "Emergenze",
+    null
+   ]
+  ]
+ },
+ "Dispensa": {
+  "header": [
+   "Categoria",
+   "Elemento",
+   "Situazione attuale"
+  ],
+  "rows": [
+   [
+    "Base",
+    "Pasta",
+    "Normalmente presente"
+   ],
+   [
+    "Base",
+    "Riso",
+    "Normalmente presente"
+   ],
+   [
+    "Base",
+    "Farina",
+    "Normalmente presente"
+   ],
+   [
+    "Conserve",
+    "Passata",
+    "Normalmente presente"
+   ],
+   [
+    "Legumi",
+    "Legumi secchi da ammollo",
+    "Normalmente presenti"
+   ],
+   [
+    "Condimenti",
+    "Pesto",
+    "Comprato"
+   ],
+   [
+    "Conserve",
+    "Tonno",
+    "Normalmente presente"
+   ],
+   [
+    "Condimenti",
+    "Spezie",
+    "Normalmente presenti"
+   ],
+   [
+    "Latticini",
+    "Latte",
+    "Normalmente presente"
+   ],
+   [
+    "Brodo",
+    "Dadi",
+    "Comprati"
+   ],
+   [
+    "Condimenti",
+    "Olive",
+    "Normalmente presenti"
+   ],
+   [
+    "Condimenti",
+    "Capperi",
+    "Normalmente presenti"
+   ],
+   [
+    "Condimenti",
+    "Aceto",
+    "Normalmente presente"
+   ],
+   [
+    "Comprato",
+    "Pane",
+    "Comprato"
+   ],
+   [
+    "Comprato",
+    "Sugo cacio e pepe",
+    "Comprato"
+   ],
+   [
+    "Comprato",
+    "Pasta sfoglia/brisé",
+    "Comprata quando serve"
+   ],
+   [
+    "Comprato",
+    "Salse",
+    "Comprate"
+   ],
+   [
+    "Comprato",
+    "Marmellate",
+    "Comprate"
+   ],
+   [
+    "Fatto in casa",
+    "Ragù",
+    "Autoprodotto"
+   ],
+   [
+    "Fatto in casa",
+    "Pasta fresca",
+    "Solo soprattutto Natale/Pasqua"
+   ],
+   [
+    "Fatto in casa",
+    "Torte dolci",
+    "Autoprodotte"
+   ],
+   [
+    "Fatto in casa",
+    "Pasta frolla",
+    "A volte autoprodotta"
+   ]
+  ]
+ },
+ "Freezer": {
+  "header": [
+   "Cassetto",
+   "Contenuto",
+   "Porzioni",
+   "Data congelamento",
+   "Data consigliata consumo",
+   "Note"
+  ],
+  "rows": [
+   [
+    1,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   [
+    2,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   [
+    3,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  ]
+ }
+}
