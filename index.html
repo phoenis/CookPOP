@@ -277,9 +277,9 @@ const GRAD_ORDER = ['preferita','ci-piace','ogni-tanto','da-provare'];
 const ATTREZZ_LABEL = { 'Padella':'Padella', 'Pentola':'Pentola', 'Forno':'Forno', 'Piastra':'Piastra', 'Moulinex':'Moulinex', 'Frullatore':'Frullatore', 'Fritto':'Fritto' };
 const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullatore','Fritto'];
 
-const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro'];
-const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', altro:'Altro' };
-const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🧂', surgelati:'❄️', altro:'🛒' };
+const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','utility','surgelati','altro'];
+const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', utility:'Utility', surgelati:'Surgelati', altro:'Altro' };
+const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', utility:'🧂', surgelati:'❄️', altro:'🛒' };
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer' };
@@ -291,9 +291,14 @@ const DEPT_RULES = [
   ['mozzarella','latticini'], ['ricotta','latticini'], ['parmigiano','latticini'], ['formaggio','latticini'], ['grana','latticini'], ['latte','latticini'], ['burro','latticini'], ['yogurt','latticini'], ['stracchino','latticini'], ['provola','latticini'],
   ['uova','uova'], ['uovo','uova'],
   ['pane','pane'], ['farina','pane'], ['pasta','pane'], ['riso','pane'], ['lievito','pane'],
-  ['senape','dispensa'], ['miele','dispensa'], ['aceto','dispensa'], ['pangrattato','dispensa'], ['olio','dispensa'], ['sale','dispensa'], ['pepe','dispensa'], ['zucchero','dispensa'], ['spezie','dispensa'],
+  // Le voci "peperoncino" e "peperon" (stem di peperone/peperoni) vanno controllate
+  // prima di "pepe", altrimenti "pepe" le intercetta per prima essendo una sua sottostringa.
+  ['peperoncino','utility'], ['peperon','verdura'],
+  ['sale','utility'], ['olio','utility'], ['pepe','utility'], ['aceto','utility'], ['zucchero','utility'], ['spezie','utility'],
+  ['origano','utility'], ['rosmarino','utility'], ['timo','utility'], ['alloro','utility'], ['cannella','utility'], ['paprika','utility'], ['noce moscata','utility'],
+  ['senape','dispensa'], ['miele','dispensa'], ['pangrattato','dispensa'],
   ['surgelat','surgelati'], ['gelato','surgelati'],
-  ['melanzan','verdura'], ['zucchin','verdura'], ['peperon','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
+  ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
 ];
 const STAPLE_KEYWORDS = [
   'olio', 'sale', 'pepe', 'basilico', 'aglio', 'zucchero', 'aceto', 'origano',
