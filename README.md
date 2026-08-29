@@ -36,7 +36,7 @@ reparto), **Prep** (ricettario filtrabile per categoria/tempo/stagione/ecc.),
 
 ## Cosa manca
 
-**81 ricette su 188** non hanno ancora `recipeDetails` (ingredienti precisi,
+**71 ricette su 188** non hanno ancora `recipeDetails` (ingredienti precisi,
 procedimento, tempo esatto, link). Per queste, l'app mostra solo i metadati
 del foglio originale e un avviso "ingredienti non ancora salvati" nella lista
 della spesa.
