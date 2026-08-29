@@ -312,6 +312,23 @@ const firebaseReady = (async ()=>{
   }
 })();
 
+// Firebase Realtime Database vieta "." "#" "$" "/" "[" "]" nelle chiavi, ma
+// alcuni nomi di ricetta le contengono (es. "Orata/branzino al forno con
+// patate", usato come chiave in recipeIngredients): le codifichiamo solo nel
+// payload verso Firebase, lasciando invariato il formato locale/JSON.
+function fbKeyEncode(k){ return k.replace(/[%.#$\/\[\]]/g, c => '%'+c.charCodeAt(0).toString(16).padStart(2,'0')); }
+function fbKeyDecode(k){ return k.replace(/%([0-9a-fA-F]{2})/g, (_,h) => String.fromCharCode(parseInt(h,16))); }
+function encodeKeysForFirebase(obj){
+  const out = {};
+  for(const k in obj) out[fbKeyEncode(k)] = obj[k];
+  return out;
+}
+function decodeKeysFromFirebase(obj){
+  const out = {};
+  for(const k in obj) out[fbKeyDecode(k)] = obj[k];
+  return out;
+}
+
 async function loadState(){
   // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
   try{
@@ -330,6 +347,7 @@ async function loadState(){
     let done = false;
     window.cookpopSync.onChange((saved)=>{
       if(saved){
+        if(saved.recipeIngredients) saved.recipeIngredients = decodeKeysFromFirebase(saved.recipeIngredients);
         Object.assign(state, saved);
         if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
         try{ localStorage.setItem('quaderno-state', JSON.stringify(saved)); }catch(e){}
@@ -357,7 +375,10 @@ function persist(){
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
     try{
       await firebaseReady;
-      if(window.cookpopSync) await window.cookpopSync.save(payload);
+      if(window.cookpopSync){
+        const fbPayload = { ...payload, recipeIngredients: encodeKeysForFirebase(payload.recipeIngredients) };
+        await window.cookpopSync.save(fbPayload);
+      }
       const hint = document.querySelector('.save-hint');
       if(hint){ hint.textContent = 'salvato ✓'; setTimeout(()=>{ if(hint) hint.textContent=''; }, 1500); }
     }catch(e){ console.error('Errore salvataggio', e); }
