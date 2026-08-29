@@ -284,47 +284,80 @@ const state = {
   filters: { cat:'', tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' }
 };
 
-if(!window.storage){
-  // Fallback per l'uso fuori dal sandbox degli artifact Claude.ai (es. GitHub Pages),
-  // dove window.storage non esiste: stessa interfaccia, backend su localStorage.
-  window.storage = {
-    async get(key){
-      try{
-        const v = localStorage.getItem(key);
-        return v===null ? null : {value:v};
-      }catch(e){ return null; }
-    },
-    async set(key, value){
-      try{ localStorage.setItem(key, value); }catch(e){}
-    }
-  };
-}
+// Sincronizzazione condivisa via Firebase Realtime Database: chiunque apra la
+// pagina legge/scrive lo stesso stato, con aggiornamenti in tempo reale tra
+// dispositivi diversi. Import dinamico per restare in un unico <script> classico.
+const firebaseReady = (async ()=>{
+  try{
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js");
+    const { getDatabase, ref, set: fbSet, onValue } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js");
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVlyYgyJ1rTtyitMc3xoNhvBm3HPpC0g8",
+      authDomain: "cookpop-c91d6.firebaseapp.com",
+      databaseURL: "https://cookpop-c91d6-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "cookpop-c91d6",
+      storageBucket: "cookpop-c91d6.firebasestorage.app",
+      messagingSenderId: "384434265113",
+      appId: "1:384434265113:web:63e745711537a29f885e88"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const stateRef = ref(db, 'quaderno-state');
+    window.cookpopSync = {
+      save(data){ return fbSet(stateRef, data); },
+      onChange(cb){ onValue(stateRef, (snap)=>cb(snap.val())); }
+    };
+  }catch(e){
+    console.error('Firebase non disponibile: nessuna sincronizzazione tra dispositivi, uso solo il salvataggio locale', e);
+  }
+})();
 
 async function loadState(){
+  // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
   try{
-    const r = await window.storage.get('quaderno-state');
-    if(r && r.value){
-      const saved = JSON.parse(r.value);
+    const cached = localStorage.getItem('quaderno-state');
+    if(cached){
+      const saved = JSON.parse(cached);
       Object.assign(state, saved);
       if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
     }
   }catch(e){ /* nessuno stato salvato ancora */ }
+
+  await firebaseReady;
+  if(!window.cookpopSync) return;
+
+  await new Promise((resolve)=>{
+    let done = false;
+    window.cookpopSync.onChange((saved)=>{
+      if(saved){
+        Object.assign(state, saved);
+        if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
+        try{ localStorage.setItem('quaderno-state', JSON.stringify(saved)); }catch(e){}
+      }
+      render();
+      if(!done){ done = true; resolve(); }
+    });
+    setTimeout(()=>{ if(!done){ done = true; resolve(); } }, 2500);
+  });
 }
 let saveTimeout=null;
 function persist(){
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async ()=>{
+    const payload = {
+      shopChecked: state.shopChecked,
+      pantryChecked: state.pantryChecked,
+      shopView: state.shopView,
+      weekOverrides: state.weekOverrides,
+      weekBaseline: state.weekBaseline,
+      appliedForcedWeekVersion: state.appliedForcedWeekVersion,
+      freezer: state.freezer,
+      recipeIngredients: state.recipeIngredients
+    };
+    try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
     try{
-      await window.storage.set('quaderno-state', JSON.stringify({
-        shopChecked: state.shopChecked,
-        pantryChecked: state.pantryChecked,
-        shopView: state.shopView,
-        weekOverrides: state.weekOverrides,
-        weekBaseline: state.weekBaseline,
-        appliedForcedWeekVersion: state.appliedForcedWeekVersion,
-        freezer: state.freezer,
-        recipeIngredients: state.recipeIngredients
-      }));
+      await firebaseReady;
+      if(window.cookpopSync) await window.cookpopSync.save(payload);
       const hint = document.querySelector('.save-hint');
       if(hint){ hint.textContent = 'salvato ✓'; setTimeout(()=>{ if(hint) hint.textContent=''; }, 1500); }
     }catch(e){ console.error('Errore salvataggio', e); }

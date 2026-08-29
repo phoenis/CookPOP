@@ -1,7 +1,7 @@
 # Quaderno della Cucina — Mara & Ste
 
 App web a file singolo (`index.html`) per la pianificazione settimanale dei pasti.
-Nessuna build, nessuna dipendenza esterna: si apre e basta.
+Nessuna build: si apre e basta. Online su https://phoenis.github.io/CookPOP/
 
 ## Come funziona
 
@@ -9,8 +9,14 @@ Tutto — dati e logica — vive in `index.html`:
 - Un oggetto `DATA` con 188 ricette (catalogo estratto da un file Excel originale),
   di cui **106 già "curate"** con ingredienti reali, procedimento, tempi e link
   (vedi `DATA.recipeDetails`).
-- Persistenza lato utente tramite `window.storage` (menù della settimana, spesa
-  spuntata, inventario freezer, ecc. — vive nel browser, non in questo repo).
+- Persistenza condivisa su Firebase Realtime Database (menù della settimana,
+  spesa spuntata, inventario freezer, ecc.): chi apre la pagina legge/scrive lo
+  stesso stato, con aggiornamenti in tempo reale su tutti i dispositivi. La
+  configurazione Firebase (progetto `cookpop-c91d6`) è incorporata in
+  `index.html`; le regole del Realtime Database consentono lettura/scrittura
+  solo sul path `quaderno-state`, tutto il resto è bloccato. Se Firebase non è
+  raggiungibile (rete assente), l'app resta funzionante in locale su
+  `localStorage` come cache/fallback.
 
 Le 4 tab dell'app: **Menù** (settimana corrente + generatore automatico),
 **Spesa** (lista aggiornata in automatico in base al menù, per giorno o per
