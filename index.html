@@ -153,16 +153,17 @@
 
   .inv-item{ display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px dashed var(--line); }
   .inv-item .inv-name{ flex:1; font-size:13.5px; }
-  .inv-luogo{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:13px; line-height:1; cursor:pointer; }
-  .inv-luogo:hover{ background:rgba(124,139,111,0.14); }
+  .inv-luogo{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:none; background:transparent; font-size:13px; line-height:1; cursor:pointer; }
+  .inv-luogo:hover{ opacity:0.65; }
   .qty-stepper{ flex-shrink:0; display:flex; align-items:center; gap:4px; }
   .qty-btn{ width:24px; height:24px; border-radius:50%; border:1px solid var(--line); background:#fff; color:var(--green-deep); font-size:14px; line-height:1; cursor:pointer; }
   .qty-btn:hover{ background:rgba(124,139,111,0.14); }
   .qty-num{ display:inline-block; min-width:22px; text-align:center; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:600; color:var(--ink); cursor:text; }
   .qty-input{ width:44px; font-family:'JetBrains Mono', monospace; font-size:13px; text-align:center; padding:3px 2px; border-radius:6px; border:1px solid var(--gold); background:#fff; color:var(--ink); -moz-appearance:textfield; appearance:textfield; }
   .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
-  .inv-remove{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:12px; line-height:1; cursor:pointer; }
-  .inv-remove:hover{ background:rgba(179,58,58,0.1); }
+  .inv-remove{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:var(--tomato); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
+  .inv-remove svg{ width:16px; height:16px; }
+  .inv-remove:hover{ opacity:0.7; }
   .inv-add-row{ display:flex; gap:6px; margin-top:12px; }
   .inv-add-row input, .inv-add-row select{ font-family:'Inter',sans-serif; font-size:13px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); }
   .inv-add-row input#inv-add-name{ flex:1; min-width:0; }
@@ -1089,7 +1090,7 @@ function renderDispensa(){
           : `<span class="qty-num" data-qty-show="${escapeAttr(it.key)}">${it.qty}</span>`}
         <button class="qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
       </span>
-      <button class="inv-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}">🗑️</button>
+      <button class="inv-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
 
