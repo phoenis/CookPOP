@@ -160,13 +160,6 @@
   .inv-add-row input#inv-add-qta{ flex:1; min-width:0; }
   .inv-add-row button{ flex-shrink:0; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; padding:8px 12px; border-radius:8px; border:none; background:var(--green-mid); color:#fff; cursor:pointer; }
   .inv-add-row button:hover{ background:var(--green-deep); }
-  .freezer-drawers{ display:grid; grid-template-columns:1fr; gap:12px; margin-top:6px;}
-  .drawer{ border:1px solid var(--line); border-radius:12px; padding:14px; background:linear-gradient(180deg, #fffdf8 0%, #f6efdd 100%); position:relative; }
-  .drawer::before{ content:''; position:absolute; top:0; left:14px; right:14px; height:3px; background:var(--green-mid); border-radius:0 0 4px 4px; }
-  .drawer-title{ font-family:'Fraunces', serif; font-weight:700; font-size:15px; color:var(--green-deep); margin-bottom:8px; }
-  .drawer input{ width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:6px 8px; border-radius:7px; border:1px solid var(--line); margin-bottom:6px; background:#fff; }
-  .drawer .row2{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-  .drawer label{ font-family:'JetBrains Mono', monospace; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--sage); display:block; margin-bottom:2px; }
   .save-hint{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--sage); text-align:right; min-height:14px; }
   footer.credit{ text-align:center; color:rgba(245,239,225,0.35); font-family:'JetBrains Mono', monospace; font-size:10.5px; margin-top:28px; letter-spacing:0.05em; }
   .generate-week-block{ margin-top:20px; padding-top:18px; border-top:1px solid var(--line); text-align:center; }
@@ -320,6 +313,17 @@ function upsertPantryItem(nome, qta){
   state.pantryItems[key] = { nome: trimmedName, qta: trimmedQta || (existing ? existing.qta : '') };
 }
 
+// Freezer trattato come la dispensa: stessa lista libera nome+quantità,
+// niente più cassetti fissi.
+function upsertFreezerItem(nome, qta){
+  const trimmedName = (nome||'').trim();
+  if(!trimmedName) return;
+  const key = trimmedName.toLowerCase();
+  const existing = state.freezerItems[key];
+  const trimmedQta = (qta||'').trim();
+  state.freezerItems[key] = { nome: trimmedName, qta: trimmedQta || (existing ? existing.qta : '') };
+}
+
 function classifyDept(ingrediente){
   const s = (ingrediente||'').toLowerCase();
   for(const [kw, dept] of DEPT_RULES){ if(s.includes(kw)) return dept; }
@@ -344,9 +348,10 @@ const state = {
   pantryChecked: {},
   pantryItems: {},
   pantrySeeded: false,
+  freezerItems: {},
+  freezerSeeded: false,
   weekOverrides: {},
   weekBaseline: null,
-  freezer: {1:{},2:{},3:{}},
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   expandedDay: null,
   expandedRecipe: null,
@@ -464,9 +469,11 @@ async function loadState(){
       if(saved){
         if(saved.recipeIngredients) saved.recipeIngredients = decodeKeysFromFirebase(saved.recipeIngredients);
         if(saved.pantryItems) saved.pantryItems = decodeKeysFromFirebase(saved.pantryItems);
+        if(saved.freezerItems) saved.freezerItems = decodeKeysFromFirebase(saved.freezerItems);
         Object.assign(state, saved);
         if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
         if(saved.pantryItems) state.pantryItems = saved.pantryItems;
+        if(saved.freezerItems) state.freezerItems = saved.freezerItems;
         try{ localStorage.setItem('quaderno-state', JSON.stringify(saved)); }catch(e){}
       }
       render();
@@ -486,10 +493,11 @@ function persist(){
       weekOverrides: state.weekOverrides,
       weekBaseline: state.weekBaseline,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
-      freezer: state.freezer,
       recipeIngredients: state.recipeIngredients,
       pantryItems: state.pantryItems,
-      pantrySeeded: state.pantrySeeded
+      pantrySeeded: state.pantrySeeded,
+      freezerItems: state.freezerItems,
+      freezerSeeded: state.freezerSeeded
     };
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
     try{
@@ -501,7 +509,8 @@ function persist(){
         const fbPayload = JSON.parse(JSON.stringify({
           ...payload,
           recipeIngredients: encodeKeysForFirebase(payload.recipeIngredients),
-          pantryItems: encodeKeysForFirebase(payload.pantryItems)
+          pantryItems: encodeKeysForFirebase(payload.pantryItems),
+          freezerItems: encodeKeysForFirebase(payload.freezerItems)
         }));
         await window.cookpopSync.save(fbPayload);
       }
@@ -1049,21 +1058,14 @@ function renderDispensa(){
       <button class="inv-remove" data-inv-remove="${escapeAttr(key)}" type="button" aria-label="Rimuovi ${escapeAttr(it.nome)}">✕</button>
     </div>`).join('') : `<p class="ing-empty">Vuota per ora — spunta qualcosa in Spesa o aggiungilo qui sotto.</p>`;
 
-  const drawersHtml = [1,2,3].map(n=>{
-    const d = state.freezer[n] || {};
-    return `
-    <div class="drawer">
-      <div class="drawer-title">Cassetto ${n}</div>
-      <label>Contenuto</label>
-      <input type="text" data-drawer="${n}" data-field="contenuto" value="${escapeAttr(d.contenuto||'')}" placeholder="es. Ragù, Pollo alla cacciatora…">
-      <div class="row2">
-        <div><label>Porzioni</label><input type="text" data-drawer="${n}" data-field="porzioni" value="${escapeAttr(d.porzioni||'')}" placeholder="es. 2"></div>
-        <div><label>Congelato il</label><input type="text" data-drawer="${n}" data-field="dataCong" value="${escapeAttr(d.dataCong||'')}" placeholder="gg/mm"></div>
-      </div>
-      <label>Note</label>
-      <input type="text" data-drawer="${n}" data-field="note" value="${escapeAttr(d.note||'')}" placeholder="es. consumare entro fine mese">
-    </div>`;
-  }).join('');
+  const freezerList = Object.entries(state.freezerItems).sort((a,b)=> a[1].nome.localeCompare(b[1].nome, 'it'));
+  const freezerHtml = freezerList.length ? freezerList.map(([key, it])=>`
+    <div class="inv-item">
+      <span class="inv-name">${escapeHtml(it.nome)}</span>
+      <input type="text" class="inv-qta" value="${escapeAttr(it.qta||'')}" placeholder="quantità" data-freezer-key="${escapeAttr(key)}">
+      <button class="inv-remove" data-freezer-remove="${escapeAttr(key)}" type="button" aria-label="Rimuovi ${escapeAttr(it.nome)}">✕</button>
+    </div>`).join('') : `<p class="ing-empty">Vuoto per ora — aggiungi qualcosa qui sotto.</p>`;
+
   return `
     <h2 class="section-title">Dispensa</h2>
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
@@ -1074,8 +1076,13 @@ function renderDispensa(){
       <button id="inv-add-btn" type="button">+ Aggiungi</button>
     </div>
     <h2 class="section-title" style="margin-top:26px;">Freezer</h2>
-    <p class="section-sub">3 cassetti — inventario semplice, sempre aggiornato</p>
-    <div class="freezer-drawers">${drawersHtml}</div>
+    <p class="section-sub">Stessa idea della dispensa — aggiungi o togli quello che congeli e scongeli</p>
+    ${freezerHtml}
+    <div class="inv-add-row">
+      <input type="text" id="freezer-add-name" placeholder="Nuovo elemento">
+      <input type="text" id="freezer-add-qta" placeholder="Quantità">
+      <button id="freezer-add-btn" type="button">+ Aggiungi</button>
+    </div>
     <div class="save-hint"></div>
   `;
 }
@@ -1227,16 +1234,7 @@ function attachHandlers(){
     if(el) el.addEventListener('change', e=>{ state.filters[key] = e.target.value; render(); });
   });
 
-  document.querySelectorAll('.drawer input').forEach(inp=>{
-    inp.addEventListener('input', e=>{
-      const n = e.target.dataset.drawer, field = e.target.dataset.field;
-      if(!state.freezer[n]) state.freezer[n] = {};
-      state.freezer[n][field] = e.target.value;
-      persist();
-    });
-  });
-
-  document.querySelectorAll('.inv-qta').forEach(inp=>{
+  document.querySelectorAll('[data-inv-key]').forEach(inp=>{
     inp.addEventListener('change', e=>{
       const key = e.target.dataset.invKey;
       if(state.pantryItems[key]){
@@ -1265,6 +1263,36 @@ function attachHandlers(){
       inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
     });
   }
+
+  document.querySelectorAll('[data-freezer-key]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const key = e.target.dataset.freezerKey;
+      if(state.freezerItems[key]){
+        state.freezerItems[key].qta = e.target.value.trim();
+        persist();
+      }
+    });
+  });
+  document.querySelectorAll('[data-freezer-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      delete state.freezerItems[e.currentTarget.dataset.freezerRemove];
+      persist(); render();
+    });
+  });
+  const freezerAddBtn = document.getElementById('freezer-add-btn');
+  if(freezerAddBtn){
+    const nameInput = document.getElementById('freezer-add-name');
+    const qtaInput = document.getElementById('freezer-add-qta');
+    const doAdd = ()=>{
+      if(!nameInput.value.trim()) return;
+      upsertFreezerItem(nameInput.value, qtaInput.value);
+      persist(); render();
+    };
+    freezerAddBtn.addEventListener('click', doAdd);
+    [nameInput, qtaInput].forEach(inp=>{
+      inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
+    });
+  }
 }
 
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
@@ -1287,6 +1315,21 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
   if(!state.pantrySeeded){
     DATA.pantry.forEach(p=> upsertPantryItem(p.elemento, ''));
     state.pantrySeeded = true;
+    persist();
+  }
+  // Una tantum: porta il contenuto dei vecchi 3 cassetti fissi nella nuova
+  // lista libera del freezer, comprimendo porzioni/data/note in un'unica
+  // quantità testuale così non si perde nulla.
+  if(!state.freezerSeeded){
+    if(state.freezer){
+      Object.values(state.freezer).forEach(d=>{
+        if(d && d.contenuto && d.contenuto.trim()){
+          const extra = [d.porzioni, d.dataCong && `congelato ${d.dataCong}`, d.note].filter(Boolean).join(' · ');
+          upsertFreezerItem(d.contenuto, extra);
+        }
+      });
+    }
+    state.freezerSeeded = true;
     persist();
   }
   render();
