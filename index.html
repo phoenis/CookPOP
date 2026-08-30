@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quaderno Cucina">
 <title>Quaderno della Cucina — Mara & Ste</title>
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
@@ -148,6 +152,8 @@
   .tag.tempo{ background:rgba(42,36,32,0.08); color:var(--ink); opacity:0.75; }
   .heart{ font-size:18px; flex-shrink:0; }
   .cat-icon{ font-size:20px; flex-shrink:0; }
+  .recipe-card-side{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
+  .recipe-time{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--ink); opacity:0.75; background:rgba(42,36,32,0.08); padding:2px 8px; border-radius:20px; white-space:nowrap; }
   .recipe-list{ display:grid; grid-template-columns:1fr; gap:8px; }
   .recipe-list .recipe-card-wrap .detail-box{ margin-top:-2px; margin-bottom:0; border-top-left-radius:0; border-top-right-radius:0; }
 
@@ -257,6 +263,8 @@ function catIcon(cat){ return CAT_ICON[cat] || '🍽️'; }
 const CAT_ORDER = ['pasta','riso','carne','pesce','legumi','uova','verdure','forno'];
 
 const TEMPO_LABEL = { 'express':'⚡ Express — fino a 20 min', 'veloce':'🟢 Veloce — 20–30 min', 'normale':'🟡 Normale — 30–45 min', 'lunga':'🟠 Lunga — 45–90 min', 'progetto':'🔴 Progetto — oltre 90 min' };
+const TEMPO_DOT = { 'express':'⚡', 'veloce':'🟢', 'normale':'🟡', 'lunga':'🟠', 'progetto':'🔴' };
+const TEMPO_DURATION = { 'express':'fino a 20 min', 'veloce':'20–30 min', 'normale':'30–45 min', 'lunga':'45–90 min', 'progetto':'oltre 90 min' };
 const TEMPO_ORDER = ['express','veloce','normale','lunga','progetto'];
 
 const PIAN_LABEL = { 'nessuna':'Nessuna', 'ammollo':'Ammollo', 'scongelamento':'Scongelamento', 'marinatura':'Marinatura', 'impasto-lievitazione':'Impasto / lievitazione', 'prep-anticipata':'Preparazione anticipata' };
@@ -395,6 +403,20 @@ const state = {
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
   filters: { cat:'', tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' }
 };
+
+// Le 4 tab vivono anche come "pagine" via anchor (#menu/#spesa/#prep/#dispensa):
+// un reload o il tasto indietro del browser restano sulla tab corrente invece
+// di tornare sempre a Menù.
+const TAB_KEYS = ['menu', 'spesa', 'prep', 'dispensa'];
+function tabFromHash(){
+  const h = window.location.hash.replace('#', '');
+  return TAB_KEYS.includes(h) ? h : 'menu';
+}
+state.tab = tabFromHash();
+window.addEventListener('hashchange', ()=>{
+  const next = tabFromHash();
+  if(next !== state.tab){ state.tab = next; render(); }
+});
 
 // Sincronizzazione condivisa via Firebase Realtime Database: chiunque apra la
 // pagina legge/scrive lo stesso stato, con aggiornamenti in tempo reale tra
@@ -995,14 +1017,16 @@ function renderPrep(){
         <div>
           <div class="recipe-name">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento">📖</span>' : ''}</div>
           <div class="recipe-tags">
-            <span class="tag tempo">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
             <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
-            <span class="tag freezer">${escapeHtml(FREEZER_LABEL[r.freezerNew])}</span>
+            ${r.freezerNew !== 'non-adatta' ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[r.freezerNew])}</span>` : ''}
             <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
             ${r.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
           </div>
         </div>
-        <div class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</div>
+        <div class="recipe-card-side">
+          <span class="recipe-time" title="${escapeAttr(TEMPO_LABEL[r.tempoBucket])}">${TEMPO_DOT[r.tempoBucket]} ${escapeHtml(TEMPO_DURATION[r.tempoBucket])}</span>
+          <div class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</div>
+        </div>
       </div>
       ${detail}
     </div>`;
@@ -1380,7 +1404,11 @@ function attachHandlers(){
 }
 
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{ state.tab = btn.dataset.tab; render(); });
+  btn.addEventListener('click', ()=>{
+    state.tab = btn.dataset.tab;
+    window.location.hash = state.tab;
+    render();
+  });
 });
 
 (async function init(){
@@ -1452,7 +1480,18 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
         const regs = await navigator.serviceWorker.getRegistrations();
         await Promise.all(regs.map(r=>r.unregister()));
       }
-    }catch(e){ /* ignora: procedi comunque con il reload forzato */ }
+      // Su iOS, aperta da "Aggiungi a Home", una normale navigazione (anche con
+      // URL diverso) può comunque restituire una copia in cache del sistema.
+      // Un fetch con cache:'no-store' bypassa sempre la rete, senza eccezioni;
+      // riscriviamo poi il documento a mano col markup appena scaricato.
+      const res = await fetch(window.location.pathname + '?_refresh=' + Date.now(), { cache: 'no-store' });
+      if(!res.ok) throw new Error('fetch failed: ' + res.status);
+      const html = await res.text();
+      document.open();
+      document.write(html);
+      document.close();
+      return;
+    }catch(e){ /* ignora: procedi col fallback sotto */ }
     // Cambia l'URL così il browser non può servire la pagina dalla cache HTTP.
     const url = new URL(window.location.href);
     url.searchParams.set('_refresh', Date.now().toString());
