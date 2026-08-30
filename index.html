@@ -158,7 +158,8 @@
   .recipe-list .recipe-card-wrap .detail-box{ margin-top:-2px; margin-bottom:0; border-top-left-radius:0; border-top-right-radius:0; }
 
   .inv-item{ display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px dashed var(--line); position:relative; }
-  .inv-item .inv-name{ flex:1; font-size:13.5px; }
+  .inv-item .inv-name{ flex:1; min-width:0; text-align:left; font-family:'Inter', sans-serif; font-size:13.5px; color:var(--ink); background:none; border:none; padding:4px 0; cursor:pointer; }
+  .inv-item .inv-name:hover{ text-decoration:underline; }
   .inv-luogo{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:none; background:transparent; font-size:13px; line-height:1; cursor:pointer; }
   .inv-luogo:hover{ opacity:0.65; }
   .luogo-picker-backdrop{ position:fixed; inset:0; z-index:150; background:transparent; }
@@ -382,6 +383,27 @@ function upsertPantryItem(nome, luogo){
   };
 }
 
+// Rinominare cambia anche la chiave (derivata dal nome): se il nuovo nome
+// coincide con un'altra voce già esistente, le quantità si sommano invece
+// di perdersi. Ritorna la chiave da usare dopo la modifica.
+function renamePantryItem(oldKey, newName){
+  const trimmed = (newName||'').trim();
+  const existing = state.pantryItems[oldKey];
+  if(!trimmed || !existing) return oldKey;
+  const newKey = trimmed.toLowerCase();
+  if(newKey === oldKey){
+    existing.nome = trimmed;
+    return oldKey;
+  }
+  if(state.pantryItems[newKey]){
+    state.pantryItems[newKey].qty = (state.pantryItems[newKey].qty || 0) + (existing.qty || 0);
+  } else {
+    state.pantryItems[newKey] = { nome: trimmed, qty: existing.qty, luogo: existing.luogo, cat: existing.cat };
+  }
+  delete state.pantryItems[oldKey];
+  return newKey;
+}
+
 function classifyDept(ingrediente){
   const s = (ingrediente||'').toLowerCase();
   for(const [kw, dept] of DEPT_RULES){ if(s.includes(kw)) return dept; }
@@ -412,6 +434,7 @@ const state = {
   pantryView: 'categoria',
   pantryEditingKey: null,
   pantryLuogoPicker: null,
+  pantryEditKey: null,
   weekOverrides: {},
   weekBaseline: null,
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
@@ -1159,7 +1182,7 @@ function renderDispensa(){
   // voce senza quantità (0) non compare: la quantità è un contatore che si
   // vede solo una volta impostato.
   const items = Object.entries(state.pantryItems)
-    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, luogo: it.luogo || 'dispensa' }))
+    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0);
 
   function itemRow(it){
@@ -1172,7 +1195,7 @@ function renderDispensa(){
       <div class="luogo-picker">
         ${LUOGO_ORDER.map(l=>`<button type="button" class="luogo-picker-opt${l===it.luogo?' active':''}" data-luogo-set="${escapeAttr(it.key)}" data-luogo-value="${l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
       </div>` : ''}
-      <span class="inv-name">${escapeHtml(it.nome)}</span>
+      <button class="inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
       <span class="qty-stepper">
         <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
@@ -1197,13 +1220,51 @@ function renderDispensa(){
       </div>`).join('');
   } else {
     const byDept = {};
-    items.forEach(it=>{ const d = classifyDept(it.nome); (byDept[d] = byDept[d] || []).push(it); });
+    items.forEach(it=>{ const d = it.cat || classifyDept(it.nome); (byDept[d] = byDept[d] || []).push(it); });
     body = DEPT_ORDER.filter(d=>byDept[d] && byDept[d].length).map(d=>`
       <div class="dept-block">
         <div class="dept-title"><span class="dept-icon">${DEPT_ICON[d]}</span>${DEPT_LABEL[d]}</div>
         ${byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('')}
       </div>`).join('');
   }
+
+  const editItem = state.pantryEditKey ? state.pantryItems[state.pantryEditKey] : null;
+  const editModal = editItem ? `
+    <div class="filters-modal-backdrop" data-close-pantry-edit>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Modifica ingrediente</h3>
+          <button class="filters-close-btn" data-close-pantry-edit>✕</button>
+        </div>
+        <div class="filter-groups">
+          <div class="filter-group">
+            <div class="filter-group-label">Nome</div>
+            <input type="text" id="pantry-edit-name" value="${escapeAttr(editItem.nome)}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Categoria</div>
+            <select id="pantry-edit-cat">
+              <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(editItem.nome)])})</option>
+              ${DEPT_ORDER.map(d=>`<option value="${d}" ${editItem.cat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Luogo</div>
+            <select id="pantry-edit-luogo">
+              ${LUOGO_ORDER.map(l=>`<option value="${l}" ${(editItem.luogo||'dispensa')===l?'selected':''}>${LUOGO_ICON[l]} ${escapeHtml(LUOGO_LABEL[l])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Quantità</div>
+            <input type="number" min="0" id="pantry-edit-qty" value="${editItem.qty}">
+          </div>
+        </div>
+        <div class="filters-modal-footer">
+          <button class="reset-btn" id="pantry-edit-delete">Elimina</button>
+          <button class="mini-add-btn" data-close-pantry-edit>Chiudi</button>
+        </div>
+      </div>
+    </div>` : '';
 
   return `
     <h2 class="section-title">Dispensa</h2>
@@ -1221,6 +1282,7 @@ function renderDispensa(){
       <button id="inv-add-btn" type="button">+ Aggiungi</button>
     </div>
     <div class="save-hint"></div>
+    ${editModal}
   `;
 }
 
@@ -1474,6 +1536,62 @@ function attachHandlers(){
     };
     invAddBtn.addEventListener('click', doAdd);
     nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
+  }
+
+  document.querySelectorAll('[data-pantry-edit]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.pantryEditKey = e.currentTarget.dataset.pantryEdit;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-close-pantry-edit]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.pantryEditKey = null; render();
+    });
+  });
+  const editNameInput = document.getElementById('pantry-edit-name');
+  if(editNameInput){
+    editNameInput.addEventListener('change', e=>{
+      state.pantryEditKey = renamePantryItem(state.pantryEditKey, e.target.value);
+      persist(); render();
+    });
+  }
+  const editCatSelect = document.getElementById('pantry-edit-cat');
+  if(editCatSelect){
+    editCatSelect.addEventListener('change', e=>{
+      const it = state.pantryItems[state.pantryEditKey];
+      if(it){
+        if(e.target.value) it.cat = e.target.value; else delete it.cat;
+        persist(); render();
+      }
+    });
+  }
+  const editLuogoSelect = document.getElementById('pantry-edit-luogo');
+  if(editLuogoSelect){
+    editLuogoSelect.addEventListener('change', e=>{
+      const it = state.pantryItems[state.pantryEditKey];
+      if(it){ it.luogo = e.target.value; persist(); render(); }
+    });
+  }
+  const editQtyInput = document.getElementById('pantry-edit-qty');
+  if(editQtyInput){
+    editQtyInput.addEventListener('change', e=>{
+      const it = state.pantryItems[state.pantryEditKey];
+      if(it){
+        const n = parseInt(e.target.value, 10);
+        it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+        persist(); render();
+      }
+    });
+  }
+  const editDeleteBtn = document.getElementById('pantry-edit-delete');
+  if(editDeleteBtn){
+    editDeleteBtn.addEventListener('click', ()=>{
+      delete state.pantryItems[state.pantryEditKey];
+      state.pantryEditKey = null;
+      persist(); render();
+    });
   }
 }
 
