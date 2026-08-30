@@ -102,8 +102,9 @@
   .dept-block:first-child{ margin-top:0; }
   .dept-title{ display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--gold-dark); padding:6px 0 4px; border-bottom:1px solid var(--line); margin-bottom:2px; }
   .dept-icon{ font-size:14px; }
-  .shop-item{ display:flex; align-items:flex-start; gap:10px; padding:7px 2px; border-bottom:1px dashed var(--line); font-size:13.5px; }
-  .shop-item:last-of-type{ border-bottom:none; }
+  .shop-item-row{ display:flex; align-items:center; gap:2px; border-bottom:1px dashed var(--line); }
+  .shop-item-row:last-of-type{ border-bottom:none; }
+  .shop-item{ flex:1; min-width:0; display:flex; align-items:flex-start; gap:10px; padding:7px 2px; font-size:13.5px; }
   .shop-item input[type=checkbox]{ margin-top:3px; width:16px;height:16px; accent-color:var(--tomato); flex-shrink:0; }
   .shop-item.checked .item-name{ text-decoration:line-through; opacity:0.45; }
   .item-name{ font-weight:600; }
@@ -326,11 +327,16 @@ function computeStapleList(){
   DATA.week1.forEach((d,i)=>{
     const name = effectiveRecipeName(i);
     getIngredientsFor(name).forEach((it,idx)=>{
-      if(isStaple(it.ingrediente)) flat.push({ key:`d${i}_${idx}`, ingrediente:it.ingrediente, qta:it.qta, context:`${d.giorno} · ${name}` });
+      const key = `d${i}_${idx}`;
+      if(!state.shopDismissed[key] && isStaple(it.ingrediente)) flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, context:`${d.giorno} · ${name}` });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
-    if(isStaple(it.ingrediente)) flat.push({ key:`gen_${idx}`, ingrediente:it.ingrediente, qta:it.qta, context:'Ogni settimana' });
+    const key = `gen_${idx}`;
+    if(!state.shopDismissed[key] && isStaple(it.ingrediente)) flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, context:'Ogni settimana' });
+  });
+  Object.entries(state.shopExtras).forEach(([id, it])=>{
+    if(!state.shopDismissed[id] && isStaple(it.ingrediente)) flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, context:'Aggiunti a mano' });
   });
   const merged = {};
   flat.forEach(it=>{
@@ -342,6 +348,20 @@ function computeStapleList(){
     }
   });
   return Object.values(merged);
+}
+
+// Un basilare parte "confermato" (quindi spuntato, in "Di solito li hai già")
+// se lo si ha già in dispensa; se l'utente ha toccato la spunta a mano, quella
+// scelta vince sempre. Se non è confermato, le sue occorrenze restano/tornano
+// nella lista principale da comprare.
+function hasPantryStock(ingrediente){
+  const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
+  return !!(it && typeof it.qty === 'number' && it.qty > 0);
+}
+function isStapleConfirmed(it){
+  const touched = it.keys.some(k => state.shopChecked[k] !== undefined);
+  if(touched) return it.keys.every(k => state.shopChecked[k]);
+  return hasPantryStock(it.ingrediente);
 }
 
 // Inventario unico (dispensa/ripostiglio/frigo/freezer distinti solo dal
@@ -382,6 +402,8 @@ function getIngredientsFor(name){
 const state = {
   tab: 'menu',
   shopChecked: {},
+  shopDismissed: {},
+  shopExtras: {},
   shopView: 'giorno',
   pantryChecked: {},
   pantryItems: {},
@@ -542,6 +564,8 @@ function persist(){
   saveTimeout = setTimeout(async ()=>{
     const payload = {
       shopChecked: state.shopChecked,
+      shopDismissed: state.shopDismissed,
+      shopExtras: state.shopExtras,
       pantryChecked: state.pantryChecked,
       shopView: state.shopView,
       weekOverrides: state.weekOverrides,
@@ -837,36 +861,52 @@ function renderSpesa(){
     const name = effectiveRecipeName(i);
     const items = getIngredientsFor(name);
     items.forEach((it,idx)=>{
-      flat.push({ key:`d${i}_${idx}`, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:`${d.giorno} · ${name}`, staple: isStaple(it.ingrediente) });
+      const key = `d${i}_${idx}`;
+      if(state.shopDismissed[key]) return;
+      flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:`${d.giorno} · ${name}`, staple: isStaple(it.ingrediente) });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
-    flat.push({ key:`gen_${idx}`, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:'Ogni settimana', staple: isStaple(it.ingrediente) });
+    const key = `gen_${idx}`;
+    if(state.shopDismissed[key]) return;
+    flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:'Ogni settimana', staple: isStaple(it.ingrediente) });
+  });
+  Object.entries(state.shopExtras).forEach(([id, it])=>{
+    if(state.shopDismissed[id]) return;
+    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
   });
 
-  const mainFlat = flat.filter(it => !it.staple);
+  // basilari "confermati" (già in dispensa, o spuntati a mano): restano nella
+  // sezione basilari; gli altri tornano/restano nella lista da comprare sopra.
+  const confirmedStapleNames = new Set(
+    computeStapleList().filter(isStapleConfirmed).map(it => it.ingrediente.trim().toLowerCase())
+  );
+  const mainFlat = flat.filter(it => !it.staple || !confirmedStapleNames.has(it.ingrediente.trim().toLowerCase()));
 
   const total = mainFlat.length;
   const done = mainFlat.filter(it=>state.shopChecked[it.key]).length;
 
-  function itemRow(keys, ingrediente, qta, note, subtitle){
-    const checked = keys.every(k=>state.shopChecked[k]);
+  function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked){
+    const checked = forcedChecked !== undefined ? forcedChecked : keys.every(k=>state.shopChecked[k]);
     return `
-    <label class="shop-item ${checked?'checked':''}">
-      <input type="checkbox" data-shop-keys="${keys.join(',')}" data-shop-name="${escapeAttr(ingrediente)}" ${checked?'checked':''}>
-      <span>
-        <span class="item-name">${escapeHtml(ingrediente)}</span>
-        <span class="item-detail">${escapeHtml(qta||'')}${subtitle ? ' · ' + escapeHtml(subtitle) : ''}${note ? ' · ' + escapeHtml(note) : ''}</span>
-      </span>
-    </label>`;
+    <div class="shop-item-row">
+      <label class="shop-item ${checked?'checked':''}">
+        <input type="checkbox" data-shop-keys="${keys.join(',')}" data-shop-name="${escapeAttr(ingrediente)}" ${checked?'checked':''}>
+        <span>
+          <span class="item-name">${escapeHtml(ingrediente)}</span>
+          <span class="item-detail">${escapeHtml(qta||'')}${subtitle ? ' · ' + escapeHtml(subtitle) : ''}${note ? ' · ' + escapeHtml(note) : ''}</span>
+        </span>
+      </label>
+      <button class="inv-remove" data-shop-remove="${keys.join(',')}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+    </div>`;
   }
 
-  const stapleList = computeStapleList();
-  const staplesHtml = stapleList.length ? `
+  const confirmedStaples = computeStapleList().filter(isStapleConfirmed);
+  const staplesHtml = confirmedStaples.length ? `
     <div class="staples-block">
       <div class="staples-title">🏠 Di solito li hai già</div>
-      <p class="staples-hint">Spuntali se non ti servono — restano fuori dalla lista qui sopra.</p>
-      ${stapleList.map(it=>itemRow(it.keys, it.ingrediente, it.qta, '', it.contexts.join(' + '))).join('')}
+      <p class="staples-hint">Già spuntati perché li hai in dispensa — togli la spunta se ti servono e passano nella lista sopra.</p>
+      ${confirmedStaples.map(it=>itemRow(it.keys, it.ingrediente, it.qta, '', it.contexts.join(' + '), true)).join('')}
     </div>` : '';
 
   let body = '';
@@ -935,6 +975,14 @@ function renderSpesa(){
         ${genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
       </div>`;
     }
+    const extraContext = mainFlat.filter(it => it.context === 'Aggiunti a mano');
+    if(extraContext.length){
+      body += `
+      <div class="shop-day-group">
+        <div class="shop-day-title">Aggiunti a mano</div>
+        ${extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
+      </div>`;
+    }
   }
 
   const missingDays = DATA.week1
@@ -956,6 +1004,11 @@ function renderSpesa(){
     <div class="shop-progress">${done} / ${total} presi</div>
     <button class="reset-btn" id="reset-shop">Svuota spunte</button>
     ${body}
+    <div class="inv-add-row">
+      <input type="text" id="shop-add-name" placeholder="Ingrediente extra">
+      <input type="text" id="shop-add-qta" placeholder="Quantità">
+      <button id="shop-add-btn" type="button">+ Aggiungi</button>
+    </div>
     ${staplesHtml}
   `;
 }
@@ -1190,8 +1243,32 @@ function attachHandlers(){
       persist(); render();
     });
   });
+  document.querySelectorAll('[data-shop-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.currentTarget.dataset.shopRemove.split(',').forEach(k=>{
+        if(state.shopExtras[k]) delete state.shopExtras[k];
+        else state.shopDismissed[k] = true;
+      });
+      persist(); render();
+    });
+  });
+  const shopAddBtn = document.getElementById('shop-add-btn');
+  if(shopAddBtn){
+    const nameInput = document.getElementById('shop-add-name');
+    const qtaInput = document.getElementById('shop-add-qta');
+    const doAdd = ()=>{
+      if(!nameInput.value.trim()) return;
+      const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+      state.shopExtras[id] = { ingrediente: nameInput.value.trim(), qta: qtaInput.value.trim() };
+      persist(); render();
+    };
+    shopAddBtn.addEventListener('click', doAdd);
+    [nameInput, qtaInput].forEach(inp=>{
+      inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
+    });
+  }
   const resetBtn = document.getElementById('reset-shop');
-  if(resetBtn) resetBtn.addEventListener('click', ()=>{ state.shopChecked = {}; persist(); render(); });
+  if(resetBtn) resetBtn.addEventListener('click', ()=>{ state.shopChecked = {}; state.shopDismissed = {}; persist(); render(); });
 
   document.querySelectorAll('[data-open-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
