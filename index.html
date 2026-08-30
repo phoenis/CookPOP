@@ -100,6 +100,7 @@
   .day-meta{ font-size:12.5px; color:var(--sage); margin-top:4px; line-height:1.5; }
   .day-meta b{ color:var(--ink); font-weight:600; }
   .soak-chip{ display:inline-block; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--steel); background:rgba(59,111,143,0.1); padding:3px 8px; border-radius:20px; margin-top:6px; }
+  .avanzo-chip{ display:inline-block; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--amber); background:rgba(201,138,46,0.12); padding:3px 8px; border-radius:20px; margin-top:6px; }
   .swap-select{ margin-top:10px; width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:7px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
 
   .swap-controls{ display:flex; gap:8px; margin-top:10px; }
@@ -506,6 +507,8 @@ const state = {
   weekOverrides: {},
   weekBaseline: null,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
+  dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
+  linkPickerOpenDay: null,
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
   recipeEdits: {},
@@ -673,6 +676,7 @@ function persist(){
       weekOverrides: state.weekOverrides,
       weekBaseline: state.weekBaseline,
       extraWeeks: state.extraWeeks,
+      dayLinks: state.dayLinks,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
       mealsDone: state.mealsDone,
       recipeIngredients: state.recipeIngredients,
@@ -732,7 +736,17 @@ function weekMealsDoneRef(weekIdx){
   if(!w) return {};
   return w.mealsDone || (w.mealsDone = {});
 }
+// Un giorno "avanzo" (state.dayLinks) rimanda semplicemente al giorno sorgente
+// per nome/meta ricetta: stessa ricetta ovunque venga letta, senza duplicare
+// nulla. allPlannedDays() lo esclude dall'aggregazione Spesa (ingredienti già
+// contati sul giorno sorgente); il link si rompe da solo se il giorno sorgente
+// cambia ricetta (vedi unlinkDaysPointingTo).
+function linkedSourceDayKey(weekIdx, i){
+  return state.dayLinks[`${weekIdx}_${i}`] || null;
+}
 function effectiveRecipeName(weekIdx, i){
+  const link = linkedSourceDayKey(weekIdx, i);
+  if(link){ const [sw,si] = link.split('_'); return effectiveRecipeName(parseInt(sw,10), si); }
   const overrides = weekOverridesRef(weekIdx);
   if(overrides[i]) return overrides[i];
   const baseline = weekBaselineRef(weekIdx);
@@ -744,6 +758,8 @@ function effectiveRecipeName(weekIdx, i){
 // manualmente è la sostituzione, se fa parte di un menù generato è la ricetta generata,
 // altrimenti (solo settimana 0) si prova ad abbinarla al catalogo (catalogMatch).
 function effectiveRecipeMeta(weekIdx, i){
+  const link = linkedSourceDayKey(weekIdx, i);
+  if(link){ const [sw,si] = link.split('_'); return effectiveRecipeMeta(parseInt(sw,10), si); }
   const overrideName = weekOverridesRef(weekIdx)[i];
   if(overrideName) return getRecipeMeta(overrideName);
   const baseline = weekBaselineRef(weekIdx);
@@ -806,11 +822,14 @@ function weekLabelFor(weekIdx){
 }
 // Tutti i giorni pianificati (settimana corrente + eventuali extra), nell'ordine di
 // visualizzazione: usato da Spesa per aggregare gli ingredienti di ogni settimana.
+// I giorni "avanzo di un altro giorno" sono esclusi: i loro ingredienti sono già
+// contati sul giorno sorgente, altrimenti finirebbero comprati due volte.
 function allPlannedDays(){
   const days = [];
   const pushWeek = (weekIdx) => {
     const dates = weekDatesFor(weekIdx);
     WEEK_DISPLAY_ORDER.forEach((i,pos)=>{
+      if(linkedSourceDayKey(weekIdx, i)) return;
       days.push({
         weekIdx, i,
         giorno: DATA.week1[i].giorno,
@@ -893,6 +912,14 @@ function pickWeekRecipes(){
 
 // Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
 // state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
+// Rimuove ogni collegamento "avanzo di" che punta a dayKey: usata ogni volta
+// che la ricetta di un giorno cambia, per non lasciare un giorno "fantasma"
+// che continua a mostrare una ricetta di cui in realtà non ci sono più avanzi.
+function unlinkDaysPointingTo(dayKey){
+  Object.keys(state.dayLinks).forEach(k=>{
+    if(state.dayLinks[k] === dayKey) delete state.dayLinks[k];
+  });
+}
 function generateWeek(weekIdx){
   const baseline = {};
   pickWeekRecipes().forEach((r, i) => { baseline[i] = r.nome; });
@@ -902,6 +929,11 @@ function generateWeek(weekIdx){
     state.mealsDone = {};
   } else {
     state.extraWeeks[weekIdx-1] = { baseline, overrides:{}, mealsDone:{} };
+  }
+  for(let i=0;i<7;i++){
+    const dayKey = `${weekIdx}_${i}`;
+    delete state.dayLinks[dayKey];
+    unlinkDaysPointingTo(dayKey);
   }
   state.expandedDay = null;
   state.swapOpenDay = null;
@@ -930,10 +962,15 @@ function swapDayRecipes(weekIdxA, i, weekIdxB, j){
   if(weekIdxA === weekIdxB && i === j) return;
   const nameI = effectiveRecipeName(weekIdxA, i);
   const nameJ = effectiveRecipeName(weekIdxB, j);
+  const dayKeyA = `${weekIdxA}_${i}`, dayKeyB = `${weekIdxB}_${j}`;
   weekOverridesRef(weekIdxA)[i] = nameJ;
   weekOverridesRef(weekIdxB)[j] = nameI;
   delete weekMealsDoneRef(weekIdxA)[i];
   delete weekMealsDoneRef(weekIdxB)[j];
+  delete state.dayLinks[dayKeyA];
+  delete state.dayLinks[dayKeyB];
+  unlinkDaysPointingTo(dayKeyA);
+  unlinkDaysPointingTo(dayKeyB);
   state.swapOpenDay = null;
   persist();
   render();
@@ -1077,12 +1114,13 @@ function renderRecipeEditModal(){
 // insieme, usato per lo state ephemeral (espanso, swap aperto, modale fatta...).
 function renderDayCard(weekIdx, i, pos, weekDates){
   const dayKey = `${weekIdx}_${i}`;
+  const linkSource = linkedSourceDayKey(weekIdx, i);
   const d = DATA.week1[i];
   const dateLabel = formatShortDate(weekDates[pos]);
   const isToday = isSameDay(weekDates[pos], new Date());
   const name = effectiveRecipeName(weekIdx, i);
   const hasManualOverride = !!weekOverridesRef(weekIdx)[i];
-  const isChanged = weekIdx !== 0 || hasManualOverride || !!(state.weekBaseline && state.weekBaseline[i]);
+  const isChanged = !!linkSource || weekIdx !== 0 || hasManualOverride || !!(state.weekBaseline && state.weekBaseline[i]);
   const rec = effectiveRecipeMeta(weekIdx, i); // dati di catalogo, se disponibili
   const currentCat = effectiveCategoria(weekIdx, i);
   let swapPanelHtml = '';
@@ -1111,14 +1149,45 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       </div>
     </div>`;
   }
+  let linkPanelHtml = '';
+  if(state.linkPickerOpenDay === dayKey){
+    const options = allPlannedDays().filter(o => `${o.weekIdx}_${o.i}` !== dayKey);
+    const optionsHtml = options.map(o=>`
+      <div class="swap-result" data-link-pick="${o.weekIdx}_${o.i}" data-link-day="${dayKey}">
+        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)}</span>
+        <span class="swap-result-time">${escapeHtml(o.name)}</span>
+      </div>`).join('');
+    linkPanelHtml = `
+    <div class="swap-panel">
+      <p class="section-sub" style="margin:0 0 8px;">Scegli il giorno in cui avete cucinato la dose doppia:</p>
+      <div class="swap-results">
+        ${optionsHtml || '<div class="ing-empty">Nessun altro giorno disponibile.</div>'}
+      </div>
+    </div>`;
+  }
+
   const isDone = !!weekMealsDoneRef(weekIdx)[i];
-  const swapControls = `
+  let swapControls;
+  if(linkSource){
+    const [slw, sli] = linkSource.split('_');
+    const sourceGiorno = DATA.week1[sli].giorno;
+    swapControls = `
+    <div class="avanzo-chip">🥡 Avanzo di ${escapeHtml(sourceGiorno)}</div>
+    <div class="swap-controls">
+      <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Mangiato' : '🍽️ Segna come mangiato'}</button>
+      <button class="mini-add-btn" data-unlink-day="${dayKey}">🔗 Scollega</button>
+    </div>`;
+  } else {
+    swapControls = `
     <div class="swap-controls">
       <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
       <button class="mini-add-btn" data-open-swap="${dayKey}">🔀 Cambia ricetta</button>
       ${hasManualOverride ? `<button class="mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
+      <button class="mini-add-btn" data-open-link-picker="${dayKey}">🥡 Segna come avanzo</button>
     </div>
-    ${swapPanelHtml}`;
+    ${swapPanelHtml}
+    ${linkPanelHtml}`;
+  }
 
   // tempo: se cambiata (a mano o generata) e in catalogo, usa il tempo della nuova ricetta; altrimenti quello originale del giorno
   const timeDisplay = (isChanged && rec) ? rec.tempo : d.tempo;
@@ -1790,7 +1859,36 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const key = e.target.dataset.openSwap;
       state.swapOpenDay = state.swapOpenDay === key ? null : key;
+      state.linkPickerOpenDay = null;
       render();
+    });
+  });
+  document.querySelectorAll('[data-open-link-picker]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.openLinkPicker;
+      state.linkPickerOpenDay = state.linkPickerOpenDay === key ? null : key;
+      state.swapOpenDay = null;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-link-pick]').forEach(row=>{
+    row.addEventListener('click', e=>{
+      const el = e.currentTarget;
+      const dayKey = el.dataset.linkDay;
+      const sourceKey = el.dataset.linkPick;
+      const [w,i] = dayKey.split('_');
+      const weekIdx = parseInt(w,10);
+      state.dayLinks[dayKey] = sourceKey;
+      delete weekOverridesRef(weekIdx)[i];
+      delete weekMealsDoneRef(weekIdx)[i];
+      state.linkPickerOpenDay = null;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-unlink-day]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      delete state.dayLinks[e.currentTarget.dataset.unlinkDay];
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-drag-handle]').forEach(handle=>{
@@ -1807,10 +1905,13 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-reset-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const [w,i] = e.target.dataset.resetSwap.split('_');
+      const key = e.target.dataset.resetSwap;
+      const [w,i] = key.split('_');
       const weekIdx = parseInt(w,10);
       delete weekOverridesRef(weekIdx)[i];
       delete weekMealsDoneRef(weekIdx)[i];
+      delete state.dayLinks[key];
+      unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -1836,11 +1937,14 @@ function attachHandlers(){
   document.querySelectorAll('[data-swap-pick]').forEach(row=>{
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
-      const [w,i] = el.dataset.swapDay.split('_');
+      const key = el.dataset.swapDay;
+      const [w,i] = key.split('_');
       const weekIdx = parseInt(w,10);
       const recipeName = el.dataset.swapPick;
       weekOverridesRef(weekIdx)[i] = recipeName;
       delete weekMealsDoneRef(weekIdx)[i];
+      delete state.dayLinks[key];
+      unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -1854,6 +1958,12 @@ function attachHandlers(){
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(mealsDone[i]){
         delete mealsDone[i];
+        persist(); render();
+      } else if(linkedSourceDayKey(weekIdx, i)){
+        // giorno "avanzo": nessun nuovo ingrediente consumato (già scalato sul
+        // giorno sorgente), quindi si segna direttamente senza passare dalla
+        // modale di aggiornamento Dispensa.
+        mealsDone[i] = true;
         persist(); render();
       } else {
         const recipeName = effectiveRecipeName(weekIdx, i);
