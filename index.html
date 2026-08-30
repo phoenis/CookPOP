@@ -73,6 +73,12 @@
   .day-menu-row{ display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
   .day-menu{ font-size:14.5px; font-weight:600; cursor:pointer; color:var(--green-deep); border-bottom:1px dotted var(--sage); }
   .day-menu:hover{ color:var(--gold-dark); }
+  .drag-handle{ flex-shrink:0; margin-left:auto; background:none; border:none; color:var(--sage); font-size:17px; line-height:1; cursor:grab; padding:4px 6px; touch-action:none; }
+  .drag-handle:hover{ color:var(--gold-dark); }
+  .drag-handle:active{ cursor:grabbing; }
+  .day-card.dragging{ opacity:0.4; }
+  .day-card.drag-over{ border-color:var(--gold); box-shadow:0 0 0 2px var(--gold) inset; }
+  .drag-ghost{ position:fixed; z-index:500; pointer-events:none; background:var(--gold); color:var(--green-deep); font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:8px 14px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,0.35); max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .day-meta{ font-size:12.5px; color:var(--sage); margin-top:4px; line-height:1.5; }
   .day-meta b{ color:var(--ink); font-weight:600; }
   .soak-chip{ display:inline-block; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--steel); background:rgba(59,111,143,0.1); padding:3px 8px; border-radius:20px; margin-top:6px; }
@@ -838,6 +844,22 @@ function generateWeekMenu(){
   render();
 }
 
+// Scambia le ricette di due giorni (drag&drop nel Menù): entrambi diventano
+// override manuali, coerente con "Cambia ricetta" — il "fatta" non ha più
+// senso dopo lo scambio, quindi si azzera per entrambi i giorni coinvolti.
+function swapDayRecipes(i, j){
+  if(i === j) return;
+  const nameI = effectiveRecipeName(i);
+  const nameJ = effectiveRecipeName(j);
+  state.weekOverrides[i] = nameJ;
+  state.weekOverrides[j] = nameI;
+  delete state.mealsDone[i];
+  delete state.mealsDone[j];
+  state.swapOpenDay = null;
+  persist();
+  render();
+}
+
 function render(){
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const panel = document.getElementById('panel');
@@ -1099,13 +1121,14 @@ function renderMenu(){
     }
 
     return `
-    <div class="day-card${isDone ? ' done' : ''}">
+    <div class="day-card${isDone ? ' done' : ''}" data-day-index="${i}">
       <div class="day-row">
         <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
         <div class="day-time">${escapeHtml(timeDisplay)}</div>
       </div>
       <div class="day-menu-row">
         <span class="day-menu" data-toggle-day="${i}">${escapeHtml(name)}</span>
+        <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
       </div>
       <div class="day-meta">
         ${metaLines.map(l=>`<div>${l}</div>`).join('')}
@@ -1159,7 +1182,7 @@ function renderMenu(){
 
   return `
     <h2 class="section-title">Settimana del ${upcomingWeekLabel()}</h2>
-    <p class="section-sub">Tocca il nome di una ricetta per vederne i dettagli</p>
+    <p class="section-sub">Tocca il nome di una ricetta per vederne i dettagli — trascina ⠿ per scambiarla con un altro giorno</p>
     <div class="balance-strip">${strip}</div>
     ${days}
     ${doneModal}
@@ -1636,6 +1659,9 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-drag-handle]').forEach(handle=>{
+    handle.addEventListener('pointerdown', startDayDrag);
+  });
   const genWeekBtn = document.getElementById('generate-week');
   if(genWeekBtn) genWeekBtn.addEventListener('click', ()=>{ generateWeekMenu(); });
 
@@ -2041,6 +2067,56 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
   if(settingsClose) settingsClose.addEventListener('click', close);
   settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
 })();
+
+// Drag&drop per scambiare le ricette di due giorni nel Menù (Pointer Events,
+// non l'HTML5 drag&drop nativo: su mobile è quello che funziona in modo affidabile
+// sia con dito che con mouse). dragState vive fuori da attachHandlers perché deve
+// sopravvivere ai render intermedi; i listener su document vanno registrati una
+// sola volta, mentre il pointerdown sull'handle viene ri-agganciato a ogni render
+// (l'elemento viene ricreato ogni volta) da attachHandlers.
+let dragState = null;
+function startDayDrag(e){
+  e.preventDefault();
+  const card = e.currentTarget.closest('.day-card');
+  if(!card) return;
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  const recipeEl = card.querySelector('.day-menu');
+  ghost.textContent = recipeEl ? recipeEl.textContent : '';
+  document.body.appendChild(ghost);
+  positionGhost(ghost, e.clientX, e.clientY);
+  card.classList.add('dragging');
+  dragState = { sourceIndex: card.dataset.dayIndex, sourceCard: card, ghost, lastTarget: null };
+  e.currentTarget.setPointerCapture(e.pointerId);
+}
+function positionGhost(ghost, x, y){
+  ghost.style.left = (x + 14) + 'px';
+  ghost.style.top = (y - 40) + 'px';
+}
+document.addEventListener('pointermove', e=>{
+  if(!dragState) return;
+  positionGhost(dragState.ghost, e.clientX, e.clientY);
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const targetCard = el ? el.closest('.day-card') : null;
+  if(dragState.lastTarget && dragState.lastTarget !== targetCard) dragState.lastTarget.classList.remove('drag-over');
+  if(targetCard && targetCard !== dragState.sourceCard){
+    targetCard.classList.add('drag-over');
+    dragState.lastTarget = targetCard;
+  } else {
+    dragState.lastTarget = null;
+  }
+});
+function endDayDrag(commit){
+  if(!dragState) return;
+  const { sourceIndex, sourceCard, ghost, lastTarget } = dragState;
+  ghost.remove();
+  sourceCard.classList.remove('dragging');
+  if(lastTarget) lastTarget.classList.remove('drag-over');
+  dragState = null;
+  if(commit && lastTarget) swapDayRecipes(sourceIndex, lastTarget.dataset.dayIndex);
+}
+document.addEventListener('pointerup', ()=> endDayDrag(true));
+document.addEventListener('pointercancel', ()=> endDayDrag(false));
 
 (async function init(){
   await firebaseReady;
