@@ -76,6 +76,10 @@
   .day-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
   .day-name{ font-family:'Fraunces', serif; font-weight:700; font-size:16px; color:var(--ink); min-width:90px; }
   .day-date{ font-family:'JetBrains Mono', monospace; font-weight:400; font-size:11.5px; color:var(--sage); letter-spacing:0.02em; }
+  .today-badge{ font-family:'JetBrains Mono', monospace; font-weight:600; font-size:9.5px; letter-spacing:0.04em; text-transform:uppercase; color:var(--green-deep); background:var(--gold); padding:2px 7px; border-radius:20px; margin-left:4px; }
+  .day-card.today{ box-shadow:inset 3px 0 0 var(--gold); }
+  .week-section{ display:block; margin-bottom:8px; }
+  .week-section + .week-section{ margin-top:26px; padding-top:22px; border-top:1px solid var(--line); }
   .day-time{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--ink); opacity:0.75; background:var(--surface-2); padding:2px 8px; border-radius:20px; }
   .day-menu-row{ display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
   .day-menu{ font-size:14.5px; font-weight:600; cursor:pointer; color:var(--ink); border-bottom:1px dotted var(--sage); }
@@ -374,11 +378,10 @@ function isStaple(ingrediente){
 // confermati come "già in casa").
 function computeStapleList(){
   const flat = [];
-  DATA.week1.forEach((d,i)=>{
-    const name = effectiveRecipeName(i);
+  allPlannedDays().forEach(({weekIdx,i,giorno,dateLabel,name})=>{
     getIngredientsFor(name).forEach((it,idx)=>{
-      const key = `d${i}_${idx}`;
-      if(!state.shopDismissed[key] && isStaple(it.ingrediente)) flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, context:`${d.giorno} · ${name}` });
+      const key = dayIngKey(weekIdx, i, idx);
+      if(!state.shopDismissed[key] && isStaple(it.ingrediente)) flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, context:`${giorno} ${dateLabel} · ${name}` });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
@@ -529,6 +532,7 @@ const state = {
   pantryEditKey: null,
   weekOverrides: {},
   weekBaseline: null,
+  extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
   recipeEdits: {},
@@ -695,6 +699,7 @@ function persist(){
       shopView: state.shopView,
       weekOverrides: state.weekOverrides,
       weekBaseline: state.weekBaseline,
+      extraWeeks: state.extraWeeks,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
       mealsDone: state.mealsDone,
       recipeIngredients: state.recipeIngredients,
@@ -727,24 +732,52 @@ function persist(){
   }, 350);
 }
 
-function effectiveRecipeName(i){
-  if(state.weekOverrides[i]) return state.weekOverrides[i];
-  if(state.weekBaseline && state.weekBaseline[i]) return state.weekBaseline[i];
-  return DATA.week1[i].cena;
+// Settimana 0 = quella "corrente" (DATA.week1 + weekOverrides/weekBaseline/mealsDone
+// in cima allo state, come da sempre — invariati per compatibilità con i dati già
+// salvati). Settimana N (N>=1) = state.extraWeeks[N-1], una pianificazione aggiuntiva
+// creata con "Aggiungi settimana": stessa forma {baseline, overrides, mealsDone}, ma
+// senza il foglio originale (DATA.week1) come base, dato che non esiste per definizione.
+function weekOverridesRef(weekIdx){
+  if(weekIdx === 0) return state.weekOverrides;
+  const w = state.extraWeeks[weekIdx-1];
+  return w ? w.overrides : {};
 }
-// Ricetta "vera" del catalogo per il giorno i: se sostituita manualmente è la sostituzione,
-// se fa parte di un menù generato è la ricetta generata, altrimenti si prova ad abbinarla al catalogo (catalogMatch)
-function effectiveRecipeMeta(i){
-  const overrideName = state.weekOverrides[i];
+function weekBaselineRef(weekIdx){
+  if(weekIdx === 0) return state.weekBaseline;
+  const w = state.extraWeeks[weekIdx-1];
+  return w ? w.baseline : null;
+}
+function weekMealsDoneRef(weekIdx){
+  if(weekIdx === 0) return state.mealsDone;
+  const w = state.extraWeeks[weekIdx-1];
+  return w ? w.mealsDone : {};
+}
+function effectiveRecipeName(weekIdx, i){
+  const overrides = weekOverridesRef(weekIdx);
+  if(overrides[i]) return overrides[i];
+  const baseline = weekBaselineRef(weekIdx);
+  if(baseline && baseline[i]) return baseline[i];
+  if(weekIdx === 0) return DATA.week1[i].cena;
+  return '';
+}
+// Ricetta "vera" del catalogo per il giorno i della settimana weekIdx: se sostituita
+// manualmente è la sostituzione, se fa parte di un menù generato è la ricetta generata,
+// altrimenti (solo settimana 0) si prova ad abbinarla al catalogo (catalogMatch).
+function effectiveRecipeMeta(weekIdx, i){
+  const overrideName = weekOverridesRef(weekIdx)[i];
   if(overrideName) return getRecipeMeta(overrideName);
-  if(state.weekBaseline && state.weekBaseline[i]) return getRecipeMeta(state.weekBaseline[i]);
-  const match = DATA.week1[i].catalogMatch;
-  return match ? getRecipeMeta(match) : null;
+  const baseline = weekBaselineRef(weekIdx);
+  if(baseline && baseline[i]) return getRecipeMeta(baseline[i]);
+  if(weekIdx === 0){
+    const match = DATA.week1[i].catalogMatch;
+    return match ? getRecipeMeta(match) : null;
+  }
+  return null;
 }
-function effectiveCategoria(i){
-  const rec = effectiveRecipeMeta(i);
+function effectiveCategoria(weekIdx, i){
+  const rec = effectiveRecipeMeta(weekIdx, i);
   if(rec) return rec.categoriaNew;
-  return DATA.week1[i].fallbackCategoria || '';
+  return weekIdx === 0 ? (DATA.week1[i].fallbackCategoria || '') : '';
 }
 
 const MONTHS_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
@@ -756,16 +789,21 @@ const MONTHS_IT_SHORT = ['gen','feb','mar','apr','mag','giu','lug','ago','set','
 // qui si cambia solo l'ORDINE con cui i 7 giorni vengono mostrati.
 const WEEK_DISPLAY_ORDER = [5,6,0,1,2,3,4];
 
+// Sabato che apre la settimana "corrente" (quella che contiene oggi): se oggi è
+// sabato è oggi stesso, altrimenti il sabato appena passato — così la settimana 0
+// include sempre la data di oggi ed è possibile evidenziarla nel Menù.
 function upcomingSaturday(){
   const today = new Date();
   const day = today.getDay(); // 0=dom, 1=lun ... 6=sab
-  const diffToSaturday = (6 - day + 7) % 7; // se oggi è sabato, diff=0 (settimana in corso conta come "a venire")
+  const daysSinceSaturday = (day + 1) % 7;
   const saturday = new Date(today);
-  saturday.setDate(today.getDate() + diffToSaturday);
+  saturday.setDate(today.getDate() - daysSinceSaturday);
   return saturday;
 }
-function upcomingWeekDates(){
+// weekIdx-esima settimana a partire da quella corrente (0 = corrente, 1 = successiva, ...)
+function weekDatesFor(weekIdx){
   const saturday = upcomingSaturday();
+  saturday.setDate(saturday.getDate() + weekIdx*7);
   return WEEK_DISPLAY_ORDER.map((_,pos)=>{
     const d = new Date(saturday);
     d.setDate(saturday.getDate() + pos);
@@ -775,14 +813,41 @@ function upcomingWeekDates(){
 function formatShortDate(date){
   return `${date.getDate()} ${MONTHS_IT_SHORT[date.getMonth()]}`;
 }
-function upcomingWeekLabel(){
-  const saturday = upcomingSaturday();
-  const friday = new Date(saturday);
-  friday.setDate(saturday.getDate() + 6);
+function isSameDay(a, b){
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+function weekLabelFor(weekIdx){
+  const dates = weekDatesFor(weekIdx);
+  const saturday = dates[0], friday = dates[6];
   const dm = saturday.getDate(), ds = friday.getDate();
   const mm = MONTHS_IT[saturday.getMonth()], ms = MONTHS_IT[friday.getMonth()];
   if(mm === ms) return `${dm}–${ds} ${mm}`;
   return `${dm} ${mm} – ${ds} ${ms}`;
+}
+// Tutti i giorni pianificati (settimana corrente + eventuali extra), nell'ordine di
+// visualizzazione: usato da Spesa per aggregare gli ingredienti di ogni settimana.
+function allPlannedDays(){
+  const days = [];
+  const pushWeek = (weekIdx) => {
+    const dates = weekDatesFor(weekIdx);
+    WEEK_DISPLAY_ORDER.forEach((i,pos)=>{
+      days.push({
+        weekIdx, i,
+        giorno: DATA.week1[i].giorno,
+        dateLabel: formatShortDate(dates[pos]),
+        name: effectiveRecipeName(weekIdx, i)
+      });
+    });
+  };
+  pushWeek(0);
+  state.extraWeeks.forEach((w,wi)=> pushWeek(wi+1));
+  return days;
+}
+// Chiave stabile per un ingrediente di un giorno: invariata per la settimana 0
+// (compatibilità con le spunte/dismissioni già salvate), con prefisso di settimana
+// per le extra dato che non possono esistere collisioni con le chiavi già in uso.
+function dayIngKey(weekIdx, i, idx){
+  return weekIdx === 0 ? `d${i}_${idx}` : `d${weekIdx}_${i}_${idx}`;
 }
 
 function currentSeasonKey(){
@@ -793,7 +858,11 @@ function currentSeasonKey(){
   return 'inverno';                          // dic-feb
 }
 
-function generateWeekMenu(){
+// Sceglie 7 ricette di stagione per una settimana, variando le categorie
+// giorno per giorno (da lunedì a venerdì solo ricette fino a 30-45 min).
+// Puramente funzionale: non tocca lo state, così è riusabile sia per la
+// settimana corrente che per ogni settimana extra aggiunta.
+function pickWeekRecipes(){
   const season = currentSeasonKey();
   let pool = DATA.recipes.filter(r => r.stagioni.includes(season) || r.stagioni.includes('tutto'));
   if(pool.length < 7) pool = DATA.recipes.slice(); // fallback di sicurezza, non dovrebbe servire
@@ -839,28 +908,52 @@ function generateWeekMenu(){
     prevCat = chosen.categoriaNew;
   }
 
-  const newBaseline = {};
-  picked.forEach((r, i) => { newBaseline[i] = r.nome; });
-  state.weekBaseline = newBaseline;
-  state.weekOverrides = {};
+  return picked;
+}
+
+// Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
+// state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
+function generateWeek(weekIdx){
+  const baseline = {};
+  pickWeekRecipes().forEach((r, i) => { baseline[i] = r.nome; });
+  if(weekIdx === 0){
+    state.weekBaseline = baseline;
+    state.weekOverrides = {};
+    state.mealsDone = {};
+  } else {
+    state.extraWeeks[weekIdx-1] = { baseline, overrides:{}, mealsDone:{} };
+  }
   state.expandedDay = null;
   state.swapOpenDay = null;
-  state.mealsDone = {};
+  persist();
+  render();
+}
+function addWeek(){
+  generateWeek(state.extraWeeks.length + 1);
+}
+// Rimuove una settimana extra: le successive scalano di una posizione, ma dato
+// che il loro weekIdx è sempre derivato dalla posizione nell'array (mai un id
+// fisso salvato altrove) non serve nessuna migrazione.
+function removeWeek(weekIdx){
+  if(weekIdx === 0) return;
+  state.extraWeeks.splice(weekIdx-1, 1);
+  state.expandedDay = null;
+  state.swapOpenDay = null;
   persist();
   render();
 }
 
-// Scambia le ricette di due giorni (drag&drop nel Menù): entrambi diventano
-// override manuali, coerente con "Cambia ricetta" — il "fatta" non ha più
-// senso dopo lo scambio, quindi si azzera per entrambi i giorni coinvolti.
-function swapDayRecipes(i, j){
-  if(i === j) return;
-  const nameI = effectiveRecipeName(i);
-  const nameJ = effectiveRecipeName(j);
-  state.weekOverrides[i] = nameJ;
-  state.weekOverrides[j] = nameI;
-  delete state.mealsDone[i];
-  delete state.mealsDone[j];
+// Scambia le ricette di due giorni, anche tra settimane diverse (drag&drop nel
+// Menù): entrambi diventano override manuali, coerente con "Cambia ricetta" —
+// il "fatta" non ha più senso dopo lo scambio, quindi si azzera per entrambi.
+function swapDayRecipes(weekIdxA, i, weekIdxB, j){
+  if(weekIdxA === weekIdxB && i === j) return;
+  const nameI = effectiveRecipeName(weekIdxA, i);
+  const nameJ = effectiveRecipeName(weekIdxB, j);
+  weekOverridesRef(weekIdxA)[i] = nameJ;
+  weekOverridesRef(weekIdxB)[j] = nameI;
+  delete weekMealsDoneRef(weekIdxA)[i];
+  delete weekMealsDoneRef(weekIdxB)[j];
   state.swapOpenDay = null;
   persist();
   render();
@@ -999,156 +1092,190 @@ function renderRecipeEditModal(){
     </div>`;
 }
 
-function renderMenu(){
-  const weekDates = upcomingWeekDates();
+// Un giorno di una qualunque settimana (weekIdx 0 = corrente, >=1 = extra).
+// dayKey identifica il giorno in modo univoco tra tutte le settimane mostrate
+// insieme, usato per lo state ephemeral (espanso, swap aperto, modale fatta...).
+function renderDayCard(weekIdx, i, pos, weekDates){
+  const dayKey = `${weekIdx}_${i}`;
+  const d = DATA.week1[i];
+  const dateLabel = formatShortDate(weekDates[pos]);
+  const isToday = isSameDay(weekDates[pos], new Date());
+  const name = effectiveRecipeName(weekIdx, i);
+  const hasManualOverride = !!weekOverridesRef(weekIdx)[i];
+  const isChanged = weekIdx !== 0 || hasManualOverride || !!(state.weekBaseline && state.weekBaseline[i]);
+  const rec = effectiveRecipeMeta(weekIdx, i); // dati di catalogo, se disponibili
+  const currentCat = effectiveCategoria(weekIdx, i);
+  let swapPanelHtml = '';
+  if(state.swapOpenDay === dayKey){
+    const f = state.swapFilters[dayKey] || {search:'', cat: currentCat ? 'same' : 'all'};
+    state.swapFilters[dayKey] = f;
+    let results = DATA.recipes;
+    if(f.cat === 'same' && currentCat) results = results.filter(r=>r.categoriaNew === currentCat);
+    if(f.search) results = results.filter(r=>r.nome.toLowerCase().includes(f.search.toLowerCase()));
+    const resultsHtml = results.slice(0, 60).map(r=>`
+      <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${dayKey}">
+        <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
+        <span class="swap-result-name">${escapeHtml(r.nome)}</span>
+        <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
+      </div>`).join('');
+    swapPanelHtml = `
+    <div class="swap-panel">
+      <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${dayKey}" value="${escapeAttr(f.search)}">
+      <div class="swap-cat-chips">
+        ${currentCat ? `<button class="chip-btn ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${dayKey}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
+        <button class="chip-btn ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${dayKey}">Tutte le categorie</button>
+      </div>
+      <div class="swap-results">
+        ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+        ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
+      </div>
+    </div>`;
+  }
+  const isDone = !!weekMealsDoneRef(weekIdx)[i];
+  const swapControls = `
+    <div class="swap-controls">
+      <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
+      <button class="mini-add-btn" data-open-swap="${dayKey}">🔀 Cambia ricetta</button>
+      ${hasManualOverride ? `<button class="mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
+    </div>
+    ${swapPanelHtml}`;
+
+  // tempo: se cambiata (a mano o generata) e in catalogo, usa il tempo della nuova ricetta; altrimenti quello originale del giorno
+  const timeDisplay = (isChanged && rec) ? rec.tempo : d.tempo;
+
+  // note: se cambiata, ricostruite dalla ricetta scelta; altrimenti quelle originali del foglio (solo settimana corrente)
+  let metaLines = [];
+  if(isChanged){
+    if(rec){
+      if(rec.prep && rec.prep !== 'No') metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
+      if(rec.freezer === 'Sì') metaLines.push(`<b>Nota:</b> congela bene — valuta doppia dose per il freezer`);
+    } else {
+      metaLines.push(`<b>Nota:</b> ricetta non presente nel catalogo, dettagli non disponibili`);
+    }
+  } else {
+    if(d.ricordare && d.ricordare !== 'Niente') metaLines.push(`<b>Da ricordare:</b> ${escapeHtml(d.ricordare)}`);
+    if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
+  }
+
+  // auto reminder: se domani è Legumi, avvisa oggi (il "domani" segue l'ordine
+  // di visualizzazione, non l'indice originale, dato che la settimana parte dal sabato;
+  // non attraversa il confine tra una settimana e la successiva)
+  let soakChip = '';
+  if(pos < WEEK_DISPLAY_ORDER.length - 1){
+    const nextCat = effectiveCategoria(weekIdx, WEEK_DISPLAY_ORDER[pos+1]);
+    if(nextCat === 'legumi'){
+      soakChip = `<div class="soak-chip">💧 Domani legumi — valuta l'ammollo stasera</div>`;
+    }
+  }
+
+  let detailHtml = '';
+  if(state.expandedDay === dayKey){
+    const det = getRecipeDetails(name);
+    const ing = getIngredientsFor(name);
+    const ingHtml = ing.length
+      ? `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${ing.map(it=>`<li><span>${escapeHtml(it.ingrediente)}</span><span style="color:var(--sage)">${escapeHtml(it.qta||'')}</span></li>`).join('')}</ul></div>`
+      : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
+    const tagsHtml = rec ? `
+      <div class="detail-tags">
+        <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
+        <span class="tag tempo">${escapeHtml(det ? "⏱ " + det.tempo : TEMPO_LABEL[rec.tempoBucket])}</span>
+        ${det ? `<span class="tag">${escapeHtml(det.porzioni)}</span>` : ''}
+        <span class="tag season">${rec.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
+        <span class="tag freezer">${escapeHtml(FREEZER_LABEL[rec.freezerNew])}</span>
+        <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[rec.avanziNew])}</span>
+        ${rec.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
+      </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
+    const stepsHtml = det && det.procedimento && det.procedimento.length
+      ? `<div class="detail-section"><div class="detail-section-title">👩🏻‍🍳 Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+      : '';
+    const noteExtra = det ? [
+        det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
+        det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
+        det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
+      ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
+    const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title">📝 Note</div>${noteExtra}</div>` : '';
+    const linkHtml = det && det.link ? `<div class="detail-section"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">🔗 Fonte della ricetta</a></div>` : '';
+    const addFormHtml = det ? '' : `
+      <div class="add-ing-form">
+        <input type="text" placeholder="Ingrediente" data-ning="${dayKey}">
+        <input type="text" placeholder="Quantità" data-nqta="${dayKey}">
+        <button data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
+      </div>`;
+    const editRecipeBtn = rec ? `<button class="mini-add-btn" data-open-recipe-edit="${escapeAttr(name)}">✏️ Modifica ricetta</button>` : '';
+    detailHtml = `
+    <div class="detail-box">
+      ${tagsHtml}
+      ${ingHtml}
+      ${noteBox}
+      ${stepsHtml}
+      ${linkHtml}
+      ${addFormHtml}
+      ${editRecipeBtn}
+    </div>`;
+  }
+
+  return `
+  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
+    <div class="day-row">
+      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span>${isToday ? '<span class="today-badge">Oggi</span>' : ''}</div>
+      <div class="day-time">${escapeHtml(timeDisplay)}</div>
+    </div>
+    <div class="day-menu-row">
+      <span class="day-menu" data-toggle-day="${dayKey}">${escapeHtml(name)}</span>
+      <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
+    </div>
+    <div class="day-meta">
+      ${metaLines.map(l=>`<div>${l}</div>`).join('')}
+    </div>
+    ${soakChip}
+    ${detailHtml}
+    ${swapControls}
+  </div>`;
+}
+
+// Un blocco settimana completo: intestazione con data, striscia categorie,
+// 7 giorni, e i controlli per generare/rigenerare (e, per le extra, rimuovere).
+function renderWeekSection(weekIdx){
+  const weekDates = weekDatesFor(weekIdx);
   const strip = WEEK_DISPLAY_ORDER.map(i=>{
     const d = DATA.week1[i];
-    const cat = effectiveCategoria(i);
+    const cat = effectiveCategoria(weekIdx, i);
     return `<div class="balance-chip">
       <div class="bd">${d.giorno.slice(0,3)}</div>
       <div class="bc">${cat ? catIcon(cat) : '—'}</div>
     </div>`;
   }).join('');
 
-  const days = WEEK_DISPLAY_ORDER.map((i,pos)=>{
-    const d = DATA.week1[i];
-    const dateLabel = formatShortDate(weekDates[pos]);
-    const name = effectiveRecipeName(i);
-    const hasManualOverride = !!state.weekOverrides[i];
-    const isChanged = hasManualOverride || !!(state.weekBaseline && state.weekBaseline[i]);
-    const rec = effectiveRecipeMeta(i); // dati di catalogo, se disponibili
-    const currentCat = effectiveCategoria(i);
-    let swapPanelHtml = '';
-    if(state.swapOpenDay === i){
-      const f = state.swapFilters[i] || {search:'', cat: currentCat ? 'same' : 'all'};
-      state.swapFilters[i] = f;
-      let results = DATA.recipes;
-      if(f.cat === 'same' && currentCat) results = results.filter(r=>r.categoriaNew === currentCat);
-      if(f.search) results = results.filter(r=>r.nome.toLowerCase().includes(f.search.toLowerCase()));
-      const resultsHtml = results.slice(0, 60).map(r=>`
-        <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${i}">
-          <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
-          <span class="swap-result-name">${escapeHtml(r.nome)}</span>
-          <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
-        </div>`).join('');
-      swapPanelHtml = `
-      <div class="swap-panel">
-        <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${i}" value="${escapeAttr(f.search)}">
-        <div class="swap-cat-chips">
-          ${currentCat ? `<button class="chip-btn ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${i}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
-          <button class="chip-btn ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${i}">Tutte le categorie</button>
-        </div>
-        <div class="swap-results">
-          ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
-          ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
-        </div>
-      </div>`;
-    }
-    const isDone = !!state.mealsDone[i];
-    const swapControls = `
-      <div class="swap-controls">
-        <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${i}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
-        <button class="mini-add-btn" data-open-swap="${i}">🔀 Cambia ricetta</button>
-        ${hasManualOverride ? `<button class="mini-add-btn" data-reset-swap="${i}">↺ Originale</button>` : ''}
-      </div>
-      ${swapPanelHtml}`;
+  const days = WEEK_DISPLAY_ORDER.map((i,pos)=> renderDayCard(weekIdx, i, pos, weekDates)).join('');
 
-    // tempo: se cambiata (a mano o generata) e in catalogo, usa il tempo della nuova ricetta; altrimenti quello originale del giorno
-    const timeDisplay = (isChanged && rec) ? rec.tempo : d.tempo;
-
-    // note: se cambiata, ricostruite dalla ricetta scelta; altrimenti quelle originali del foglio
-    let metaLines = [];
-    if(isChanged){
-      if(rec){
-        if(rec.prep && rec.prep !== 'No') metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
-        if(rec.freezer === 'Sì') metaLines.push(`<b>Nota:</b> congela bene — valuta doppia dose per il freezer`);
-      } else {
-        metaLines.push(`<b>Nota:</b> ricetta non presente nel catalogo, dettagli non disponibili`);
-      }
-    } else {
-      if(d.ricordare && d.ricordare !== 'Niente') metaLines.push(`<b>Da ricordare:</b> ${escapeHtml(d.ricordare)}`);
-      if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
-    }
-
-    // auto reminder: se domani è Legumi, avvisa oggi (il "domani" segue l'ordine
-    // di visualizzazione, non l'indice originale, dato che la settimana ora parte dal sabato)
-    let soakChip = '';
-    if(pos < WEEK_DISPLAY_ORDER.length - 1){
-      const nextCat = effectiveCategoria(WEEK_DISPLAY_ORDER[pos+1]);
-      if(nextCat === 'legumi'){
-        soakChip = `<div class="soak-chip">💧 Domani legumi — valuta l'ammollo stasera</div>`;
-      }
-    }
-
-    let detailHtml = '';
-    if(state.expandedDay === i){
-      const det = getRecipeDetails(name);
-      const ing = getIngredientsFor(name);
-      const ingHtml = ing.length
-        ? `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${ing.map(it=>`<li><span>${escapeHtml(it.ingrediente)}</span><span style="color:var(--sage)">${escapeHtml(it.qta||'')}</span></li>`).join('')}</ul></div>`
-        : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
-      const tagsHtml = rec ? `
-        <div class="detail-tags">
-          <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
-          <span class="tag tempo">${escapeHtml(det ? "⏱ " + det.tempo : TEMPO_LABEL[rec.tempoBucket])}</span>
-          ${det ? `<span class="tag">${escapeHtml(det.porzioni)}</span>` : ''}
-          <span class="tag season">${rec.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
-          <span class="tag freezer">${escapeHtml(FREEZER_LABEL[rec.freezerNew])}</span>
-          <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[rec.avanziNew])}</span>
-          ${rec.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
-        </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
-      const stepsHtml = det && det.procedimento && det.procedimento.length
-        ? `<div class="detail-section"><div class="detail-section-title">👩🏻‍🍳 Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
-        : '';
-      const noteExtra = det ? [
-          det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
-          det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
-          det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
-        ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
-      const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title">📝 Note</div>${noteExtra}</div>` : '';
-      const linkHtml = det && det.link ? `<div class="detail-section"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">🔗 Fonte della ricetta</a></div>` : '';
-      const addFormHtml = det ? '' : `
-        <div class="add-ing-form">
-          <input type="text" placeholder="Ingrediente" data-ning="${i}">
-          <input type="text" placeholder="Quantità" data-nqta="${i}">
-          <button data-add-ing="${i}">+ aggiungi ingrediente</button>
-        </div>`;
-      const editRecipeBtn = rec ? `<button class="mini-add-btn" data-open-recipe-edit="${escapeAttr(name)}">✏️ Modifica ricetta</button>` : '';
-      detailHtml = `
-      <div class="detail-box">
-        ${tagsHtml}
-        ${ingHtml}
-        ${noteBox}
-        ${stepsHtml}
-        ${linkHtml}
-        ${addFormHtml}
-        ${editRecipeBtn}
-      </div>`;
-    }
-
-    return `
-    <div class="day-card${isDone ? ' done' : ''}" data-day-index="${i}">
-      <div class="day-row">
-        <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
-        <div class="day-time">${escapeHtml(timeDisplay)}</div>
-      </div>
-      <div class="day-menu-row">
-        <span class="day-menu" data-toggle-day="${i}">${escapeHtml(name)}</span>
-        <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
-      </div>
-      <div class="day-meta">
-        ${metaLines.map(l=>`<div>${l}</div>`).join('')}
-      </div>
-      ${soakChip}
-      ${detailHtml}
-      ${swapControls}
+  const controls = weekIdx === 0 ? `
+    <div class="generate-week-block">
+      <button class="generate-week-btn" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256"><path fill="currentColor" d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z"></path></svg>Genera nuovo menù</button>
+      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. Da lunedì a venerdì solo ricette fino a 30–45 min.</p>
+    </div>` : `
+    <div class="generate-week-block">
+      <button class="mini-add-btn" data-generate-week="${weekIdx}">🔀 Rigenera questa settimana</button>
+      <button class="mini-add-btn" data-remove-week="${weekIdx}">🗑️ Rimuovi settimana</button>
     </div>`;
-  }).join('');
+
+  return `
+    <section class="week-section">
+      <h2 class="section-title">Settimana del ${weekLabelFor(weekIdx)}</h2>
+      <div class="balance-strip">${strip}</div>
+      ${days}
+      ${controls}
+    </section>`;
+}
+
+function renderMenu(){
+  const weekSections = [0, ...state.extraWeeks.map((_,n)=>n+1)]
+    .map(weekIdx => renderWeekSection(weekIdx)).join('');
 
   let doneModal = '';
   if(state.doneModalDay !== null){
-    const di = state.doneModalDay;
-    const doneName = effectiveRecipeName(di);
+    const [dw, di] = state.doneModalDay.split('_');
+    const doneWeekIdx = parseInt(dw,10);
+    const doneName = effectiveRecipeName(doneWeekIdx, di);
     const doneIng = getIngredientsFor(doneName);
     const qtyMap = state.doneModalQty || {};
     doneModal = `
@@ -1180,36 +1307,33 @@ function renderMenu(){
         </div>` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
         <div class="filters-modal-footer">
           <button class="reset-btn" data-close-done-modal>Annulla</button>
-          <button class="mini-add-btn" data-confirm-done="${di}">Conferma</button>
+          <button class="mini-add-btn" data-confirm-done="${state.doneModalDay}">Conferma</button>
         </div>
       </div>
     </div>`;
   }
 
   return `
-    <h2 class="section-title">Settimana del ${upcomingWeekLabel()}</h2>
     <p class="section-sub">Tocca il nome di una ricetta per vederne i dettagli — trascina ⠿ per scambiarla con un altro giorno</p>
-    <div class="balance-strip">${strip}</div>
-    ${days}
+    ${weekSections}
     ${doneModal}
     ${renderRecipeEditModal()}
     <div class="generate-week-block">
-      <button class="generate-week-btn" id="generate-week"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256"><path fill="currentColor" d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z"></path></svg>Genera nuovo menù</button>
-      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. Da lunedì a venerdì solo ricette fino a 30–45 min.</p>
+      <button class="generate-week-btn" id="add-week">+ Aggiungi settimana</button>
+      <p class="generate-week-hint">Pianifica un'altra settimana in più, con le stesse regole del menù generato.</p>
     </div>
   `;
 }
 
 function renderSpesa(){
-  // costruisco una lista piatta di tutti gli articoli, con contesto e chiave stabile
+  // costruisco una lista piatta di tutti gli articoli (settimana corrente + extra), con contesto e chiave stabile
   const flat = [];
-  DATA.week1.forEach((d,i)=>{
-    const name = effectiveRecipeName(i);
+  allPlannedDays().forEach(({weekIdx,i,giorno,dateLabel,name})=>{
     const items = getIngredientsFor(name);
     items.forEach((it,idx)=>{
-      const key = `d${i}_${idx}`;
+      const key = dayIngKey(weekIdx, i, idx);
       if(state.shopDismissed[key]) return;
-      flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:`${d.giorno} · ${name}`, staple: isStaple(it.ingrediente) });
+      flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, staple: isStaple(it.ingrediente) });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
@@ -1301,16 +1425,15 @@ function renderSpesa(){
       </div>`;
     }).join('');
   } else {
-    body = WEEK_DISPLAY_ORDER.map(i=>{
-      const d = DATA.week1[i];
-      const name = effectiveRecipeName(i);
-      const dayItems = mainFlat.filter(it => it.context === `${d.giorno} · ${name}`);
+    body = allPlannedDays().map(({giorno,dateLabel,name})=>{
+      const context = `${giorno} ${dateLabel} · ${name}`;
+      const dayItems = mainFlat.filter(it => it.context === context);
       const rows = dayItems.length
         ? dayItems.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')
         : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`;
       return `
       <div class="shop-day-group">
-        <div class="shop-day-title">${escapeHtml(d.giorno)} · ${escapeHtml(name)}</div>
+        <div class="shop-day-title">${escapeHtml(giorno)} ${escapeHtml(dateLabel)} · ${escapeHtml(name)}</div>
         ${rows}
       </div>`;
     }).join('');
@@ -1332,12 +1455,12 @@ function renderSpesa(){
     }
   }
 
-  const missingDays = DATA.week1
-    .map((d,i)=>({giorno:d.giorno, nome: effectiveRecipeName(i)}))
+  const missingDays = allPlannedDays()
+    .map(({giorno,dateLabel,name})=>({giorno, dateLabel, nome:name}))
     .filter(d => !(getIngredientsFor(d.nome) && getIngredientsFor(d.nome).length));
   const missingBanner = missingDays.length ? `
     <div class="missing-ing-banner">
-      ⚠️ Ingredienti non ancora salvati per: ${missingDays.map(d=>`${escapeHtml(d.giorno)} (${escapeHtml(d.nome)})`).join(', ')}. Aprili dal Menù per aggiungerli.
+      ⚠️ Ingredienti non ancora salvati per: ${missingDays.map(d=>`${escapeHtml(d.giorno)} ${escapeHtml(d.dateLabel)} (${escapeHtml(d.nome)})`).join(', ')}. Aprili dal Menù per aggiungerli.
     </div>` : '';
 
   return `
@@ -1660,22 +1783,29 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-open-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const i = parseInt(e.target.dataset.openSwap);
-      state.swapOpenDay = state.swapOpenDay === i ? null : i;
+      const key = e.target.dataset.openSwap;
+      state.swapOpenDay = state.swapOpenDay === key ? null : key;
       render();
     });
   });
   document.querySelectorAll('[data-drag-handle]').forEach(handle=>{
     handle.addEventListener('pointerdown', startDayDrag);
   });
-  const genWeekBtn = document.getElementById('generate-week');
-  if(genWeekBtn) genWeekBtn.addEventListener('click', ()=>{ generateWeekMenu(); });
+  document.querySelectorAll('[data-generate-week]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ generateWeek(parseInt(e.currentTarget.dataset.generateWeek,10)); });
+  });
+  document.querySelectorAll('[data-remove-week]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ removeWeek(parseInt(e.currentTarget.dataset.removeWeek,10)); });
+  });
+  const addWeekBtn = document.getElementById('add-week');
+  if(addWeekBtn) addWeekBtn.addEventListener('click', ()=>{ addWeek(); });
 
   document.querySelectorAll('[data-reset-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const i = e.target.dataset.resetSwap;
-      delete state.weekOverrides[i];
-      delete state.mealsDone[i];
+      const [w,i] = e.target.dataset.resetSwap.split('_');
+      const weekIdx = parseInt(w,10);
+      delete weekOverridesRef(weekIdx)[i];
+      delete weekMealsDoneRef(weekIdx)[i];
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -1701,10 +1831,11 @@ function attachHandlers(){
   document.querySelectorAll('[data-swap-pick]').forEach(row=>{
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
-      const i = el.dataset.swapDay;
+      const [w,i] = el.dataset.swapDay.split('_');
+      const weekIdx = parseInt(w,10);
       const recipeName = el.dataset.swapPick;
-      state.weekOverrides[i] = recipeName;
-      delete state.mealsDone[i];
+      weekOverridesRef(weekIdx)[i] = recipeName;
+      delete weekMealsDoneRef(weekIdx)[i];
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -1712,19 +1843,22 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const i = e.currentTarget.dataset.toggleDone;
-      if(state.mealsDone[i]){
-        delete state.mealsDone[i];
+      const key = e.currentTarget.dataset.toggleDone;
+      const [w,i] = key.split('_');
+      const weekIdx = parseInt(w,10);
+      const mealsDone = weekMealsDoneRef(weekIdx);
+      if(mealsDone[i]){
+        delete mealsDone[i];
         persist(); render();
       } else {
-        const recipeName = effectiveRecipeName(i);
+        const recipeName = effectiveRecipeName(weekIdx, i);
         const qtyMap = {};
         getIngredientsFor(recipeName).forEach(it=>{
-          const key = (it.ingrediente||'').trim().toLowerCase();
-          const pantryIt = state.pantryItems[key];
+          const pantryKey = (it.ingrediente||'').trim().toLowerCase();
+          const pantryIt = state.pantryItems[pantryKey];
           if(pantryIt && typeof pantryIt.qty === 'number') qtyMap[it.ingrediente] = pantryIt.qty;
         });
-        state.doneModalDay = i;
+        state.doneModalDay = key;
         state.doneModalQty = qtyMap;
         render();
       }
@@ -1754,13 +1888,14 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-confirm-done]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const i = e.currentTarget.dataset.confirmDone;
+      const key = e.currentTarget.dataset.confirmDone;
+      const [w,i] = key.split('_');
       const qtyMap = state.doneModalQty || {};
       Object.keys(qtyMap).forEach(ingrediente=>{
-        const key = ingrediente.trim().toLowerCase();
-        if(state.pantryItems[key]) state.pantryItems[key].qty = qtyMap[ingrediente];
+        const pantryKey = ingrediente.trim().toLowerCase();
+        if(state.pantryItems[pantryKey]) state.pantryItems[pantryKey].qty = qtyMap[ingrediente];
       });
-      state.mealsDone[i] = true;
+      weekMealsDoneRef(parseInt(w,10))[i] = true;
       state.doneModalDay = null;
       state.doneModalQty = {};
       persist(); render();
@@ -1769,25 +1904,26 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-toggle-day]').forEach(el=>{
     el.addEventListener('click', e=>{
-      const i = parseInt(e.target.dataset.toggleDay);
-      state.expandedDay = state.expandedDay === i ? null : i;
+      const key = e.target.dataset.toggleDay;
+      state.expandedDay = state.expandedDay === key ? null : key;
       render();
     });
   });
 
   document.querySelectorAll('[data-add-ing]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const i = e.target.dataset.addIng;
-      const nameInput = document.querySelector(`[data-ning="${i}"]`);
-      const qtaInput = document.querySelector(`[data-nqta="${i}"]`);
+      const key = e.target.dataset.addIng;
+      const nameInput = document.querySelector(`[data-ning="${key}"]`);
+      const qtaInput = document.querySelector(`[data-nqta="${key}"]`);
       const ingrediente = nameInput.value.trim();
       const qta = qtaInput.value.trim();
       if(!ingrediente) return;
-      const recipeName = effectiveRecipeName(parseInt(i));
+      const [w,i] = key.split('_');
+      const recipeName = effectiveRecipeName(parseInt(w,10), i);
       if(!state.recipeIngredients[recipeName]) state.recipeIngredients[recipeName] = [];
       state.recipeIngredients[recipeName].push({ingrediente, qta, dove:'', note:''});
       persist(); render();
-      state.expandedDay = parseInt(i);
+      state.expandedDay = key;
     });
   });
 
@@ -2092,15 +2228,34 @@ function startDayDrag(e){
   document.body.appendChild(ghost);
   positionGhost(ghost, e.clientX, e.clientY);
   card.classList.add('dragging');
-  dragState = { sourceIndex: card.dataset.dayIndex, sourceCard: card, ghost, lastTarget: null };
+  dragState = { sourceWeekIdx: card.dataset.weekIdx, sourceIndex: card.dataset.dayIndex, sourceCard: card, ghost, lastTarget: null };
   e.currentTarget.setPointerCapture(e.pointerId);
+  lastPointerY = e.clientY;
+  if(!autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
 }
 function positionGhost(ghost, x, y){
   ghost.style.left = (x + 14) + 'px';
   ghost.style.top = (y - 40) + 'px';
 }
+let lastPointerY = 0;
+let autoScrollRAF = null;
+// Con più settimane il giorno di destinazione può essere fuori schermo: tenendo
+// il dito vicino al bordo superiore/inferiore durante il trascinamento la pagina
+// scorre da sola, come in una lista nativa con drag&drop.
+function autoScrollTick(){
+  if(!dragState){ autoScrollRAF = null; return; }
+  const margin = 80, maxSpeed = 16;
+  const vh = window.innerHeight;
+  if(lastPointerY < margin){
+    window.scrollBy(0, -maxSpeed * (1 - lastPointerY/margin));
+  } else if(lastPointerY > vh - margin){
+    window.scrollBy(0, maxSpeed * (1 - (vh - lastPointerY)/margin));
+  }
+  autoScrollRAF = requestAnimationFrame(autoScrollTick);
+}
 document.addEventListener('pointermove', e=>{
   if(!dragState) return;
+  lastPointerY = e.clientY;
   positionGhost(dragState.ghost, e.clientX, e.clientY);
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const targetCard = el ? el.closest('.day-card') : null;
@@ -2114,12 +2269,12 @@ document.addEventListener('pointermove', e=>{
 });
 function endDayDrag(commit){
   if(!dragState) return;
-  const { sourceIndex, sourceCard, ghost, lastTarget } = dragState;
+  const { sourceWeekIdx, sourceIndex, sourceCard, ghost, lastTarget } = dragState;
   ghost.remove();
   sourceCard.classList.remove('dragging');
   if(lastTarget) lastTarget.classList.remove('drag-over');
   dragState = null;
-  if(commit && lastTarget) swapDayRecipes(sourceIndex, lastTarget.dataset.dayIndex);
+  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), sourceIndex, parseInt(lastTarget.dataset.weekIdx,10), lastTarget.dataset.dayIndex);
 }
 document.addEventListener('pointerup', ()=> endDayDrag(true));
 document.addEventListener('pointercancel', ()=> endDayDrag(false));
