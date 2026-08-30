@@ -48,6 +48,8 @@
   .balance-chip .bc{ font-size:18px; margin-top:3px; line-height:1; }
 
   .day-card{ border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; background:#fffdf8; }
+  .day-card.done{ border-color:var(--sage); background:rgba(124,139,111,0.08); }
+  .day-card.done .day-menu{ text-decoration:line-through; opacity:0.6; }
   .day-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
   .day-name{ font-family:'Fraunces', serif; font-weight:700; font-size:16px; color:var(--green-deep); min-width:90px; }
   .day-time{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--ink); opacity:0.75; background:rgba(42,36,32,0.08); padding:2px 8px; border-radius:20px; }
@@ -72,6 +74,11 @@
   .swap-result-icon{ font-size:15px; flex-shrink:0; }
   .swap-result-name{ flex:1; font-weight:600; }
   .swap-result-time{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--sage); flex-shrink:0; }
+
+  .done-ing-list{ display:flex; flex-direction:column; gap:2px; }
+  .done-ing-row{ display:flex; align-items:center; gap:9px; font-size:13.5px; padding:7px 2px; border-bottom:1px dashed var(--line); cursor:pointer; }
+  .done-ing-row:last-child{ border-bottom:none; }
+  .done-ing-row input[type=checkbox]{ width:16px; height:16px; accent-color:var(--tomato); flex-shrink:0; }
 
   .detail-box{ margin-top:10px; padding:12px; background:rgba(124,139,111,0.08); border-radius:10px; border:1px solid var(--line); }
   .detail-tags{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; }
@@ -443,6 +450,9 @@ const state = {
   expandedRecipe: null,
   swapOpenDay: null,
   swapFilters: {},
+  mealsDone: {},
+  doneModalDay: null,
+  doneModalChecks: {},
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
   filters: { cat:'', tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' }
 };
@@ -595,6 +605,7 @@ function persist(){
       weekOverrides: state.weekOverrides,
       weekBaseline: state.weekBaseline,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
+      mealsDone: state.mealsDone,
       recipeIngredients: state.recipeIngredients,
       pantryItems: state.pantryItems,
       pantrySeeded: state.pantrySeeded,
@@ -716,6 +727,7 @@ function generateWeekMenu(){
   state.weekOverrides = {};
   state.expandedDay = null;
   state.swapOpenDay = null;
+  state.mealsDone = {};
   persist();
   render();
 }
@@ -771,8 +783,10 @@ function renderMenu(){
         </div>
       </div>`;
     }
+    const isDone = !!state.mealsDone[i];
     const swapControls = `
       <div class="swap-controls">
+        <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${i}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
         <button class="mini-add-btn" data-open-swap="${i}">🔀 Cambia ricetta</button>
         ${hasManualOverride ? `<button class="mini-add-btn" data-reset-swap="${i}">↺ Originale</button>` : ''}
       </div>
@@ -849,7 +863,7 @@ function renderMenu(){
     }
 
     return `
-    <div class="day-card">
+    <div class="day-card${isDone ? ' done' : ''}">
       <div class="day-row">
         <div class="day-name">${d.giorno}</div>
         <div class="day-time">${escapeHtml(timeDisplay)}</div>
@@ -866,11 +880,42 @@ function renderMenu(){
     </div>`;
   }).join('');
 
+  let doneModal = '';
+  if(state.doneModalDay !== null){
+    const di = state.doneModalDay;
+    const doneName = effectiveRecipeName(di);
+    const doneIng = getIngredientsFor(doneName);
+    const checks = state.doneModalChecks || {};
+    doneModal = `
+    <div class="filters-modal-backdrop" data-close-done-modal>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Ricetta fatta! 🎉</h3>
+          <button class="filters-close-btn" data-close-done-modal>✕</button>
+        </div>
+        <p class="section-sub" style="margin-top:-8px;">Quali ingredienti hai usato e finito? Verranno segnati come esauriti in Dispensa.</p>
+        ${doneIng.length ? `
+        <div class="done-ing-list">
+          ${doneIng.map(it=>`
+            <label class="done-ing-row">
+              <input type="checkbox" data-done-ing="${escapeAttr(it.ingrediente)}" ${checks[it.ingrediente] ? 'checked' : ''}>
+              <span>${escapeHtml(it.ingrediente)}</span>
+            </label>`).join('')}
+        </div>` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
+        <div class="filters-modal-footer">
+          <button class="reset-btn" data-close-done-modal>Annulla</button>
+          <button class="mini-add-btn" data-confirm-done="${di}">Conferma</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
   return `
     <h2 class="section-title">Settimana del ${upcomingWeekLabel()}</h2>
     <p class="section-sub">Tocca il nome di una ricetta per vederne i dettagli</p>
     <div class="balance-strip">${strip}</div>
     ${days}
+    ${doneModal}
     <div class="generate-week-block">
       <button class="generate-week-btn" id="generate-week"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256"><path fill="currentColor" d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z"></path></svg>Genera nuovo menù</button>
       <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. Da lunedì a venerdì solo ricette fino a 30–45 min.</p>
@@ -1347,6 +1392,7 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const i = e.target.dataset.resetSwap;
       delete state.weekOverrides[i];
+      delete state.mealsDone[i];
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -1375,7 +1421,50 @@ function attachHandlers(){
       const i = el.dataset.swapDay;
       const recipeName = el.dataset.swapPick;
       state.weekOverrides[i] = recipeName;
+      delete state.mealsDone[i];
       state.swapOpenDay = null;
+      persist(); render();
+    });
+  });
+
+  document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const i = e.currentTarget.dataset.toggleDone;
+      if(state.mealsDone[i]){
+        delete state.mealsDone[i];
+        persist(); render();
+      } else {
+        state.doneModalDay = i;
+        state.doneModalChecks = {};
+        render();
+      }
+    });
+  });
+  document.querySelectorAll('[data-close-done-modal]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.doneModalDay = null;
+      state.doneModalChecks = {};
+      render();
+    });
+  });
+  document.querySelectorAll('[data-done-ing]').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      state.doneModalChecks[e.currentTarget.dataset.doneIng] = e.currentTarget.checked;
+    });
+  });
+  document.querySelectorAll('[data-confirm-done]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const i = e.currentTarget.dataset.confirmDone;
+      const checks = state.doneModalChecks || {};
+      Object.keys(checks).forEach(ingrediente=>{
+        if(!checks[ingrediente]) return;
+        const key = ingrediente.trim().toLowerCase();
+        if(state.pantryItems[key]) state.pantryItems[key].qty = 0;
+      });
+      state.mealsDone[i] = true;
+      state.doneModalDay = null;
+      state.doneModalChecks = {};
       persist(); render();
     });
   });
