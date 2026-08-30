@@ -737,20 +737,27 @@ function persist(){
 // salvati). Settimana N (N>=1) = state.extraWeeks[N-1], una pianificazione aggiuntiva
 // creata con "Aggiungi settimana": stessa forma {baseline, overrides, mealsDone}, ma
 // senza il foglio originale (DATA.week1) come base, dato che non esiste per definizione.
+// Firebase Realtime Database elimina i campi il cui valore è un oggetto vuoto
+// ({}): appena una settimana extra viene sincronizzata, "overrides"/"mealsDone"
+// (spesso vuoti) possono sparire dal documento salvato. Le funzioni sotto si
+// "auto-riparano" ricreandoli al volo se mancano, invece di andare in errore
+// leggendo undefined (il bug che rompeva il render di Menù e Spesa).
 function weekOverridesRef(weekIdx){
-  if(weekIdx === 0) return state.weekOverrides;
+  if(weekIdx === 0) return state.weekOverrides || (state.weekOverrides = {});
   const w = state.extraWeeks[weekIdx-1];
-  return w ? w.overrides : {};
+  if(!w) return {};
+  return w.overrides || (w.overrides = {});
 }
 function weekBaselineRef(weekIdx){
   if(weekIdx === 0) return state.weekBaseline;
   const w = state.extraWeeks[weekIdx-1];
-  return w ? w.baseline : null;
+  return w ? (w.baseline || null) : null;
 }
 function weekMealsDoneRef(weekIdx){
-  if(weekIdx === 0) return state.mealsDone;
+  if(weekIdx === 0) return state.mealsDone || (state.mealsDone = {});
   const w = state.extraWeeks[weekIdx-1];
-  return w ? w.mealsDone : {};
+  if(!w) return {};
+  return w.mealsDone || (w.mealsDone = {});
 }
 function effectiveRecipeName(weekIdx, i){
   const overrides = weekOverridesRef(weekIdx);
