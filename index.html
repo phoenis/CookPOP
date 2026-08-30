@@ -360,15 +360,12 @@ const DEPT_RULES = [
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
 ];
-const STAPLE_KEYWORDS = [
-  'olio', 'sale', 'pepe', 'basilico', 'aglio', 'zucchero', 'aceto', 'origano',
-  'rosmarino', 'timo', 'alloro', 'peperoncino', 'noce moscata', 'paprika',
-  'cannella', 'prezzemolo'
-];
+// "Di solito li hai già" = reparto Utility (olio, sale, spezie, aceto...): stessa
+// classificazione già usata in Dispensa/Spesa per reparto, invece di un elenco di
+// parole chiave separato che poteva disallinearsi (es. basilico/aglio/prezzemolo
+// vi comparivano pur essendo classificati come verdura, non utility).
 function isStaple(ingrediente){
-  const s = (ingrediente||'').toLowerCase();
-  // parola intera, non sottostringa: altrimenti "pepe" intercetta anche "Peperoni"
-  return STAPLE_KEYWORDS.some(k => new RegExp(`\\b${k}\\b`).test(s));
+  return classifyDept(ingrediente) === 'utility';
 }
 
 // Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
