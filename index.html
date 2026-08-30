@@ -505,6 +505,7 @@ const state = {
   pantryLuogoPicker: null,
   pantryEditKey: null,
   weekOverrides: {},
+  weekOverridePicked: {},
   weekBaseline: null,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
@@ -674,6 +675,7 @@ function persist(){
       pantryChecked: state.pantryChecked,
       shopView: state.shopView,
       weekOverrides: state.weekOverrides,
+      weekOverridePicked: state.weekOverridePicked,
       weekBaseline: state.weekBaseline,
       extraWeeks: state.extraWeeks,
       dayLinks: state.dayLinks,
@@ -735,6 +737,17 @@ function weekMealsDoneRef(weekIdx){
   const w = state.extraWeeks[weekIdx-1];
   if(!w) return {};
   return w.mealsDone || (w.mealsDone = {});
+}
+// Marca solo i giorni la cui ricetta è stata scelta a mano dal catalogo
+// ("Cambia ricetta"), non quelli che l'hanno semplicemente ricevuta scambiando
+// il giorno con un altro (drag&drop o pulsante Cambia ricetta usato per uno
+// scambio): "↺ Originale" ha senso solo per riportare una scelta dal catalogo,
+// non per disfare uno scambio, che riguarda l'intera settimana.
+function weekOverridePickedRef(weekIdx){
+  if(weekIdx === 0) return state.weekOverridePicked || (state.weekOverridePicked = {});
+  const w = state.extraWeeks[weekIdx-1];
+  if(!w) return {};
+  return w.overridePicked || (w.overridePicked = {});
 }
 // Un giorno "avanzo" (state.dayLinks) rimanda semplicemente al giorno sorgente
 // per nome/meta ricetta: stessa ricetta ovunque venga letta, senza duplicare
@@ -926,9 +939,10 @@ function generateWeek(weekIdx){
   if(weekIdx === 0){
     state.weekBaseline = baseline;
     state.weekOverrides = {};
+    state.weekOverridePicked = {};
     state.mealsDone = {};
   } else {
-    state.extraWeeks[weekIdx-1] = { baseline, overrides:{}, mealsDone:{} };
+    state.extraWeeks[weekIdx-1] = { baseline, overrides:{}, overridePicked:{}, mealsDone:{} };
   }
   for(let i=0;i<7;i++){
     const dayKey = `${weekIdx}_${i}`;
@@ -965,6 +979,8 @@ function swapDayRecipes(weekIdxA, i, weekIdxB, j){
   const dayKeyA = `${weekIdxA}_${i}`, dayKeyB = `${weekIdxB}_${j}`;
   weekOverridesRef(weekIdxA)[i] = nameJ;
   weekOverridesRef(weekIdxB)[j] = nameI;
+  delete weekOverridePickedRef(weekIdxA)[i];
+  delete weekOverridePickedRef(weekIdxB)[j];
   delete weekMealsDoneRef(weekIdxA)[i];
   delete weekMealsDoneRef(weekIdxB)[j];
   delete state.dayLinks[dayKeyA];
@@ -1119,8 +1135,11 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   const dateLabel = formatShortDate(weekDates[pos]);
   const isToday = isSameDay(weekDates[pos], new Date());
   const name = effectiveRecipeName(weekIdx, i);
-  const hasManualOverride = !!weekOverridesRef(weekIdx)[i];
-  const isChanged = !!linkSource || weekIdx !== 0 || hasManualOverride || !!(state.weekBaseline && state.weekBaseline[i]);
+  const hasOverride = !!weekOverridesRef(weekIdx)[i];
+  // "↺ Originale" ha senso solo dopo una scelta manuale dal catalogo, non dopo
+  // uno scambio tra giorni (che riguarda l'intera settimana, non un giorno solo).
+  const hasPickedOverride = !!weekOverridePickedRef(weekIdx)[i];
+  const isChanged = !!linkSource || weekIdx !== 0 || hasOverride || !!(state.weekBaseline && state.weekBaseline[i]);
   const rec = effectiveRecipeMeta(weekIdx, i); // dati di catalogo, se disponibili
   const currentCat = effectiveCategoria(weekIdx, i);
   let swapPanelHtml = '';
@@ -1182,7 +1201,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     <div class="swap-controls">
       <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
       <button class="mini-add-btn" data-open-swap="${dayKey}">🔀 Cambia ricetta</button>
-      ${hasManualOverride ? `<button class="mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
+      ${hasPickedOverride ? `<button class="mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
       <button class="mini-add-btn" data-open-link-picker="${dayKey}">🥡 Segna come avanzo</button>
     </div>
     ${swapPanelHtml}
@@ -1880,6 +1899,7 @@ function attachHandlers(){
       const weekIdx = parseInt(w,10);
       state.dayLinks[dayKey] = sourceKey;
       delete weekOverridesRef(weekIdx)[i];
+      delete weekOverridePickedRef(weekIdx)[i];
       delete weekMealsDoneRef(weekIdx)[i];
       state.linkPickerOpenDay = null;
       persist(); render();
@@ -1909,6 +1929,7 @@ function attachHandlers(){
       const [w,i] = key.split('_');
       const weekIdx = parseInt(w,10);
       delete weekOverridesRef(weekIdx)[i];
+      delete weekOverridePickedRef(weekIdx)[i];
       delete weekMealsDoneRef(weekIdx)[i];
       delete state.dayLinks[key];
       unlinkDaysPointingTo(key);
@@ -1942,6 +1963,7 @@ function attachHandlers(){
       const weekIdx = parseInt(w,10);
       const recipeName = el.dataset.swapPick;
       weekOverridesRef(weekIdx)[i] = recipeName;
+      weekOverridePickedRef(weekIdx)[i] = true;
       delete weekMealsDoneRef(weekIdx)[i];
       delete state.dayLinks[key];
       unlinkDaysPointingTo(key);
@@ -2441,6 +2463,7 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
   if(DATA.forcedWeekBaseline && state.appliedForcedWeekVersion !== DATA.forcedWeekVersion){
     state.weekBaseline = DATA.forcedWeekBaseline;
     state.weekOverrides = {};
+    state.weekOverridePicked = {};
     state.appliedForcedWeekVersion = DATA.forcedWeekVersion;
     persist();
   }
