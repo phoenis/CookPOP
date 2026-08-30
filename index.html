@@ -153,9 +153,6 @@
   .item-detail{ display:block; font-size:11.5px; color:var(--sage); margin-top:1px; }
   .shop-progress{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--gold-dark); margin-bottom:12px; }
   .missing-ing-banner{ font-size:12.5px; line-height:1.5; background:rgba(179,58,58,0.08); border:1px solid rgba(179,58,58,0.25); color:var(--ink); border-radius:8px; padding:10px 12px; margin-bottom:14px; }
-  .staples-block{ margin-top:20px; padding-top:16px; border-top:1px dashed var(--line); }
-  .staples-title{ font-family:'Fraunces', serif; font-weight:700; font-size:15px; color:var(--ink); margin-bottom:2px; }
-  .staples-hint{ font-size:11.5px; color:var(--sage); margin:0 0 8px; }
   .view-toggle{ display:flex; gap:6px; margin-bottom:12px; }
   .view-btn{ flex:1; font-family:'JetBrains Mono', monospace; font-size:11.5px; padding:8px 6px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
   .view-btn.active{ background:var(--green-mid); color:#fff; border-color:var(--green-mid); }
@@ -371,39 +368,10 @@ function isStaple(ingrediente){
 // Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
 // nome (non nome+quantità: altrimenti lo stesso ingrediente con una qta scritta
 // in modo leggermente diverso da una ricetta all'altra compariva due volte).
-// Usata sia dalla lista della spesa sia dalla Dispensa (per mostrare quelli
-// confermati come "già in casa").
-function computeStapleList(){
-  const flat = [];
-  allPlannedDays().forEach(({weekIdx,i,giorno,dateLabel,name})=>{
-    getIngredientsFor(name).forEach((it,idx)=>{
-      const key = dayIngKey(weekIdx, i, idx);
-      if(!state.shopDismissed[key] && isStaple(it.ingrediente)) flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, context:`${giorno} ${dateLabel} · ${name}` });
-    });
-  });
-  DATA.generalShopping.forEach((it,idx)=>{
-    const key = `gen_${idx}`;
-    if(!state.shopDismissed[key] && isStaple(it.ingrediente)) flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, context:'Ogni settimana' });
-  });
-  Object.entries(state.shopExtras).forEach(([id, it])=>{
-    if(!state.shopDismissed[id] && isStaple(it.ingrediente)) flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, context:'Aggiunti a mano' });
-  });
-  const merged = {};
-  flat.forEach(it=>{
-    const mergeKey = (it.ingrediente||'').trim().toLowerCase();
-    if(!merged[mergeKey]) merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, keys: [it.key], contexts: [it.context] };
-    else{
-      merged[mergeKey].keys.push(it.key);
-      if(!merged[mergeKey].contexts.includes(it.context)) merged[mergeKey].contexts.push(it.context);
-    }
-  });
-  return Object.values(merged);
-}
 
-// Un basilare parte "confermato" (quindi spuntato, in "Di solito li hai già")
-// se lo si ha già in dispensa; se l'utente ha toccato la spunta a mano, quella
-// scelta vince sempre. Se non è confermato, le sue occorrenze restano/tornano
-// nella lista principale da comprare.
+// Un utility (basilare) parte "confermato" - quindi già spuntato in Spesa, al
+// suo posto nella lista normale - se lo si ha già in dispensa; se l'utente ha
+// toccato la spunta a mano, quella scelta vince sempre.
 function hasPantryStock(ingrediente){
   const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
   return !!(it && typeof it.qty === 'number' && it.qty > 0);
@@ -1350,18 +1318,21 @@ function renderSpesa(){
     flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
   });
 
-  // basilari "confermati" (già in dispensa, o spuntati a mano): restano nella
-  // sezione basilari; gli altri tornano/restano nella lista da comprare sopra.
-  const confirmedStapleNames = new Set(
-    computeStapleList().filter(isStapleConfirmed).map(it => it.ingrediente.trim().toLowerCase())
-  );
-  const mainFlat = flat.filter(it => !it.staple || !confirmedStapleNames.has(it.ingrediente.trim().toLowerCase()));
+  // Gli utility (basilari) già confermati - a mano o perché presenti in
+  // Dispensa - non finiscono più in una sezione a parte: restano nella lista
+  // normale (per giorno/per reparto) ma già spuntati, coerente con isStapleConfirmed.
+  const mainFlat = flat;
+
+  function isItemChecked(keys, ingrediente){
+    if(isStaple(ingrediente)) return isStapleConfirmed({keys, ingrediente});
+    return keys.every(k=>state.shopChecked[k]);
+  }
 
   const total = mainFlat.length;
-  const done = mainFlat.filter(it=>state.shopChecked[it.key]).length;
+  const done = mainFlat.filter(it=>isItemChecked([it.key], it.ingrediente)).length;
 
   function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked){
-    const checked = forcedChecked !== undefined ? forcedChecked : keys.every(k=>state.shopChecked[k]);
+    const checked = forcedChecked !== undefined ? forcedChecked : isItemChecked(keys, ingrediente);
     return `
     <div class="shop-item-row">
       <label class="shop-item ${checked?'checked':''}">
@@ -1374,14 +1345,6 @@ function renderSpesa(){
       <button class="inv-remove" data-shop-remove="${keys.join(',')}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
-
-  const confirmedStaples = computeStapleList().filter(isStapleConfirmed);
-  const staplesHtml = confirmedStaples.length ? `
-    <div class="staples-block">
-      <div class="staples-title">${DEPT_ICON.utility} ${DEPT_LABEL.utility}</div>
-      <p class="staples-hint">Già spuntati perché li hai in dispensa — togli la spunta se ti servono e passano nella lista sopra.</p>
-      ${confirmedStaples.map(it=>itemRow(it.keys, it.ingrediente, it.qta, '', it.contexts.join(' + '), true)).join('')}
-    </div>` : '';
 
   let body = '';
   if(state.shopView === 'reparto'){
@@ -1478,7 +1441,6 @@ function renderSpesa(){
     <div class="shop-progress">${done} / ${total} presi</div>
     <button class="reset-btn" id="reset-shop">Svuota spunte</button>
     ${body}
-    ${staplesHtml}
     <div class="inv-add-row">
       <input type="text" id="shop-add-name" placeholder="Ingrediente extra">
       <input type="text" id="shop-add-qta" placeholder="Quantità">
