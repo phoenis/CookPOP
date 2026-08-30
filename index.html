@@ -68,6 +68,7 @@
   .day-card.done .day-menu{ text-decoration:line-through; opacity:0.6; }
   .day-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
   .day-name{ font-family:'Fraunces', serif; font-weight:700; font-size:16px; color:var(--green-deep); min-width:90px; }
+  .day-date{ font-family:'JetBrains Mono', monospace; font-weight:400; font-size:11.5px; color:var(--sage); letter-spacing:0.02em; }
   .day-time{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--ink); opacity:0.75; background:rgba(42,36,32,0.08); padding:2px 8px; border-radius:20px; }
   .day-menu-row{ display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
   .day-menu{ font-size:14.5px; font-weight:600; cursor:pointer; color:var(--green-deep); border-bottom:1px dotted var(--sage); }
@@ -735,16 +736,39 @@ function effectiveCategoria(i){
 }
 
 const MONTHS_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
-function upcomingWeekLabel(){
+const MONTHS_IT_SHORT = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+
+// La settimana visualizzata parte dal sabato (giorno della spesa) e finisce
+// al venerdì successivo: DATA.week1 resta indicizzato Lun(0)...Dom(6) come
+// prima (weekOverrides/weekBaseline/mealsDone usano ancora questi indici),
+// qui si cambia solo l'ORDINE con cui i 7 giorni vengono mostrati.
+const WEEK_DISPLAY_ORDER = [5,6,0,1,2,3,4];
+
+function upcomingSaturday(){
   const today = new Date();
   const day = today.getDay(); // 0=dom, 1=lun ... 6=sab
-  const diffToMonday = (8 - day) % 7; // se oggi è lunedì, diff=0 (settimana in corso conta come "a venire")
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diffToMonday);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const dm = monday.getDate(), ds = sunday.getDate();
-  const mm = MONTHS_IT[monday.getMonth()], ms = MONTHS_IT[sunday.getMonth()];
+  const diffToSaturday = (6 - day + 7) % 7; // se oggi è sabato, diff=0 (settimana in corso conta come "a venire")
+  const saturday = new Date(today);
+  saturday.setDate(today.getDate() + diffToSaturday);
+  return saturday;
+}
+function upcomingWeekDates(){
+  const saturday = upcomingSaturday();
+  return WEEK_DISPLAY_ORDER.map((_,pos)=>{
+    const d = new Date(saturday);
+    d.setDate(saturday.getDate() + pos);
+    return d;
+  });
+}
+function formatShortDate(date){
+  return `${date.getDate()} ${MONTHS_IT_SHORT[date.getMonth()]}`;
+}
+function upcomingWeekLabel(){
+  const saturday = upcomingSaturday();
+  const friday = new Date(saturday);
+  friday.setDate(saturday.getDate() + 6);
+  const dm = saturday.getDate(), ds = friday.getDate();
+  const mm = MONTHS_IT[saturday.getMonth()], ms = MONTHS_IT[friday.getMonth()];
   if(mm === ms) return `${dm}–${ds} ${mm}`;
   return `${dm} ${mm} – ${ds} ${ms}`;
 }
@@ -948,7 +972,9 @@ function renderRecipeEditModal(){
 }
 
 function renderMenu(){
-  const strip = DATA.week1.map((d,i)=>{
+  const weekDates = upcomingWeekDates();
+  const strip = WEEK_DISPLAY_ORDER.map(i=>{
+    const d = DATA.week1[i];
     const cat = effectiveCategoria(i);
     return `<div class="balance-chip">
       <div class="bd">${d.giorno.slice(0,3)}</div>
@@ -956,7 +982,9 @@ function renderMenu(){
     </div>`;
   }).join('');
 
-  const days = DATA.week1.map((d,i)=>{
+  const days = WEEK_DISPLAY_ORDER.map((i,pos)=>{
+    const d = DATA.week1[i];
+    const dateLabel = formatShortDate(weekDates[pos]);
     const name = effectiveRecipeName(i);
     const hasManualOverride = !!state.weekOverrides[i];
     const isChanged = hasManualOverride || !!(state.weekBaseline && state.weekBaseline[i]);
@@ -1014,10 +1042,11 @@ function renderMenu(){
       if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
     }
 
-    // auto reminder: se domani è Legumi, avvisa oggi
+    // auto reminder: se domani è Legumi, avvisa oggi (il "domani" segue l'ordine
+    // di visualizzazione, non l'indice originale, dato che la settimana ora parte dal sabato)
     let soakChip = '';
-    if(i < DATA.week1.length - 1){
-      const nextCat = effectiveCategoria(i+1);
+    if(pos < WEEK_DISPLAY_ORDER.length - 1){
+      const nextCat = effectiveCategoria(WEEK_DISPLAY_ORDER[pos+1]);
       if(nextCat === 'legumi'){
         soakChip = `<div class="soak-chip">💧 Domani legumi — valuta l'ammollo stasera</div>`;
       }
@@ -1072,7 +1101,7 @@ function renderMenu(){
     return `
     <div class="day-card${isDone ? ' done' : ''}">
       <div class="day-row">
-        <div class="day-name">${d.giorno}</div>
+        <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
         <div class="day-time">${escapeHtml(timeDisplay)}</div>
       </div>
       <div class="day-menu-row">
@@ -1243,7 +1272,8 @@ function renderSpesa(){
       </div>`;
     }).join('');
   } else {
-    body = DATA.week1.map((d,i)=>{
+    body = WEEK_DISPLAY_ORDER.map(i=>{
+      const d = DATA.week1[i];
       const name = effectiveRecipeName(i);
       const dayItems = mainFlat.filter(it => it.context === `${d.giorno} · ${name}`);
       const rows = dayItems.length
