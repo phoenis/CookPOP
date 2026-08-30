@@ -153,7 +153,6 @@
   .heart{ font-size:18px; flex-shrink:0; }
   .cat-icon{ font-size:20px; flex-shrink:0; }
   .recipe-card-side{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
-  .recipe-time{ font-size:15px; line-height:1; cursor:help; }
   .recipe-list{ display:grid; grid-template-columns:1fr; gap:8px; }
   .recipe-list .recipe-card-wrap .detail-box{ margin-top:-2px; margin-bottom:0; border-top-left-radius:0; border-top-right-radius:0; }
 
@@ -263,8 +262,6 @@ function catIcon(cat){ return CAT_ICON[cat] || '🍽️'; }
 const CAT_ORDER = ['pasta','riso','carne','pesce','legumi','uova','verdure','forno'];
 
 const TEMPO_LABEL = { 'express':'⚡ Express — fino a 20 min', 'veloce':'🟢 Veloce — 20–30 min', 'normale':'🟡 Normale — 30–45 min', 'lunga':'🟠 Lunga — 45–90 min', 'progetto':'🔴 Progetto — oltre 90 min' };
-const TEMPO_DOT = { 'express':'⚡', 'veloce':'🟢', 'normale':'🟡', 'lunga':'🟠', 'progetto':'🔴' };
-const TEMPO_DURATION = { 'express':'fino a 20 min', 'veloce':'20–30 min', 'normale':'30–45 min', 'lunga':'45–90 min', 'progetto':'oltre 90 min' };
 const TEMPO_ORDER = ['express','veloce','normale','lunga','progetto'];
 
 const PIAN_LABEL = { 'nessuna':'Nessuna', 'ammollo':'Ammollo', 'scongelamento':'Scongelamento', 'marinatura':'Marinatura', 'impasto-lievitazione':'Impasto / lievitazione', 'prep-anticipata':'Preparazione anticipata' };
@@ -289,9 +286,9 @@ const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi'
 const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', utility:'Utility', surgelati:'Surgelati', altro:'Altro' };
 const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', utility:'🧂', surgelati:'❄️', altro:'🛒' };
 
-const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer'];
-const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer' };
-const LUOGO_ICON = { dispensa:'🗄️', ripostiglio:'📦', frigo:'🧊', freezer:'❄️' };
+const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','utility'];
+const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', utility:'Utility' };
+const LUOGO_ICON = { dispensa:'🗄️', ripostiglio:'📦', frigo:'🧊', freezer:'❄️', utility:'🧂' };
 const DEPT_RULES = [
   ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
   ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['pesce','pesce'],
@@ -1024,7 +1021,7 @@ function renderPrep(){
           </div>
         </div>
         <div class="recipe-card-side">
-          <span class="recipe-time" title="${escapeAttr(TEMPO_DURATION[r.tempoBucket])}">${TEMPO_DOT[r.tempoBucket]}</span>
+          <span class="day-time">${escapeHtml(r.tempo)}</span>
           <div class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</div>
         </div>
       </div>
