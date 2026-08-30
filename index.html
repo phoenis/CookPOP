@@ -27,16 +27,32 @@
     color:var(--ink); font-family:'Inter', sans-serif; min-height:100vh; -webkit-font-smoothing:antialiased;
   }
   ::selection{ background:var(--gold); color:var(--green-deep); }
-  .app{ max-width:960px; margin:0 auto; padding:20px 16px 80px; }
-  header.top{ padding:28px 4px 20px; color:var(--paper); text-align:center; }
-  header.top .eyebrow{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
-  header.top h1{ font-family:'Fraunces', serif; font-weight:700; font-size:clamp(28px,5vw,42px); margin:0 0 6px; letter-spacing:-0.01em; }
-  header.top p{ font-family:'Fraunces', serif; font-style:italic; font-weight:500; color:var(--paper-2); opacity:0.85; margin:0; font-size:15px; }
-  nav.tabs{ display:flex; gap:6px; background:var(--green-mid); padding:6px; border-radius:14px; margin-bottom:18px; position:sticky; top:10px; z-index:50; box-shadow:0 8px 24px rgba(0,0,0,0.25); }
-  nav.tabs button{ flex:1; background:transparent; border:none; color:var(--paper-2); font-family:'JetBrains Mono', monospace; font-size:12.5px; letter-spacing:0.04em; padding:11px 6px; border-radius:9px; cursor:pointer; transition:background .15s ease, color .15s ease; }
-  nav.tabs button:hover{ background:rgba(245,239,225,0.08); }
-  nav.tabs button.active{ background:var(--gold); color:var(--green-deep); font-weight:600; }
+  .app{ max-width:960px; margin:0 auto; padding:16px 16px calc(84px + env(safe-area-inset-bottom)); }
+
+  /* topbar: nome app + ingranaggio impostazioni, sticky in cima come una vera app */
+  .topbar{ position:sticky; top:0; z-index:90; background:var(--green-deep); box-shadow:0 4px 16px rgba(0,0,0,0.22); }
+  .topbar-inner{ max-width:960px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top)); }
+  .topbar-title{ font-family:'Fraunces', serif; font-weight:700; font-size:19px; color:var(--paper); letter-spacing:-0.01em; }
+  .settings-btn{ flex-shrink:0; width:36px; height:36px; border-radius:50%; border:1px solid rgba(245,239,225,0.2); background:rgba(245,239,225,0.08); color:var(--paper-2); display:flex; align-items:center; justify-content:center; font-size:17px; cursor:pointer; padding:0; }
+  .settings-btn:hover{ background:rgba(245,239,225,0.18); }
+
+  /* bottom-nav: barra di navigazione fissa in fondo, come una vera app mobile */
+  nav.tabs{ position:fixed; left:0; right:0; bottom:0; z-index:90; display:flex; background:var(--green-mid); box-shadow:0 -6px 20px rgba(0,0,0,0.25); padding-bottom:env(safe-area-inset-bottom); }
+  nav.tabs button{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:transparent; border:none; color:var(--paper-2); font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.03em; padding:9px 4px 8px; cursor:pointer; transition:color .15s ease; }
+  nav.tabs button .bn-icon{ font-size:19px; line-height:1; }
+  nav.tabs button:hover{ color:var(--paper); }
+  nav.tabs button.active{ color:var(--gold); }
   nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+  /* settings sheet: stessa modale bottom-sheet usata altrove, con id fissi per riusare la logica di refresh/logout già esistente */
+  .settings-backdrop{ display:none; position:fixed; inset:0; background:rgba(34,53,38,0.55); z-index:200; align-items:flex-end; justify-content:center; }
+  .settings-backdrop.open{ display:flex; }
+  .settings-sheet .filters-modal-header{ margin-bottom:10px; }
+  .settings-item{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-family:'Inter',sans-serif; font-size:14px; font-weight:600; color:var(--ink); background:#fff; border:1px solid var(--line); padding:12px 14px; border-radius:10px; cursor:pointer; margin-bottom:8px; }
+  .settings-item:hover{ border-color:var(--gold-dark); }
+  .settings-item:disabled{ opacity:0.5; cursor:default; }
+  .settings-item.settings-item-danger{ color:var(--tomato); }
+  .settings-credit{ text-align:center; color:var(--sage); font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.05em; margin:14px 0 0; }
   .panel{ background:var(--paper); border-radius:16px; padding:22px 20px 26px; box-shadow:0 14px 40px rgba(0,0,0,0.28); }
   h2.section-title{ font-family:'Fraunces', serif; font-weight:700; font-size:22px; margin:0 0 4px; color:var(--green-deep); }
   p.section-sub{ font-size:13px; color:var(--sage); margin:0 0 16px; }
@@ -200,10 +216,6 @@
   .inv-add-row button{ flex-shrink:0; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; padding:8px 12px; border-radius:8px; border:none; background:var(--green-mid); color:#fff; cursor:pointer; }
   .inv-add-row button:hover{ background:var(--green-deep); }
   .save-hint{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--sage); text-align:right; min-height:14px; }
-  footer.credit{ text-align:center; color:rgba(245,239,225,0.35); font-family:'JetBrains Mono', monospace; font-size:10.5px; margin-top:28px; letter-spacing:0.05em; }
-  .refresh-btn{ display:block; margin:12px auto 0; font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.05em; color:var(--paper-2); background:rgba(245,239,225,0.08); border:1px solid rgba(245,239,225,0.2); padding:6px 14px; border-radius:20px; cursor:pointer; }
-  .refresh-btn:hover{ background:rgba(245,239,225,0.18); }
-  .refresh-btn:disabled{ opacity:0.5; cursor:default; }
   .generate-week-block{ margin-top:20px; padding-top:18px; border-top:1px solid var(--line); text-align:center; }
   .generate-week-btn{ display:inline-flex; align-items:center; gap:8px; font-family:'Inter', sans-serif; font-weight:600; font-size:15px; padding:12px 22px; border-radius:12px; border:none; background:var(--green-mid); color:#fff; cursor:pointer; box-shadow:0 6px 16px rgba(50,74,52,0.3); }
   .generate-week-btn:hover{ background:var(--green-deep); }
@@ -219,8 +231,6 @@
   .login-box button:hover{ background:var(--gold-dark); color:var(--paper); }
   .login-box button:disabled{ opacity:0.6; cursor:default; }
   .login-error{ color:var(--tomato); font-size:12.5px; margin-top:10px; min-height:16px; }
-  .logout-btn{ position:absolute; top:14px; right:14px; font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.05em; color:var(--paper-2); background:rgba(245,239,225,0.1); border:1px solid rgba(245,239,225,0.25); padding:5px 10px; border-radius:20px; cursor:pointer; display:none; }
-  .logout-btn:hover{ background:rgba(245,239,225,0.2); }
 </style>
 </head>
 <body>
@@ -234,22 +244,31 @@
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="topbar-title">CookPOP</span>
+    <button class="settings-btn" id="settings-btn" type="button" aria-label="Impostazioni">⚙️</button>
+  </div>
+</header>
 <div class="app">
-  <header class="top" style="position:relative;">
-    <button class="logout-btn" id="logout-btn" type="button">Esci</button>
-    <div class="eyebrow">Cassetto Ricette &middot; Brescia</div>
-    <h1>CookPOP</h1>
-    <p>Mara &amp; Ste</p>
-  </header>
-  <nav class="tabs">
-    <button data-tab="menu" class="active">Menù</button>
-    <button data-tab="spesa">Spesa</button>
-    <button data-tab="prep">Prep</button>
-    <button data-tab="dispensa">Dispensa</button>
-  </nav>
   <main class="panel" id="panel"></main>
-  <footer class="credit">AGGIORNATO A MANO, CUCINATO CON CURA</footer>
-  <button class="refresh-btn" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
+</div>
+<nav class="tabs">
+  <button data-tab="menu" class="active"><span class="bn-icon">📅</span><span class="bn-label">Menù</span></button>
+  <button data-tab="spesa"><span class="bn-icon">🛒</span><span class="bn-label">Spesa</span></button>
+  <button data-tab="prep"><span class="bn-icon">📖</span><span class="bn-label">Prep</span></button>
+  <button data-tab="dispensa"><span class="bn-icon">🗄️</span><span class="bn-label">Dispensa</span></button>
+</nav>
+<div class="settings-backdrop" id="settings-backdrop">
+  <div class="settings-sheet filters-modal">
+    <div class="filters-modal-header">
+      <h3>Impostazioni</h3>
+      <button class="filters-close-btn" id="settings-close">✕</button>
+    </div>
+    <button class="settings-item" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
+    <button class="settings-item settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>
+    <p class="settings-credit">AGGIORNATO A MANO, CUCINATO CON CURA</p>
+  </div>
 </div>
 
 <script>
@@ -1980,6 +1999,18 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     render();
   });
 });
+
+(function(){
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsBackdrop = document.getElementById('settings-backdrop');
+  const settingsClose = document.getElementById('settings-close');
+  if(!settingsBtn || !settingsBackdrop) return;
+  const open = ()=> settingsBackdrop.classList.add('open');
+  const close = ()=> settingsBackdrop.classList.remove('open');
+  settingsBtn.addEventListener('click', open);
+  if(settingsClose) settingsClose.addEventListener('click', close);
+  settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
+})();
 
 (async function init(){
   await firebaseReady;
