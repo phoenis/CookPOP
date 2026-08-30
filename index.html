@@ -1378,7 +1378,7 @@ function renderSpesa(){
   const confirmedStaples = computeStapleList().filter(isStapleConfirmed);
   const staplesHtml = confirmedStaples.length ? `
     <div class="staples-block">
-      <div class="staples-title">🏠 Di solito li hai già</div>
+      <div class="staples-title">${DEPT_ICON.utility} ${DEPT_LABEL.utility}</div>
       <p class="staples-hint">Già spuntati perché li hai in dispensa — togli la spunta se ti servono e passano nella lista sopra.</p>
       ${confirmedStaples.map(it=>itemRow(it.keys, it.ingrediente, it.qta, '', it.contexts.join(' + '), true)).join('')}
     </div>` : '';
@@ -1478,12 +1478,12 @@ function renderSpesa(){
     <div class="shop-progress">${done} / ${total} presi</div>
     <button class="reset-btn" id="reset-shop">Svuota spunte</button>
     ${body}
+    ${staplesHtml}
     <div class="inv-add-row">
       <input type="text" id="shop-add-name" placeholder="Ingrediente extra">
       <input type="text" id="shop-add-qta" placeholder="Quantità">
       <button id="shop-add-btn" type="button">+ Aggiungi</button>
     </div>
-    ${staplesHtml}
   `;
 }
 
