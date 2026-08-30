@@ -148,6 +148,14 @@
   .filter-group-label{ font-family:'JetBrains Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--sage); margin-bottom:6px; }
   .chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
   .filter-group select{ width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+  .filter-group input[type=text]{ width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+  .recipe-edit-modal{ max-width:560px; }
+  .edit-ing-row, .edit-step-row{ display:flex; gap:6px; margin-bottom:6px; align-items:flex-start; }
+  .edit-ing-row .edit-ing-name{ flex:1.6; min-width:0; font-family:'Inter',sans-serif; font-size:13px; padding:8px 9px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+  .edit-ing-row .edit-ing-qta{ flex:1; min-width:0; font-family:'Inter',sans-serif; font-size:13px; padding:8px 9px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+  .edit-step-row .edit-step-text{ flex:1; min-width:0; font-family:'Inter',sans-serif; font-size:13px; padding:8px 9px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); resize:vertical; }
+  .edit-row-remove{ flex-shrink:0; width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:#fff; color:var(--tomato); cursor:pointer; font-size:13px; }
+  .edit-row-remove:hover{ background:rgba(179,58,58,0.08); }
   .recipe-count{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--sage); margin-bottom:10px; }
   .recipe-list{ display:grid; grid-template-columns:1fr; gap:8px; }
   .recipe-card{ border:1px solid var(--line); background:#fffdf8; border-radius:10px; padding:11px 13px; display:flex; justify-content:space-between; align-items:stretch; gap:10px; cursor:pointer; }
@@ -430,13 +438,34 @@ function classifyDept(ingrediente){
 const recipeByName = {};
 DATA.recipes.forEach(r=>{ recipeByName[r.nome] = r; });
 
-// Ingredienti "veri" per una ricetta: se è una ricetta curata (con procedimento reale)
-// uso sempre quelli aggiornati dal dataset, altrimenti quelli eventualmente aggiunti a mano.
-// I nomi vengono passati attraverso ingredientRenames: rinominare un ingrediente in
-// Dispensa lo aggiorna così ovunque compaia nelle ricette, senza toccare i dati statici.
+// Le modifiche fatte a mano dall'utente (Menù o Prep, sono la stessa modale)
+// vivono in state.recipeEdits e si sovrappongono ai dati statici del catalogo:
+// così restano sincronizzate ovunque la ricetta compaia, senza duplicare nulla.
+function getRecipeMeta(name){
+  const base = recipeByName[name];
+  if(!base) return null;
+  const edit = state.recipeEdits[name];
+  return edit ? Object.assign({}, base, edit) : base;
+}
+function getRecipeDetails(name){
+  const base = DATA.recipeDetails[name] || null;
+  const edit = state.recipeEdits[name];
+  if(!edit) return base;
+  return Object.assign({}, base || {}, edit);
+}
+
+// Ingredienti "veri" per una ricetta: se è stata modificata a mano uso quelli
+// aggiornati, altrimenti quelli curati dal dataset, altrimenti quelli eventualmente
+// aggiunti a mano tramite il form rapido. I nomi vengono passati attraverso
+// ingredientRenames: rinominare un ingrediente in Dispensa lo aggiorna così ovunque
+// compaia nelle ricette, senza toccare i dati statici.
 function getIngredientsFor(name){
+  const edit = state.recipeEdits[name];
   const det = DATA.recipeDetails[name];
-  const list = det ? det.ingredienti : (state.recipeIngredients[name] || []);
+  let list;
+  if(edit && edit.ingredienti) list = edit.ingredienti;
+  else if(det) list = det.ingredienti;
+  else list = state.recipeIngredients[name] || [];
   const renames = state.ingredientRenames;
   if(!renames || !Object.keys(renames).length) return list;
   return list.map(it=>{
@@ -470,6 +499,8 @@ const state = {
   weekBaseline: null,
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
+  recipeEdits: {},
+  recipeEditName: null,
   expandedDay: null,
   expandedRecipe: null,
   swapOpenDay: null,
@@ -605,11 +636,13 @@ async function loadState(){
         if(saved.pantryItems) saved.pantryItems = decodeKeysFromFirebase(saved.pantryItems);
         if(saved.freezerItems) saved.freezerItems = decodeKeysFromFirebase(saved.freezerItems);
         if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
+        if(saved.recipeEdits) saved.recipeEdits = decodeKeysFromFirebase(saved.recipeEdits);
         Object.assign(state, saved);
         if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
         if(saved.pantryItems) state.pantryItems = saved.pantryItems;
         if(saved.freezerItems) state.freezerItems = saved.freezerItems;
         if(saved.ingredientRenames) state.ingredientRenames = saved.ingredientRenames;
+        if(saved.recipeEdits) state.recipeEdits = saved.recipeEdits;
         try{ localStorage.setItem('quaderno-state', JSON.stringify(saved)); }catch(e){}
       }
       render();
@@ -634,6 +667,7 @@ function persist(){
       mealsDone: state.mealsDone,
       recipeIngredients: state.recipeIngredients,
       ingredientRenames: state.ingredientRenames,
+      recipeEdits: state.recipeEdits,
       pantryItems: state.pantryItems,
       pantrySeeded: state.pantrySeeded,
       pantryQtyMigrated: state.pantryQtyMigrated,
@@ -650,7 +684,8 @@ function persist(){
           ...payload,
           recipeIngredients: encodeKeysForFirebase(payload.recipeIngredients),
           pantryItems: encodeKeysForFirebase(payload.pantryItems),
-          ingredientRenames: encodeKeysForFirebase(payload.ingredientRenames)
+          ingredientRenames: encodeKeysForFirebase(payload.ingredientRenames),
+          recipeEdits: encodeKeysForFirebase(payload.recipeEdits)
         }));
         await window.cookpopSync.save(fbPayload);
       }
@@ -669,10 +704,10 @@ function effectiveRecipeName(i){
 // se fa parte di un menù generato è la ricetta generata, altrimenti si prova ad abbinarla al catalogo (catalogMatch)
 function effectiveRecipeMeta(i){
   const overrideName = state.weekOverrides[i];
-  if(overrideName) return recipeByName[overrideName] || null;
-  if(state.weekBaseline && state.weekBaseline[i]) return recipeByName[state.weekBaseline[i]] || null;
+  if(overrideName) return getRecipeMeta(overrideName);
+  if(state.weekBaseline && state.weekBaseline[i]) return getRecipeMeta(state.weekBaseline[i]);
   const match = DATA.week1[i].catalogMatch;
-  return match ? recipeByName[match] : null;
+  return match ? getRecipeMeta(match) : null;
 }
 function effectiveCategoria(i){
   const rec = effectiveRecipeMeta(i);
@@ -770,6 +805,129 @@ function render(){
   attachHandlers();
 }
 
+function editIngRowHtml(ingrediente, qta){
+  return `
+    <div class="edit-ing-row">
+      <input type="text" class="edit-ing-name" placeholder="Ingrediente" value="${escapeAttr(ingrediente||'')}">
+      <input type="text" class="edit-ing-qta" placeholder="Quantità" value="${escapeAttr(qta||'')}">
+      <button type="button" class="edit-row-remove" data-remove-row aria-label="Rimuovi riga">✕</button>
+    </div>`;
+}
+function editStepRowHtml(text){
+  return `
+    <div class="edit-step-row">
+      <textarea class="edit-step-text" rows="2" placeholder="Passaggio">${escapeHtml(text||'')}</textarea>
+      <button type="button" class="edit-row-remove" data-remove-row aria-label="Rimuovi passaggio">✕</button>
+    </div>`;
+}
+
+// Modale unica "Modifica ricetta", condivisa da Menù e Prep (stessa modale,
+// stesso state.recipeEdits): qualsiasi modifica è quindi automaticamente
+// visibile in entrambe le tab, non serve tenerle sincronizzate a mano.
+function renderRecipeEditModal(){
+  if(!state.recipeEditName) return '';
+  const name = state.recipeEditName;
+  const rec = getRecipeMeta(name);
+  const det = getRecipeDetails(name);
+  if(!rec) return '';
+  const ingredienti = getIngredientsFor(name);
+  const procedimento = (det && det.procedimento) || [];
+  const stagioniSet = new Set(rec.stagioni || []);
+
+  const ingRowsHtml = (ingredienti.length ? ingredienti : [{ingrediente:'',qta:''}])
+    .map(it => editIngRowHtml(it.ingrediente, it.qta)).join('');
+
+  const stepRowsHtml = (procedimento.length ? procedimento : [''])
+    .map(s => editStepRowHtml(s)).join('');
+
+  return `
+    <div class="filters-modal-backdrop" data-close-recipe-edit>
+      <div class="filters-modal recipe-edit-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Modifica ricetta</h3>
+          <button class="filters-close-btn" data-close-recipe-edit>✕</button>
+        </div>
+        <p class="section-sub" style="margin-top:-8px;">${escapeHtml(name)}</p>
+        <div class="filter-groups">
+          <div class="filter-group">
+            <div class="filter-group-label">⏱ Tempo (etichetta mostrata)</div>
+            <input type="text" id="edit-tempo" value="${escapeAttr(rec.tempo || '')}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">⏱ Fascia di tempo (usata per filtrare in Prep)</div>
+            <select id="edit-tempo-bucket">
+              ${TEMPO_ORDER.map(t=>`<option value="${t}" ${rec.tempoBucket===t?'selected':''}>${escapeHtml(TEMPO_LABEL[t])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🍽️ Porzioni</div>
+            <input type="text" id="edit-porzioni" value="${escapeAttr((det && det.porzioni) || '')}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🍽️ Categoria</div>
+            <select id="edit-categoria">
+              ${CAT_ORDER.map(c=>`<option value="${c}" ${rec.categoriaNew===c?'selected':''}>${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🌦 Stagioni</div>
+            <div class="chip-row" id="edit-stagioni">
+              ${STAGIONE_ORDER.map(s=>`<button type="button" class="chip-btn ${stagioniSet.has(s)?'active':''}" data-stagione-chip="${s}">${escapeHtml(STAGIONE_LABEL[s])}</button>`).join('')}
+            </div>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🧊 Freezer</div>
+            <select id="edit-freezer-new">
+              ${FREEZER_ORDER.map(f=>`<option value="${f}" ${rec.freezerNew===f?'selected':''}>${escapeHtml(FREEZER_LABEL[f])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🥡 Avanzi</div>
+            <select id="edit-avanzi-new">
+              ${AVANZI_ORDER.map(a=>`<option value="${a}" ${rec.avanziNew===a?'selected':''}>${escapeHtml(AVANZI_LABEL[a])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">📅 Pianificazione</div>
+            <select id="edit-pianificazione">
+              ${PIAN_ORDER.map(p=>`<option value="${p}" ${rec.pianificazione===p?'selected':''}>${escapeHtml(PIAN_LABEL[p])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🛒 Ingredienti</div>
+            <div id="edit-ing-list">${ingRowsHtml}</div>
+            <button type="button" class="mini-add-btn" id="edit-add-ing-row">+ aggiungi ingrediente</button>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">👩🏻‍🍳 Procedimento</div>
+            <div id="edit-step-list">${stepRowsHtml}</div>
+            <button type="button" class="mini-add-btn" id="edit-add-step-row">+ aggiungi passaggio</button>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">📝 Da ricordare</div>
+            <input type="text" id="edit-ricordare" value="${escapeAttr((det && det.ricordare) || '')}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🥡 Nota avanzi</div>
+            <input type="text" id="edit-avanzi-note" value="${escapeAttr((det && det.avanzi) || '')}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🧊 Nota freezer</div>
+            <input type="text" id="edit-freezer-note" value="${escapeAttr((det && det.freezer) || '')}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🔗 Link fonte</div>
+            <input type="text" id="edit-link" value="${escapeAttr((det && det.link) || '')}">
+          </div>
+        </div>
+        <div class="filters-modal-footer">
+          <button class="reset-btn" data-close-recipe-edit>Annulla</button>
+          <button class="mini-add-btn" id="edit-recipe-save" data-save-recipe-edit="${escapeAttr(name)}">Salva</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderMenu(){
   const strip = DATA.week1.map((d,i)=>{
     const cat = effectiveCategoria(i);
@@ -848,7 +1006,7 @@ function renderMenu(){
 
     let detailHtml = '';
     if(state.expandedDay === i){
-      const det = DATA.recipeDetails[name];
+      const det = getRecipeDetails(name);
       const ing = getIngredientsFor(name);
       const ingHtml = ing.length
         ? `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${ing.map(it=>`<li><span>${escapeHtml(it.ingrediente)}</span><span style="color:var(--sage)">${escapeHtml(it.qta||'')}</span></li>`).join('')}</ul></div>`
@@ -879,6 +1037,7 @@ function renderMenu(){
           <input type="text" placeholder="Quantità" data-nqta="${i}">
           <button data-add-ing="${i}">+ aggiungi ingrediente</button>
         </div>`;
+      const editRecipeBtn = rec ? `<button class="mini-add-btn" data-open-recipe-edit="${escapeAttr(name)}">✏️ Modifica ricetta</button>` : '';
       detailHtml = `
       <div class="detail-box">
         ${tagsHtml}
@@ -887,6 +1046,7 @@ function renderMenu(){
         ${stepsHtml}
         ${linkHtml}
         ${addFormHtml}
+        ${editRecipeBtn}
       </div>`;
     }
 
@@ -955,6 +1115,7 @@ function renderMenu(){
     <div class="balance-strip">${strip}</div>
     ${days}
     ${doneModal}
+    ${renderRecipeEditModal()}
     <div class="generate-week-block">
       <button class="generate-week-btn" id="generate-week"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256"><path fill="currentColor" d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z"></path></svg>Genera nuovo menù</button>
       <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. Da lunedì a venerdì solo ricette fino a 30–45 min.</p>
@@ -1122,7 +1283,7 @@ function renderSpesa(){
 }
 
 function renderPrep(){
-  let list = DATA.recipes.filter(r=>{
+  let list = DATA.recipes.map(r=>getRecipeMeta(r.nome)).filter(r=>{
     if(state.filters.cat && r.categoriaNew !== state.filters.cat) return false;
     if(state.filters.tempo && r.tempoBucket !== state.filters.tempo) return false;
     if(state.filters.pian && r.pianificazione !== state.filters.pian) return false;
@@ -1136,7 +1297,7 @@ function renderPrep(){
   });
   const cards = list.map(r=>{
     const isOpen = state.expandedRecipe === r.nome;
-    const det = DATA.recipeDetails[r.nome];
+    const det = getRecipeDetails(r.nome);
     const ing = getIngredientsFor(r.nome);
     let detail = '';
     if(isOpen){
@@ -1167,6 +1328,7 @@ function renderPrep(){
         ${stepsHtml}
         ${linkHtml}
         ${addFormHtml}
+        <button class="mini-add-btn" data-open-recipe-edit="${escapeAttr(r.nome)}">✏️ Modifica ricetta</button>
       </div>`;
     }
     return `
@@ -1257,6 +1419,7 @@ function renderPrep(){
     ${filtersModal}
     <div class="recipe-count">${list.length} ricette trovate</div>
     <div class="recipe-list">${cards || '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>'}</div>
+    ${renderRecipeEditModal()}
   `;
 }
 
@@ -1565,6 +1728,77 @@ function attachHandlers(){
       if(!ingrediente) return;
       if(!state.recipeIngredients[recipeName]) state.recipeIngredients[recipeName] = [];
       state.recipeIngredients[recipeName].push({ingrediente, qta, dove:'', note:''});
+      persist(); render();
+    });
+  });
+
+  document.querySelectorAll('[data-open-recipe-edit]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.recipeEditName = e.currentTarget.dataset.openRecipeEdit;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-close-recipe-edit]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.recipeEditName = null;
+      render();
+    });
+  });
+  const recipeEditModal = document.querySelector('.recipe-edit-modal');
+  if(recipeEditModal){
+    // Aggiungere/rimuovere righe o attivare una stagione non richiede un render
+    // completo: si manipola solo il DOM del form, per non perdere il testo che
+    // si sta scrivendo negli altri campi (a differenza del resto dell'app, che
+    // ri-renderizza tutto a ogni modifica).
+    recipeEditModal.addEventListener('click', e=>{
+      if(e.target.closest('[data-remove-row]')){
+        e.target.closest('.edit-ing-row, .edit-step-row').remove();
+        return;
+      }
+      const stagioneChip = e.target.closest('[data-stagione-chip]');
+      if(stagioneChip){
+        stagioneChip.classList.toggle('active');
+        return;
+      }
+      if(e.target.closest('#edit-add-ing-row')){
+        document.getElementById('edit-ing-list').insertAdjacentHTML('beforeend', editIngRowHtml('', ''));
+        return;
+      }
+      if(e.target.closest('#edit-add-step-row')){
+        document.getElementById('edit-step-list').insertAdjacentHTML('beforeend', editStepRowHtml(''));
+        return;
+      }
+    });
+  }
+  document.querySelectorAll('[data-save-recipe-edit]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const name = e.currentTarget.dataset.saveRecipeEdit;
+      const ingredienti = Array.from(document.querySelectorAll('#edit-ing-list .edit-ing-row')).map(row=>({
+        ingrediente: row.querySelector('.edit-ing-name').value.trim(),
+        qta: row.querySelector('.edit-ing-qta').value.trim()
+      })).filter(it=>it.ingrediente);
+      const procedimento = Array.from(document.querySelectorAll('#edit-step-list .edit-step-text'))
+        .map(el=>el.value.trim()).filter(Boolean);
+      const stagioni = Array.from(document.querySelectorAll('#edit-stagioni [data-stagione-chip].active'))
+        .map(el=>el.dataset.stagioneChip);
+      state.recipeEdits[name] = {
+        tempo: document.getElementById('edit-tempo').value.trim(),
+        tempoBucket: document.getElementById('edit-tempo-bucket').value,
+        porzioni: document.getElementById('edit-porzioni').value.trim(),
+        categoriaNew: document.getElementById('edit-categoria').value,
+        stagioni: stagioni.length ? stagioni : ['tutto'],
+        freezerNew: document.getElementById('edit-freezer-new').value,
+        avanziNew: document.getElementById('edit-avanzi-new').value,
+        pianificazione: document.getElementById('edit-pianificazione').value,
+        ingredienti,
+        procedimento,
+        ricordare: document.getElementById('edit-ricordare').value.trim(),
+        avanzi: document.getElementById('edit-avanzi-note').value.trim(),
+        freezer: document.getElementById('edit-freezer-note').value.trim(),
+        link: document.getElementById('edit-link').value.trim()
+      };
+      state.recipeEditName = null;
       persist(); render();
     });
   });
