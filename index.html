@@ -7,115 +7,154 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CookPOP">
-<meta name="theme-color" content="#faf8f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#f3f2f2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#18191b" media="(prefers-color-scheme: dark)">
 <title>CookPOP</title>
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#faf8f4; --surface:#ffffff; --surface-2:rgba(34,29,23,0.045);
-    --green-deep:#2f4a37; --green-mid:#3c5c44;
-    --gold:#d4a73a; --gold-dark:#a97f22; --tomato:#b33a3a; --steel:#3b6f8f;
-    --amber:#c98a2e; --plum:#7a5a8a; --ink:#221f1b; --sage:#7c7568; --line: rgba(30,25,20,0.1);
+    /* palette caldo/agrume: il colore comunica stato di disponibilità, non decorazione —
+       verde = ce l'hai/fatto, giallo+arancio = attenzione, rosso = manca/azione richiesta,
+       bordeaux = testo rosso a dimensione di corpo (il rosso pieno non ha contrasto sufficiente sotto i 18px) */
+    --bg:#f3f2f2; --surface:#ffffff; --surface-2:rgba(34,29,23,0.045);
+    --green-deep:#8cb42a; --green-mid:#5a7517;
+    --gold:#e03c1e; --gold-dark:#c53116; --tomato:#87282b; --steel:#fb8323;
+    --amber:#fbc02d; --plum:#7a5a8a; --ink:#201e1d; --sage:#7d7979; --line: rgba(32,30,29,0.18);
+    --line-strong: rgba(32,30,29,0.4);
   }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#18191b; --surface:#242423; --surface-2:rgba(255,255,255,0.05);
+      --green-deep:#a3cc3f;
       --ink:#ece7e0; --sage:#9a9488; --line: rgba(255,255,255,0.12);
+      --line-strong: rgba(255,255,255,0.35);
     }
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background:var(--bg); color:var(--ink); font-family:'Inter', sans-serif; min-height:100vh; -webkit-font-smoothing:antialiased;
+    background:var(--bg); color:var(--ink); font-family:'Archivo', sans-serif; min-height:100vh; -webkit-font-smoothing:antialiased;
   }
-  ::selection{ background:var(--gold); color:var(--green-deep); }
+  ::selection{ background:var(--gold); color:var(--bg); }
   .app{ max-width:960px; margin:0 auto; padding:16px 16px calc(84px + env(safe-area-inset-bottom)); }
 
   /* topbar: nome app + ingranaggio impostazioni, sticky in cima come una vera app */
   .topbar{ position:sticky; top:0; z-index:90; background:var(--bg); border-bottom:1px solid var(--line); }
   .topbar-inner{ max-width:960px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top)); }
-  .topbar-title{ font-family:'Fraunces', serif; font-weight:700; font-size:19px; color:var(--ink); letter-spacing:-0.01em; }
-  .settings-btn{ flex-shrink:0; width:36px; height:36px; border-radius:50%; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); display:flex; align-items:center; justify-content:center; font-size:17px; cursor:pointer; padding:0; }
+  .topbar-title{ font-family:'Archivo', sans-serif; font-weight:700; font-size:19px; color:var(--ink); letter-spacing:-0.01em; }
+  .settings-btn{ flex-shrink:0; width:36px; height:36px; border-radius:0; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); display:flex; align-items:center; justify-content:center; font-size:17px; cursor:pointer; padding:0; }
   .settings-btn:hover{ background:var(--surface); }
 
   /* pulsante flottante "+" (stile WhatsApp) per aggiungere un ingrediente in Spesa */
-  .fab{ position:fixed; right:18px; bottom:calc(84px + env(safe-area-inset-bottom) + 14px); z-index:80; width:56px; height:56px; border-radius:50%; border:none; background:var(--gold); color:var(--green-deep); font-size:28px; font-weight:600; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.3); }
+  .fab{ position:fixed; right:18px; bottom:calc(84px + env(safe-area-inset-bottom) + 14px); z-index:80; width:56px; height:56px; border-radius:0; border:none; background:var(--gold); color:var(--bg); font-size:28px; font-weight:600; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.3); }
   .fab:hover{ background:var(--gold-dark); }
   .fab:active{ transform:scale(0.94); }
 
   /* bottom-nav: barra di navigazione fissa in fondo, come una vera app mobile */
   nav.tabs{ position:fixed; left:0; right:0; bottom:0; z-index:90; display:flex; background:var(--bg); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); }
-  nav.tabs button{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:transparent; border:none; color:var(--sage); font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.03em; padding:7px 4px; cursor:pointer; transition:color .15s ease; }
-  nav.tabs button .bn-icon{ font-size:19px; line-height:1; padding:3px 18px; border-radius:14px; transition:background .18s ease; }
-  nav.tabs button:hover .bn-icon{ background:var(--surface-2); }
-  nav.tabs button.active{ color:var(--gold-dark); }
-  nav.tabs button.active .bn-icon{ background:rgba(212,167,58,0.22); }
-  nav.tabs button.active .bn-label{ font-weight:700; }
+  nav.tabs button{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:transparent; border:none; border-top:2px solid transparent; color:var(--sage); font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 4px 6px; cursor:pointer; transition:color .15s ease, border-color .15s ease; }
+  nav.tabs button .bn-icon{ font-size:19px; line-height:1; }
+  nav.tabs button:hover{ color:var(--ink); }
+  nav.tabs button.active{ color:var(--gold); border-top-color:var(--gold); }
   nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
 
   /* settings sheet: stessa modale bottom-sheet usata altrove, con id fissi per riusare la logica di refresh/logout già esistente */
   .settings-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center; }
   .settings-backdrop.open{ display:flex; }
   .settings-sheet .filters-modal-header{ margin-bottom:10px; }
-  .settings-item{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-family:'Inter',sans-serif; font-size:14px; font-weight:600; color:var(--ink); background:var(--surface); border:1px solid var(--line); padding:12px 14px; border-radius:10px; cursor:pointer; margin-bottom:8px; }
+  .settings-item{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-family:'Archivo', sans-serif; font-size:14px; font-weight:600; color:var(--ink); background:var(--surface); border:1px solid var(--line); padding:12px 14px; border-radius:0; cursor:pointer; margin-bottom:8px; }
   .settings-item:hover{ border-color:var(--gold-dark); }
   .settings-item:disabled{ opacity:0.5; cursor:default; }
   .settings-item.settings-item-danger{ color:var(--tomato); }
-  .settings-credit{ text-align:center; color:var(--sage); font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.05em; margin:14px 0 0; }
+  .settings-credit{ text-align:center; color:var(--sage); font-family:'Archivo', sans-serif; font-size:10.5px; letter-spacing:0.05em; margin:14px 0 0; }
   .panel{ padding:6px 0 10px; }
-  h2.section-title{ font-family:'Fraunces', serif; font-weight:700; font-size:22px; margin:0 0 4px; color:var(--ink); }
+  h2.section-title{ font-family:'Archivo', sans-serif; font-weight:800; font-size:30px; line-height:1.05; letter-spacing:-0.02em; margin:0 0 4px; color:var(--ink); text-align:left; }
   p.section-sub{ font-size:13px; color:var(--sage); margin:0 0 16px; }
+
+  /* header "Oggi": cena di stasera, chi cucina, promemoria, stato della casa —
+     espande la tab Menù invece di essere una quinta tab */
+  .oggi-header{ padding-bottom:18px; margin-bottom:18px; border-bottom:2px solid var(--line-strong); }
+  .oggi-kicker{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--sage); }
+  .oggi-title{ font-family:'Archivo', sans-serif; font-weight:800; font-size:30px; line-height:1.05; letter-spacing:-0.02em; margin:6px 0 0; }
+  .oggi-dish-row{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-top:14px; }
+  .oggi-dish{ font-family:'Archivo', sans-serif; font-weight:800; font-size:24px; line-height:1.08; margin:0; max-width:250px; }
+  .oggi-time{ font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; letter-spacing:0.1em; white-space:nowrap; flex-shrink:0; }
+  .oggi-badges{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .oggi-badges .tag{ background:transparent; border:1px solid var(--line-strong); }
+  .oggi-badges .tag.oggi-turno{ background:var(--gold); border-color:var(--gold); color:var(--bg); }
+  .oggi-actions{ display:flex; gap:10px; margin-top:14px; }
+  .btn-primary-flat{ flex:1; font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--gold); background:var(--gold); color:var(--bg); cursor:pointer; border-radius:0; text-align:left; }
+  .btn-primary-flat:hover{ background:var(--gold-dark); border-color:var(--gold-dark); }
+  .btn-secondary-flat{ font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); cursor:pointer; border-radius:0; }
+  .btn-secondary-flat:hover{ background:var(--surface-2); }
+  .oggi-prep{ margin-top:16px; padding-top:14px; border-top:2px solid var(--line-strong); }
+  .oggi-prep-label{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:4px; }
+  .oggi-status{ margin-top:16px; padding-top:14px; border-top:2px solid var(--line-strong); }
+  .oggi-status-title{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--sage); padding-bottom:8px; }
+  .oggi-status-row{ width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 0; background:transparent; border:0; border-top:1px solid var(--line); font-family:'Archivo', sans-serif; font-size:15px; font-weight:600; color:var(--ink); text-align:left; cursor:pointer; }
+  .oggi-status-row-static{ cursor:default; }
+  .oggi-status-meta{ font-size:12px; font-weight:400; color:var(--sage); flex-shrink:0; }
 
   /* balance strip */
   .balance-strip{ display:flex; gap:6px; margin-bottom:18px; overflow-x:auto; padding-bottom:2px; }
-  .balance-chip{ flex:1; min-width:52px; text-align:center; border-radius:10px; padding:8px 4px 7px; background:var(--surface-2); }
-  .balance-chip .bd{ font-family:'JetBrains Mono', monospace; font-size:9.5px; color:var(--sage); text-transform:uppercase; }
+  .balance-chip{ flex:1; min-width:52px; text-align:center; border-radius:0; padding:8px 4px 7px; background:var(--surface-2); }
+  .balance-chip .bd{ font-family:'Archivo', sans-serif; font-size:9.5px; color:var(--sage); text-transform:uppercase; }
   .balance-chip .bc{ font-size:18px; margin-top:3px; line-height:1; }
 
-  .day-card{ border-radius:12px; padding:14px 4px; border-bottom:1px solid var(--line); }
+  .day-card{ border-radius:0; padding:14px 4px; border-bottom:1px solid var(--line); }
   .day-card:last-child{ border-bottom:none; }
-  .day-card.done{ background:var(--surface-2); }
+  .day-card.done{ background:color-mix(in srgb, var(--green-deep) 8%, transparent); }
   .day-card.done .day-menu{ text-decoration:line-through; opacity:0.6; }
   .day-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
-  .day-name{ font-family:'Fraunces', serif; font-weight:700; font-size:16px; color:var(--ink); min-width:90px; }
-  .day-date{ font-family:'JetBrains Mono', monospace; font-weight:400; font-size:11.5px; color:var(--sage); letter-spacing:0.02em; }
-  .today-badge{ font-family:'JetBrains Mono', monospace; font-weight:600; font-size:9.5px; letter-spacing:0.04em; text-transform:uppercase; color:var(--green-deep); background:var(--gold); padding:2px 7px; border-radius:20px; margin-left:4px; }
+  .day-name{ font-family:'Archivo', sans-serif; font-weight:700; font-size:16px; color:var(--ink); min-width:90px; }
+  .day-date{ font-family:'Archivo', sans-serif; font-weight:400; font-size:11.5px; color:var(--sage); letter-spacing:0.02em; }
+  .today-badge{ font-family:'Archivo', sans-serif; font-weight:800; font-size:9.5px; letter-spacing:0.12em; text-transform:uppercase; color:var(--bg); background:var(--gold); padding:5px 9px; border-radius:0; margin-left:4px; }
   .day-card.today{ box-shadow:inset 3px 0 0 var(--gold); }
   .week-section{ display:block; margin-bottom:8px; }
   .week-section + .week-section{ margin-top:26px; padding-top:22px; border-top:1px solid var(--line); }
-  .day-time{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--ink); opacity:0.75; background:var(--surface-2); padding:2px 8px; border-radius:20px; }
+  .day-time{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); opacity:0.75; background:var(--surface-2); padding:5px 9px; border-radius:0; }
   .day-menu-row{ display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
-  .day-menu{ font-size:14.5px; font-weight:600; cursor:pointer; color:var(--ink); border-bottom:1px dotted var(--sage); }
+  .cook-pill{ width:26px; height:26px; flex-shrink:0; border:1px solid var(--line-strong); background:transparent; color:var(--bg); font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; border-radius:0; }
+  .cook-pill.cook-mara{ background:var(--gold); border-color:var(--gold); }
+  .cook-pill.cook-ste{ background:var(--tomato); border-color:var(--tomato); }
+  .day-menu{ font-size:15px; font-weight:600; cursor:pointer; color:var(--ink); border-bottom:1px dotted var(--sage); }
   .day-menu:hover{ color:var(--gold-dark); }
   .drag-handle{ flex-shrink:0; margin-left:auto; background:none; border:none; color:var(--sage); font-size:17px; line-height:1; cursor:grab; padding:4px 6px; touch-action:none; }
   .drag-handle:hover{ color:var(--gold-dark); }
   .drag-handle:active{ cursor:grabbing; }
   .day-card.dragging{ opacity:0.4; }
   .day-card.drag-over{ box-shadow:0 0 0 2px var(--gold) inset; }
-  .drag-ghost{ position:fixed; z-index:500; pointer-events:none; background:var(--gold); color:var(--green-deep); font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:8px 14px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,0.35); max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .drag-ghost{ position:fixed; z-index:500; pointer-events:none; background:var(--gold); color:var(--bg); font-family:'Archivo', sans-serif; font-weight:600; font-size:13px; padding:8px 14px; border-radius:0; box-shadow:0 10px 30px rgba(0,0,0,0.35); max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .day-meta{ font-size:12.5px; color:var(--sage); margin-top:4px; line-height:1.5; }
   .day-meta b{ color:var(--ink); font-weight:600; }
-  .soak-chip{ display:inline-block; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--steel); background:rgba(59,111,143,0.1); padding:3px 8px; border-radius:20px; margin-top:6px; }
-  .avanzo-chip{ display:inline-block; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--amber); background:rgba(201,138,46,0.12); padding:3px 8px; border-radius:20px; margin-top:6px; }
-  .swap-select{ margin-top:10px; width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:7px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .soak-chip{ display:inline-block; font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); background:var(--amber); padding:5px 9px; border-radius:0; margin-top:6px; }
+  .avanzo-chip{ display:inline-block; font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); background:var(--amber); padding:5px 9px; border-radius:0; margin-top:6px; }
+  .swap-select{ margin-top:10px; width:100%; font-family:'Archivo', sans-serif; font-size:13px; padding:7px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
 
   .swap-controls{ display:flex; gap:8px; margin-top:10px; }
-  .swap-panel{ margin-top:8px; border-radius:10px; padding:10px; background:var(--surface-2); }
-  .swap-search{ width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:7px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); margin-bottom:8px; }
+  .swap-panel{ margin-top:8px; border-radius:0; padding:10px; background:var(--surface-2); }
+  .swap-suggestions{ margin-bottom:12px; }
+  .swap-suggestion{ display:block; width:100%; text-align:left; background:var(--surface); border:0; border-bottom:1px solid var(--line); padding:10px 8px; cursor:pointer; font-family:'Archivo', sans-serif; }
+  .swap-suggestion:last-child{ border-bottom:0; }
+  .swap-suggestion-top{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .swap-suggestion-name{ font-size:14px; font-weight:600; color:var(--ink); }
+  .swap-suggestion-time{ font-size:11px; font-weight:800; color:var(--ink); white-space:nowrap; }
+  .swap-suggestion-motivo{ display:block; font-size:11px; font-weight:800; letter-spacing:0.04em; color:var(--gold); margin-top:3px; }
+  .swap-search{ width:100%; font-family:'Archivo', sans-serif; font-size:13px; padding:7px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); margin-bottom:8px; }
   .swap-cat-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-  .chip-btn{ font-family:'JetBrains Mono', monospace; font-size:11px; padding:5px 10px; border-radius:20px; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
-  .chip-btn.active{ background:var(--gold); border-color:var(--gold); color:var(--green-deep); font-weight:600; }
+  .chip-btn{ font-family:'Archivo', sans-serif; font-size:11px; padding:5px 10px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
+  .chip-btn.active{ background:var(--gold); border-color:var(--gold); color:var(--bg); font-weight:600; }
+  .chip-btn.done-btn.active{ background:var(--green-deep); border-color:var(--green-deep); color:var(--bg); }
   .swap-results{ max-height:240px; overflow-y:auto; border-top:1px solid var(--line); }
   .swap-result{ display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px dashed var(--line); cursor:pointer; font-size:13px; }
   .swap-result:last-child{ border-bottom:none; }
   .swap-result:hover{ background:var(--surface-2); }
   .swap-result-icon{ font-size:15px; flex-shrink:0; }
   .swap-result-name{ flex:1; font-weight:600; }
-  .swap-result-time{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--sage); flex-shrink:0; }
+  .swap-result-time{ font-family:'Archivo', sans-serif; font-size:10.5px; color:var(--sage); flex-shrink:0; }
 
   .done-ing-list{ display:flex; flex-direction:column; gap:2px; }
   .done-ing-row{ display:flex; align-items:center; justify-content:space-between; gap:9px; font-size:13.5px; padding:7px 2px; border-bottom:1px dashed var(--line); }
@@ -123,86 +162,93 @@
   .done-ing-row.untracked{ color:var(--sage); }
   .done-ing-row .done-ing-hint{ font-size:11.5px; color:var(--sage); font-style:italic; }
 
-  .detail-box{ margin-top:10px; padding:12px; background:var(--surface-2); border-radius:10px; }
+  .detail-box{ margin-top:10px; padding:12px; background:var(--surface-2); border-radius:0; }
   .detail-tags{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; }
   .ing-list{ list-style:none; padding:0; margin:0; }
   .ing-empty{ font-size:12px; color:var(--sage); font-style:italic; margin-bottom:8px; }
   .detail-section{ padding-top:10px; margin-top:10px; border-top:1px solid var(--line); }
   .detail-section:first-child{ padding-top:0; margin-top:0; border-top:none; }
-  .detail-section-title{ font-family:'JetBrains Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--gold-dark); margin-bottom:6px; }
-  .note-box{ background:rgba(212,167,58,0.09); border:1px solid rgba(212,167,58,0.25); border-radius:8px; padding:8px 10px; border-top:1px solid rgba(212,167,58,0.25); }
+  .detail-section-title{ font-family:'Archivo', sans-serif; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink); padding-bottom:6px; margin-bottom:8px; border-bottom:2px solid var(--line-strong); }
+  .note-box{ background:rgba(212,167,58,0.09); border:1px solid rgba(212,167,58,0.25); border-radius:0; padding:8px 10px; border-top:1px solid rgba(212,167,58,0.25); }
   .detail-extra-note{ font-size:12.5px; color:var(--ink); margin-bottom:4px; line-height:1.4; }
   .detail-extra-note:last-child{ margin-bottom:0; }
   .steps-list{ margin:0; padding-left:18px; font-size:12.5px; line-height:1.6; }
   .steps-list li{ margin-bottom:3px; }
-  .ing-list li{ font-size:12.5px; padding:3px 0; border-bottom:1px dashed var(--line); display:flex; justify-content:space-between; gap:8px; }
+  .ing-list li{ font-size:12.5px; padding:5px 0; border-bottom:1px dashed var(--line); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .ing-list li .ing-list-name{ flex:1; min-width:0; }
+  .ing-status{ font-family:'Archivo', sans-serif; font-weight:800; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; padding:3px 6px; border:1px solid; white-space:nowrap; flex-shrink:0; }
+  .ing-status.in-casa{ border-color:var(--green-deep); color:var(--green-mid); }
+  .ing-status.manca{ border-color:var(--gold); color:var(--gold); }
   .ing-list li:last-child{ border-bottom:none; }
   .full-badge{ font-size:12px; }
   .source-link{ font-size:12px; color:var(--steel); text-decoration:none; font-weight:600; }
   .source-link:hover{ text-decoration:underline; }
   .add-ing-form{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px; }
-  .add-ing-form input{ font-family:'Inter',sans-serif; font-size:12.5px; padding:6px 8px; border-radius:7px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
-  .add-ing-form button{ grid-column:1 / -1; font-family:'JetBrains Mono', monospace; font-size:11.5px; background:var(--green-mid); color:#fff; border:none; padding:7px; border-radius:7px; cursor:pointer; }
-  .add-ing-form button:hover{ background:var(--green-deep); }
+  .add-ing-form input{ font-family:'Archivo', sans-serif; font-size:12.5px; padding:6px 8px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .add-ing-form button{ grid-column:1 / -1; font-family:'Archivo', sans-serif; font-weight:800; font-size:11.5px; letter-spacing:0.04em; background:var(--gold); color:var(--bg); border:none; padding:7px; border-radius:0; cursor:pointer; }
+  .add-ing-form button:hover{ background:var(--gold-dark); }
 
   .shop-day-group{ margin-bottom:20px; }
-  .shop-day-title{ font-family:'Fraunces', serif; font-weight:700; font-size:14.5px; color:var(--ink); margin-bottom:6px; }
-  .shop-day-title .d{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--sage); font-weight:400; margin-right:6px; }
+  .shop-day-title{ display:flex; justify-content:space-between; align-items:baseline; font-family:'Archivo', sans-serif; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink); padding:16px 0 8px; border-bottom:2px solid var(--line-strong); margin-bottom:2px; }
+  .shop-day-title .d{ font-family:'Archivo', sans-serif; font-size:10.5px; color:var(--sage); font-weight:400; margin-right:6px; }
+  .shop-assignee-btn{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); background:none; border:0; padding:0; cursor:pointer; }
+  .shop-assignee-btn:not(.assigned){ color:var(--sage); }
   .dept-block{ margin-top:8px; }
   .dept-block:first-child{ margin-top:0; }
-  .dept-title{ display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--gold-dark); padding:6px 0 4px; border-bottom:1px solid var(--line); margin-bottom:2px; }
+  .dept-title{ display:flex; align-items:center; gap:6px; font-family:'Archivo', sans-serif; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink); padding:16px 0 8px; border-bottom:2px solid var(--line-strong); margin-bottom:2px; }
   .dept-icon{ font-size:14px; }
   .shop-item-row{ display:flex; align-items:center; gap:2px; border-bottom:1px dashed var(--line); }
   .shop-item-row:last-of-type{ border-bottom:none; }
   .shop-item{ flex:1; min-width:0; display:flex; align-items:flex-start; gap:10px; padding:7px 2px; font-size:13.5px; }
-  .shop-item input[type=checkbox]{ margin-top:3px; width:16px;height:16px; accent-color:var(--tomato); flex-shrink:0; }
+  .shop-item input[type=checkbox]{ margin-top:3px; width:16px;height:16px; accent-color:var(--ink); flex-shrink:0; }
+  .shop-item.checked input[type=checkbox]{ accent-color:var(--green-deep); }
   .shop-item.checked .item-name{ text-decoration:line-through; opacity:0.45; }
-  .item-name{ font-weight:600; }
+  .item-name{ font-weight:600; font-size:15px; }
   .item-detail{ display:block; font-size:11.5px; color:var(--sage); margin-top:1px; }
-  .shop-progress{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--gold-dark); margin-bottom:12px; }
-  .missing-ing-banner{ font-size:12.5px; line-height:1.5; background:rgba(179,58,58,0.08); border:1px solid rgba(179,58,58,0.25); color:var(--ink); border-radius:8px; padding:10px 12px; margin-bottom:14px; }
+  .shop-progress{ font-family:'Archivo', sans-serif; font-size:11.5px; color:var(--gold-dark); margin-bottom:12px; }
+  .missing-ing-banner{ font-size:12.5px; line-height:1.5; background:var(--amber); border:1px solid var(--steel); color:var(--ink); border-radius:0; padding:10px 12px; margin-bottom:14px; }
   .view-toggle{ display:flex; gap:6px; margin-bottom:12px; }
-  .view-btn{ flex:1; font-family:'JetBrains Mono', monospace; font-size:11.5px; padding:8px 6px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
-  .view-btn.active{ background:var(--green-mid); color:#fff; border-color:var(--green-mid); }
-  .reset-btn{ font-family:'JetBrains Mono', monospace; font-size:11px; background:none; border:1px solid var(--line); color:var(--sage); padding:6px 10px; border-radius:8px; cursor:pointer; margin-bottom:16px; }
+  .view-btn{ flex:1; font-family:'Archivo', sans-serif; font-size:11.5px; padding:8px 6px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
+  .view-btn.active{ background:var(--gold); color:var(--bg); border-color:var(--gold); }
+  .reset-btn{ font-family:'Archivo', sans-serif; font-size:11px; background:none; border:1px solid var(--line); color:var(--sage); padding:6px 10px; border-radius:0; cursor:pointer; margin-bottom:16px; }
   .reset-btn:hover{ border-color:var(--tomato); color:var(--tomato); }
-  .mini-add-btn{ font-family:'JetBrains Mono', monospace; font-size:11px; background:none; border:1px dashed var(--sage); color:var(--sage); padding:5px 9px; border-radius:7px; cursor:pointer; margin-top:4px; }
+  .mini-add-btn{ font-family:'Archivo', sans-serif; font-size:11px; background:none; border:1px dashed var(--sage); color:var(--sage); padding:5px 9px; border-radius:0; cursor:pointer; margin-top:4px; }
   .mini-add-btn:hover{ border-color:var(--gold-dark); color:var(--gold-dark); }
 
   .filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
-  .filters select, .filters input[type=search]{ font-family:'Inter',sans-serif; font-size:13px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .filters select, .filters input[type=search]{ font-family:'Archivo', sans-serif; font-size:13px; padding:8px 10px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
   .filters input[type=search]{ flex:1; min-width:140px; }
-  .filters-open-btn{ display:inline-flex; align-items:center; gap:6px; font-family:'JetBrains Mono', monospace; font-size:12.5px; padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--green-mid); cursor:pointer; white-space:nowrap; }
+  .filters-open-btn{ display:inline-flex; align-items:center; gap:6px; font-family:'Archivo', sans-serif; font-size:12.5px; padding:8px 12px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--gold-dark); cursor:pointer; white-space:nowrap; }
   .filters-open-btn:hover{ border-color:var(--gold-dark); color:var(--gold-dark); }
   .filters-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; display:flex; align-items:flex-end; justify-content:center; }
-  .filters-modal{ background:var(--surface); width:100%; max-width:520px; max-height:82vh; overflow-y:auto; border-radius:18px 18px 0 0; padding:18px 18px 14px; box-shadow:0 -10px 40px rgba(0,0,0,0.3); }
+  .filters-modal{ background:var(--surface); width:100%; max-width:520px; max-height:82vh; overflow-y:auto; border-radius:0; padding:18px 18px 14px; box-shadow:0 -10px 40px rgba(0,0,0,0.3); }
   .filters-modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
-  .filters-modal-header h3{ font-family:'Fraunces', serif; font-weight:700; font-size:19px; margin:0; color:var(--ink); }
+  .filters-modal-header h3{ font-family:'Archivo', sans-serif; font-weight:800; font-size:20px; margin:0; color:var(--ink); }
   .filters-close-btn{ background:none; border:none; font-size:18px; color:var(--sage); cursor:pointer; padding:4px 8px; }
   .filters-close-btn:hover{ color:var(--tomato); }
   .filters-modal-footer{ display:flex; gap:8px; margin-top:14px; }
   .filters-modal-footer .reset-btn{ margin-bottom:0; flex:1; }
-  .filters-modal-footer .mini-add-btn{ margin-top:0; flex:1; text-align:center; background:var(--gold); border-color:var(--gold); color:var(--green-deep); font-weight:600; }
+  .filters-modal-footer .mini-add-btn{ margin-top:0; flex:1; text-align:center; background:var(--gold); border-color:var(--gold); color:var(--bg); font-weight:600; }
   .filter-groups{ display:flex; flex-direction:column; gap:12px; margin-bottom:16px; }
-  .filter-group-label{ font-family:'JetBrains Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--sage); margin-bottom:6px; }
+  .filter-group-label{ font-family:'Archivo', sans-serif; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--sage); margin-bottom:6px; }
   .chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
-  .filter-group select{ width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
-  .filter-group input[type=text]{ width:100%; font-family:'Inter',sans-serif; font-size:13px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .filter-group select{ width:100%; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 10px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .filter-group input[type=text]{ width:100%; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 10px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
   .recipe-edit-modal{ max-width:560px; }
   .edit-ing-row, .edit-step-row{ display:flex; gap:6px; margin-bottom:6px; align-items:flex-start; }
-  .edit-ing-row .edit-ing-name{ flex:1.6; min-width:0; font-family:'Inter',sans-serif; font-size:13px; padding:8px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
-  .edit-ing-row .edit-ing-qta{ flex:1; min-width:0; font-family:'Inter',sans-serif; font-size:13px; padding:8px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
-  .edit-step-row .edit-step-text{ flex:1; min-width:0; font-family:'Inter',sans-serif; font-size:13px; padding:8px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); resize:vertical; }
-  .edit-row-remove{ flex-shrink:0; width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:var(--surface); color:var(--tomato); cursor:pointer; font-size:13px; }
+  .edit-ing-row .edit-ing-name{ flex:1.6; min-width:0; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .edit-ing-row .edit-ing-qta{ flex:1; min-width:0; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .edit-step-row .edit-step-text{ flex:1; min-width:0; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); resize:vertical; }
+  .edit-row-remove{ flex-shrink:0; width:30px; height:30px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--tomato); cursor:pointer; font-size:13px; }
   .edit-row-remove:hover{ background:rgba(179,58,58,0.08); }
-  .recipe-count{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--sage); margin-bottom:10px; }
+  .recipe-count{ font-family:'Archivo', sans-serif; font-size:11.5px; color:var(--sage); margin-bottom:10px; }
   .recipe-list{ display:grid; grid-template-columns:1fr; gap:0; }
   .recipe-card{ border-bottom:1px solid var(--line); padding:11px 4px; display:flex; justify-content:space-between; align-items:stretch; gap:10px; cursor:pointer; }
   .recipe-card:hover{ background:var(--surface-2); }
   .recipe-card-wrap{ margin-bottom:0; }
-  .recipe-name{ font-weight:600; font-size:14px; }
+  .recipe-name{ font-weight:600; font-size:15px; }
   .recipe-tags{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
-  .tag{ font-family:'JetBrains Mono', monospace; font-size:10.5px; padding:2px 7px; border-radius:20px; background:var(--surface-2); color:var(--green-mid); white-space:nowrap; }
+  .tag{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; padding:5px 9px; border-radius:0; background:var(--surface-2); color:var(--ink); white-space:nowrap; }
   .tag.season{ background:rgba(212,167,58,0.18); color:var(--gold-dark); }
   .tag.freezer{ background:rgba(59,111,143,0.14); color:var(--steel); }
   .tag.tempo{ background:var(--surface-2); color:var(--ink); opacity:0.75; }
@@ -212,44 +258,45 @@
   .recipe-list .recipe-card-wrap .detail-box{ margin-top:0; margin-bottom:0; }
 
   .inv-item{ display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px dashed var(--line); position:relative; }
-  .inv-item .inv-name{ flex:1; min-width:0; text-align:left; font-family:'Inter', sans-serif; font-size:13.5px; color:var(--ink); background:none; border:none; padding:4px 0; cursor:pointer; }
+  .inv-item .inv-name{ flex:1; min-width:0; text-align:left; font-family:'Archivo', sans-serif; font-weight:600; font-size:15px; color:var(--ink); background:none; border:none; padding:4px 0; cursor:pointer; }
   .inv-item .inv-name:hover{ text-decoration:underline; }
-  .inv-luogo{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:none; background:transparent; font-size:13px; line-height:1; cursor:pointer; }
+  .inv-luogo{ flex-shrink:0; width:26px; height:26px; border-radius:0; border:none; background:transparent; font-size:13px; line-height:1; cursor:pointer; }
   .inv-luogo:hover{ opacity:0.65; }
   .luogo-picker-backdrop{ position:fixed; inset:0; z-index:150; background:transparent; }
-  .luogo-picker{ position:absolute; top:100%; left:0; margin-top:4px; z-index:151; display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:5px; box-shadow:0 6px 18px rgba(0,0,0,0.22); }
-  .luogo-picker-opt{ width:30px; height:30px; flex-shrink:0; border-radius:50%; border:none; background:transparent; font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .luogo-picker{ position:absolute; top:100%; left:0; margin-top:4px; z-index:151; display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:0; padding:5px; box-shadow:0 6px 18px rgba(0,0,0,0.22); }
+  .luogo-picker-opt{ width:30px; height:30px; flex-shrink:0; border-radius:0; border:none; background:transparent; font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .luogo-picker-opt:hover{ background:var(--surface-2); }
   .luogo-picker-opt.active{ background:var(--gold); }
   .qty-stepper{ flex-shrink:0; display:flex; align-items:center; gap:4px; }
-  .qty-btn{ width:24px; height:24px; border-radius:50%; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:14px; line-height:1; cursor:pointer; }
+  .qty-btn{ width:24px; height:24px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:14px; line-height:1; cursor:pointer; }
   .qty-btn:hover{ background:var(--surface-2); }
-  .qty-num{ display:inline-block; min-width:22px; text-align:center; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:600; color:var(--ink); cursor:text; }
-  .qty-input{ width:44px; font-family:'JetBrains Mono', monospace; font-size:13px; text-align:center; padding:3px 2px; border-radius:6px; border:1px solid var(--gold); background:var(--surface); color:var(--ink); -moz-appearance:textfield; appearance:textfield; }
+  .qty-num{ display:inline-block; min-width:22px; text-align:center; font-family:'Archivo', sans-serif; font-size:13px; font-weight:600; color:var(--ink); cursor:text; }
+  .qty-num.low{ color:var(--steel); font-weight:800; }
+  .qty-input{ width:44px; font-family:'Archivo', sans-serif; font-size:13px; text-align:center; padding:3px 2px; border-radius:0; border:1px solid var(--gold); background:var(--surface); color:var(--ink); -moz-appearance:textfield; appearance:textfield; }
   .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
-  .inv-remove{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:var(--tomato); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
+  .inv-remove{ flex-shrink:0; width:26px; height:26px; border-radius:0; border:none; background:transparent; color:var(--tomato); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
   .inv-remove svg{ width:16px; height:16px; }
   .inv-remove:hover{ opacity:0.7; }
   .inv-add-row{ display:flex; gap:6px; margin-top:12px; }
-  .inv-add-row input, .inv-add-row select{ font-family:'Inter',sans-serif; font-size:13px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  .inv-add-row input, .inv-add-row select{ font-family:'Archivo', sans-serif; font-size:13px; padding:8px 10px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
   .inv-add-row input#inv-add-name, .inv-add-row input#shop-add-name{ flex:1.5; min-width:0; }
   .inv-add-row input#shop-add-qta{ flex:1; min-width:0; }
   .inv-add-row select#inv-add-luogo{ flex-shrink:0; max-width:130px; }
-  .inv-add-row button{ flex-shrink:0; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; padding:8px 12px; border-radius:8px; border:none; background:var(--green-mid); color:#fff; cursor:pointer; }
-  .inv-add-row button:hover{ background:var(--green-deep); }
-  .save-hint{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--sage); text-align:right; min-height:14px; }
+  .inv-add-row button{ flex-shrink:0; font-family:'Archivo', sans-serif; font-weight:800; font-size:12.5px; padding:8px 12px; border-radius:0; border:none; background:var(--gold); color:var(--bg); cursor:pointer; }
+  .inv-add-row button:hover{ background:var(--gold-dark); }
+  .save-hint{ font-family:'Archivo', sans-serif; font-size:10.5px; color:var(--sage); text-align:right; min-height:14px; }
   .generate-week-block{ margin-top:20px; padding-top:18px; border-top:1px solid var(--line); text-align:center; }
-  .generate-week-btn{ display:inline-flex; align-items:center; gap:8px; font-family:'Inter', sans-serif; font-weight:600; font-size:15px; padding:12px 22px; border-radius:12px; border:none; background:var(--green-mid); color:#fff; cursor:pointer; box-shadow:0 6px 16px rgba(50,74,52,0.3); }
-  .generate-week-btn:hover{ background:var(--green-deep); }
+  .generate-week-btn{ display:inline-flex; align-items:center; gap:8px; font-family:'Archivo', sans-serif; font-weight:800; font-size:15px; padding:12px 22px; border-radius:0; border:none; background:var(--gold); color:var(--bg); cursor:pointer; box-shadow:0 6px 16px rgba(224,60,30,0.3); }
+  .generate-week-btn:hover{ background:var(--gold-dark); }
   .generate-week-hint{ font-size:11.5px; color:var(--sage); margin:8px 0 0; }
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
   #login-gate{ position:fixed; inset:0; z-index:999; display:none; align-items:center; justify-content:center; background:var(--bg); padding:20px; }
-  .login-box{ width:100%; max-width:340px; background:var(--surface); border-radius:16px; padding:28px 24px; box-shadow:0 20px 50px rgba(0,0,0,0.2); text-align:center; }
-  .login-box h2{ font-family:'Fraunces', serif; font-weight:700; font-size:24px; margin:0 0 4px; color:var(--ink); }
-  .login-box .login-sub{ font-family:'Fraunces', serif; font-style:italic; color:var(--sage); margin:0 0 20px; font-size:14px; }
-  .login-box input{ width:100%; font-family:'Inter', sans-serif; font-size:14px; padding:11px 12px; border-radius:9px; border:1px solid var(--line); background:var(--surface); color:var(--ink); margin-bottom:10px; }
-  .login-box button{ width:100%; font-family:'Inter', sans-serif; font-weight:600; font-size:14.5px; padding:11px; border-radius:9px; border:none; background:var(--gold); color:var(--green-deep); cursor:pointer; margin-top:4px; }
+  .login-box{ width:100%; max-width:340px; background:var(--surface); border-radius:0; padding:28px 24px; box-shadow:0 20px 50px rgba(0,0,0,0.2); text-align:center; }
+  .login-box h2{ font-family:'Archivo', sans-serif; font-weight:700; font-size:24px; margin:0 0 4px; color:var(--ink); }
+  .login-box .login-sub{ font-family:'Archivo', sans-serif; font-style:italic; color:var(--sage); margin:0 0 20px; font-size:14px; }
+  .login-box input{ width:100%; font-family:'Archivo', sans-serif; font-size:14px; padding:11px 12px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); margin-bottom:10px; }
+  .login-box button{ width:100%; font-family:'Archivo', sans-serif; font-weight:800; font-size:14.5px; padding:11px; border-radius:0; border:none; background:var(--gold); color:var(--bg); cursor:pointer; margin-top:4px; }
   .login-box button:hover{ background:var(--gold-dark); color:#fff; }
   .login-box button:disabled{ opacity:0.6; cursor:default; }
   .login-error{ color:var(--tomato); font-size:12.5px; margin-top:10px; min-height:16px; }
@@ -286,6 +333,11 @@
     <div class="filters-modal-header">
       <h3>Impostazioni</h3>
       <button class="filters-close-btn" id="settings-close">✕</button>
+    </div>
+    <div class="filter-group-label">Chi sei (solo su questo telefono)</div>
+    <div class="view-toggle" id="current-user-toggle">
+      <button type="button" class="view-btn" data-set-user="mara">Mara</button>
+      <button type="button" class="view-btn" data-set-user="ste">Ste</button>
     </div>
     <button class="settings-item" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
     <button class="settings-item settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>
@@ -388,6 +440,22 @@ function isStapleConfirmed(it){
   const touched = it.keys.some(k => state.shopChecked[k] !== undefined);
   if(touched) return it.keys.every(k => state.shopChecked[k]);
   return hasPantryStock(it.ingrediente);
+}
+
+// Lista ingredienti di una ricetta con badge IN CASA/MANCA (da hasPantryStock)
+// e un'azione per mandare solo i mancanti in Spesa: condivisa da Menù e Prep,
+// così il comportamento resta identico ovunque si apra il dettaglio di una ricetta.
+function renderIngredientsSection(ing, recipeName){
+  if(!ing.length) return `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
+  const rows = ing.map(it=>{
+    const inCasa = hasPantryStock(it.ingrediente);
+    return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}</span><span class="ing-status ${inCasa?'in-casa':'manca'}">${inCasa?'In casa':'Manca'}</span><span style="color:var(--sage)">${escapeHtml(it.qta||'')}</span></li>`;
+  }).join('');
+  const mancanti = ing.filter(it => !hasPantryStock(it.ingrediente));
+  const mancantiBtn = mancanti.length
+    ? `<button class="mini-add-btn" data-mancanti-in-spesa="${escapeAttr(recipeName)}">Manda ${mancanti.length} mancant${mancanti.length===1?'e':'i'} in spesa</button>`
+    : '';
+  return `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
 }
 
 // Inventario unico (dispensa/ripostiglio/frigo/freezer distinti solo dal
@@ -509,6 +577,8 @@ const state = {
   weekBaseline: null,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
+  cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno
+  shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
@@ -627,6 +697,16 @@ function waitForAuth(){
   });
 }
 
+// Chi sta guardando il telefono ora: solo locale, mai su Firebase (a differenza
+// di state.cooks, che è chi cucina quel giorno ed è condiviso tra i due).
+function getCurrentUser(){
+  try{ return localStorage.getItem('cookpop-current-user') || null; }catch(e){ return null; }
+}
+function setCurrentUser(u){
+  try{ localStorage.setItem('cookpop-current-user', u); }catch(e){}
+}
+const COOK_LABEL = { mara:'Mara', ste:'Ste' };
+
 async function loadState(){
   // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
   try{
@@ -679,6 +759,8 @@ function persist(){
       weekBaseline: state.weekBaseline,
       extraWeeks: state.extraWeeks,
       dayLinks: state.dayLinks,
+      cooks: state.cooks,
+      shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
       mealsDone: state.mealsDone,
       recipeIngredients: state.recipeIngredients,
@@ -874,6 +956,32 @@ function currentSeasonKey(){
 // giorno per giorno (da lunedì a venerdì solo ricette fino a 30-45 min).
 // Puramente funzionale: non tocca lo state, così è riusabile sia per la
 // settimana corrente che per ogni settimana extra aggiunta.
+// Al posto di una lunga lista filtrabile, 3 suggerimenti con una motivazione
+// esplicita: sotto i 30 minuti nei feriali, progetto/congelabile nel weekend,
+// altrimenti una categoria diversa da quella di oggi. i è l'indice originale
+// del giorno (0=Lun...6=Dom): 5 e 6 (Sab/Dom) contano come weekend.
+function suggestSwaps(weekIdx, i){
+  const currentCat = effectiveCategoria(weekIdx, i);
+  const inPlan = new Set();
+  WEEK_DISPLAY_ORDER.forEach(di => { const n = effectiveRecipeName(weekIdx, di); if(n) inPlan.add(n); });
+  const isWeekend = i === 5 || i === 6;
+  const WEEKDAY_TEMPO = ['express','veloce','normale'];
+  const scored = DATA.recipes.filter(r => !inPlan.has(r.nome)).map(r=>{
+    const isLong = r.tempoBucket === 'progetto' || r.tempoBucket === 'lunga';
+    const isFreezable = r.freezerNew === 'congelabile' || r.freezerNew === 'base';
+    let motivo;
+    if(isWeekend && isLong) motivo = 'Progetto da weekend';
+    else if(WEEKDAY_TEMPO.includes(r.tempoBucket)) motivo = 'Sotto i 30–45 minuti';
+    else if(isFreezable) motivo = 'Congelabile: doppia porzione';
+    else motivo = 'Categoria diversa da oggi';
+    let score = isWeekend ? (isLong ? 0 : 2) : (WEEKDAY_TEMPO.includes(r.tempoBucket) ? 0 : 2);
+    if(r.categoriaNew === currentCat) score += 1;
+    return { r, motivo, score };
+  });
+  scored.sort((a,b)=> a.score - b.score);
+  return scored.slice(0,3);
+}
+
 function pickWeekRecipes(){
   const season = currentSeasonKey();
   let pool = DATA.recipes.filter(r => r.stagioni.includes(season) || r.stagioni.includes('tutto'));
@@ -932,6 +1040,21 @@ function unlinkDaysPointingTo(dayKey){
   Object.keys(state.dayLinks).forEach(k=>{
     if(state.dayLinks[k] === dayKey) delete state.dayLinks[k];
   });
+}
+// Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
+function toggleCook(dayKey){
+  const cur = state.cooks[dayKey];
+  if(!cur) state.cooks[dayKey] = 'mara';
+  else if(cur === 'mara') state.cooks[dayKey] = 'ste';
+  else delete state.cooks[dayKey];
+  persist(); render();
+}
+function toggleShopAssignee(store){
+  const cur = state.shopAssignees[store];
+  if(!cur) state.shopAssignees[store] = 'mara';
+  else if(cur === 'mara') state.shopAssignees[store] = 'ste';
+  else delete state.shopAssignees[store];
+  persist(); render();
 }
 function generateWeek(weekIdx){
   const baseline = {};
@@ -1155,8 +1278,20 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         <span class="swap-result-name">${escapeHtml(r.nome)}</span>
         <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
       </div>`).join('');
+    const suggestions = suggestSwaps(weekIdx, i);
+    const suggestionsHtml = suggestions.length ? `
+      <div class="swap-suggestions">
+        <div class="filter-group-label">Suggeriti per questo giorno</div>
+        ${suggestions.map(s=>`
+          <button type="button" class="swap-suggestion" data-swap-pick="${escapeAttr(s.r.nome)}" data-swap-day="${dayKey}">
+            <span class="swap-suggestion-top"><span class="swap-suggestion-name">${escapeHtml(s.r.nome)}</span><span class="swap-suggestion-time">${escapeHtml(s.r.tempo)}</span></span>
+            <span class="swap-suggestion-motivo">${escapeHtml(s.motivo)}</span>
+          </button>`).join('')}
+      </div>` : '';
     swapPanelHtml = `
     <div class="swap-panel">
+      ${suggestionsHtml}
+      <div class="filter-group-label">Oppure cerca</div>
       <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${dayKey}" value="${escapeAttr(f.search)}">
       <div class="swap-cat-chips">
         ${currentCat ? `<button class="chip-btn ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${dayKey}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
@@ -1193,13 +1328,13 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     swapControls = `
     <div class="avanzo-chip">🥡 Avanzo di ${escapeHtml(sourceGiorno)}</div>
     <div class="swap-controls">
-      <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Mangiato' : '🍽️ Segna come mangiato'}</button>
+      <button class="chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Mangiato' : '🍽️ Segna come mangiato'}</button>
       <button class="mini-add-btn" data-unlink-day="${dayKey}">🔗 Scollega</button>
     </div>`;
   } else {
     swapControls = `
     <div class="swap-controls">
-      <button class="chip-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
+      <button class="chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
       <button class="mini-add-btn" data-open-swap="${dayKey}">🔀 Cambia ricetta</button>
       ${hasPickedOverride ? `<button class="mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
       <button class="mini-add-btn" data-open-link-picker="${dayKey}">🥡 Segna come avanzo</button>
@@ -1240,9 +1375,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   if(state.expandedDay === dayKey){
     const det = getRecipeDetails(name);
     const ing = getIngredientsFor(name);
-    const ingHtml = ing.length
-      ? `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${ing.map(it=>`<li><span>${escapeHtml(it.ingrediente)}</span><span style="color:var(--sage)">${escapeHtml(it.qta||'')}</span></li>`).join('')}</ul></div>`
-      : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
+    const ingHtml = renderIngredientsSection(ing, name);
     const tagsHtml = rec ? `
       <div class="detail-tags">
         <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
@@ -1282,13 +1415,23 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     </div>`;
   }
 
+  const cook = state.cooks[dayKey];
+  let todayBadgeLabel = 'Oggi';
+  if(isToday){
+    const me = getCurrentUser();
+    if(cook && me && cook === me) todayBadgeLabel = 'Tocca a te';
+    else if(cook) todayBadgeLabel = 'Cucina ' + COOK_LABEL[cook];
+  }
+  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${cook ? COOK_LABEL[cook][0] : ''}</button>`;
+
   return `
   <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
     <div class="day-row">
-      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span>${isToday ? '<span class="today-badge">Oggi</span>' : ''}</div>
+      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span>${isToday ? `<span class="today-badge">${escapeHtml(todayBadgeLabel)}</span>` : ''}</div>
       <div class="day-time">${escapeHtml(timeDisplay)}</div>
     </div>
     <div class="day-menu-row">
+      ${cookPill}
       <span class="day-menu" data-toggle-day="${dayKey}">${escapeHtml(name)}</span>
       <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
     </div>
@@ -1333,6 +1476,101 @@ function renderWeekSection(weekIdx){
       ${days}
       ${controls}
     </section>`;
+}
+
+// Posizione (0..6, ordine di visualizzazione) del giorno di oggi nella
+// settimana 0: c'è sempre, dato che la settimana 0 è ancorata a "oggi"
+// (vedi upcomingSaturday). Usata dall'header "Oggi" e per il badge del giorno.
+function findTodayPos(){
+  const dates = weekDatesFor(0);
+  const today = new Date();
+  for(let pos=0; pos<WEEK_DISPLAY_ORDER.length; pos++){
+    if(isSameDay(dates[pos], today)) return pos;
+  }
+  return null;
+}
+
+// Header "Oggi" in cima al Menù: la cena di stasera in grande, chi cucina, il
+// promemoria di preparazione anticipata se previsto, e lo stato della casa
+// (spesa da fare, dispensa in esaurimento, domani) come nel prototipo — qui
+// come header espanso della tab Menù invece che una quinta tab, per restare
+// coerenti con la navigazione a 4 tab già esistente.
+function renderOggiHeader(){
+  const pos = findTodayPos();
+  if(pos === null) return '';
+  const i = WEEK_DISPLAY_ORDER[pos];
+  const todayKey = `0_${i}`;
+  const name = effectiveRecipeName(0, i);
+  const rec = effectiveRecipeMeta(0, i);
+  const det = getRecipeDetails(name);
+  const timeDisplay = det ? det.tempo : (rec ? rec.tempo : DATA.week1[i].tempo);
+  const cook = state.cooks[todayKey];
+  const me = getCurrentUser();
+  const turnoLabel = cook ? (me && cook === me ? 'Tocca a te' : 'Cucina ' + COOK_LABEL[cook]) : 'Non assegnato';
+  const today = new Date();
+  const kicker = `${DATA.week1[i].giorno} ${today.getDate()} ${MONTHS_IT[today.getMonth()]}`;
+  const prep = (rec && rec.prep && rec.prep !== 'No') ? rec.prep : '';
+
+  // stato della casa: da comprare (approssimato, senza il merge per reparto che fa Spesa),
+  // scorte basse in Dispensa, e cosa c'è domani
+  let daComprare = 0;
+  allPlannedDays().forEach(({weekIdx:w, i:di, name:n})=>{
+    getIngredientsFor(n).forEach((it, idx)=>{
+      const key = dayIngKey(w, di, idx);
+      if(state.shopDismissed[key] || state.shopChecked[key]) return;
+      daComprare++;
+    });
+  });
+  const scorteBasse = Object.values(state.pantryItems).filter(it => typeof it.qty === 'number' && it.qty > 0 && it.qty <= 1).length;
+
+  let tomorrowKey = null;
+  if(pos < 6) tomorrowKey = `0_${WEEK_DISPLAY_ORDER[pos+1]}`;
+  else if(state.extraWeeks.length >= 1) tomorrowKey = `1_${WEEK_DISPLAY_ORDER[0]}`;
+  let domaniLine = 'Pianifica la prossima settimana';
+  if(tomorrowKey){
+    const [tw, ti] = tomorrowKey.split('_');
+    const tWeekIdx = parseInt(tw,10);
+    const tName = effectiveRecipeName(tWeekIdx, ti);
+    const tCook = state.cooks[tomorrowKey];
+    domaniLine = `Domani · ${tName}`;
+    var domaniMeta = tCook ? COOK_LABEL[tCook] : 'da assegnare';
+  } else {
+    var domaniMeta = '';
+  }
+
+  return `
+    <div class="oggi-header">
+      <div class="oggi-kicker">${escapeHtml(kicker)}</div>
+      <h1 class="oggi-title">Cena di stasera</h1>
+      <div class="oggi-dish-row">
+        <h2 class="oggi-dish">${escapeHtml(name)}</h2>
+        <span class="oggi-time">${escapeHtml(timeDisplay)}</span>
+      </div>
+      <div class="oggi-badges">
+        <span class="tag oggi-turno">${escapeHtml(turnoLabel)}</span>
+        ${rec ? `<span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>` : ''}
+      </div>
+      <div class="oggi-actions">
+        <button class="btn-primary-flat" data-toggle-day="${todayKey}">Apri la ricetta</button>
+        <button class="btn-secondary-flat" data-open-swap="${todayKey}">Cambia</button>
+      </div>
+      ${prep ? `<div class="oggi-prep"><div class="oggi-prep-label">Da ricordare</div><div>${escapeHtml(prep)}</div></div>` : ''}
+      <div class="oggi-status">
+        <div class="oggi-status-title">Stato della casa</div>
+        <button type="button" class="oggi-status-row" data-go-tab="spesa">
+          <span>Spesa</span>
+          <span class="oggi-status-meta">${daComprare ? daComprare + ' voci da comprare' : 'Lista aggiornata'} →</span>
+        </button>
+        <button type="button" class="oggi-status-row" data-go-tab="dispensa">
+          <span>Dispensa</span>
+          <span class="oggi-status-meta">${scorteBasse ? scorteBasse + ' in esaurimento' : 'Tutto ok'} →</span>
+        </button>
+        <div class="oggi-status-row oggi-status-row-static">
+          <span>${escapeHtml(domaniLine)}</span>
+          <span class="oggi-status-meta">${escapeHtml(domaniMeta)}</span>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderMenu(){
@@ -1382,6 +1620,7 @@ function renderMenu(){
   }
 
   return `
+    ${renderOggiHeader()}
     <p class="section-sub">Tocca il nome di una ricetta per vederne i dettagli — trascina ⠿ per scambiarla con un altro giorno</p>
     ${weekSections}
     ${doneModal}
@@ -1481,9 +1720,13 @@ function renderSpesa(){
             <div class="dept-title"><span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}</div>
             ${byDept[dept].map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '))).join('')}
           </div>`).join('');
+      const assignee = state.shopAssignees[store];
       return `
       <div class="shop-day-group">
-        <div class="shop-day-title">${escapeHtml(store)}</div>
+        <div class="shop-day-title">
+          <span>${escapeHtml(store)}</span>
+          <button type="button" class="shop-assignee-btn${assignee ? ' assigned' : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>
+        </div>
         ${deptSections}
       </div>`;
     }).join('');
@@ -1561,6 +1804,7 @@ function renderSpesa(){
     <div class="shop-progress">${done} / ${total} presi</div>
     <button class="reset-btn" id="reset-shop">Svuota spunte</button>
     ${body}
+    ${done ? `<button class="btn-primary-flat" id="move-checked-to-pantry" style="width:100%; margin-top:16px;">Sposta ${done} spuntati in dispensa</button>` : ''}
     ${addIngModal}
     <button class="fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente">+</button>
   `;
@@ -1585,9 +1829,7 @@ function renderPrep(){
     const ing = getIngredientsFor(r.nome);
     let detail = '';
     if(isOpen){
-      const ingHtml = ing.length
-        ? `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${ing.map(it=>`<li><span>${escapeHtml(it.ingrediente)}</span><span style="color:var(--sage)">${escapeHtml(it.qta||'')}</span></li>`).join('')}</ul></div>`
-        : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
+      const ingHtml = renderIngredientsSection(ing, r.nome);
       const stepsHtml = det && det.procedimento && det.procedimento.length
         ? `<div class="detail-section"><div class="detail-section-title">👩🏻‍🍳 Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
         : '';
@@ -1732,7 +1974,7 @@ function renderDispensa(){
         <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
           ? `<input type="number" min="0" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">`
-          : `<span class="qty-num" data-qty-show="${escapeAttr(it.key)}">${it.qty}</span>`}
+          : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}</span>`}
         <button class="qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
       </span>
       <button class="inv-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
@@ -1837,6 +2079,18 @@ function attachHandlers(){
       persist(); render();
     });
   });
+  const moveToPantryBtn = document.getElementById('move-checked-to-pantry');
+  if(moveToPantryBtn){
+    // La dispensa è già aggiornata voce per voce alla spunta (sopra): qui
+    // serve solo a "chiudere" il giro spesa, togliendo dalla lista quello
+    // che hai già preso (spuntato a mano o già in dispensa).
+    moveToPantryBtn.addEventListener('click', ()=>{
+      document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
+        cb.dataset.shopKeys.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+      });
+      persist(); render();
+    });
+  }
   document.querySelectorAll('[data-shop-remove]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       e.currentTarget.dataset.shopRemove.split(',').forEach(k=>{
@@ -1913,6 +2167,33 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-drag-handle]').forEach(handle=>{
     handle.addEventListener('pointerdown', startDayDrag);
+  });
+  document.querySelectorAll('[data-toggle-cook]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ toggleCook(e.currentTarget.dataset.toggleCook); });
+  });
+  document.querySelectorAll('[data-toggle-assignee]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ toggleShopAssignee(e.currentTarget.dataset.toggleAssignee); });
+  });
+  document.querySelectorAll('[data-go-tab]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.tab = e.currentTarget.dataset.goTab;
+      window.location.hash = state.tab;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-mancanti-in-spesa]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const recipeName = e.currentTarget.dataset.mancantiInSpesa;
+      getIngredientsFor(recipeName).filter(it => !hasPantryStock(it.ingrediente)).forEach(it=>{
+        const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
+        if(already) return;
+        const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+        state.shopExtras[id] = { ingrediente: it.ingrediente, qta: it.qta || '' };
+      });
+      state.tab = 'spesa';
+      window.location.hash = 'spesa';
+      persist(); render();
+    });
   });
   document.querySelectorAll('[data-generate-week]').forEach(btn=>{
     btn.addEventListener('click', e=>{ generateWeek(parseInt(e.currentTarget.dataset.generateWeek,10)); });
@@ -2385,6 +2666,26 @@ function goToTab(delta){
   settingsBtn.addEventListener('click', open);
   if(settingsClose) settingsClose.addEventListener('click', close);
   settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
+
+  // "Chi sei": solo locale (localStorage), mai sincronizzato — identifica chi
+  // sta guardando il telefono, usato solo per il badge "Tocca a te" nel Menù.
+  const userToggle = document.getElementById('current-user-toggle');
+  if(userToggle){
+    const markActive = ()=>{
+      const me = getCurrentUser();
+      userToggle.querySelectorAll('[data-set-user]').forEach(b=>{
+        b.classList.toggle('active', b.dataset.setUser === me);
+      });
+    };
+    markActive();
+    userToggle.querySelectorAll('[data-set-user]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        setCurrentUser(b.dataset.setUser);
+        markActive();
+        render();
+      });
+    });
+  }
 })();
 
 // Drag&drop per scambiare le ricette di due giorni nel Menù (Pointer Events,
