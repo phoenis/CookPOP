@@ -7,15 +7,23 @@
     --gold:#e03c1e; --gold-dark:#c53116; --tomato:#87282b; --steel:#fb8323;
     --amber:#fbc02d; --plum:#7a5a8a; --ink:#201e1d; --sage:#7d7979; --line: rgba(32,30,29,0.18);
     --line-strong: rgba(32,30,29,0.4);
+
+
+    --luogo-dispensa: #FF7043;
+    --luogo-ripostiglio: #8D6E63;
+    --luogo-frigo: #546E7A;
+    --luogo-freezer: #2196F3;
+    --luogo-utility: #424242;
+    --luogo-giardino: #2E7D32;
   }
-  @media (prefers-color-scheme: dark){
+ /* @media (prefers-color-scheme: dark){
     :root{
       --bg:#18191b; --surface:#242423; --surface-2:rgba(255,255,255,0.05);
       --green-deep:#a3cc3f;
       --ink:#ece7e0; --sage:#9a9488; --line: rgba(255,255,255,0.12);
       --line-strong: rgba(255,255,255,0.35);
     }
-  }
+  }*/
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -72,7 +80,7 @@
   .btn.is-danger{ color:var(--tomato); }
   .btn.is-block{ width:100%; }
 
-  .settings-btn{ width:36px; height:36px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font-size:17px; }
+  .settings-btn{ width:36px; height:36px; border:none; background:transparent; color:var(--ink); font-size:24px; }
   .settings-btn:hover{ background:var(--surface); }
 
   /* pulsante flottante "+" (stile WhatsApp) per aggiungere un ingrediente in Spesa */
@@ -83,7 +91,8 @@
      pattern a sé (icona+etichetta impilate, indicatore a barra), non un .btn */
   nav.tabs{ position:fixed; left:0; right:0; bottom:0; z-index:90; display:flex; background:var(--bg); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); }
   nav.tabs button{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:transparent; border:none; border-top:2px solid transparent; color:var(--sage); font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 4px 6px; cursor:pointer; transition:color .15s ease, border-color .15s ease; }
-  nav.tabs button .bn-icon{ font-size:19px; line-height:1; }
+  nav.tabs button .bn-icon{ height:1.3rem; width: 1.3rem; }
+  button svg{ display: flex; align-content:center; justify-content:center; height:100%; width:100%; }
   nav.tabs button:hover{ color:var(--ink); }
   nav.tabs button.active{ color:var(--gold); border-top-color:var(--gold); }
   nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
@@ -265,13 +274,10 @@
   .inv-name{ flex:1; min-width:0; text-align:left; font-weight:600; font-size:15px; color:var(--ink); }
   .is-text.inv-name{ padding:4px 0; }
   .inv-name:hover{ text-decoration:underline; }
-  .inv-luogo{ width:26px; height:26px; font-size:13px; line-height:1; }
-  .inv-luogo:hover{ opacity:0.65; }
   .luogo-picker-backdrop{ position:fixed; inset:0; z-index:150; background:transparent; }
-  .luogo-picker{ position:absolute; top:100%; left:0; margin-top:4px; z-index:151; display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:0; padding:5px; box-shadow:0 6px 18px rgba(0,0,0,0.22); }
+  .luogo-picker{ position:absolute; top:100%; left:0; margin-top:4px; z-index:151; display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:9999px; padding:5px; box-shadow:0 6px 18px rgba(0,0,0,0.22); }
   .luogo-picker-opt{ width:30px; height:30px; font-size:15px; line-height:1; }
   .luogo-picker-opt:hover{ background:var(--surface-2); }
-  .luogo-picker-opt.active{ background:var(--gold); }
   .qty-stepper{ flex-shrink:0; display:flex; align-items:center; gap:4px; }
   .qty-btn{ width:24px; height:24px; font-size:14px; line-height:1; }
   .is-outline.qty-btn{ color:var(--ink); }
@@ -304,3 +310,32 @@
   .login-box .btn:hover{ color:#fff; }
   .login-box .btn:disabled{ opacity:0.6; }
   .login-error{ color:var(--tomato); font-size:12.5px; margin-top:10px; min-height:16px; }
+
+  [data-luogo-value="Dispensa"],[data-luogo-value="dispensa"] {color: var(--luogo-dispensa); background-color: color-mix(in lab, var(--luogo-dispensa) 15%, transparent);}
+  [data-luogo-value="Ripostiglio"],[data-luogo-value="ripostiglio"] {color: var(--luogo-ripostiglio); background-color: color-mix(in lab, var(--luogo-ripostiglio) 15%, transparent);}
+  [data-luogo-value="Frigo"],[data-luogo-value="frigo"] {color: var(--luogo-frigo); background-color: color-mix(in lab, var(--luogo-frigo) 15%, transparent);}
+  [data-luogo-value="Freezer"],[data-luogo-value="freezer"] {color: var(--luogo-freezer); background-color: color-mix(in lab, var(--luogo-freezer) 15%, transparent);}
+  [data-luogo-value="Utility"],[data-luogo-value="utility"] {color: var(--luogo-utility); background-color: color-mix(in lab, var(--luogo-utility) 15%, transparent);}
+  [data-luogo-value="Giardino"],[data-luogo-value="giardino"] {color: var(--luogo-giardino); background-color: color-mix(in lab, var(--luogo-giardino) 15%, transparent);}
+/*
+  [data-luogo-value="dispensa"] {color: var(--luogo-dispensa); background-color: color-mix(in lab, var(--luogo-dispensa) 7%, transparent);}
+  [data-luogo-value="ripostiglio"] {color: var(--luogo-ripostiglio); background-color: color-mix(in lab, var(--luogo-ripostiglio) 7%, transparent);}
+  [data-luogo-value="frigo"] {color: var(--luogo-frigo); background-color: color-mix(in lab, var(--luogo-frigo) 7%, transparent);}
+  [data-luogo-value="freezer"] {color: var(--luogo-freezer); background-color: color-mix(in lab, var(--luogo-freezer) 7%, transparent);}
+  [data-luogo-value="utility"] {color: var(--luogo-utility); background-color: color-mix(in lab, var(--luogo-utility) 7%, transparent);}
+  [data-luogo-value="giardino"] {color: var(--luogo-giardino); background-color: color-mix(in lab, var(--luogo-giardino) 7%, transparent);}
+*/
+  [data-luogo-value="dispensa"] {color: var(--luogo-dispensa); background-color: transparent;}
+  [data-luogo-value="ripostiglio"] {color: var(--luogo-ripostiglio); background-color: transparent;}
+  [data-luogo-value="frigo"] {color: var(--luogo-frigo); background-color: transparent;}
+  [data-luogo-value="freezer"] {color: var(--luogo-freezer); background-color: transparent;}
+  [data-luogo-value="utility"] {color: var(--luogo-utility); background-color: transparent;}
+  [data-luogo-value="giardino"] {color: var(--luogo-giardino); background-color: transparent;}
+
+  [data-luogo-value="Dispensa"].active,[data-luogo-value="dispensa"].active {color: white; background-color: var(--luogo-dispensa);}
+  [data-luogo-value="Ripostiglio"].active,[data-luogo-value="ripostiglio"].active {color: white; background-color: var(--luogo-ripostiglio);}
+  [data-luogo-value="Frigo"].active,[data-luogo-value="frigo"].active {color: white; background-color: var(--luogo-frigo);}
+  [data-luogo-value="Freezer"].active,[data-luogo-value="freezer"].active {color: white; background-color: var(--luogo-freezer);}
+  [data-luogo-value="Utility"].active,[data-luogo-value="utility"].active {color: white; background-color: var(--luogo-utility);}
+  [data-luogo-value="Giardino"].active,[data-luogo-value="giardino"].active {color: white; background-color: var(--luogo-giardino);}
+
