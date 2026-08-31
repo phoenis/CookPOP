@@ -62,7 +62,7 @@
   nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
 
   /* settings sheet: stessa modale bottom-sheet usata altrove, con id fissi per riusare la logica di refresh/logout già esistente */
-  .settings-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center; }
+  .settings-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; padding:20px; }
   .settings-backdrop.open{ display:flex; }
   .settings-sheet .filters-modal-header{ margin-bottom:10px; }
   .settings-item{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-family:'Archivo', sans-serif; font-size:14px; font-weight:600; color:var(--ink); background:var(--surface); border:1px solid var(--line); padding:12px 14px; border-radius:999px; cursor:pointer; margin-bottom:8px; }
@@ -207,10 +207,8 @@
   .filters input[type=search]{ flex:1; min-width:140px; }
   .filters-open-btn{ display:inline-flex; align-items:center; gap:6px; font-family:'Archivo', sans-serif; font-size:12.5px; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--gold-dark); cursor:pointer; white-space:nowrap; }
   .filters-open-btn:hover{ border-color:var(--gold-dark); color:var(--gold-dark); }
-  .filters-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; display:flex; align-items:flex-end; justify-content:center; }
-  .filters-modal-backdrop.centered-modal{ align-items:center; padding:20px; }
-  .filters-modal{ background:var(--surface); width:100%; max-width:520px; max-height:82vh; overflow-y:auto; border-radius:0; padding:18px 18px 14px; box-shadow:0 -10px 40px rgba(0,0,0,0.3); }
-  .filters-modal.centered-modal{ max-width:340px; border:2px solid var(--line-strong); box-shadow:0 12px 40px rgba(0,0,0,0.35); }
+  .filters-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .filters-modal{ background:var(--surface); width:100%; max-width:520px; max-height:82vh; overflow-y:auto; border-radius:1rem; padding:18px 18px 14px; border:2px solid var(--line-strong); box-shadow:0 12px 40px rgba(0,0,0,0.35); }
   .filters-modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
   .filters-modal-header h3{ font-family:'Archivo', sans-serif; font-weight:800; font-size:20px; margin:0; color:var(--ink); }
   .filters-close-btn{ background:none; border:none; font-size:18px; color:var(--sage); cursor:pointer; padding:4px 8px; }
@@ -1739,8 +1737,8 @@ function renderSpesa(){
     </div>` : '';
 
   const addIngModal = state.addIngModalOpen ? `
-    <div class="filters-modal-backdrop centered-modal" data-close-add-ing-modal>
-      <div class="filters-modal centered-modal" data-stop-close>
+    <div class="filters-modal-backdrop" data-close-add-ing-modal>
+      <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Aggiungi ingrediente</h3>
           <button class="filters-close-btn" data-close-add-ing-modal>✕</button>
