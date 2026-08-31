@@ -96,7 +96,7 @@ function renderIngredientsSection(ing, recipeName){
   }).join('');
   const mancanti = ing.filter(it => !hasPantryStock(it.ingrediente));
   const mancantiBtn = mancanti.length
-    ? `<button class="mini-add-btn" data-mancanti-in-spesa="${escapeAttr(recipeName)}">Manda ${mancanti.length} mancant${mancanti.length===1?'e':'i'} in spesa</button>`
+    ? `<button class="btn is-dashed mini-add-btn" data-mancanti-in-spesa="${escapeAttr(recipeName)}">Manda ${mancanti.length} mancant${mancanti.length===1?'e':'i'} in spesa</button>`
     : '';
   return `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
 }
@@ -773,14 +773,14 @@ function editIngRowHtml(ingrediente, qta){
     <div class="edit-ing-row">
       <input type="text" class="edit-ing-name" placeholder="Ingrediente" value="${escapeAttr(ingrediente||'')}">
       <input type="text" class="edit-ing-qta" placeholder="Quantità" value="${escapeAttr(qta||'')}">
-      <button type="button" class="edit-row-remove" data-remove-row aria-label="Rimuovi riga">✕</button>
+      <button type="button" class="btn is-outline is-icon is-danger edit-row-remove" data-remove-row aria-label="Rimuovi riga">✕</button>
     </div>`;
 }
 function editStepRowHtml(text){
   return `
     <div class="edit-step-row">
       <textarea class="edit-step-text" rows="2" placeholder="Passaggio">${escapeHtml(text||'')}</textarea>
-      <button type="button" class="edit-row-remove" data-remove-row aria-label="Rimuovi passaggio">✕</button>
+      <button type="button" class="btn is-outline is-icon is-danger edit-row-remove" data-remove-row aria-label="Rimuovi passaggio">✕</button>
     </div>`;
 }
 
@@ -808,7 +808,7 @@ function renderRecipeEditModal(){
       <div class="filters-modal recipe-edit-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Modifica ricetta</h3>
-          <button class="filters-close-btn" data-close-recipe-edit>✕</button>
+          <button class="btn is-icon filters-close-btn" data-close-recipe-edit>✕</button>
         </div>
         <p class="section-sub" style="margin-top:-8px;">${escapeHtml(name)}</p>
         <div class="filter-groups">
@@ -835,7 +835,7 @@ function renderRecipeEditModal(){
           <div class="filter-group">
             <div class="filter-group-label">🌦 Stagioni</div>
             <div class="chip-row" id="edit-stagioni">
-              ${STAGIONE_ORDER.map(s=>`<button type="button" class="chip-btn ${stagioniSet.has(s)?'active':''}" data-stagione-chip="${s}">${escapeHtml(STAGIONE_LABEL[s])}</button>`).join('')}
+              ${STAGIONE_ORDER.map(s=>`<button type="button" class="btn is-outline chip-btn ${stagioniSet.has(s)?'active':''}" data-stagione-chip="${s}">${escapeHtml(STAGIONE_LABEL[s])}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
@@ -860,12 +860,12 @@ function renderRecipeEditModal(){
           <div class="filter-group">
             <div class="filter-group-label">🛒 Ingredienti</div>
             <div id="edit-ing-list">${ingRowsHtml}</div>
-            <button type="button" class="mini-add-btn" id="edit-add-ing-row">+ aggiungi ingrediente</button>
+            <button type="button" class="btn is-dashed mini-add-btn" id="edit-add-ing-row">+ aggiungi ingrediente</button>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">👩🏻‍🍳 Procedimento</div>
             <div id="edit-step-list">${stepRowsHtml}</div>
-            <button type="button" class="mini-add-btn" id="edit-add-step-row">+ aggiungi passaggio</button>
+            <button type="button" class="btn is-dashed mini-add-btn" id="edit-add-step-row">+ aggiungi passaggio</button>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">📝 Da ricordare</div>
@@ -885,8 +885,8 @@ function renderRecipeEditModal(){
           </div>
         </div>
         <div class="filters-modal-footer">
-          <button class="reset-btn" data-close-recipe-edit>Annulla</button>
-          <button class="mini-add-btn" id="edit-recipe-save" data-save-recipe-edit="${escapeAttr(name)}">Salva</button>
+          <button class="btn is-ghost reset-btn" data-close-recipe-edit>Annulla</button>
+          <button class="btn is-solid mini-add-btn" id="edit-recipe-save" data-save-recipe-edit="${escapeAttr(name)}">Salva</button>
         </div>
       </div>
     </div>`;
@@ -927,7 +927,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       <div class="swap-suggestions">
         <div class="filter-group-label">Suggeriti per questo giorno</div>
         ${suggestions.map(s=>`
-          <button type="button" class="swap-suggestion" data-swap-pick="${escapeAttr(s.r.nome)}" data-swap-day="${dayKey}">
+          <button type="button" class="btn swap-suggestion" data-swap-pick="${escapeAttr(s.r.nome)}" data-swap-day="${dayKey}">
             <span class="swap-suggestion-top"><span class="swap-suggestion-name">${escapeHtml(s.r.nome)}</span><span class="swap-suggestion-time">${escapeHtml(s.r.tempo)}</span></span>
             <span class="swap-suggestion-motivo">${escapeHtml(s.motivo)}</span>
           </button>`).join('')}
@@ -938,8 +938,8 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       <div class="filter-group-label">Oppure cerca</div>
       <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${dayKey}" value="${escapeAttr(f.search)}">
       <div class="swap-cat-chips">
-        ${currentCat ? `<button class="chip-btn ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${dayKey}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
-        <button class="chip-btn ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${dayKey}">Tutte le categorie</button>
+        ${currentCat ? `<button class="btn is-outline chip-btn ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${dayKey}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
+        <button class="btn is-outline chip-btn ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${dayKey}">Tutte le categorie</button>
       </div>
       <div class="swap-results">
         ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
@@ -972,16 +972,16 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     swapControls = `
     <div class="avanzo-chip">🥡 Avanzo di ${escapeHtml(sourceGiorno)}</div>
     <div class="swap-controls">
-      <button class="chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Mangiato' : '🍽️ Segna come mangiato'}</button>
-      <button class="mini-add-btn" data-unlink-day="${dayKey}">🔗 Scollega</button>
+      <button class="btn is-outline chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Mangiato' : '🍽️ Segna come mangiato'}</button>
+      <button class="btn is-dashed mini-add-btn" data-unlink-day="${dayKey}">🔗 Scollega</button>
     </div>`;
   } else {
     swapControls = `
     <div class="swap-controls">
-      <button class="chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
-      <button class="mini-add-btn" data-open-swap="${dayKey}">🔀 Cambia ricetta</button>
-      ${hasPickedOverride ? `<button class="mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
-      <button class="mini-add-btn" data-open-link-picker="${dayKey}">🥡 Segna come avanzo</button>
+      <button class="btn is-outline chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
+      <button class="btn is-dashed mini-add-btn" data-open-swap="${dayKey}">🔀 Cambia ricetta</button>
+      ${hasPickedOverride ? `<button class="btn is-dashed mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
+      <button class="btn is-dashed mini-add-btn" data-open-link-picker="${dayKey}">🥡 Segna come avanzo</button>
     </div>
     ${swapPanelHtml}
     ${linkPanelHtml}`;
@@ -1044,9 +1044,9 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       <div class="add-ing-form">
         <input type="text" placeholder="Ingrediente" data-ning="${dayKey}">
         <input type="text" placeholder="Quantità" data-nqta="${dayKey}">
-        <button data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
+        <button class="btn is-solid" data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
       </div>`;
-    const editRecipeBtn = rec ? `<button class="mini-add-btn" data-open-recipe-edit="${escapeAttr(name)}">✏️ Modifica ricetta</button>` : '';
+    const editRecipeBtn = rec ? `<button class="btn is-dashed mini-add-btn" data-open-recipe-edit="${escapeAttr(name)}">✏️ Modifica ricetta</button>` : '';
     detailHtml = `
     <div class="detail-box">
       ${tagsHtml}
@@ -1066,7 +1066,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     if(cook && me && cook === me) todayBadgeLabel = 'Tocca a te';
     else if(cook) todayBadgeLabel = 'Cucina ' + COOK_LABEL[cook];
   }
-  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${cook ? COOK_LABEL[cook][0] : ''}</button>`;
+  const cookPill = `<button type="button" class="btn is-icon cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${cook ? COOK_LABEL[cook][0] : ''}</button>`;
 
   return `
   <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
@@ -1077,7 +1077,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     <div class="day-menu-row">
       ${cookPill}
       <span class="day-menu" data-toggle-day="${dayKey}">${escapeHtml(name)}</span>
-      <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
+      <button type="button" class="btn is-icon drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
     </div>
     <div class="day-meta">
       ${metaLines.map(l=>`<div>${l}</div>`).join('')}
@@ -1112,12 +1112,12 @@ function renderWeekSection(weekIdx){
 
   const controls = weekIdx === 0 ? `
     <div class="generate-week-block">
-      <button class="generate-week-btn" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256"><path fill="currentColor" d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z"></path></svg>Genera nuovo menù</button>
+      <button class="btn is-solid generate-week-btn" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256"><path fill="currentColor" d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z"></path></svg>Genera nuovo menù</button>
       <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. Da lunedì a venerdì solo ricette fino a 30–45 min.</p>
     </div>` : `
     <div class="generate-week-block">
-      <button class="mini-add-btn" data-generate-week="${weekIdx}">🔀 Rigenera questa settimana</button>
-      <button class="mini-add-btn" data-remove-week="${weekIdx}">🗑️ Rimuovi settimana</button>
+      <button class="btn is-dashed mini-add-btn" data-generate-week="${weekIdx}">🔀 Rigenera questa settimana</button>
+      <button class="btn is-dashed mini-add-btn" data-remove-week="${weekIdx}">🗑️ Rimuovi settimana</button>
     </div>`;
 
   return `
@@ -1181,11 +1181,11 @@ function renderOggiHeader(){
     <div class="oggi-header">
       <div class="oggi-status">
         <div class="oggi-status-title">Stato della casa</div>
-        <button type="button" class="oggi-status-row" data-go-tab="spesa">
+        <button type="button" class="btn is-row" data-go-tab="spesa">
           <span>Spesa</span>
           <span class="oggi-status-meta">${daComprare ? daComprare + ' voci da comprare' : 'Lista aggiornata'} →</span>
         </button>
-        <button type="button" class="oggi-status-row" data-go-tab="dispensa">
+        <button type="button" class="btn is-row" data-go-tab="dispensa">
           <span>Dispensa</span>
           <span class="oggi-status-meta">${scorteBasse ? scorteBasse + ' in esaurimento' : 'Tutto ok'} →</span>
         </button>
@@ -1213,7 +1213,7 @@ function renderMenu(){
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Ricetta fatta! 🎉</h3>
-          <button class="filters-close-btn" data-close-done-modal>✕</button>
+          <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
         </div>
         <p class="section-sub" style="margin-top:-8px;">Quanto ti resta in Dispensa di ogni ingrediente? Aggiusta solo quello che hai usato — il resto non cambia.</p>
         ${doneIng.length ? `
@@ -1228,16 +1228,16 @@ function renderMenu(){
             <div class="done-ing-row">
               <span>${escapeHtml(name)}</span>
               <span class="qty-stepper">
-                <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
+                <button class="btn is-outline is-icon qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
                 <span class="qty-num">${qtyMap[name]}</span>
-                <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
+                <button class="btn is-outline is-icon qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
               </span>
             </div>`;
           }).join('')}
         </div>` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
         <div class="filters-modal-footer">
-          <button class="reset-btn" data-close-done-modal>Annulla</button>
-          <button class="mini-add-btn" data-confirm-done="${state.doneModalDay}">Conferma</button>
+          <button class="btn is-ghost reset-btn" data-close-done-modal>Annulla</button>
+          <button class="btn is-solid mini-add-btn" data-confirm-done="${state.doneModalDay}">Conferma</button>
         </div>
       </div>
     </div>`;
@@ -1250,7 +1250,7 @@ function renderMenu(){
     ${doneModal}
     ${renderRecipeEditModal()}
     <div class="generate-week-block">
-      <button class="generate-week-btn" id="add-week">+ Aggiungi settimana</button>
+      <button class="btn is-solid generate-week-btn" id="add-week">+ Aggiungi settimana</button>
       <p class="generate-week-hint">Pianifica un'altra settimana in più, con le stesse regole del menù generato.</p>
     </div>
   `;
@@ -1301,7 +1301,7 @@ function renderSpesa(){
           <span class="item-detail">${escapeHtml(qta||'')}${subtitle ? ' · ' + escapeHtml(subtitle) : ''}${note ? ' · ' + escapeHtml(note) : ''}</span>
         </span>
       </label>
-      <button class="inv-remove" data-shop-remove="${keys.join(',')}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+      <button class="btn is-icon is-danger inv-remove" data-shop-remove="${keys.join(',')}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
 
@@ -1349,7 +1349,7 @@ function renderSpesa(){
       <div class="shop-day-group">
         <div class="shop-day-title">
           <span>${escapeHtml(store)}</span>
-          <button type="button" class="shop-assignee-btn${assignee ? ' assigned' : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>
+          <button type="button" class="btn is-text shop-assignee-btn${assignee ? ' assigned' : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>
         </div>
         ${deptSections}
       </div>`;
@@ -1398,7 +1398,7 @@ function renderSpesa(){
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Aggiungi ingrediente</h3>
-          <button class="filters-close-btn" data-close-add-ing-modal>✕</button>
+          <button class="btn is-icon filters-close-btn" data-close-add-ing-modal>✕</button>
         </div>
         <div class="filter-groups">
           <div class="filter-group">
@@ -1411,8 +1411,8 @@ function renderSpesa(){
           </div>
         </div>
         <div class="filters-modal-footer">
-          <button class="reset-btn" data-close-add-ing-modal>Annulla</button>
-          <button class="mini-add-btn" id="shop-add-btn" type="button">+ Aggiungi</button>
+          <button class="btn is-ghost reset-btn" data-close-add-ing-modal>Annulla</button>
+          <button class="btn is-solid mini-add-btn" id="shop-add-btn" type="button">+ Aggiungi</button>
         </div>
       </div>
     </div>` : '';
@@ -1422,15 +1422,15 @@ function renderSpesa(){
     <p class="section-sub">Si aggiorna in automatico in base al menù attuale — spuntare un articolo lo aggiunge anche in Dispensa</p>
     ${missingBanner}
     <div class="view-toggle">
-      <button class="view-btn ${state.shopView==='reparto'?'active':''}" data-shop-view="reparto">Per reparto</button>
-      <button class="view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
+      <button class="btn is-outline view-btn ${state.shopView==='reparto'?'active':''}" data-shop-view="reparto">Per reparto</button>
+      <button class="btn is-outline view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
     </div>
     <div class="shop-progress">${done} / ${total} presi</div>
-    <button class="reset-btn" id="reset-shop">Svuota spunte</button>
+    <button class="btn is-ghost reset-btn" id="reset-shop">Svuota spunte</button>
     ${body}
-    ${done ? `<button class="btn-primary-flat" id="move-checked-to-pantry" style="width:100%; margin-top:16px;">Sposta ${done} spuntati in dispensa</button>` : ''}
+    ${done ? `<button class="btn is-solid is-block btn-primary-flat" id="move-checked-to-pantry" style="margin-top:16px;">Sposta ${done} spuntati in dispensa</button>` : ''}
     ${addIngModal}
-    <button class="fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente">+</button>
+    <button class="btn is-solid is-icon fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente">+</button>
   `;
 }
 
@@ -1469,7 +1469,7 @@ function renderPrep(){
         <div class="add-ing-form">
           <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(r.nome)}">
           <input type="text" placeholder="Quantità" data-rnqta="${escapeAttr(r.nome)}">
-          <button data-add-ing-recipe="${escapeAttr(r.nome)}">+ aggiungi ingrediente</button>
+          <button class="btn is-solid" data-add-ing-recipe="${escapeAttr(r.nome)}">+ aggiungi ingrediente</button>
         </div>`;
       detail = `
       <div class="detail-box">
@@ -1478,7 +1478,7 @@ function renderPrep(){
         ${stepsHtml}
         ${linkHtml}
         ${addFormHtml}
-        <button class="mini-add-btn" data-open-recipe-edit="${escapeAttr(r.nome)}">✏️ Modifica ricetta</button>
+        <button class="btn is-dashed mini-add-btn" data-open-recipe-edit="${escapeAttr(r.nome)}">✏️ Modifica ricetta</button>
       </div>`;
     }
     return `
@@ -1513,14 +1513,14 @@ function renderPrep(){
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Filtri</h3>
-          <button class="filters-close-btn" data-close-filters>✕</button>
+          <button class="btn is-icon filters-close-btn" data-close-filters>✕</button>
         </div>
         <div class="filter-groups">
           <div class="filter-group">
             <div class="filter-group-label">🍽️ Categoria</div>
             <div class="chip-row">
-              <button class="chip-btn ${!state.filters.cat?'active':''}" data-f="cat" data-v="">Tutte</button>
-              ${CAT_ORDER.map(c=>`<button class="chip-btn ${state.filters.cat===c?'active':''}" data-f="cat" data-v="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
+              <button class="btn is-outline chip-btn ${!state.filters.cat?'active':''}" data-f="cat" data-v="">Tutte</button>
+              ${CAT_ORDER.map(c=>`<button class="btn is-outline chip-btn ${state.filters.cat===c?'active':''}" data-f="cat" data-v="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
@@ -1553,8 +1553,8 @@ function renderPrep(){
           </div>
         </div>
         <div class="filters-modal-footer">
-          <button class="reset-btn" id="clear-filters">Cancella filtri</button>
-          <button class="mini-add-btn" data-close-filters>Applica</button>
+          <button class="btn is-ghost reset-btn" id="clear-filters">Cancella filtri</button>
+          <button class="btn is-solid mini-add-btn" data-close-filters>Applica</button>
         </div>
       </div>
     </div>` : '';
@@ -1564,7 +1564,7 @@ function renderPrep(){
     <p class="section-sub">${DATA.recipes.length} ricette — tocca una ricetta per vedere gli ingredienti</p>
     <div class="filters">
       <input type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
-      <button class="filters-open-btn" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
+      <button class="btn is-outline filters-open-btn" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
     </div>
     ${filtersModal}
     <div class="recipe-count">${list.length} ricette trovate</div>
@@ -1587,21 +1587,21 @@ function renderDispensa(){
     const editing = state.pantryEditingKey === it.key;
     return `
     <div class="inv-item">
-      <button class="inv-luogo" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${LUOGO_ICON[it.luogo]}</button>
+      <button class="btn is-icon inv-luogo" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${LUOGO_ICON[it.luogo]}</button>
       ${state.pantryLuogoPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-luogo-picker-close></div>
       <div class="luogo-picker">
-        ${LUOGO_ORDER.map(l=>`<button type="button" class="luogo-picker-opt${l===it.luogo?' active':''}" data-luogo-set="${escapeAttr(it.key)}" data-luogo-value="${l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
+        ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===it.luogo?' active':''}" data-luogo-set="${escapeAttr(it.key)}" data-luogo-value="${l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
       </div>` : ''}
-      <button class="inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
+      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
       <span class="qty-stepper">
-        <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
+        <button class="btn is-outline is-icon qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
           ? `<input type="number" min="0" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">`
           : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}</span>`}
-        <button class="qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
+        <button class="btn is-outline is-icon qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
       </span>
-      <button class="inv-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+      <button class="btn is-icon is-danger inv-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
 
@@ -1632,7 +1632,7 @@ function renderDispensa(){
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Modifica ingrediente</h3>
-          <button class="filters-close-btn" data-close-pantry-edit>✕</button>
+          <button class="btn is-icon filters-close-btn" data-close-pantry-edit>✕</button>
         </div>
         <div class="filter-groups">
           <div class="filter-group">
@@ -1658,8 +1658,8 @@ function renderDispensa(){
           </div>
         </div>
         <div class="filters-modal-footer">
-          <button class="reset-btn" id="pantry-edit-delete">Elimina</button>
-          <button class="mini-add-btn" data-close-pantry-edit>Chiudi</button>
+          <button class="btn is-ghost reset-btn" id="pantry-edit-delete">Elimina</button>
+          <button class="btn is-solid mini-add-btn" data-close-pantry-edit>Chiudi</button>
         </div>
       </div>
     </div>` : '';
@@ -1668,8 +1668,8 @@ function renderDispensa(){
     <h2 class="section-title">Dispensa</h2>
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
     <div class="view-toggle">
-      <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
-      <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
+      <button class="btn is-outline view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
+      <button class="btn is-outline view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
     </div>
     ${body}
     <div class="inv-add-row">
@@ -1677,7 +1677,7 @@ function renderDispensa(){
         ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
       </select>
       <input type="text" id="inv-add-name" placeholder="Nuovo ingrediente">
-      <button id="inv-add-btn" type="button">+ Aggiungi</button>
+      <button id="inv-add-btn" type="button" class="btn is-solid">+ Aggiungi</button>
     </div>
     <div class="save-hint"></div>
     ${editModal}

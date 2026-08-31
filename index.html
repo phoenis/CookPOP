@@ -23,14 +23,14 @@
     <p class="login-sub">Accedi per continuare</p>
     <input id="login-email" type="email" placeholder="Email" autocomplete="username">
     <input id="login-password" type="password" placeholder="Password" autocomplete="current-password">
-    <button id="login-submit" type="button">Accedi</button>
+    <button id="login-submit" type="button" class="btn is-solid is-block">Accedi</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
 <header class="topbar">
   <div class="topbar-inner">
     <span class="topbar-title">CookPOP</span>
-    <button class="settings-btn" id="settings-btn" type="button" aria-label="Impostazioni">⚙️</button>
+    <button class="btn is-icon settings-btn" id="settings-btn" type="button" aria-label="Impostazioni">⚙️</button>
   </div>
 </header>
 <div class="app">
@@ -46,15 +46,15 @@
   <div class="settings-sheet filters-modal">
     <div class="filters-modal-header">
       <h3>Impostazioni</h3>
-      <button class="filters-close-btn" id="settings-close">✕</button>
+      <button class="btn is-icon filters-close-btn" id="settings-close">✕</button>
     </div>
     <div class="filter-group-label">Chi sei (solo su questo telefono)</div>
     <div class="view-toggle" id="current-user-toggle">
-      <button type="button" class="view-btn" data-set-user="mara">Mara</button>
-      <button type="button" class="view-btn" data-set-user="ste">Ste</button>
+      <button type="button" class="btn is-outline view-btn" data-set-user="mara">Mara</button>
+      <button type="button" class="btn is-outline view-btn" data-set-user="ste">Ste</button>
     </div>
-    <button class="settings-item" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
-    <button class="settings-item settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>
+    <button class="btn is-outline settings-item" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
+    <button class="btn is-outline settings-item settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>
     <p class="settings-credit">AGGIORNATO A MANO, CUCINATO CON CURA</p>
   </div>
 </div>
