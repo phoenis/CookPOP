@@ -39,7 +39,8 @@
   /* bottom-nav: barra di navigazione fissa in fondo, come una vera app mobile */
   nav.tabs{ position:fixed; left:0; right:0; bottom:0; z-index:90; display:flex; background:var(--bg); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); }
   nav.tabs button{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:transparent; border:none; border-top:2px solid transparent; color:var(--sage); font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:7px 4px 6px; cursor:pointer; transition:color .15s ease, border-color .15s ease; }
-  nav.tabs button .bn-icon{ font-size:19px; line-height:1; }
+  nav.tabs button .bn-icon{ height:1.3rem; width: 1.3rem; }
+  nav.tabs button .bn-icon svg{ display: flex; height:100%; width:100%; }
   nav.tabs button:hover{ color:var(--ink); }
   nav.tabs button.active{ color:var(--gold); border-top-color:var(--gold); }
   nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
