@@ -1450,7 +1450,14 @@ function renderDayCard(weekIdx, i, pos, weekDates){
 // 7 giorni, e i controlli per generare/rigenerare (e, per le extra, rimuovere).
 function renderWeekSection(weekIdx){
   const weekDates = weekDatesFor(weekIdx);
-  const strip = WEEK_DISPLAY_ORDER.map(i=>{
+  // Nella settimana corrente non ha senso mostrare i giorni già passati: si
+  // parte da oggi. Nelle settimane extra (sempre future) si mostrano tutti.
+  const startPos = weekIdx === 0 ? (findTodayPos() ?? 0) : 0;
+  const positions = [];
+  for(let pos=startPos; pos<WEEK_DISPLAY_ORDER.length; pos++) positions.push(pos);
+
+  const strip = positions.map(pos=>{
+    const i = WEEK_DISPLAY_ORDER[pos];
     const d = DATA.week1[i];
     const cat = effectiveCategoria(weekIdx, i);
     return `<div class="balance-chip">
@@ -1459,7 +1466,7 @@ function renderWeekSection(weekIdx){
     </div>`;
   }).join('');
 
-  const days = WEEK_DISPLAY_ORDER.map((i,pos)=> renderDayCard(weekIdx, i, pos, weekDates)).join('');
+  const days = positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
   const controls = weekIdx === 0 ? `
     <div class="generate-week-block">
@@ -2811,6 +2818,8 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
     state.pantryQtyMigrated = true;
     persist();
   }
+  const todayPos = findTodayPos();
+  if(todayPos !== null) state.expandedDay = `0_${WEEK_DISPLAY_ORDER[todayPos]}`;
   render();
 })();
 
