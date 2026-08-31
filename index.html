@@ -77,22 +77,9 @@
   /* header "Oggi": cena di stasera, chi cucina, promemoria, stato della casa —
      espande la tab Menù invece di essere una quinta tab */
   .oggi-header{ padding-bottom:18px; margin-bottom:18px; border-bottom:2px solid var(--line-strong); }
-  .oggi-kicker{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--sage); }
-  .oggi-title{ font-family:'Archivo', sans-serif; font-weight:800; font-size:30px; line-height:1.05; letter-spacing:-0.02em; margin:6px 0 0; }
-  .oggi-dish-row{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-top:14px; }
-  .oggi-dish{ font-family:'Archivo', sans-serif; font-weight:800; font-size:24px; line-height:1.08; margin:0; max-width:250px; }
-  .oggi-time{ font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; letter-spacing:0.1em; white-space:nowrap; flex-shrink:0; }
-  .oggi-badges{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
-  .oggi-badges .tag{ background:transparent; border:1px solid var(--line-strong); }
-  .oggi-badges .tag.oggi-turno{ background:var(--gold); border-color:var(--gold); color:var(--bg); }
-  .oggi-actions{ display:flex; gap:10px; margin-top:14px; }
   .btn-primary-flat{ flex:1; font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--gold); background:var(--gold); color:var(--bg); cursor:pointer; border-radius:999px; text-align:left; }
   .btn-primary-flat:hover{ background:var(--gold-dark); border-color:var(--gold-dark); }
-  .btn-secondary-flat{ font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); cursor:pointer; border-radius:999px; }
-  .btn-secondary-flat:hover{ background:var(--surface-2); }
-  .oggi-prep{ margin-top:16px; padding-top:14px; border-top:2px solid var(--line-strong); }
-  .oggi-prep-label{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:4px; }
-  .oggi-status{ margin-top:16px; padding-top:14px; border-top:2px solid var(--line-strong); }
+  .oggi-status{ }
   .oggi-status-title{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--sage); padding-bottom:8px; }
   .oggi-status-row{ width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 0; background:transparent; border:0; border-top:1px solid var(--line); font-family:'Archivo', sans-serif; font-size:15px; font-weight:600; color:var(--ink); text-align:left; cursor:pointer; }
   .oggi-status-row-static{ cursor:default; }
@@ -1499,26 +1486,14 @@ function findTodayPos(){
   return null;
 }
 
-// Header "Oggi" in cima al Menù: la cena di stasera in grande, chi cucina, il
-// promemoria di preparazione anticipata se previsto, e lo stato della casa
-// (spesa da fare, dispensa in esaurimento, domani) come nel prototipo — qui
-// come header espanso della tab Menù invece che una quinta tab, per restare
-// coerenti con la navigazione a 4 tab già esistente.
+// Header "Oggi" in cima al Menù: lo stato della casa (spesa da fare,
+// dispensa in esaurimento, domani) — la cena di stasera non è più ripetuta
+// qui perché la scheda del giorno corrente è già aperta di default subito
+// sotto, nella lista della settimana.
 function renderOggiHeader(){
   const pos = findTodayPos();
   if(pos === null) return '';
   const i = WEEK_DISPLAY_ORDER[pos];
-  const todayKey = `0_${i}`;
-  const name = effectiveRecipeName(0, i);
-  const rec = effectiveRecipeMeta(0, i);
-  const det = getRecipeDetails(name);
-  const timeDisplay = det ? det.tempo : (rec ? rec.tempo : DATA.week1[i].tempo);
-  const cook = state.cooks[todayKey];
-  const me = getCurrentUser();
-  const turnoLabel = cook ? (me && cook === me ? 'Tocca a te' : 'Cucina ' + COOK_LABEL[cook]) : 'Non assegnato';
-  const today = new Date();
-  const kicker = `${DATA.week1[i].giorno} ${today.getDate()} ${MONTHS_IT[today.getMonth()]}`;
-  const prep = (rec && rec.prep && rec.prep !== 'No') ? rec.prep : '';
 
   // stato della casa: da comprare (approssimato, senza il merge per reparto che fa Spesa),
   // scorte basse in Dispensa, e cosa c'è domani
@@ -1549,21 +1524,6 @@ function renderOggiHeader(){
 
   return `
     <div class="oggi-header">
-      <div class="oggi-kicker">${escapeHtml(kicker)}</div>
-      <h1 class="oggi-title">Cena di stasera</h1>
-      <div class="oggi-dish-row">
-        <h2 class="oggi-dish">${escapeHtml(name)}</h2>
-        <span class="oggi-time">${escapeHtml(timeDisplay)}</span>
-      </div>
-      <div class="oggi-badges">
-        <span class="tag oggi-turno">${escapeHtml(turnoLabel)}</span>
-        ${rec ? `<span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>` : ''}
-      </div>
-      <div class="oggi-actions">
-        <button class="btn-primary-flat" data-toggle-day="${todayKey}">Apri la ricetta</button>
-        <button class="btn-secondary-flat" data-open-swap="${todayKey}">Cambia</button>
-      </div>
-      ${prep ? `<div class="oggi-prep"><div class="oggi-prep-label">Da ricordare</div><div>${escapeHtml(prep)}</div></div>` : ''}
       <div class="oggi-status">
         <div class="oggi-status-title">Stato della casa</div>
         <button type="button" class="oggi-status-row" data-go-tab="spesa">
