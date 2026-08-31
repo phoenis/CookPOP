@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -30,7 +30,7 @@
 <header class="topbar">
   <div class="topbar-inner">
     <span class="topbar-title">CookPOP</span>
-    <button class="btn is-icon settings-btn" id="settings-btn" type="button" aria-label="Impostazioni"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M112 60a16 16 0 1 1 16 16a16 16 0 0 1-16-16m16 52a16 16 0 1 0 16 16a16 16 0 0 0-16-16m0 68a16 16 0 1 0 16 16a16 16 0 0 0-16-16"></path></svg></button>
+    <button class="btn-settings" id="settings-btn" type="button" aria-label="Impostazioni"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M112 60a16 16 0 1 1 16 16a16 16 0 0 1-16-16m16 52a16 16 0 1 0 16 16a16 16 0 0 0-16-16m0 68a16 16 0 1 0 16 16a16 16 0 0 0-16-16"></path></svg></button>
   </div>
 </header>
 <div class="app">
@@ -42,7 +42,7 @@
   <text class="cal-day-num" x="128" y="178" text-anchor="middle" font-size="88" font-weight="700" fill="currentColor" font-family="system-ui, sans-serif">1</text>
 </svg></span><span class="bn-label">Menù</span></button>
   <button data-tab="spesa"><span class="bn-icon"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg></span><span class="bn-label">Spesa</span></button>
-  <button data-tab="prep"><span class="bn-icon"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg></span><span class="bn-label">Prep</span></button>
+  <button data-tab="prep"><span class="bn-icon"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg></span><span class="bn-label">Ricette</span></button>
   <button data-tab="dispensa"><span class="bn-icon"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M220 151.67V216a12 12 0 0 1-12 12H48a12 12 0 0 1-12-12v-64.33a12 12 0 1 1 24 0v52.23h136v-52.23a12 12 0 1 1 24 0M88 183.81h80a12.06 12.06 0 0 0 0-24.11H88a12.06 12.06 0 0 0 0 24.11M96.2 113l75.17 27.49a12.05 12.05 0 0 0 8.21-22.66l-75.17-27.48A12 12 0 0 0 96.2 113M128 49.29l61.29 51.64a12 12 0 0 0 16.9-1.48a12.09 12.09 0 0 0-1.48-17l-61.27-51.63a12 12 0 0 0-16.91 1.49A12.1 12.1 0 0 0 128 49.29"></path></svg></span><span class="bn-label">Dispensa</span></button>
 </nav>
 <div class="settings-backdrop" id="settings-backdrop">
@@ -50,11 +50,6 @@
     <div class="filters-modal-header">
       <h3>Impostazioni</h3>
       <button class="btn is-icon filters-close-btn" id="settings-close">✕</button>
-    </div>
-    <div class="filter-group-label">Chi sei (solo su questo telefono)</div>
-    <div class="view-toggle" id="current-user-toggle">
-      <button type="button" class="btn is-outline view-btn" data-set-user="mara">Mara</button>
-      <button type="button" class="btn is-outline view-btn" data-set-user="ste">Ste</button>
     </div>
     <button class="btn is-outline settings-item" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
     <button class="btn is-outline settings-item settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>

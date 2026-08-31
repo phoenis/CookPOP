@@ -41,14 +41,13 @@ const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi'
 const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', utility:'Utility', surgelati:'Surgelati', altro:'Altro' };
 const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', utility:'🧂', surgelati:'❄️', altro:'🛒' };
 
-const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','utility','giardino'];
-const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', utility:'Utility', giardino:'Giardino' };
+const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
+const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
 const LUOGO_ICON = { 
-  dispensa:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6.4 7c-.34.55-.4.97-.4 1.38C6 9.15 7 11 7 12c0 .95-.4 1.5-.4 1.5H5.1s.4-.55.4-1.5c0-1-1-2.85-1-3.62c0-.41.06-.83.4-1.38zm5 0c-.34.55-.4.97-.4 1.38c0 .77 1 2.62 1 3.62c0 .95-.4 1.5-.4 1.5h1.5s.4-.55.4-1.5c0-1-1-2.85-1-3.62c0-.41.06-.83.4-1.38zM8.15 7c-.34.55-.4.97-.4 1.38c0 .77 1 2.63 1 3.62c0 .95-.4 1.5-.4 1.5h1.5s.4-.55.4-1.5c0-1-1-2.85-1-3.62c0-.41.06-.83.4-1.38zm13.32-.5s.13-1.06.13-1.5c0-1.65-1.35-3-3-3c-1.54 0-2.81 1.16-2.98 2.65L14.53 15H2.93c-.02 3.87 3.09 7 6.82 7c3.48 0 6.34-2.73 6.71-6.23L17.61 4.9c.05-.51.47-.9.99-.9c.55 0 1 .45 1 1c0 .3-.1 1.25-.1 1.25z"></path></svg>', 
-  ripostiglio:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke-width="1.5"><path fill="currentColor" d="m2.695 7.185l9 4l.61-1.37l-9-4zM12.75 21.5v-11h-1.5v11zm-.445-10.315l9-4l-.61-1.37l-9 4z"></path><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M3 17.11V6.89a.6.6 0 0 1 .356-.548l8.4-3.734a.6.6 0 0 1 .488 0l8.4 3.734A.6.6 0 0 1 21 6.89v10.22a.6.6 0 0 1-.356.548l-8.4 3.734a.6.6 0 0 1-.488 0l-8.4-3.734A.6.6 0 0 1 3 17.11"></path><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="m7.5 4.5l8.644 3.842a.6.6 0 0 1 .356.548v3.61"></path></g></svg>', 
+  dispensa:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M253.76 93A12 12 0 0 0 237 90.24l-9 6.44V80a12 12 0 0 0-12-12H40a12 12 0 0 0-12 12v16.68l-9-6.44a12 12 0 1 0-14 19.52l23 16.42V184a36 36 0 0 0 36 36h128a36 36 0 0 0 36-36v-57.82l23-16.42A12 12 0 0 0 253.76 93M204 184a12 12 0 0 1-12 12H64a12 12 0 0 1-12-12V92h152ZM76 40V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0"></path></svg>', 
+  ripostiglio:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--heroicons" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m7.875 14.25l1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.3 2.3 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.3 2.3 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25"></path></svg>', 
   frigo:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5h2v3H8zm0 7h2v5H8zm10-9.99L6 2a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.11-.9-1.99-2-1.99M18 20H6v-9.02h12zm0-11H6V4h12z"></path></svg>', 
   freezer:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.65 149.14a12 12 0 0 1-8.79 14.51l-20.67 5.08l5.4 20.16a12 12 0 0 1-23.18 6.22l-7.29-27.2L140 148.78V187l20.48 20.48a12 12 0 0 1-17 17L128 209l-15.51 15.52a12 12 0 0 1-17-17L116 187v-38.22l-33.12 19.13l-7.29 27.2a12 12 0 0 1-23.18-6.22l5.4-20.16l-20.67-5.08a12 12 0 1 1 5.72-23.3l27.89 6.85L104 128l-33.25-19.2l-27.89 6.85A11.8 11.8 0 0 1 40 116a12 12 0 0 1-2.85-23.65l20.67-5.08l-5.4-20.16a12 12 0 0 1 23.18-6.22l7.29 27.2L116 107.21V69L95.52 48.48a12 12 0 0 1 17-17L128 47l15.51-15.52a12 12 0 1 1 17 17L140 69v38.24l33.12-19.12l7.29-27.2a12 12 0 0 1 23.18 6.22l-5.4 20.16l20.67 5.08A12 12 0 0 1 216 116a11.8 11.8 0 0 1-2.87-.35l-27.89-6.85L152 128l33.25 19.2l27.89-6.85a12 12 0 0 1 14.51 8.79"></path></svg>', 
-  utility:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M13 11c0 2.21-2.239 4-5 4s-5-1.79-5-4a8 8 0 1 0 16 0a3 3 0 0 0-6 0"></path><path d="M16 8c0-2 2-4 4-4"></path></g></svg>', 
   giardino:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.42 39.86a12 12 0 0 0-11.28-11.28c-39.6-2.33-74.59 2.34-104 13.87C84 53.48 62.31 70.58 49.39 91.9c-17.62 29.11-17.66 64.45-.45 98.19l-17.43 17.43a12 12 0 0 0 17 17l17.43-17.43c16.74 8.54 33.88 12.85 50.45 12.85a91.3 91.3 0 0 0 47.74-13.3c21.32-12.92 38.42-34.62 49.45-62.75c11.5-29.43 16.17-64.43 13.84-104.03m-75.76 146.22C131.57 198.25 108 199.17 83.94 189l84.54-84.54a12 12 0 1 0-17-17L67 172.06c-10.14-24-9.22-47.63 3-67.72c20.91-34.53 70.54-53.72 134-52.25c1.38 63.44-17.81 113.08-52.34 133.99"></path></svg>' 
 };
 const DEPT_RULES = [
@@ -103,7 +102,7 @@ function renderIngredientsSection(ing, recipeName){
   }).join('');
   const mancanti = ing.filter(it => !hasPantryStock(it.ingrediente));
   const mancantiBtn = mancanti.length
-    ? `<button class="btn is-dashed mini-add-btn" data-mancanti-in-spesa="${escapeAttr(recipeName)}">Manda ${mancanti.length} mancant${mancanti.length===1?'e':'i'} in spesa</button>`
+    ? `<button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}">Manda ${mancanti.length} mancant${mancanti.length===1?'e':'i'} in spesa</button>`
     : '';
   return `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
 }
@@ -164,14 +163,27 @@ function classifyDept(ingrediente){
 const recipeByName = {};
 DATA.recipes.forEach(r=>{ recipeByName[r.nome] = r; });
 
+// Catalogo + ricette create a mano (state.customRecipes), unite ovunque prima
+// si usava solo DATA.recipes: ricerca, suggerimenti di scambio, generazione
+// casuale del menù, elenco in Ricette.
+function allRecipeMetas(){
+  return DATA.recipes.map(r=>r.nome).concat(Object.keys(state.customRecipes)).map(getRecipeMeta).filter(Boolean);
+}
+
 // Le modifiche fatte a mano dall'utente (Menù o Prep, sono la stessa modale)
-// vivono in state.recipeEdits e si sovrappongono ai dati statici del catalogo:
-// così restano sincronizzate ovunque la ricetta compaia, senza duplicare nulla.
+// vivono in state.recipeEdits e si sovrappongono ai dati statici del catalogo,
+// oppure a una ricetta creata da zero (state.customRecipes, non presente nel
+// catalogo DATA.recipes): così restano sincronizzate ovunque la ricetta
+// compaia, senza duplicare nulla. I default coprono solo i campi che il resto
+// del codice legge senza controllo di esistenza (liste/filtri).
+// Una ricetta "eliminata" (state.hiddenRecipes) sparisce ovunque: DATA.recipes
+// è statico e non si può rimuovere davvero, quindi la si nasconde soltanto.
 function getRecipeMeta(name){
-  const base = recipeByName[name];
+  if(state.hiddenRecipes[name]) return null;
+  const base = recipeByName[name] || state.customRecipes[name];
   if(!base) return null;
   const edit = state.recipeEdits[name];
-  return edit ? Object.assign({}, base, edit) : base;
+  return Object.assign({ stagioni:['tutto'], gradimento:'', attrezzatura:[] }, base, edit);
 }
 function getRecipeDetails(name){
   const base = DATA.recipeDetails[name] || null;
@@ -214,10 +226,12 @@ const state = {
   shopExtras: {},
   shopView: 'giorno',
   addIngModalOpen: false,
+  pantryAddModalOpen: false,
   pantryChecked: {},
   pantryItems: {},
   pantrySeeded: false,
   pantryQtyMigrated: false,
+  pantryUtilityLuogoMigrated: false,
   pantryView: 'categoria',
   pantryEditingKey: null,
   pantryLuogoPicker: null,
@@ -234,6 +248,10 @@ const state = {
   ingredientRenames: {},
   recipeEdits: {},
   recipeEditName: null,
+  customRecipes: {}, // nome -> {nome}: ricette create a mano, non presenti nel catalogo DATA.recipes
+  hiddenRecipes: {}, // nome -> true: ricette del catalogo "eliminate" (DATA.recipes è statico, quindi si nascondono invece di rimuoverle)
+  newRecipeModalOpen: false,
+  newRecipeError: '',
   expandedDay: null,
   expandedRecipe: null,
   swapOpenDay: null,
@@ -314,6 +332,7 @@ function decodeKeysFromFirebase(obj){
 // Mostra il gate di login finché non c'è un utente autenticato; risolve
 // subito se Firebase non è raggiungibile (offline: si procede con la sola
 // cache locale, coerente col fallback già previsto in loadState/persist).
+let loggedInEmail = null;
 function waitForAuth(){
   return new Promise((resolve)=>{
     if(!window.cookpopAuth){ resolve(); return; }
@@ -326,6 +345,7 @@ function waitForAuth(){
     let resolved = false;
 
     window.cookpopAuth.onAuthStateChanged((user)=>{
+      loggedInEmail = user ? user.email : null;
       gate.style.display = user ? 'none' : 'flex';
       if(logoutBtn) logoutBtn.style.display = user ? 'block' : 'none';
       if(user && !resolved){ resolved = true; resolve(); }
@@ -347,13 +367,13 @@ function waitForAuth(){
   });
 }
 
-// Chi sta guardando il telefono ora: solo locale, mai su Firebase (a differenza
-// di state.cooks, che è chi cucina quel giorno ed è condiviso tra i due).
+// Chi sta usando l'app ora: dedotto dall'account con cui ha fatto login
+// (le due email contengono "mara"/"ste"), non serve più un toggle manuale.
 function getCurrentUser(){
-  try{ return localStorage.getItem('cookpop-current-user') || null; }catch(e){ return null; }
-}
-function setCurrentUser(u){
-  try{ localStorage.setItem('cookpop-current-user', u); }catch(e){}
+  const email = (loggedInEmail || '').toLowerCase();
+  if(email.includes('mara')) return 'mara';
+  if(email.includes('ste')) return 'ste';
+  return null;
 }
 const COOK_LABEL = { mara:'Mara', ste:'Ste' };
 
@@ -380,12 +400,16 @@ async function loadState(){
         if(saved.freezerItems) saved.freezerItems = decodeKeysFromFirebase(saved.freezerItems);
         if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
         if(saved.recipeEdits) saved.recipeEdits = decodeKeysFromFirebase(saved.recipeEdits);
+        if(saved.customRecipes) saved.customRecipes = decodeKeysFromFirebase(saved.customRecipes);
+        if(saved.hiddenRecipes) saved.hiddenRecipes = decodeKeysFromFirebase(saved.hiddenRecipes);
         Object.assign(state, saved);
         if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
         if(saved.pantryItems) state.pantryItems = saved.pantryItems;
         if(saved.freezerItems) state.freezerItems = saved.freezerItems;
         if(saved.ingredientRenames) state.ingredientRenames = saved.ingredientRenames;
         if(saved.recipeEdits) state.recipeEdits = saved.recipeEdits;
+        if(saved.customRecipes) state.customRecipes = saved.customRecipes;
+        if(saved.hiddenRecipes) state.hiddenRecipes = saved.hiddenRecipes;
         try{ localStorage.setItem('quaderno-state', JSON.stringify(saved)); }catch(e){}
       }
       render();
@@ -416,9 +440,12 @@ function persist(){
       recipeIngredients: state.recipeIngredients,
       ingredientRenames: state.ingredientRenames,
       recipeEdits: state.recipeEdits,
+      customRecipes: state.customRecipes,
+      hiddenRecipes: state.hiddenRecipes,
       pantryItems: state.pantryItems,
       pantrySeeded: state.pantrySeeded,
       pantryQtyMigrated: state.pantryQtyMigrated,
+      pantryUtilityLuogoMigrated: state.pantryUtilityLuogoMigrated,
       pantryView: state.pantryView
     };
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
@@ -433,7 +460,9 @@ function persist(){
           recipeIngredients: encodeKeysForFirebase(payload.recipeIngredients),
           pantryItems: encodeKeysForFirebase(payload.pantryItems),
           ingredientRenames: encodeKeysForFirebase(payload.ingredientRenames),
-          recipeEdits: encodeKeysForFirebase(payload.recipeEdits)
+          recipeEdits: encodeKeysForFirebase(payload.recipeEdits),
+          customRecipes: encodeKeysForFirebase(payload.customRecipes),
+          hiddenRecipes: encodeKeysForFirebase(payload.hiddenRecipes)
         }));
         await window.cookpopSync.save(fbPayload);
       }
@@ -616,7 +645,7 @@ function suggestSwaps(weekIdx, i){
   WEEK_DISPLAY_ORDER.forEach(di => { const n = effectiveRecipeName(weekIdx, di); if(n) inPlan.add(n); });
   const isWeekend = i === 5 || i === 6;
   const WEEKDAY_TEMPO = ['express','veloce','normale'];
-  const scored = DATA.recipes.filter(r => !inPlan.has(r.nome)).map(r=>{
+  const scored = allRecipeMetas().filter(r => !inPlan.has(r.nome)).map(r=>{
     const isLong = r.tempoBucket === 'progetto' || r.tempoBucket === 'lunga';
     const isFreezable = r.freezerNew === 'congelabile' || r.freezerNew === 'base';
     let motivo;
@@ -634,8 +663,8 @@ function suggestSwaps(weekIdx, i){
 
 function pickWeekRecipes(){
   const season = currentSeasonKey();
-  let pool = DATA.recipes.filter(r => r.stagioni.includes(season) || r.stagioni.includes('tutto'));
-  if(pool.length < 7) pool = DATA.recipes.slice(); // fallback di sicurezza, non dovrebbe servire
+  let pool = allRecipeMetas().filter(r => r.stagioni.includes(season) || r.stagioni.includes('tutto'));
+  if(pool.length < 7) pool = allRecipeMetas(); // fallback di sicurezza, non dovrebbe servire
 
   // mescolo
   const shuffled = pool.slice();
@@ -842,7 +871,7 @@ function renderRecipeEditModal(){
           <div class="filter-group">
             <div class="filter-group-label">🌦 Stagioni</div>
             <div class="chip-row" id="edit-stagioni">
-              ${STAGIONE_ORDER.map(s=>`<button type="button" class="btn is-outline chip-btn ${stagioniSet.has(s)?'active':''}" data-stagione-chip="${s}">${escapeHtml(STAGIONE_LABEL[s])}</button>`).join('')}
+              ${STAGIONE_ORDER.map(s=>`<button type="button" class="btn is-chip ${stagioniSet.has(s)?'active':''}" data-stagione-chip="${s}">${escapeHtml(STAGIONE_LABEL[s])}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
@@ -867,12 +896,12 @@ function renderRecipeEditModal(){
           <div class="filter-group">
             <div class="filter-group-label">🛒 Ingredienti</div>
             <div id="edit-ing-list">${ingRowsHtml}</div>
-            <button type="button" class="btn is-dashed mini-add-btn" id="edit-add-ing-row">+ aggiungi ingrediente</button>
+            <button type="button" class="btn is-chip" id="edit-add-ing-row">+ aggiungi ingrediente</button>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">👩🏻‍🍳 Procedimento</div>
             <div id="edit-step-list">${stepRowsHtml}</div>
-            <button type="button" class="btn is-dashed mini-add-btn" id="edit-add-step-row">+ aggiungi passaggio</button>
+            <button type="button" class="btn is-chip" id="edit-add-step-row">+ aggiungi passaggio</button>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">📝 Da ricordare</div>
@@ -892,6 +921,7 @@ function renderRecipeEditModal(){
           </div>
         </div>
         <div class="filters-modal-footer">
+          <button class="btn is-ghost is-danger reset-btn" id="edit-recipe-delete" data-delete-recipe="${escapeAttr(name)}">Elimina</button>
           <button class="btn is-ghost reset-btn" data-close-recipe-edit>Annulla</button>
           <button class="btn is-solid mini-add-btn" id="edit-recipe-save" data-save-recipe-edit="${escapeAttr(name)}">Salva</button>
         </div>
@@ -920,7 +950,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   if(state.swapOpenDay === dayKey){
     const f = state.swapFilters[dayKey] || {search:'', cat: currentCat ? 'same' : 'all'};
     state.swapFilters[dayKey] = f;
-    let results = DATA.recipes;
+    let results = allRecipeMetas();
     if(f.cat === 'same' && currentCat) results = results.filter(r=>r.categoriaNew === currentCat);
     if(f.search) results = results.filter(r=>r.nome.toLowerCase().includes(f.search.toLowerCase()));
     const resultsHtml = results.slice(0, 60).map(r=>`
@@ -945,8 +975,8 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       <div class="filter-group-label">Oppure cerca</div>
       <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${dayKey}" value="${escapeAttr(f.search)}">
       <div class="swap-cat-chips">
-        ${currentCat ? `<button class="btn is-outline chip-btn ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${dayKey}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
-        <button class="btn is-outline chip-btn ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${dayKey}">Tutte le categorie</button>
+        ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${dayKey}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
+        <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${dayKey}">Tutte le categorie</button>
       </div>
       <div class="swap-results">
         ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
@@ -979,16 +1009,16 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     swapControls = `
     <div class="avanzo-chip">🥡 Avanzo di ${escapeHtml(sourceGiorno)}</div>
     <div class="swap-controls">
-      <button class="btn is-outline chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Mangiato' : '🍽️ Segna come mangiato'}</button>
-      <button class="btn is-dashed mini-add-btn" data-unlink-day="${dayKey}">🔗 Scollega</button>
+      <button class="btn is-chip ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
+      <button class="btn is-chip" data-unlink-day="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M117.18 188.74a12 12 0 0 1 0 17l-5.12 5.12A58.26 58.26 0 0 1 70.6 228a58.62 58.62 0 0 1-41.46-100.08l34.75-34.75a58.64 58.64 0 0 1 98.56 28.11a12 12 0 1 1-23.37 5.44a34.65 34.65 0 0 0-58.22-16.58l-34.75 34.75A34.62 34.62 0 0 0 70.57 204a34.4 34.4 0 0 0 24.49-10.14l5.11-5.12a12 12 0 0 1 17.01 0M226.83 45.17a58.65 58.65 0 0 0-82.93 0l-5.11 5.11a12 12 0 0 0 17 17l5.12-5.12a34.63 34.63 0 1 1 49 49l-34.81 34.7A34.4 34.4 0 0 1 150.61 156a34.63 34.63 0 0 1-33.69-26.72a12 12 0 0 0-23.38 5.44A58.64 58.64 0 0 0 150.56 180h.05a58.28 58.28 0 0 0 41.47-17.17l34.75-34.75a58.62 58.62 0 0 0 0-82.91"></path></svg> Scollega</button>
     </div>`;
   } else {
     swapControls = `
     <div class="swap-controls">
-      <button class="btn is-outline chip-btn done-btn ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '✅ Fatta' : '🍳 Segna come fatta'}</button>
-      <button class="btn is-dashed mini-add-btn" data-open-swap="${dayKey}">🔀 Cambia ricetta</button>
-      ${hasPickedOverride ? `<button class="btn is-dashed mini-add-btn" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
-      <button class="btn is-dashed mini-add-btn" data-open-link-picker="${dayKey}">🥡 Segna come avanzo</button>
+      <button class="btn is-chip ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
+      <button class="btn is-chip" data-open-swap="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Cambia</button>
+      ${hasPickedOverride ? `<button class="btn is-chip" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
+      <button class="btn is-chip" data-open-link-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzata</button>
     </div>
     ${swapPanelHtml}
     ${linkPanelHtml}`;
@@ -1053,10 +1083,13 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         <input type="text" placeholder="Quantità" data-nqta="${dayKey}">
         <button class="btn is-solid" data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
       </div>`;
-    const editRecipeBtn = rec ? `<button class="btn is-dashed mini-add-btn" data-open-recipe-edit="${escapeAttr(name)}">✏️ Modifica ricetta</button>` : '';
+    const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
+    const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
     detailHtml = `
     <div class="detail-box">
       ${tagsHtml}
+      ${dayMetaHtml}
+      ${soakChip}
       ${ingHtml}
       ${noteBox}
       ${stepsHtml}
@@ -1073,23 +1106,22 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     if(cook && me && cook === me) todayBadgeLabel = 'Tocca a te';
     else if(cook) todayBadgeLabel = 'Cucina ' + COOK_LABEL[cook];
   }
-  const cookPill = `<button type="button" class="btn is-icon cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${cook ? COOK_LABEL[cook][0] : ''}</button>`;
+  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${cook ? COOK_LABEL[cook][0] : ''}</button>`;
 
   return `
   <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
     <div class="day-row">
       <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span>${isToday ? `<span class="today-badge">${escapeHtml(todayBadgeLabel)}</span>` : ''}</div>
-      <div class="day-time">${escapeHtml(timeDisplay)}</div>
+      <div class="day-row-side">
+        <span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>
+      </div>
     </div>
     <div class="day-menu-row">
       ${cookPill}
       <span class="day-menu" data-toggle-day="${dayKey}">${escapeHtml(name)}</span>
-      <button type="button" class="btn is-icon drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
+      <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
     </div>
-    <div class="day-meta">
-      ${metaLines.map(l=>`<div>${l}</div>`).join('')}
-    </div>
-    ${soakChip}
+    <span class="day-time">${escapeHtml(timeDisplay)}</span>
     ${detailHtml}
     ${swapControls}
   </div>`;
@@ -1119,17 +1151,17 @@ function renderWeekSection(weekIdx){
 
   const controls = weekIdx === 0 ? `
     <div class="generate-week-block">
-      <button class="btn is-solid generate-week-btn" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 256 256"><path fill="currentColor" d="M224 48v48a8 8 0 0 1-8 8h-48a8 8 0 0 1 0-16h28.69l-14.63-14.63a79.56 79.56 0 0 0-56.13-23.43h-.45a79.52 79.52 0 0 0-55.89 22.77a8 8 0 0 1-11.18-11.44a96 96 0 0 1 135 .79L208 76.69V48a8 8 0 0 1 16 0m-37.59 135.29a80 80 0 0 1-112.47-.66L59.31 168H88a8 8 0 0 0 0-16H40a8 8 0 0 0-8 8v48a8 8 0 0 0 16 0v-28.69l14.63 14.63A95.43 95.43 0 0 0 130 222.06h.53a95.36 95.36 0 0 0 67.07-27.33a8 8 0 0 0-11.18-11.44Z"></path></svg>Genera nuovo menù</button>
+      <button class="btn is-outline" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg>Genera nuovo menù</button>
       <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. Da lunedì a venerdì solo ricette fino a 30–45 min.</p>
     </div>` : `
     <div class="generate-week-block">
-      <button class="btn is-dashed mini-add-btn" data-generate-week="${weekIdx}">🔀 Rigenera questa settimana</button>
-      <button class="btn is-dashed mini-add-btn" data-remove-week="${weekIdx}">🗑️ Rimuovi settimana</button>
+      <button class="btn is-chip" data-generate-week="${weekIdx}">🔀 Rigenera questa settimana</button>
+      <button class="btn is-chip" data-remove-week="${weekIdx}">🗑️ Rimuovi settimana</button>
     </div>`;
 
   return `
     <section class="week-section">
-      <h2 class="section-title">Settimana del ${weekLabelFor(weekIdx)}</h2>
+      <h2 class="week-title">Settimana del ${weekLabelFor(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
       ${days}
       ${controls}
@@ -1152,58 +1184,6 @@ function findTodayPos(){
 // dispensa in esaurimento, domani) — la cena di stasera non è più ripetuta
 // qui perché la scheda del giorno corrente è già aperta di default subito
 // sotto, nella lista della settimana.
-function renderOggiHeader(){
-  const pos = findTodayPos();
-  if(pos === null) return '';
-  const i = WEEK_DISPLAY_ORDER[pos];
-
-  // stato della casa: da comprare (approssimato, senza il merge per reparto che fa Spesa),
-  // scorte basse in Dispensa, e cosa c'è domani
-  let daComprare = 0;
-  allPlannedDays().forEach(({weekIdx:w, i:di, name:n})=>{
-    getIngredientsFor(n).forEach((it, idx)=>{
-      const key = dayIngKey(w, di, idx);
-      if(state.shopDismissed[key] || state.shopChecked[key]) return;
-      daComprare++;
-    });
-  });
-  const scorteBasse = Object.values(state.pantryItems).filter(it => typeof it.qty === 'number' && it.qty > 0 && it.qty <= 1).length;
-
-  let tomorrowKey = null;
-  if(pos < 6) tomorrowKey = `0_${WEEK_DISPLAY_ORDER[pos+1]}`;
-  else if(state.extraWeeks.length >= 1) tomorrowKey = `1_${WEEK_DISPLAY_ORDER[0]}`;
-  let domaniLine = 'Pianifica la prossima settimana';
-  if(tomorrowKey){
-    const [tw, ti] = tomorrowKey.split('_');
-    const tWeekIdx = parseInt(tw,10);
-    const tName = effectiveRecipeName(tWeekIdx, ti);
-    const tCook = state.cooks[tomorrowKey];
-    domaniLine = `Domani · ${tName}`;
-    var domaniMeta = tCook ? COOK_LABEL[tCook] : 'da assegnare';
-  } else {
-    var domaniMeta = '';
-  }
-
-  return `
-    <div class="oggi-header">
-      <div class="oggi-status">
-        <div class="oggi-status-title">Stato della casa</div>
-        <button type="button" class="btn is-row" data-go-tab="spesa">
-          <span>Spesa</span>
-          <span class="oggi-status-meta">${daComprare ? daComprare + ' voci da comprare' : 'Lista aggiornata'} →</span>
-        </button>
-        <button type="button" class="btn is-row" data-go-tab="dispensa">
-          <span>Dispensa</span>
-          <span class="oggi-status-meta">${scorteBasse ? scorteBasse + ' in esaurimento' : 'Tutto ok'} →</span>
-        </button>
-        <div class="oggi-status-row oggi-status-row-static">
-          <span>${escapeHtml(domaniLine)}</span>
-          <span class="oggi-status-meta">${escapeHtml(domaniMeta)}</span>
-        </div>
-      </div>
-    </div>`;
-}
-
 function renderMenu(){
   const weekSections = [0, ...state.extraWeeks.map((_,n)=>n+1)]
     .map(weekIdx => renderWeekSection(weekIdx)).join('');
@@ -1235,9 +1215,9 @@ function renderMenu(){
             <div class="done-ing-row">
               <span>${escapeHtml(name)}</span>
               <span class="qty-stepper">
-                <button class="btn is-outline is-icon qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
+                <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
                 <span class="qty-num">${qtyMap[name]}</span>
-                <button class="btn is-outline is-icon qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
+                <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
               </span>
             </div>`;
           }).join('')}
@@ -1251,13 +1231,11 @@ function renderMenu(){
   }
 
   return `
-    ${renderOggiHeader()}
-    <p class="section-sub">Tocca il nome di una ricetta per vederne i dettagli — trascina ⠿ per scambiarla con un altro giorno</p>
     ${weekSections}
     ${doneModal}
     ${renderRecipeEditModal()}
     <div class="generate-week-block">
-      <button class="btn is-solid generate-week-btn" id="add-week">+ Aggiungi settimana</button>
+      <button class="btn is-solid" id="add-week">+ Aggiungi settimana</button>
       <p class="generate-week-hint">Pianifica un'altra settimana in più, con le stesse regole del menù generato.</p>
     </div>
   `;
@@ -1308,7 +1286,7 @@ function renderSpesa(){
           <span class="item-detail">${escapeHtml(qta||'')}${subtitle ? ' · ' + escapeHtml(subtitle) : ''}${note ? ' · ' + escapeHtml(note) : ''}</span>
         </span>
       </label>
-      <button class="btn is-icon is-danger inv-remove" data-shop-remove="${keys.join(',')}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+      <button class="btn-remove" data-shop-remove="${keys.join(',')}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
 
@@ -1419,7 +1397,7 @@ function renderSpesa(){
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-ghost reset-btn" data-close-add-ing-modal>Annulla</button>
-          <button class="btn is-solid mini-add-btn" id="shop-add-btn" type="button">+ Aggiungi</button>
+          <button class="btn is-solid mini-add-btn" id="shop-add-btn" type="button">Aggiungi</button>
         </div>
       </div>
     </div>` : '';
@@ -1437,12 +1415,12 @@ function renderSpesa(){
     ${body}
     ${done ? `<button class="btn is-solid is-block btn-primary-flat" id="move-checked-to-pantry" style="margin-top:16px;">Sposta ${done} spuntati in dispensa</button>` : ''}
     ${addIngModal}
-    <button class="btn is-solid is-icon fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente">+</button>
+    <button class="btn is-solid is-icon fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
   `;
 }
 
 function renderPrep(){
-  let list = DATA.recipes.map(r=>getRecipeMeta(r.nome)).filter(r=>{
+  let list = allRecipeMetas().filter(r=>{
     if(state.filters.cat && r.categoriaNew !== state.filters.cat) return false;
     if(state.filters.tempo && r.tempoBucket !== state.filters.tempo) return false;
     if(state.filters.pian && r.pianificazione !== state.filters.pian) return false;
@@ -1460,6 +1438,13 @@ function renderPrep(){
     const ing = getIngredientsFor(r.nome);
     let detail = '';
     if(isOpen){
+      const tagsHtml = `
+        <div class="recipe-tags">
+          <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
+          ${(r.freezerNew && r.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[r.freezerNew])}</span>` : ''}
+          <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
+          ${r.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
+        </div>`;
       const ingHtml = renderIngredientsSection(ing, r.nome);
       const stepsHtml = det && det.procedimento && det.procedimento.length
         ? `<div class="detail-section"><div class="detail-section-title">👩🏻‍🍳 Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
@@ -1480,28 +1465,23 @@ function renderPrep(){
         </div>`;
       detail = `
       <div class="detail-box">
+        ${tagsHtml}
         ${ingHtml}
         ${noteBox}
         ${stepsHtml}
         ${linkHtml}
         ${addFormHtml}
-        <button class="btn is-dashed mini-add-btn" data-open-recipe-edit="${escapeAttr(r.nome)}">✏️ Modifica ricetta</button>
+        <button class="btn is-chip" data-open-recipe-edit="${escapeAttr(r.nome)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>
       </div>`;
     }
     return `
     <div class="recipe-card-wrap">
       <div class="recipe-card" data-toggle-recipe="${escapeAttr(r.nome)}">
         <div>
-          <div class="recipe-name">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento">📖</span>' : ''}</div>
-          <div class="recipe-tags">
-            <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
-            ${(r.freezerNew && r.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[r.freezerNew])}</span>` : ''}
-            <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
-            ${r.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
-          </div>
+          <div class="recipe-name">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
+          <span class="day-time">${escapeHtml(r.tempo)}</span>
         </div>
         <div class="recipe-card-side">
-          <span class="day-time">${escapeHtml(r.tempo)}</span>
           <div class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</div>
         </div>
       </div>
@@ -1526,8 +1506,8 @@ function renderPrep(){
           <div class="filter-group">
             <div class="filter-group-label">🍽️ Categoria</div>
             <div class="chip-row">
-              <button class="btn is-outline chip-btn ${!state.filters.cat?'active':''}" data-f="cat" data-v="">Tutte</button>
-              ${CAT_ORDER.map(c=>`<button class="btn is-outline chip-btn ${state.filters.cat===c?'active':''}" data-f="cat" data-v="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
+              <button class="btn is-chip ${!state.filters.cat?'active':''}" data-f="cat" data-v="">Tutte</button>
+              ${CAT_ORDER.map(c=>`<button class="btn is-chip ${state.filters.cat===c?'active':''}" data-f="cat" data-v="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
@@ -1566,9 +1546,32 @@ function renderPrep(){
       </div>
     </div>` : '';
 
+  const totalCount = DATA.recipes.length + Object.keys(state.customRecipes).length;
+
+  const newRecipeModal = state.newRecipeModalOpen ? `
+    <div class="filters-modal-backdrop" data-close-new-recipe-modal>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Nuova ricetta</h3>
+          <button class="btn is-icon filters-close-btn" data-close-new-recipe-modal>✕</button>
+        </div>
+        <div class="filter-groups">
+          <div class="filter-group">
+            <div class="filter-group-label">Nome</div>
+            <input type="text" id="new-recipe-name" placeholder="Es. Pasta al pesto">
+          </div>
+        </div>
+        ${state.newRecipeError ? `<p class="section-sub" style="color:var(--tomato); margin-top:-8px;">${escapeHtml(state.newRecipeError)}</p>` : ''}
+        <div class="filters-modal-footer">
+          <button class="btn is-ghost reset-btn" data-close-new-recipe-modal>Annulla</button>
+          <button class="btn is-solid mini-add-btn" id="new-recipe-create-btn" type="button">Crea</button>
+        </div>
+      </div>
+    </div>` : '';
+
   return `
     <h2 class="section-title">Ricettario</h2>
-    <p class="section-sub">${DATA.recipes.length} ricette — tocca una ricetta per vedere gli ingredienti</p>
+    <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
     <div class="filters">
       <input type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
       <button class="btn is-outline filters-open-btn" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
@@ -1577,6 +1580,8 @@ function renderPrep(){
     <div class="recipe-count">${list.length} ricette trovate</div>
     <div class="recipe-list">${cards || '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>'}</div>
     ${renderRecipeEditModal()}
+    ${newRecipeModal}
+    <button class="btn is-solid is-icon fab" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
   `;
 }
 
@@ -1602,19 +1607,19 @@ function renderDispensa(){
       </div>` : ''}
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
       <span class="qty-stepper">
-        <button class="btn is-outline is-icon qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
+        <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
           ? `<input type="number" min="0" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">`
           : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}</span>`}
-        <button class="btn is-outline is-icon qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
+        <button class="qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
       </span>
-      <button class="btn is-icon is-danger inv-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+      <button class="btn-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
 
   let body;
   if(!items.length){
-    body = `<p class="ing-empty">Vuota per ora — spunta qualcosa in Spesa o aggiungi qui sotto (poi tocca il + per impostare quanti ne hai).</p>`;
+    body = `<p class="ing-empty">Vuota per ora — spunta qualcosa in Spesa o tocca il + per aggiungere un ingrediente.</p>`;
   } else if(state.pantryView === 'luogo'){
     const byLuogo = {};
     items.forEach(it=>{ (byLuogo[it.luogo] = byLuogo[it.luogo] || []).push(it); });
@@ -1671,6 +1676,32 @@ function renderDispensa(){
       </div>
     </div>` : '';
 
+  const addModal = state.pantryAddModalOpen ? `
+    <div class="filters-modal-backdrop" data-close-pantry-add-modal>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Aggiungi ingrediente</h3>
+          <button class="btn is-icon filters-close-btn" data-close-pantry-add-modal>✕</button>
+        </div>
+        <div class="filter-groups">
+          <div class="filter-group">
+            <div class="filter-group-label">Ingrediente</div>
+            <input type="text" id="pantry-add-name" placeholder="Nuovo ingrediente">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Luogo</div>
+            <select id="pantry-add-luogo">
+              ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="filters-modal-footer">
+          <button class="btn is-ghost reset-btn" data-close-pantry-add-modal>Annulla</button>
+          <button class="btn is-solid mini-add-btn" id="pantry-add-btn" type="button">Aggiungi</button>
+        </div>
+      </div>
+    </div>` : '';
+
   return `
     <h2 class="section-title">Dispensa</h2>
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
@@ -1679,15 +1710,10 @@ function renderDispensa(){
       <button class="btn is-outline view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
     </div>
     ${body}
-    <div class="inv-add-row">
-      <select id="inv-add-luogo">
-        ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
-      </select>
-      <input type="text" id="inv-add-name" placeholder="Nuovo ingrediente">
-      <button id="inv-add-btn" type="button" class="btn is-solid">+ Aggiungi</button>
-    </div>
     <div class="save-hint"></div>
     ${editModal}
+    ${addModal}
+    <button class="btn is-solid is-icon fab" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
   `;
 }
 
@@ -1979,8 +2005,21 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-recipe]').forEach(el=>{
     el.addEventListener('click', e=>{
       const name = el.dataset.toggleRecipe;
-      state.expandedRecipe = state.expandedRecipe === name ? null : name;
+      const opening = state.expandedRecipe !== name;
+      state.expandedRecipe = opening ? name : null;
       render();
+      if(opening){
+        const card = document.querySelector(`[data-toggle-recipe="${CSS.escape(name)}"]`);
+        const wrap = card ? card.closest('.recipe-card-wrap') : null;
+        if(wrap){
+          // la topbar è sticky: scrollIntoView da solo nasconderebbe l'inizio
+          // della card sotto di lei, quindi calcolo l'offset a mano.
+          const topbar = document.querySelector('.topbar');
+          const offset = (topbar ? topbar.offsetHeight : 0) + 8;
+          const top = wrap.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+      }
     });
   });
 
@@ -2068,6 +2107,18 @@ function attachHandlers(){
       persist(); render();
     });
   });
+  document.querySelectorAll('[data-delete-recipe]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const name = e.currentTarget.dataset.deleteRecipe;
+      delete state.recipeEdits[name];
+      delete state.recipeIngredients[name];
+      if(state.customRecipes[name]) delete state.customRecipes[name];
+      else state.hiddenRecipes[name] = true;
+      if(state.expandedRecipe === name) state.expandedRecipe = null;
+      state.recipeEditName = null;
+      persist(); render();
+    });
+  });
 
   document.querySelectorAll('[data-open-filters]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.filtersOpen = true; render(); });
@@ -2085,6 +2136,36 @@ function attachHandlers(){
     state.filters = { cat:'', tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search: state.filters.search };
     render();
   });
+
+  const prepFab = document.getElementById('prep-fab');
+  if(prepFab) prepFab.addEventListener('click', ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; render(); });
+  document.querySelectorAll('[data-close-new-recipe-modal]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.newRecipeModalOpen = false;
+      state.newRecipeError = '';
+      render();
+    });
+  });
+  const newRecipeCreateBtn = document.getElementById('new-recipe-create-btn');
+  if(newRecipeCreateBtn){
+    const nameInput = document.getElementById('new-recipe-name');
+    const doCreate = ()=>{
+      const name = nameInput.value.trim();
+      if(!name){ state.newRecipeError = 'Inserisci un nome.'; render(); return; }
+      const nameLower = name.toLowerCase();
+      const exists = Object.keys(recipeByName).some(n=>n.toLowerCase()===nameLower)
+        || Object.keys(state.customRecipes).some(n=>n.toLowerCase()===nameLower);
+      if(exists){ state.newRecipeError = 'Esiste già una ricetta con questo nome.'; render(); return; }
+      state.customRecipes[name] = { nome: name };
+      state.newRecipeModalOpen = false;
+      state.newRecipeError = '';
+      state.recipeEditName = name;
+      persist(); render();
+    };
+    newRecipeCreateBtn.addEventListener('click', doCreate);
+    nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doCreate(); });
+  }
 
   const fSearch = document.getElementById('f-search');
   if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); const el=document.getElementById('f-search'); el.focus(); el.selectionStart = el.value.length; });
@@ -2169,18 +2250,28 @@ function attachHandlers(){
       persist(); render();
     });
   });
-  const invAddBtn = document.getElementById('inv-add-btn');
-  if(invAddBtn){
-    const nameInput = document.getElementById('inv-add-name');
-    const luogoSelect = document.getElementById('inv-add-luogo');
+  const pantryAddBtn = document.getElementById('pantry-add-btn');
+  if(pantryAddBtn){
+    const nameInput = document.getElementById('pantry-add-name');
+    const luogoSelect = document.getElementById('pantry-add-luogo');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
       upsertPantryItem(nameInput.value, luogoSelect.value);
+      state.pantryAddModalOpen = false;
       persist(); render();
     };
-    invAddBtn.addEventListener('click', doAdd);
+    pantryAddBtn.addEventListener('click', doAdd);
     nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
   }
+  const dispensaFab = document.getElementById('dispensa-fab');
+  if(dispensaFab) dispensaFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
+  document.querySelectorAll('[data-close-pantry-add-modal]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.pantryAddModalOpen = false;
+      render();
+    });
+  });
 
   document.querySelectorAll('[data-pantry-edit]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -2297,26 +2388,6 @@ function goToTab(delta){
   settingsBtn.addEventListener('click', open);
   if(settingsClose) settingsClose.addEventListener('click', close);
   settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
-
-  // "Chi sei": solo locale (localStorage), mai sincronizzato — identifica chi
-  // sta guardando il telefono, usato solo per il badge "Tocca a te" nel Menù.
-  const userToggle = document.getElementById('current-user-toggle');
-  if(userToggle){
-    const markActive = ()=>{
-      const me = getCurrentUser();
-      userToggle.querySelectorAll('[data-set-user]').forEach(b=>{
-        b.classList.toggle('active', b.dataset.setUser === me);
-      });
-    };
-    markActive();
-    userToggle.querySelectorAll('[data-set-user]').forEach(b=>{
-      b.addEventListener('click', ()=>{
-        setCurrentUser(b.dataset.setUser);
-        markActive();
-        render();
-      });
-    });
-  }
 })();
 
 // Drag&drop per scambiare le ricette di due giorni nel Menù (Pointer Events,
@@ -2438,6 +2509,16 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
       });
     }
     state.pantryQtyMigrated = true;
+    persist();
+  }
+  // Una tantum: il luogo "utility" è stato rimosso (resta solo come reparto
+  // della spesa) — le voci di dispensa che lo usavano passano a "dispensa".
+  if(!state.pantryUtilityLuogoMigrated){
+    Object.keys(state.pantryItems).forEach(key=>{
+      const it = state.pantryItems[key];
+      if(it && it.luogo === 'utility') it.luogo = 'dispensa';
+    });
+    state.pantryUtilityLuogoMigrated = true;
     persist();
   }
   const todayPos = findTodayPos();
