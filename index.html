@@ -1185,6 +1185,7 @@ function renderRecipeEditModal(){
           <div class="filter-group">
             <div class="filter-group-label">🧊 Freezer</div>
             <select id="edit-freezer-new">
+              <option value="" ${(!rec.freezerNew || rec.freezerNew==='non-adatta')?'selected':''}>Non congelabile</option>
               ${FREEZER_ORDER.map(f=>`<option value="${f}" ${rec.freezerNew===f?'selected':''}>${escapeHtml(FREEZER_LABEL[f])}</option>`).join('')}
             </select>
           </div>
@@ -1369,7 +1370,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         <span class="tag tempo">${escapeHtml(det ? "⏱ " + det.tempo : TEMPO_LABEL[rec.tempoBucket])}</span>
         ${det ? `<span class="tag">${escapeHtml(det.porzioni)}</span>` : ''}
         <span class="tag season">${rec.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
-        <span class="tag freezer">${escapeHtml(FREEZER_LABEL[rec.freezerNew])}</span>
+        ${(rec.freezerNew && rec.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[rec.freezerNew])}</span>` : ''}
         <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[rec.avanziNew])}</span>
         ${rec.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
       </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
@@ -1831,7 +1832,7 @@ function renderPrep(){
           <div class="recipe-name">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento">📖</span>' : ''}</div>
           <div class="recipe-tags">
             <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
-            ${r.freezerNew !== 'non-adatta' ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[r.freezerNew])}</span>` : ''}
+            ${(r.freezerNew && r.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[r.freezerNew])}</span>` : ''}
             <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
             ${r.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
           </div>
