@@ -45,11 +45,11 @@
   .topbar{ position:sticky; top:0; z-index:90; background:var(--bg); border-bottom:1px solid var(--line); }
   .topbar-inner{ max-width:960px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top)); }
   .topbar-title{ font-family:'Archivo', sans-serif; font-weight:700; font-size:19px; color:var(--ink); letter-spacing:-0.01em; }
-  .settings-btn{ flex-shrink:0; width:36px; height:36px; border-radius:0; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); display:flex; align-items:center; justify-content:center; font-size:17px; cursor:pointer; padding:0; }
+  .settings-btn{ flex-shrink:0; width:36px; height:36px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); display:flex; align-items:center; justify-content:center; font-size:17px; cursor:pointer; padding:0; }
   .settings-btn:hover{ background:var(--surface); }
 
   /* pulsante flottante "+" (stile WhatsApp) per aggiungere un ingrediente in Spesa */
-  .fab{ position:fixed; right:18px; bottom:calc(84px + env(safe-area-inset-bottom) + 14px); z-index:80; width:56px; height:56px; border-radius:0; border:none; background:var(--gold); color:var(--bg); font-size:28px; font-weight:600; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.3); }
+  .fab{ position:fixed; right:16px; bottom:calc(84px + env(safe-area-inset-bottom) + 4px); z-index:80; width:44px; height:44px; border-radius:50%; border:none; background:var(--gold); color:var(--bg); font-size:22px; font-weight:600; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.3); }
   .fab:hover{ background:var(--gold-dark); }
   .fab:active{ transform:scale(0.94); }
 
@@ -65,7 +65,7 @@
   .settings-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center; }
   .settings-backdrop.open{ display:flex; }
   .settings-sheet .filters-modal-header{ margin-bottom:10px; }
-  .settings-item{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-family:'Archivo', sans-serif; font-size:14px; font-weight:600; color:var(--ink); background:var(--surface); border:1px solid var(--line); padding:12px 14px; border-radius:0; cursor:pointer; margin-bottom:8px; }
+  .settings-item{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; font-family:'Archivo', sans-serif; font-size:14px; font-weight:600; color:var(--ink); background:var(--surface); border:1px solid var(--line); padding:12px 14px; border-radius:999px; cursor:pointer; margin-bottom:8px; }
   .settings-item:hover{ border-color:var(--gold-dark); }
   .settings-item:disabled{ opacity:0.5; cursor:default; }
   .settings-item.settings-item-danger{ color:var(--tomato); }
@@ -86,9 +86,9 @@
   .oggi-badges .tag{ background:transparent; border:1px solid var(--line-strong); }
   .oggi-badges .tag.oggi-turno{ background:var(--gold); border-color:var(--gold); color:var(--bg); }
   .oggi-actions{ display:flex; gap:10px; margin-top:14px; }
-  .btn-primary-flat{ flex:1; font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--gold); background:var(--gold); color:var(--bg); cursor:pointer; border-radius:0; text-align:left; }
+  .btn-primary-flat{ flex:1; font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--gold); background:var(--gold); color:var(--bg); cursor:pointer; border-radius:999px; text-align:left; }
   .btn-primary-flat:hover{ background:var(--gold-dark); border-color:var(--gold-dark); }
-  .btn-secondary-flat{ font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); cursor:pointer; border-radius:0; }
+  .btn-secondary-flat{ font-family:'Archivo', sans-serif; font-weight:800; font-size:14px; padding:10px 16px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); cursor:pointer; border-radius:999px; }
   .btn-secondary-flat:hover{ background:var(--surface-2); }
   .oggi-prep{ margin-top:16px; padding-top:14px; border-top:2px solid var(--line-strong); }
   .oggi-prep-label{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:4px; }
@@ -100,7 +100,7 @@
 
   /* balance strip */
   .balance-strip{ display:flex; gap:6px; margin-bottom:18px; overflow-x:auto; padding-bottom:2px; }
-  .balance-chip{ flex:1; min-width:52px; text-align:center; border-radius:0; padding:8px 4px 7px; background:var(--surface-2); }
+  .balance-chip{ flex:1; min-width:52px; text-align:center; border-radius:999px; padding:8px 4px 7px; background:var(--surface-2); }
   .balance-chip .bd{ font-family:'Archivo', sans-serif; font-size:9.5px; color:var(--sage); text-transform:uppercase; }
   .balance-chip .bc{ font-size:18px; margin-top:3px; line-height:1; }
 
@@ -111,13 +111,13 @@
   .day-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
   .day-name{ font-family:'Archivo', sans-serif; font-weight:700; font-size:16px; color:var(--ink); min-width:90px; }
   .day-date{ font-family:'Archivo', sans-serif; font-weight:400; font-size:11.5px; color:var(--sage); letter-spacing:0.02em; }
-  .today-badge{ font-family:'Archivo', sans-serif; font-weight:800; font-size:9.5px; letter-spacing:0.12em; text-transform:uppercase; color:var(--bg); background:var(--gold); padding:5px 9px; border-radius:0; margin-left:4px; }
+  .today-badge{ font-family:'Archivo', sans-serif; font-weight:800; font-size:9.5px; letter-spacing:0.12em; text-transform:uppercase; color:var(--bg); background:var(--gold); padding:5px 9px; border-radius:999px; margin-left:4px; }
   .day-card.today{ box-shadow:inset 3px 0 0 var(--gold); }
   .week-section{ display:block; margin-bottom:8px; }
   .week-section + .week-section{ margin-top:26px; padding-top:22px; border-top:1px solid var(--line); }
-  .day-time{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); opacity:0.75; background:var(--surface-2); padding:5px 9px; border-radius:0; }
+  .day-time{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); opacity:0.75; background:var(--surface-2); padding:5px 9px; border-radius:999px; }
   .day-menu-row{ display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
-  .cook-pill{ width:26px; height:26px; flex-shrink:0; border:1px solid var(--line-strong); background:transparent; color:var(--bg); font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; border-radius:0; }
+  .cook-pill{ width:26px; height:26px; flex-shrink:0; border:1px solid var(--line-strong); background:transparent; color:var(--bg); font-family:'Archivo', sans-serif; font-weight:800; font-size:11px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; border-radius:50%; }
   .cook-pill.cook-mara{ background:var(--gold); border-color:var(--gold); }
   .cook-pill.cook-ste{ background:var(--tomato); border-color:var(--tomato); }
   .day-menu{ font-size:15px; font-weight:600; cursor:pointer; color:var(--ink); border-bottom:1px dotted var(--sage); }
@@ -130,8 +130,8 @@
   .drag-ghost{ position:fixed; z-index:500; pointer-events:none; background:var(--gold); color:var(--bg); font-family:'Archivo', sans-serif; font-weight:600; font-size:13px; padding:8px 14px; border-radius:0; box-shadow:0 10px 30px rgba(0,0,0,0.35); max-width:240px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .day-meta{ font-size:12.5px; color:var(--sage); margin-top:4px; line-height:1.5; }
   .day-meta b{ color:var(--ink); font-weight:600; }
-  .soak-chip{ display:inline-block; font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); background:var(--amber); padding:5px 9px; border-radius:0; margin-top:6px; }
-  .avanzo-chip{ display:inline-block; font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); background:var(--amber); padding:5px 9px; border-radius:0; margin-top:6px; }
+  .soak-chip{ display:inline-block; font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); background:var(--amber); padding:5px 9px; border-radius:999px; margin-top:6px; }
+  .avanzo-chip{ display:inline-block; font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; color:var(--ink); background:var(--amber); padding:5px 9px; border-radius:999px; margin-top:6px; }
   .swap-select{ margin-top:10px; width:100%; font-family:'Archivo', sans-serif; font-size:13px; padding:7px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
 
   .swap-controls{ display:flex; gap:8px; margin-top:10px; }
@@ -145,7 +145,7 @@
   .swap-suggestion-motivo{ display:block; font-size:11px; font-weight:800; letter-spacing:0.04em; color:var(--gold); margin-top:3px; }
   .swap-search{ width:100%; font-family:'Archivo', sans-serif; font-size:13px; padding:7px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); margin-bottom:8px; }
   .swap-cat-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-  .chip-btn{ font-family:'Archivo', sans-serif; font-size:11px; padding:5px 10px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
+  .chip-btn{ font-family:'Archivo', sans-serif; font-size:11px; padding:5px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
   .chip-btn.active{ background:var(--gold); border-color:var(--gold); color:var(--bg); font-weight:600; }
   .chip-btn.done-btn.active{ background:var(--green-deep); border-color:var(--green-deep); color:var(--bg); }
   .swap-results{ max-height:240px; overflow-y:auto; border-top:1px solid var(--line); }
@@ -176,7 +176,7 @@
   .steps-list li{ margin-bottom:3px; }
   .ing-list li{ font-size:12.5px; padding:5px 0; border-bottom:1px dashed var(--line); display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .ing-list li .ing-list-name{ flex:1; min-width:0; }
-  .ing-status{ font-family:'Archivo', sans-serif; font-weight:800; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; padding:3px 6px; border:1px solid; white-space:nowrap; flex-shrink:0; }
+  .ing-status{ font-family:'Archivo', sans-serif; font-weight:800; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; padding:3px 6px; border:1px solid; border-radius:999px; white-space:nowrap; flex-shrink:0; }
   .ing-status.in-casa{ border-color:var(--green-deep); color:var(--green-mid); }
   .ing-status.manca{ border-color:var(--gold); color:var(--gold); }
   .ing-list li:last-child{ border-bottom:none; }
@@ -208,20 +208,22 @@
   .shop-progress{ font-family:'Archivo', sans-serif; font-size:11.5px; color:var(--gold-dark); margin-bottom:12px; }
   .missing-ing-banner{ font-size:12.5px; line-height:1.5; background:var(--amber); border:1px solid var(--steel); color:var(--ink); border-radius:0; padding:10px 12px; margin-bottom:14px; }
   .view-toggle{ display:flex; gap:6px; margin-bottom:12px; }
-  .view-btn{ flex:1; font-family:'Archivo', sans-serif; font-size:11.5px; padding:8px 6px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
+  .view-btn{ flex:1; font-family:'Archivo', sans-serif; font-size:11.5px; padding:8px 6px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--sage); cursor:pointer; }
   .view-btn.active{ background:var(--gold); color:var(--bg); border-color:var(--gold); }
-  .reset-btn{ font-family:'Archivo', sans-serif; font-size:11px; background:none; border:1px solid var(--line); color:var(--sage); padding:6px 10px; border-radius:0; cursor:pointer; margin-bottom:16px; }
+  .reset-btn{ font-family:'Archivo', sans-serif; font-size:11px; background:none; border:1px solid var(--line); color:var(--sage); padding:6px 10px; border-radius:999px; cursor:pointer; margin-bottom:16px; }
   .reset-btn:hover{ border-color:var(--tomato); color:var(--tomato); }
-  .mini-add-btn{ font-family:'Archivo', sans-serif; font-size:11px; background:none; border:1px dashed var(--sage); color:var(--sage); padding:5px 9px; border-radius:0; cursor:pointer; margin-top:4px; }
+  .mini-add-btn{ font-family:'Archivo', sans-serif; font-size:11px; background:none; border:1px dashed var(--sage); color:var(--sage); padding:5px 9px; border-radius:999px; cursor:pointer; margin-top:4px; }
   .mini-add-btn:hover{ border-color:var(--gold-dark); color:var(--gold-dark); }
 
   .filters{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
   .filters select, .filters input[type=search]{ font-family:'Archivo', sans-serif; font-size:13px; padding:8px 10px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
   .filters input[type=search]{ flex:1; min-width:140px; }
-  .filters-open-btn{ display:inline-flex; align-items:center; gap:6px; font-family:'Archivo', sans-serif; font-size:12.5px; padding:8px 12px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--gold-dark); cursor:pointer; white-space:nowrap; }
+  .filters-open-btn{ display:inline-flex; align-items:center; gap:6px; font-family:'Archivo', sans-serif; font-size:12.5px; padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--gold-dark); cursor:pointer; white-space:nowrap; }
   .filters-open-btn:hover{ border-color:var(--gold-dark); color:var(--gold-dark); }
   .filters-modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; display:flex; align-items:flex-end; justify-content:center; }
+  .filters-modal-backdrop.centered-modal{ align-items:center; padding:20px; }
   .filters-modal{ background:var(--surface); width:100%; max-width:520px; max-height:82vh; overflow-y:auto; border-radius:0; padding:18px 18px 14px; box-shadow:0 -10px 40px rgba(0,0,0,0.3); }
+  .filters-modal.centered-modal{ max-width:340px; border:2px solid var(--line-strong); box-shadow:0 12px 40px rgba(0,0,0,0.35); }
   .filters-modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
   .filters-modal-header h3{ font-family:'Archivo', sans-serif; font-weight:800; font-size:20px; margin:0; color:var(--ink); }
   .filters-close-btn{ background:none; border:none; font-size:18px; color:var(--sage); cursor:pointer; padding:4px 8px; }
@@ -239,7 +241,7 @@
   .edit-ing-row .edit-ing-name{ flex:1.6; min-width:0; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
   .edit-ing-row .edit-ing-qta{ flex:1; min-width:0; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
   .edit-step-row .edit-step-text{ flex:1; min-width:0; font-family:'Archivo', sans-serif; font-size:13px; padding:8px 9px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); resize:vertical; }
-  .edit-row-remove{ flex-shrink:0; width:30px; height:30px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--tomato); cursor:pointer; font-size:13px; }
+  .edit-row-remove{ flex-shrink:0; width:30px; height:30px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--tomato); cursor:pointer; font-size:13px; }
   .edit-row-remove:hover{ background:rgba(179,58,58,0.08); }
   .recipe-count{ font-family:'Archivo', sans-serif; font-size:11.5px; color:var(--sage); margin-bottom:10px; }
   .recipe-list{ display:grid; grid-template-columns:1fr; gap:0; }
@@ -248,7 +250,7 @@
   .recipe-card-wrap{ margin-bottom:0; }
   .recipe-name{ font-weight:600; font-size:15px; }
   .recipe-tags{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
-  .tag{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; padding:5px 9px; border-radius:0; background:var(--surface-2); color:var(--ink); white-space:nowrap; }
+  .tag{ font-family:'Archivo', sans-serif; font-weight:800; font-size:10px; letter-spacing:0.12em; padding:5px 9px; border-radius:999px; background:var(--surface-2); color:var(--ink); white-space:nowrap; }
   .tag.season{ background:rgba(212,167,58,0.18); color:var(--gold-dark); }
   .tag.freezer{ background:rgba(59,111,143,0.14); color:var(--steel); }
   .tag.tempo{ background:var(--surface-2); color:var(--ink); opacity:0.75; }
@@ -264,11 +266,11 @@
   .inv-luogo:hover{ opacity:0.65; }
   .luogo-picker-backdrop{ position:fixed; inset:0; z-index:150; background:transparent; }
   .luogo-picker{ position:absolute; top:100%; left:0; margin-top:4px; z-index:151; display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:0; padding:5px; box-shadow:0 6px 18px rgba(0,0,0,0.22); }
-  .luogo-picker-opt{ width:30px; height:30px; flex-shrink:0; border-radius:0; border:none; background:transparent; font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .luogo-picker-opt{ width:30px; height:30px; flex-shrink:0; border-radius:50%; border:none; background:transparent; font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .luogo-picker-opt:hover{ background:var(--surface-2); }
   .luogo-picker-opt.active{ background:var(--gold); }
   .qty-stepper{ flex-shrink:0; display:flex; align-items:center; gap:4px; }
-  .qty-btn{ width:24px; height:24px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:14px; line-height:1; cursor:pointer; }
+  .qty-btn{ width:24px; height:24px; border-radius:50%; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:14px; line-height:1; cursor:pointer; }
   .qty-btn:hover{ background:var(--surface-2); }
   .qty-num{ display:inline-block; min-width:22px; text-align:center; font-family:'Archivo', sans-serif; font-size:13px; font-weight:600; color:var(--ink); cursor:text; }
   .qty-num.low{ color:var(--steel); font-weight:800; }
@@ -282,11 +284,11 @@
   .inv-add-row input#inv-add-name, .inv-add-row input#shop-add-name{ flex:1.5; min-width:0; }
   .inv-add-row input#shop-add-qta{ flex:1; min-width:0; }
   .inv-add-row select#inv-add-luogo{ flex-shrink:0; max-width:130px; }
-  .inv-add-row button{ flex-shrink:0; font-family:'Archivo', sans-serif; font-weight:800; font-size:12.5px; padding:8px 12px; border-radius:0; border:none; background:var(--gold); color:var(--bg); cursor:pointer; }
+  .inv-add-row button{ flex-shrink:0; font-family:'Archivo', sans-serif; font-weight:800; font-size:12.5px; padding:8px 12px; border-radius:999px; border:none; background:var(--gold); color:var(--bg); cursor:pointer; }
   .inv-add-row button:hover{ background:var(--gold-dark); }
   .save-hint{ font-family:'Archivo', sans-serif; font-size:10.5px; color:var(--sage); text-align:right; min-height:14px; }
   .generate-week-block{ margin-top:20px; padding-top:18px; border-top:1px solid var(--line); text-align:center; }
-  .generate-week-btn{ display:inline-flex; align-items:center; gap:8px; font-family:'Archivo', sans-serif; font-weight:800; font-size:15px; padding:12px 22px; border-radius:0; border:none; background:var(--gold); color:var(--bg); cursor:pointer; box-shadow:0 6px 16px rgba(224,60,30,0.3); }
+  .generate-week-btn{ display:inline-flex; align-items:center; gap:8px; font-family:'Archivo', sans-serif; font-weight:800; font-size:15px; padding:12px 22px; border-radius:999px; border:none; background:var(--gold); color:var(--bg); cursor:pointer; box-shadow:0 6px 16px rgba(224,60,30,0.3); }
   .generate-week-btn:hover{ background:var(--gold-dark); }
   .generate-week-hint{ font-size:11.5px; color:var(--sage); margin:8px 0 0; }
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
@@ -296,7 +298,7 @@
   .login-box h2{ font-family:'Archivo', sans-serif; font-weight:700; font-size:24px; margin:0 0 4px; color:var(--ink); }
   .login-box .login-sub{ font-family:'Archivo', sans-serif; font-style:italic; color:var(--sage); margin:0 0 20px; font-size:14px; }
   .login-box input{ width:100%; font-family:'Archivo', sans-serif; font-size:14px; padding:11px 12px; border-radius:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); margin-bottom:10px; }
-  .login-box button{ width:100%; font-family:'Archivo', sans-serif; font-weight:800; font-size:14.5px; padding:11px; border-radius:0; border:none; background:var(--gold); color:var(--bg); cursor:pointer; margin-top:4px; }
+  .login-box button{ width:100%; font-family:'Archivo', sans-serif; font-weight:800; font-size:14.5px; padding:11px; border-radius:999px; border:none; background:var(--gold); color:var(--bg); cursor:pointer; margin-top:4px; }
   .login-box button:hover{ background:var(--gold-dark); color:#fff; }
   .login-box button:disabled{ opacity:0.6; cursor:default; }
   .login-error{ color:var(--tomato); font-size:12.5px; margin-top:10px; min-height:16px; }
@@ -1770,8 +1772,8 @@ function renderSpesa(){
     </div>` : '';
 
   const addIngModal = state.addIngModalOpen ? `
-    <div class="filters-modal-backdrop" data-close-add-ing-modal>
-      <div class="filters-modal" data-stop-close>
+    <div class="filters-modal-backdrop centered-modal" data-close-add-ing-modal>
+      <div class="filters-modal centered-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Aggiungi ingrediente</h3>
           <button class="filters-close-btn" data-close-add-ing-modal>✕</button>
@@ -1798,8 +1800,8 @@ function renderSpesa(){
     <p class="section-sub">Si aggiorna in automatico in base al menù attuale — spuntare un articolo lo aggiunge anche in Dispensa</p>
     ${missingBanner}
     <div class="view-toggle">
-      <button class="view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
       <button class="view-btn ${state.shopView==='reparto'?'active':''}" data-shop-view="reparto">Per reparto</button>
+      <button class="view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
     </div>
     <div class="shop-progress">${done} / ${total} presi</div>
     <button class="reset-btn" id="reset-shop">Svuota spunte</button>
