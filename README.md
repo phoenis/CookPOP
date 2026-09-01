@@ -44,9 +44,16 @@ della spesa.
 Per completarne una: cerca la ricetta online (2-3 fonti italiane affidabili),
 scrivi ingredienti/procedimento con parole proprie (mai copiare testo, per
 diritto d'autore), aggiungi una entry a `DATA.recipeDetails` nello stesso
-formato delle altre 106, e aggiorna `DATA.recipeIngredientsInitial` per quella
+formato delle altre 127, e aggiorna `DATA.recipeIngredientsInitial` per quella
 ricetta. Poi rigenera `index.html` sostituendo il blocco `const DATA = {...}`
 con il JSON aggiornato.
+
+Ogni ingrediente va tenuto come voce separata in `ingredienti` — mai
+raggruppato tipo `"Sale e pepe"` o `"Carota, sedano, cipolla"` — perché il
+riconoscimento "ce l'ho in Dispensa" confronta i nomi esatti, e un ingrediente
+combinato non trova mai corrispondenza. Va bene solo quando è davvero un solo
+ingrediente usato in più modi (es. `"Limone (scorza e succo)"`) o una scelta
+tra alternative (es. `"Filetti di pesce bianco (orata, branzino o simili)"`).
 
 ## Tassonomia dei filtri
 
