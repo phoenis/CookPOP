@@ -43,6 +43,18 @@ const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀'
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
+
+// Unità di misura tracciabili per una voce di Dispensa: '' = pezzi/generico
+// (comportamento originale, solo presenza/assenza), le altre abilitano il
+// confronto quantitativo con quanto richiesto dalla ricetta (vedi pantryStatusFor).
+const UNIT_ORDER = ['', 'g', 'kg', 'ml', 'l'];
+const UNIT_LABEL = { '':'pezzi/generico', g:'grammi (g)', kg:'chili (kg)', ml:'millilitri (ml)', l:'litri (l)' };
+// Passo dello stepper +/- in Dispensa, adeguato all'unità (1g o 1ml alla volta non avrebbe senso).
+function qtyStepFor(unit){
+  if(unit === 'g' || unit === 'ml') return 50;
+  if(unit === 'kg' || unit === 'l') return 0.1;
+  return 1;
+}
 const LUOGO_ICON = { 
   dispensa:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M253.76 93A12 12 0 0 0 237 90.24l-9 6.44V80a12 12 0 0 0-12-12H40a12 12 0 0 0-12 12v16.68l-9-6.44a12 12 0 1 0-14 19.52l23 16.42V184a36 36 0 0 0 36 36h128a36 36 0 0 0 36-36v-57.82l23-16.42A12 12 0 0 0 253.76 93M204 184a12 12 0 0 1-12 12H64a12 12 0 0 1-12-12V92h152ZM76 40V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0"></path></svg>', 
   ripostiglio:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--heroicons" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m7.875 14.25l1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.3 2.3 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.3 2.3 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25"></path></svg>', 
@@ -88,6 +100,49 @@ function hasPantryStock(ingrediente){
   const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
   return !!(it && typeof it.qty === 'number' && it.qty > 0);
 }
+
+// Estrae {value, unit} dal primo numero trovato in un testo tipo "300 g",
+// "1,5 kg", "1 spicchio" — null se non c'è un numero. unit è tutto ciò che
+// segue, minuscolo (può essere vuoto, es. "3").
+function parseQtyValue(text){
+  if(!text) return null;
+  const m = (''+text).trim().match(/^(\d+(?:[.,]\d+)?)\s*([a-zà-ù]*)/i);
+  if(!m) return null;
+  const value = parseFloat(m[1].replace(',', '.'));
+  if(Number.isNaN(value)) return null;
+  return { value, unit: (m[2]||'').toLowerCase() };
+}
+
+// Converte peso/volume in un'unità base comune (grammi o millilitri) per un
+// confronto numerico affidabile. Le altre unità (pezzi, spicchi, cucchiai...)
+// non sono normalizzabili in modo sicuro senza inventare equivalenze, quindi
+// restano fuori da questo confronto — vedi pantryStatusFor.
+const WEIGHT_TO_GRAMS = { g:1, gr:1, grammi:1, grammo:1, kg:1000, kilo:1000, kilogrammo:1000, kilogrammi:1000 };
+const VOLUME_TO_ML = { ml:1, millilitri:1, l:1000, lt:1000, litro:1000, litri:1000 };
+function toComparableUnit(value, unit){
+  const u = (unit||'').toLowerCase();
+  if(WEIGHT_TO_GRAMS[u] !== undefined) return { value: value * WEIGHT_TO_GRAMS[u], base:'g' };
+  if(VOLUME_TO_ML[u] !== undefined) return { value: value * VOLUME_TO_ML[u], base:'ml' };
+  return null;
+}
+
+// Stato di un ingrediente rispetto alla Dispensa: 'manca' se assente o a
+// quantità zero; 'poco' se in Dispensa ce n'è di meno di quanto richiesto
+// (solo quando entrambe le quantità sono in un'unità di peso/volume
+// riconosciuta e tracciata sulla voce di Dispensa — vedi UNIT_ORDER);
+// altrimenti 'in-casa' (semplice presenza, come prima di avere le unità).
+function pantryStatusFor(ingrediente, neededQtaText){
+  const key = (ingrediente||'').trim().toLowerCase();
+  const it = state.pantryItems[key];
+  if(!it || typeof it.qty !== 'number' || it.qty <= 0) return 'manca';
+  if(!it.unit) return 'in-casa';
+  const have = toComparableUnit(it.qty, it.unit);
+  const need = neededQtaText ? parseQtyValue(neededQtaText) : null;
+  const needComparable = need ? toComparableUnit(need.value, need.unit) : null;
+  if(!have || !needComparable || have.base !== needComparable.base) return 'in-casa';
+  return have.value >= needComparable.value ? 'in-casa' : 'poco';
+}
+
 function isStapleConfirmed(it){
   const touched = it.keys.some(k => state.shopChecked[k] !== undefined);
   if(touched) return it.keys.every(k => state.shopChecked[k]);
@@ -116,19 +171,22 @@ function scaleQtyText(text, ratio){
   });
 }
 
-// Lista ingredienti di una ricetta con badge IN CASA/MANCA (da hasPantryStock)
-// e un'azione per mandare solo i mancanti in Spesa: condivisa da Menù e Prep,
-// così il comportamento resta identico ovunque si apra il dettaglio di una ricetta.
+// Lista ingredienti di una ricetta con pallino IN CASA/SCORTA BASSA/MANCA
+// (da pantryStatusFor) e un'azione per mandare solo quelli da comprare in
+// Spesa: condivisa da Menù e Prep, così il comportamento resta identico
+// ovunque si apra il dettaglio di una ricetta.
 // ratio scala le quantità visualizzate (e quelle mandate in Spesa) per un
 // eventuale numero di porzioni diverso da quello base — vedi renderDayCard.
 function renderIngredientsSection(ing, recipeName, ratio){
   ratio = ratio || 1;
   if(!ing.length) return `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
+  const STATUS_LABEL = { 'in-casa':'In casa', 'poco':'Scorta bassa', 'manca':'Manca' };
   const rows = ing.map(it=>{
-    const inCasa = hasPantryStock(it.ingrediente);
-    return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}</span><span class="ing-status ${inCasa?'in-casa':'manca'}">${inCasa?'In casa':'Manca'}</span><span style="color:var(--sage)">${escapeHtml(scaleQtyText(it.qta, ratio)||'')}</span></li>`;
+    const scaledQta = scaleQtyText(it.qta, ratio);
+    const status = pantryStatusFor(it.ingrediente, scaledQta);
+    return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}</span><span class="ing-status ${status}" title="${escapeAttr(STATUS_LABEL[status])}"></span><span style="color:var(--sage)">${escapeHtml(scaledQta||'')}</span></li>`;
   }).join('');
-  const mancanti = ing.filter(it => !hasPantryStock(it.ingrediente));
+  const mancanti = ing.filter(it => pantryStatusFor(it.ingrediente, scaleQtyText(it.qta, ratio)) !== 'in-casa');
   const mancantiBtn = mancanti.length
     ? `<div class="button-wrapper"><button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}" data-mancanti-ratio="${ratio}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button></div>`
     : '';
@@ -140,7 +198,7 @@ function renderIngredientsSection(ing, recipeName, ratio){
 // automatico quando si spunta un articolo in Spesa. Quantità = un contatore
 // numerico (stepper +/- in UI); finché non è impostata (o è 0) la voce non
 // compare nell'elenco.
-function upsertPantryItem(nome, luogo, amount, staple){
+function upsertPantryItem(nome, luogo, amount, staple, unit){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
   const key = trimmedName.toLowerCase();
@@ -148,12 +206,14 @@ function upsertPantryItem(nome, luogo, amount, staple){
   const currentQty = (existing && typeof existing.qty === 'number') ? existing.qty : 0;
   const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
   const isStapleFlag = staple !== undefined ? !!staple : !!(existing && existing.staple);
+  const finalUnit = unit !== undefined ? unit : (existing && existing.unit) || '';
   state.pantryItems[key] = {
     nome: trimmedName,
     qty: currentQty + add,
     luogo: (existing && existing.luogo) || luogo || 'dispensa',
     ...((existing && existing.cat) ? { cat: existing.cat } : {}),
-    ...(isStapleFlag ? { staple: true } : {})
+    ...(isStapleFlag ? { staple: true } : {}),
+    ...(finalUnit ? { unit: finalUnit } : {})
   };
 }
 
@@ -1156,7 +1216,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         <button class="btn is-solid" data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
       </div>`;
     const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
-    const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="button-wrapper">${linkHtml}${editRecipeBtn}</div>` : '';
+    const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>` : '';
     const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
     detailHtml = `
     <div class="detail-box">
@@ -1612,7 +1672,7 @@ function renderPrep(){
         ${stepsHtml}
         ${noteBox}
         ${addFormHtml}
-        <div class="button-wrapper">${linkHtml}${editRecipeBtn}</div>
+        <div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>
       </div>`;
     }
     return `
@@ -1741,11 +1801,12 @@ function renderDispensa(){
   // voce senza quantità (0) non compare: la quantità è un contatore che si
   // vede solo una volta impostato.
   const items = Object.entries(state.pantryItems)
-    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, luogo: it.luogo || 'dispensa', cat: it.cat }))
+    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0);
 
   function itemRow(it){
     const editing = state.pantryEditingKey === it.key;
+    const step = qtyStepFor(it.unit);
     return `
     <div class="inv-item">
       <button class="btn is-icon luogo-picker-opt is-selected" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${LUOGO_ICON[it.luogo]}</button>
@@ -1758,8 +1819,8 @@ function renderDispensa(){
       <span class="qty-stepper">
         <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
-          ? `<input type="number" min="0" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">`
-          : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}</span>`}
+          ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">`
+          : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' '+escapeHtml(it.unit) : ''}</span>`}
         <button class="qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
       </span>
       <button class="btn-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
@@ -1815,7 +1876,13 @@ function renderDispensa(){
           </div>
           <div class="filter-group">
             <div class="filter-group-label">Quantità</div>
-            <input type="number" min="0" id="pantry-edit-qty" value="${editItem.qty}">
+            <input type="number" min="0" step="${qtyStepFor(editItem.unit)}" id="pantry-edit-qty" value="${editItem.qty}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
+            <select id="pantry-edit-unit">
+              ${UNIT_ORDER.map(u=>`<option value="${u}" ${(editItem.unit||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
+            </select>
           </div>
           <div class="filter-group">
             <button type="button" class="btn is-chip ${editItem.staple ? 'active' : ''}" id="pantry-edit-staple-toggle">${stapleToggleInner(!!editItem.staple)}</button>
@@ -1844,6 +1911,12 @@ function renderDispensa(){
             <div class="filter-group-label">Luogo</div>
             <select id="pantry-add-luogo">
               ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
+            <select id="pantry-add-unit">
+              ${UNIT_ORDER.map(u=>`<option value="${u}">${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
@@ -2079,7 +2152,7 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const recipeName = e.currentTarget.dataset.mancantiInSpesa;
       const ratio = parseFloat(e.currentTarget.dataset.mancantiRatio) || 1;
-      getIngredientsFor(recipeName).filter(it => !hasPantryStock(it.ingrediente)).forEach(it=>{
+      getIngredientsFor(recipeName).filter(it => pantryStatusFor(it.ingrediente, scaleQtyText(it.qta, ratio)) !== 'in-casa').forEach(it=>{
         const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
         if(already) return;
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
@@ -2479,7 +2552,8 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const it = state.pantryItems[e.currentTarget.dataset.qtyInc];
       if(!it) return;
-      it.qty = (typeof it.qty === 'number' ? it.qty : 0) + 1;
+      const step = qtyStepFor(it.unit);
+      it.qty = Math.round(((typeof it.qty === 'number' ? it.qty : 0) + step) * 100) / 100;
       persist(); render();
     });
   });
@@ -2487,7 +2561,8 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const it = state.pantryItems[e.currentTarget.dataset.qtyDec];
       if(!it) return;
-      it.qty = Math.max(0, (typeof it.qty === 'number' ? it.qty : 0) - 1);
+      const step = qtyStepFor(it.unit);
+      it.qty = Math.max(0, Math.round(((typeof it.qty === 'number' ? it.qty : 0) - step) * 100) / 100);
       persist(); render();
     });
   });
@@ -2504,7 +2579,7 @@ function attachHandlers(){
     const commitQtyEdit = ()=>{
       const it = state.pantryItems[qtyEditInput.dataset.qtyEdit];
       if(it){
-        const n = parseInt(qtyEditInput.value, 10);
+        const n = parseFloat(qtyEditInput.value);
         it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
       }
       state.pantryEditingKey = null;
@@ -2524,9 +2599,10 @@ function attachHandlers(){
     const nameInput = document.getElementById('pantry-add-name');
     const luogoSelect = document.getElementById('pantry-add-luogo');
     const stapleToggle = document.getElementById('pantry-add-staple-toggle');
+    const unitSelect = document.getElementById('pantry-add-unit');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
-      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'));
+      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'), unitSelect ? unitSelect.value : '');
       state.pantryAddModalOpen = false;
       persist(); render();
     };
@@ -2590,8 +2666,18 @@ function attachHandlers(){
     editQtyInput.addEventListener('change', e=>{
       const it = state.pantryItems[state.pantryEditKey];
       if(it){
-        const n = parseInt(e.target.value, 10);
+        const n = parseFloat(e.target.value);
         it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+        persist(); render();
+      }
+    });
+  }
+  const editUnitSelect = document.getElementById('pantry-edit-unit');
+  if(editUnitSelect){
+    editUnitSelect.addEventListener('change', e=>{
+      const it = state.pantryItems[state.pantryEditKey];
+      if(it){
+        if(e.target.value) it.unit = e.target.value; else delete it.unit;
         persist(); render();
       }
     });
