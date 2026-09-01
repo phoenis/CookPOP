@@ -358,7 +358,7 @@ const state = {
   doneModalDay: null,
   doneModalQty: {},
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
-  filters: { cat:'', tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' }
+  filters: { cat:[], tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' } // cat è multi-selezione (array), gli altri restano a valore singolo
 };
 
 // Le 4 tab vivono anche come "pagine" via anchor (#menu/#spesa/#prep/#dispensa):
@@ -1644,7 +1644,7 @@ function renderSpesa(){
 
 function renderPrep(){
   let list = allRecipeMetas().filter(r=>{
-    if(state.filters.cat && r.categoriaNew !== state.filters.cat) return false;
+    if(state.filters.cat.length && !state.filters.cat.includes(r.categoriaNew)) return false;
     if(state.filters.tempo && r.tempoBucket !== state.filters.tempo) return false;
     if(state.filters.pian && r.pianificazione !== state.filters.pian) return false;
     if(state.filters.stagione && !(r.stagioni.includes(state.filters.stagione) || r.stagioni.includes('tutto'))) return false;
@@ -1716,7 +1716,7 @@ function renderPrep(){
     return `<select id="${id}"><option value="">${label}</option>${order.map(v=>`<option value="${v}" ${current===v?'selected':''}>${escapeHtml(labelMap[v])}</option>`).join('')}</select>`;
   }
 
-  const activeCount = ['cat','tempo','pian','stagione','avanzi','freezer','grad','attrezz'].filter(k=>state.filters[k]).length;
+  const activeCount = ['tempo','pian','stagione','avanzi','freezer','grad','attrezz'].filter(k=>state.filters[k]).length + (state.filters.cat.length ? 1 : 0);
 
   const filtersModal = state.filtersOpen ? `
     <div class="filters-modal-backdrop" data-close-filters>
@@ -1729,8 +1729,8 @@ function renderPrep(){
           <div class="filter-group">
             <div class="filter-group-label">🍽️ Categoria</div>
             <div class="chip-row">
-              <button class="btn is-chip ${!state.filters.cat?'active':''}" data-f="cat" data-v="">Tutte</button>
-              ${CAT_ORDER.map(c=>`<button class="btn is-chip ${state.filters.cat===c?'active':''}" data-f="cat" data-v="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
+              <button class="btn is-chip ${!state.filters.cat.length?'active':''}" data-cat-clear>Tutte</button>
+              ${CAT_ORDER.map(c=>`<button class="btn is-chip ${state.filters.cat.includes(c)?'active':''}" data-cat-chip="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
@@ -2510,7 +2510,7 @@ function attachHandlers(){
   if(stopClose) stopClose.addEventListener('click', e=>{ e.stopPropagation(); });
   const clearFilters = document.getElementById('clear-filters');
   if(clearFilters) clearFilters.addEventListener('click', ()=>{
-    state.filters = { cat:'', tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search: state.filters.search };
+    state.filters = { cat:[], tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search: state.filters.search };
     render();
   });
 
@@ -2553,6 +2553,18 @@ function attachHandlers(){
       state.filters[f] = v;
       render();
     });
+  });
+  // Categoria: multi-selezione, a differenza degli altri filtri (un solo valore).
+  document.querySelectorAll('[data-cat-chip]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const c = e.currentTarget.dataset.catChip;
+      const idx = state.filters.cat.indexOf(c);
+      if(idx === -1) state.filters.cat.push(c); else state.filters.cat.splice(idx, 1);
+      render();
+    });
+  });
+  document.querySelectorAll('[data-cat-clear]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.filters.cat = []; render(); });
   });
   [['f-tempo','tempo'],['f-pian','pian'],['f-stagione','stagione'],['f-avanzi','avanzi'],['f-freezer','freezer'],['f-grad','grad'],['f-attrezz','attrezz']].forEach(([id,key])=>{
     const el = document.getElementById(id);
