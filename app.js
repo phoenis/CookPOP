@@ -1153,6 +1153,13 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   </div>`;
 }
 
+// Bottone icona "impostazioni generazione" (giorni veloci): riusato ovunque
+// si possa generare/rigenerare/aggiungere una settimana, così apre sempre
+// lo stesso modale (renderMenu -> genSettingsModal).
+function genSettingsButton(){
+  return `<button class="btn is-icon" type="button" data-open-gen-settings aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
+}
+
 // Un blocco settimana completo: intestazione con data, striscia categorie,
 // 7 giorni, e i controlli per generare/rigenerare (e, per le extra, rimuovere).
 function renderWeekSection(weekIdx){
@@ -1183,7 +1190,7 @@ function renderWeekSection(weekIdx){
   const quickDaysHint = state.quickDays.length
     ? `Ricette veloci (≤30–45 min) di ${state.quickDays.slice().sort((a,b)=>a-b).map(d=>DATA.week1[d].giorno.slice(0,3)).join(', ')}.`
     : 'Nessun giorno limitato a ricette veloci.';
-  const genSettingsBtn = `<button class="btn is-icon" type="button" data-open-gen-settings aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
+  const genSettingsBtn = genSettingsButton();
 
   const controls = weekIdx === 0 ? `
     <div class="generate-week-block">
@@ -1300,7 +1307,10 @@ function renderMenu(){
     ${renderRecipeEditModal()}
     ${genSettingsModal}
     <div class="generate-week-block">
-      <button class="btn is-solid" id="add-week">+ Aggiungi settimana</button>
+      <div class="generate-week-row">
+        <button class="btn is-solid" id="add-week">+ Aggiungi settimana</button>
+        ${genSettingsButton()}
+      </div>
       <p class="generate-week-hint">Pianifica un'altra settimana in più, con le stesse regole del menù generato.</p>
     </div>
   `;
