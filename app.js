@@ -1160,7 +1160,7 @@ function renderWeekSection(weekIdx){
     </div>`;
 
   return `
-    <section class="week-section">
+    <section class="recipe-list">
       <h2 class="week-title">Settimana del ${weekLabelFor(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
       ${days}
@@ -1348,7 +1348,7 @@ function renderSpesa(){
         : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`;
       return `
       <div class="shop-day-group">
-        <div class="shop-day-title">${escapeHtml(giorno)} ${escapeHtml(dateLabel)} · ${escapeHtml(name)}</div>
+        <div class="shop-day-title"><span class="font-weight-bold">${escapeHtml(name)}</span>${escapeHtml(giorno)} ${escapeHtml(dateLabel)}</div>
         ${rows}
       </div>`;
     }).join('');
@@ -1574,7 +1574,7 @@ function renderPrep(){
     <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
     <div class="filters">
       <input type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
-      <button class="btn is-outline filters-open-btn" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
+      <button class="btn is-outline view-btn" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
     </div>
     ${filtersModal}
     <div class="recipe-count">${list.length} ricette trovate</div>
