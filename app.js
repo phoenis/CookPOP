@@ -37,9 +37,9 @@ const GRAD_ORDER = ['preferita','ci-piace','ogni-tanto','da-provare'];
 const ATTREZZ_LABEL = { 'Padella':'Padella', 'Pentola':'Pentola', 'Forno':'Forno', 'Piastra':'Piastra', 'Moulinex':'Moulinex', 'Frullatore':'Frullatore', 'Fritto':'Fritto' };
 const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullatore','Fritto'];
 
-const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro'];
-const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', altro:'Altro' };
-const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', altro:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg>' };
+const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','finiti','altro'];
+const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', finiti:'Finiti in Dispensa', altro:'Altro' };
+const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', finiti:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M253.76 93A12 12 0 0 0 237 90.24l-9 6.44V80a12 12 0 0 0-12-12H40a12 12 0 0 0-12 12v16.68l-9-6.44a12 12 0 1 0-14 19.52l23 16.42V184a36 36 0 0 0 36 36h128a36 36 0 0 0 36-36v-57.82l23-16.42A12 12 0 0 0 253.76 93M204 184a12 12 0 0 1-12 12H64a12 12 0 0 1-12-12V92h152ZM76 40V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0"></path></svg>', altro:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg>' };
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
@@ -329,6 +329,7 @@ const state = {
   pantryView: 'categoria',
   pantryEditingKey: null,
   pantryLuogoPicker: null,
+  pantryFinishedOpen: false,
   pantryEditKey: null,
   weekOverrides: {},
   weekOverridePicked: {},
@@ -1503,9 +1504,11 @@ function renderSpesa(){
 
   let body = '';
   if(state.shopView === 'reparto'){
-    // classifico ogni articolo per reparto, e per la verdura forzo il negozio Fruttivendolo
+    // classifico ogni articolo per reparto, e per la verdura forzo il negozio Fruttivendolo.
+    // I "Finiti in Dispensa" vanno nel loro reparto dedicato invece che in "Altro"
+    // (o nel reparto merceologico vero, che a colpo d'occhio non spiegherebbe il perché sono lì).
     const classified = mainFlat.map(it=>{
-      const dept = classifyDept(it.ingrediente);
+      const dept = it.context === 'Finiti in Dispensa' ? 'finiti' : classifyDept(it.ingrediente);
       const store = dept === 'verdura' ? 'Fruttivendolo' : (it.dove || 'Da definire');
       return {...it, dept, store};
     });
@@ -1887,7 +1890,7 @@ function renderDispensa(){
             <div class="filter-group-label">Categoria</div>
             <select id="pantry-edit-cat">
               <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(editItem.nome)])})</option>
-              ${DEPT_ORDER.map(d=>`<option value="${d}" ${editItem.cat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${editItem.cat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
@@ -1952,6 +1955,23 @@ function renderDispensa(){
       </div>
     </div>` : '';
 
+  // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
+  // qui restano fuori dalle viste normali per luogo/categoria e finiscono in un
+  // accordion a parte, chiuso di default — non è un luogo assegnabile, solo
+  // uno stato. Riusa itemRow: stesso stepper/edit/luogo-picker degli altri.
+  const finishedItems = Object.entries(state.pantryItems)
+    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
+    .filter(it => typeof it.qty === 'number' && it.qty <= 0)
+    .sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
+  const finishedSection = finishedItems.length ? `
+    <div class="dept-block">
+      <div class="dept-title finished-toggle${state.pantryFinishedOpen ? ' open' : ''}" data-toggle-finished>
+        <span class="dept-icon">${DEPT_ICON.finiti}</span>${DEPT_LABEL.finiti} (${finishedItems.length})
+        <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+      </div>
+      ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}
+    </div>` : '';
+
   return `
     <h2 class="section-title">Dispensa</h2>
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
@@ -1960,6 +1980,7 @@ function renderDispensa(){
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
     </div>
     ${body}
+    ${finishedSection}
     <div class="save-hint"></div>
     ${editModal}
     ${addModal}
@@ -2574,6 +2595,12 @@ function attachHandlers(){
   document.querySelectorAll('[data-pantry-view]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.pantryView = e.target.dataset.pantryView;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-toggle-finished]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.pantryFinishedOpen = !state.pantryFinishedOpen;
       render();
     });
   });
