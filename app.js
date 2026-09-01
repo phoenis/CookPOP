@@ -250,6 +250,7 @@ const state = {
   weekBaseline: null,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
+  dayLinkNotes: {}, // giorno "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
   cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno
   shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
@@ -443,6 +444,7 @@ function persist(){
       weekBaseline: state.weekBaseline,
       extraWeeks: state.extraWeeks,
       dayLinks: state.dayLinks,
+      dayLinkNotes: state.dayLinkNotes,
       cooks: state.cooks,
       shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
@@ -727,8 +729,15 @@ function pickWeekRecipes(){
 // che continua a mostrare una ricetta di cui in realtà non ci sono più avanzi.
 function unlinkDaysPointingTo(dayKey){
   Object.keys(state.dayLinks).forEach(k=>{
-    if(state.dayLinks[k] === dayKey) delete state.dayLinks[k];
+    if(state.dayLinks[k] === dayKey) clearDayLink(k);
   });
+}
+// Rimuove un collegamento "avanzo di" e la sua eventuale nota (es. "fatta a
+// frittata"): le due mappe vanno sempre tenute in sincrono, altrimenti la nota
+// resterebbe orfana e ricomparirebbe se in futuro quella chiave viene riusata.
+function clearDayLink(dayKey){
+  delete state.dayLinks[dayKey];
+  delete state.dayLinkNotes[dayKey];
 }
 // Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
 function toggleCook(dayKey){
@@ -758,7 +767,7 @@ function generateWeek(weekIdx){
   }
   for(let i=0;i<7;i++){
     const dayKey = `${weekIdx}_${i}`;
-    delete state.dayLinks[dayKey];
+    clearDayLink(dayKey);
     unlinkDaysPointingTo(dayKey);
   }
   state.expandedDay = null;
@@ -795,8 +804,8 @@ function swapDayRecipes(weekIdxA, i, weekIdxB, j){
   delete weekOverridePickedRef(weekIdxB)[j];
   delete weekMealsDoneRef(weekIdxA)[i];
   delete weekMealsDoneRef(weekIdxB)[j];
-  delete state.dayLinks[dayKeyA];
-  delete state.dayLinks[dayKeyB];
+  clearDayLink(dayKeyA);
+  clearDayLink(dayKeyB);
   unlinkDaysPointingTo(dayKeyA);
   unlinkDaysPointingTo(dayKeyB);
   state.swapOpenDay = null;
@@ -996,7 +1005,11 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   }
   let linkPanelHtml = '';
   if(state.linkPickerOpenDay === dayKey){
-    const options = allPlannedDays().filter(o => `${o.weekIdx}_${o.i}` !== dayKey);
+    // Solo i giorni successivi a questo hanno senso come "quando la mangerete":
+    // allPlannedDays() è già in ordine cronologico (settimana 0, poi le extra).
+    const allDays = allPlannedDays();
+    const selfPos = allDays.findIndex(o => `${o.weekIdx}_${o.i}` === dayKey);
+    const options = allDays.filter((o, idx) => idx > selfPos);
     const optionsHtml = options.map(o=>`
       <div class="swap-result" data-link-pick="${o.weekIdx}_${o.i}" data-link-day="${dayKey}">
         <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)}</span>
@@ -1004,9 +1017,9 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       </div>`).join('');
     linkPanelHtml = `
     <div class="swap-panel">
-      <p class="section-sub" style="margin:0 0 8px;">Scegli il giorno in cui avete cucinato la dose doppia:</p>
+      <p class="section-sub" style="margin:0 0 8px;">Scegli il giorno in cui la mangerete:</p>
       <div class="swap-results">
-        ${optionsHtml || '<div class="ing-empty">Nessun altro giorno disponibile.</div>'}
+        ${optionsHtml || '<div class="ing-empty">Nessun giorno successivo disponibile.</div>'}
       </div>
     </div>`;
   }
@@ -1018,6 +1031,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     const sourceGiorno = DATA.week1[sli].giorno;
     swapControls = `
     <div class="avanzo-chip">🥡 Avanzo di ${escapeHtml(sourceGiorno)}</div>
+    <input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[dayKey] || '')}" data-link-note="${dayKey}">
     <div class="swap-controls">
       <button class="btn is-chip ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
       <button class="btn is-chip is-dashed" data-unlink-day="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M117.18 188.74a12 12 0 0 1 0 17l-5.12 5.12A58.26 58.26 0 0 1 70.6 228a58.62 58.62 0 0 1-41.46-100.08l34.75-34.75a58.64 58.64 0 0 1 98.56 28.11a12 12 0 1 1-23.37 5.44a34.65 34.65 0 0 0-58.22-16.58l-34.75 34.75A34.62 34.62 0 0 0 70.57 204a34.4 34.4 0 0 0 24.49-10.14l5.11-5.12a12 12 0 0 1 17.01 0M226.83 45.17a58.65 58.65 0 0 0-82.93 0l-5.11 5.11a12 12 0 0 0 17 17l5.12-5.12a34.63 34.63 0 1 1 49 49l-34.81 34.7A34.4 34.4 0 0 1 150.61 156a34.63 34.63 0 0 1-33.69-26.72a12 12 0 0 0-23.38 5.44A58.64 58.64 0 0 0 150.56 180h.05a58.28 58.28 0 0 0 41.47-17.17l34.75-34.75a58.62 58.62 0 0 0 0-82.91"></path></svg> Scollega</button>
@@ -1170,7 +1184,7 @@ function renderWeekSection(weekIdx){
     </div>`;
 
   return `
-    <section class="recipe-list">
+    <section class="week-section">
       <h2 class="week-title">Settimana del ${weekLabelFor(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
       ${days}
@@ -1892,11 +1906,11 @@ function attachHandlers(){
   document.querySelectorAll('[data-link-pick]').forEach(row=>{
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
-      const dayKey = el.dataset.linkDay;
-      const sourceKey = el.dataset.linkPick;
-      const [w,i] = dayKey.split('_');
+      const sourceKey = el.dataset.linkDay; // giorno in cui è stata cucinata (dove hai cliccato "È avanzata")
+      const targetKey = el.dataset.linkPick; // giorno scelto in cui la mangerete
+      const [w,i] = targetKey.split('_');
       const weekIdx = parseInt(w,10);
-      state.dayLinks[dayKey] = sourceKey;
+      state.dayLinks[targetKey] = sourceKey;
       delete weekOverridesRef(weekIdx)[i];
       delete weekOverridePickedRef(weekIdx)[i];
       delete weekMealsDoneRef(weekIdx)[i];
@@ -1906,9 +1920,19 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-unlink-day]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      delete state.dayLinks[e.currentTarget.dataset.unlinkDay];
+      clearDayLink(e.currentTarget.dataset.unlinkDay);
       persist(); render();
     });
+  });
+  document.querySelectorAll('[data-link-note]').forEach(inp=>{
+    const commit = e=>{
+      const key = e.target.dataset.linkNote;
+      const val = e.target.value.trim();
+      if(val) state.dayLinkNotes[key] = val; else delete state.dayLinkNotes[key];
+      persist();
+    };
+    inp.addEventListener('blur', commit);
+    inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') e.target.blur(); });
   });
   document.querySelectorAll('[data-drag-handle]').forEach(handle=>{
     handle.addEventListener('pointerdown', startDayDrag);
@@ -1957,7 +1981,7 @@ function attachHandlers(){
       delete weekOverridesRef(weekIdx)[i];
       delete weekOverridePickedRef(weekIdx)[i];
       delete weekMealsDoneRef(weekIdx)[i];
-      delete state.dayLinks[key];
+      clearDayLink(key);
       unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
       persist(); render();
@@ -1991,7 +2015,7 @@ function attachHandlers(){
       weekOverridesRef(weekIdx)[i] = recipeName;
       weekOverridePickedRef(weekIdx)[i] = true;
       delete weekMealsDoneRef(weekIdx)[i];
-      delete state.dayLinks[key];
+      clearDayLink(key);
       unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
       persist(); render();
