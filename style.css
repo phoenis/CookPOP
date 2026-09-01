@@ -187,7 +187,7 @@
   .day-card:last-child{ border-bottom:none; }
   .day-card.done{ background:color-mix(in srgb, var(--green-deep) 8%, transparent); }
   .day-card.done .day-menu{ text-decoration:line-through; opacity:0.6; }
-  .day-row{ display:flex; justify-content:space-between; align-items:baseline; gap:0.625rem; flex-wrap:wrap; }
+  .day-row{ display:flex; justify-content:space-between; align-items:center; gap:0.625rem; flex-wrap:wrap; }
   .day-row-side{ display:flex; align-items:center; flex-shrink:0; height: 1rem;}
   .day-name{ font-family:var(--font-family); font-weight:var(--weight-medium); font-size:var(--text-small); min-width:5.625rem; }
   .day-date{ font-family:var(--font-family); font-weight:var(--weight-normal); font-size:var(--text-xsmall); color:var(--ink-light); }
