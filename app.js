@@ -2092,8 +2092,21 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-day]').forEach(el=>{
     el.addEventListener('click', e=>{
       const key = e.target.dataset.toggleDay;
-      state.expandedDay = state.expandedDay === key ? null : key;
+      const opening = state.expandedDay !== key;
+      state.expandedDay = opening ? key : null;
       render();
+      if(opening){
+        const menuEl = document.querySelector(`[data-toggle-day="${CSS.escape(key)}"]`);
+        const card = menuEl ? menuEl.closest('.day-card') : null;
+        if(card){
+          // la topbar è sticky: scrollIntoView da solo nasconderebbe l'inizio
+          // della card sotto di lei, quindi calcolo l'offset a mano (come in Ricette).
+          const topbar = document.querySelector('.topbar');
+          const offset = (topbar ? topbar.offsetHeight : 0) + 8;
+          const top = card.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+      }
     });
   });
 
