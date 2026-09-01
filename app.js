@@ -1284,7 +1284,10 @@ function renderWeekSection(weekIdx){
     const d = DATA.week1[i];
     const cat = effectiveCategoria(weekIdx, i);
     const isToday = isSameDay(weekDates[pos], new Date());
-    return `<div class="balance-chip${isToday ? ' today' : ''}">
+    // Ancora al giorno corrispondente più sotto: i giorni già passati (visibili
+    // solo qui, la card è nascosta — vedi startPos) non trovano nulla e il tap
+    // resta senza effetto, senza bisogno di disabilitarli a parte.
+    return `<div class="balance-chip${isToday ? ' today' : ''}" data-scroll-to-day="${weekIdx}_${i}">
       <div class="bd">${d.giorno.slice(0,3)}</div>
       <div class="bc">${cat ? catIcon(cat) : '—'}</div>
     </div>`;
@@ -2325,6 +2328,19 @@ function attachHandlers(){
           window.scrollTo({ top, behavior: 'smooth' });
         }
       }
+    });
+  });
+  document.querySelectorAll('[data-scroll-to-day]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      const [w, i] = e.currentTarget.dataset.scrollToDay.split('_');
+      // Solo colpo d'occhio nella striscia: i giorni già passati non hanno una
+      // card visibile (vedi startPos in renderWeekSection), il tap non fa nulla.
+      const card = document.querySelector(`.day-card[data-week-idx="${CSS.escape(w)}"][data-day-index="${CSS.escape(i)}"]`);
+      if(!card) return;
+      const topbar = document.querySelector('.topbar');
+      const offset = (topbar ? topbar.offsetHeight : 0) + 8;
+      const top = card.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
     });
   });
 

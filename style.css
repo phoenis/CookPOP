@@ -180,7 +180,7 @@
   .color-delete{color: var(--delete);}
   /* balance strip */
   .balance-strip{ display:flex; gap:0.375rem; margin-bottom:1.125rem; overflow-x:auto; padding-bottom:0.125rem; }
-  .balance-chip{ flex:1; min-width:4rem; text-align:center; border-radius:var(--radius-pill); padding:var(--space-xsmall) var(--space-xxsmall) var(--space-xsmall); background:var(--surface-2); border: var(--border) solid transparent; font-family:var(--font-family); font-size:var(--text-xsmall); /* color:var(--ink-light);  */text-transform:uppercase; }
+  .balance-chip{ flex:1; min-width:4rem; text-align:center; border-radius:var(--radius-pill); padding:var(--space-xsmall) var(--space-xxsmall) var(--space-xsmall); background:var(--surface-2); border: var(--border) solid transparent; font-family:var(--font-family); font-size:var(--text-xsmall); /* color:var(--ink-light);  */text-transform:uppercase; cursor:pointer; }
   .balance-chip .bc{ font-size:var(--text-medium); margin-top:0.1875rem; line-height:var(--line-height-small); }
   .balance-chip.today{ /* border-color: var(--gold); */background-color: var(--gold-soft); color: var(--gold); font-weight: var(--weight-medium);}
 
