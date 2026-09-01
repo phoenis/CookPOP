@@ -1284,10 +1284,11 @@ function renderWeekSection(weekIdx){
     const d = DATA.week1[i];
     const cat = effectiveCategoria(weekIdx, i);
     const isToday = isSameDay(weekDates[pos], new Date());
-    // Ancora al giorno corrispondente più sotto: i giorni già passati (visibili
-    // solo qui, la card è nascosta — vedi startPos) non trovano nulla e il tap
-    // resta senza effetto, senza bisogno di disabilitarli a parte.
-    return `<div class="balance-chip${isToday ? ' today' : ''}" data-scroll-to-day="${weekIdx}_${i}">
+    // I giorni già passati (pos < startPos) sono visibili solo qui, la loro
+    // card è nascosta più sotto — vedi startPos: niente da fare scorrendoci,
+    // quindi la classe "past" li marca per uno stile disabilitato via CSS.
+    const isPast = pos < startPos;
+    return `<div class="balance-chip${isToday ? ' today' : ''}${isPast ? ' past' : ''}" data-scroll-to-day="${weekIdx}_${i}">
       <div class="bd">${d.giorno.slice(0,3)}</div>
       <div class="bc">${cat ? catIcon(cat) : '—'}</div>
     </div>`;
