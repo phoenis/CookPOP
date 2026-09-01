@@ -130,7 +130,7 @@ function renderIngredientsSection(ing, recipeName, ratio){
   }).join('');
   const mancanti = ing.filter(it => !hasPantryStock(it.ingrediente));
   const mancantiBtn = mancanti.length
-    ? `<button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}" data-mancanti-ratio="${ratio}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button>`
+    ? `<div class="button-wrapper"><button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}" data-mancanti-ratio="${ratio}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button></div>`
     : '';
   return `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
 }
@@ -1156,7 +1156,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         <button class="btn is-solid" data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
       </div>`;
     const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
-    const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="detail-section is-edit">${linkHtml}${editRecipeBtn}</div>` : '';
+    const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="button-wrapper">${linkHtml}${editRecipeBtn}</div>` : '';
     const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
     detailHtml = `
     <div class="detail-box">
@@ -1612,7 +1612,7 @@ function renderPrep(){
         ${stepsHtml}
         ${noteBox}
         ${addFormHtml}
-        <div class="detail-section is-edit">${linkHtml}${editRecipeBtn}</div>
+        <div class="button-wrapper">${linkHtml}${editRecipeBtn}</div>
       </div>`;
     }
     return `
