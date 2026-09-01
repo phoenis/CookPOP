@@ -1109,7 +1109,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${cook ? COOK_LABEL[cook][0] : ''}</button>`;
 
   return `
-  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
+  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}${state.expandedDay === dayKey ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
     <div class="day-row">
       <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span>${isToday ? `<span class="today-badge">${escapeHtml(todayBadgeLabel)}</span>` : ''}</div>
       <div class="day-row-side">
@@ -1439,7 +1439,7 @@ function renderPrep(){
     let detail = '';
     if(isOpen){
       const tagsHtml = `
-        <div class="recipe-tags">
+        <div class="detail-tags">
           <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
           ${(r.freezerNew && r.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[r.freezerNew])}</span>` : ''}
           <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
@@ -1475,14 +1475,14 @@ function renderPrep(){
       </div>`;
     }
     return `
-    <div class="recipe-card-wrap">
-      <div class="recipe-card" data-toggle-recipe="${escapeAttr(r.nome)}">
+    <div class="day-card${isOpen ? ' open' : ''}" data-toggle-recipe="${escapeAttr(r.nome)}">
+      <div class="day-row">
         <div>
           <div class="day-menu">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
           <span class="day-time">${escapeHtml(r.tempo)}</span>
         </div>
-        <div class="recipe-card-side">
-          <div class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</div>
+        <div class="day-row-side">
+          <span class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</span>
         </div>
       </div>
       ${detail}
@@ -2010,13 +2010,12 @@ function attachHandlers(){
       render();
       if(opening){
         const card = document.querySelector(`[data-toggle-recipe="${CSS.escape(name)}"]`);
-        const wrap = card ? card.closest('.recipe-card-wrap') : null;
-        if(wrap){
+        if(card){
           // la topbar è sticky: scrollIntoView da solo nasconderebbe l'inizio
           // della card sotto di lei, quindi calcolo l'offset a mano.
           const topbar = document.querySelector('.topbar');
           const offset = (topbar ? topbar.offsetHeight : 0) + 8;
-          const top = wrap.getBoundingClientRect().top + window.scrollY - offset;
+          const top = card.getBoundingClientRect().top + window.scrollY - offset;
           window.scrollTo({ top, behavior: 'smooth' });
         }
       }
