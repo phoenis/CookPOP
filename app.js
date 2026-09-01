@@ -334,7 +334,7 @@ const state = {
   weekOverrides: {},
   weekOverridePicked: {},
   weekBaseline: null,
-  quickDays: [0,1,2,3,4], // indici giorno (0=Lun..6=Dom) limitati a ricette veloci in pickWeekRecipes
+  dayTempoCap: {0:'normale',1:'normale',2:'normale',3:'normale',4:'normale',5:'progetto',6:'progetto'}, // giorno (0=Lun..6=Dom) -> tempoBucket massimo consentito in pickWeekRecipes ('progetto' = nessun limite)
   genSettingsOpen: false,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
@@ -535,7 +535,7 @@ function persist(){
       dayLinks: state.dayLinks,
       dayLinkNotes: state.dayLinkNotes,
       dayPortions: state.dayPortions,
-      quickDays: state.quickDays,
+      dayTempoCap: state.dayTempoCap,
       cooks: state.cooks,
       shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
@@ -781,17 +781,16 @@ function pickWeekRecipes(){
   const catCount = {};
   let prevCat = null;
 
-  const WEEKDAY_TEMPO = ['express','veloce','normale']; // fino a 30-45 min
-  const quickDays = new Set(state.quickDays); // giorni (0=Lun..6=Dom) limitati a ricette veloci, configurabile dall'utente
-
   for(let day = 0; day < 7; day++){
-    const isQuickDay = quickDays.has(day);
+    const cap = state.dayTempoCap[day] || 'progetto';
+    const capIdx = TEMPO_ORDER.indexOf(cap);
     // candidati non ancora usati, ordinati per preferenza: categoria diversa dal giorno prima
     // e categoria meno usata finora nella settimana
     let candidates = shuffled.filter(r => !usedNames.has(r.nome));
-    if(isQuickDay){
-      const limited = candidates.filter(r => WEEKDAY_TEMPO.includes(r.tempoBucket));
-      if(limited.length > 0) candidates = limited; // solo ricette veloci in quel giorno, se disponibili
+    if(capIdx < TEMPO_ORDER.length - 1){
+      const allowed = TEMPO_ORDER.slice(0, capIdx + 1);
+      const limited = candidates.filter(r => allowed.includes(r.tempoBucket));
+      if(limited.length > 0) candidates = limited; // rispetta il tetto di durata scelto per quel giorno, se disponibili
     }
     if(candidates.length === 0) candidates = shuffled; // esaurito il pool, riparto (raro)
 
@@ -1297,9 +1296,10 @@ function renderWeekSection(weekIdx){
 
   const days = positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
-  const quickDaysHint = state.quickDays.length
-    ? `Ricette veloci (≤30–45 min) di ${state.quickDays.slice().sort((a,b)=>a-b).map(d=>DATA.week1[d].giorno.slice(0,3)).join(', ')}.`
-    : 'Nessun giorno limitato a ricette veloci.';
+  const cappedDays = [0,1,2,3,4,5,6].filter(d => (state.dayTempoCap[d] || 'progetto') !== 'progetto');
+  const dayTempoHint = cappedDays.length
+    ? cappedDays.map(d => `${DATA.week1[d].giorno.slice(0,3)} max ${TEMPO_LABEL[state.dayTempoCap[d]].split(' — ')[0]}`).join(', ')
+    : 'Nessun limite di durata sui giorni.';
   const genSettingsBtn = genSettingsButton();
 
   const controls = weekIdx === 0 ? `
@@ -1308,7 +1308,7 @@ function renderWeekSection(weekIdx){
         <button class="btn is-outline" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg>Genera nuovo menù</button>
         ${genSettingsBtn}
       </div>
-      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. ${escapeHtml(quickDaysHint)}</p>
+      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. ${escapeHtml(dayTempoHint)}</p>
     </div>` : `
     <div class="generate-week-block is-added">
       <div class="generate-week-row">
@@ -1398,11 +1398,19 @@ function renderMenu(){
         </div>
         <div class="filter-groups">
           <div class="filter-group">
-            <div class="filter-group-label">Giorni con ricette veloci (≤30–45 min)</div>
-            <div class="chip-row">
-              ${DATA.week1.map((d,idx)=>`<button type="button" class="btn is-chip ${state.quickDays.includes(idx)?'active':''}" data-quick-day-chip="${idx}">${escapeHtml(d.giorno.slice(0,3))}</button>`).join('')}
+            <div class="filter-group-label">Durata massima ricette per giorno</div>
+            <div class="tempo-cap-list">
+              ${DATA.week1.map((d,idx)=>{
+                const cap = state.dayTempoCap[idx] || 'progetto';
+                const capIdx = TEMPO_ORDER.indexOf(cap);
+                const dots = TEMPO_ORDER.map((t,i)=>`<button type="button" class="tempo-cap-dot${i<=capIdx?' active':''}" data-tempo-cap-day="${idx}" data-tempo-cap-level="${t}" aria-label="${escapeAttr(TEMPO_LABEL[t])}">${TEMPO_LABEL[t].split(' ')[0]}</button>`).join('');
+                return `<div class="tempo-cap-row">
+                  <span class="tempo-cap-day-label">${escapeHtml(d.giorno.slice(0,3))}</span>
+                  <span class="tempo-cap-dots">${dots}</span>
+                </div>`;
+              }).join('')}
             </div>
-            <p class="section-sub" style="margin:0.5rem 0 0;">Nei giorni scelti la generazione preferisce ricette veloci — se sei in ferie togli i feriali, se il weekend è pieno aggiungilo.</p>
+            <p class="section-sub" style="margin:0.5rem 0 0;">Tocca fino a dove vuoi arrivare: quel giorno la generazione sceglierà solo ricette entro quella durata.</p>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -2229,11 +2237,11 @@ function attachHandlers(){
       render();
     });
   });
-  document.querySelectorAll('[data-quick-day-chip]').forEach(btn=>{
+  document.querySelectorAll('[data-tempo-cap-day]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const day = parseInt(e.currentTarget.dataset.quickDayChip, 10);
-      const idx = state.quickDays.indexOf(day);
-      if(idx === -1) state.quickDays.push(day); else state.quickDays.splice(idx, 1);
+      const day = parseInt(e.currentTarget.dataset.tempoCapDay, 10);
+      const level = e.currentTarget.dataset.tempoCapLevel;
+      state.dayTempoCap[day] = level;
       persist(); render();
     });
   });
