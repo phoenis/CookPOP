@@ -1124,18 +1124,16 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   }
 
   const cook = state.cooks[dayKey];
-  let todayBadgeLabel = 'Oggi';
-  if(isToday){
-    const me = getCurrentUser();
-    if(cook && me && cook === me) todayBadgeLabel = 'Tocca a te';
-    else if(cook) todayBadgeLabel = 'Cucina ' + COOK_LABEL[cook];
-  }
-  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${cook ? COOK_LABEL[cook][0] : ''}</button>`;
+  const isOpen = state.expandedDay === dayKey;
+  // Un'unica fonte per "chi cucina": iniziale sola a card chiusa, nome per
+  // esteso a card aperta — non più duplicata nel .today-badge separato.
+  const cookLabel = cook ? (isOpen ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '';
+  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
 
   return `
-  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}${state.expandedDay === dayKey ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
+  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
     <div class="day-row">
-      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span>${isToday ? `<span class="today-badge">${escapeHtml(todayBadgeLabel)}</span>` : ''}</div>
+      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
       ${cookPill}
       <div class="day-row-side">
         <span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>
