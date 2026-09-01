@@ -183,7 +183,8 @@
   .balance-chip{ flex:1; min-width:4rem; text-align:center; border-radius:var(--radius-pill); padding:var(--space-xsmall) var(--space-xxsmall) var(--space-xsmall); background:var(--surface-2); border: var(--border) solid transparent; font-family:var(--font-family); font-size:var(--text-xsmall); /* color:var(--ink-light);  */text-transform:uppercase; cursor:pointer; }
   .balance-chip .bc{ font-size:var(--text-medium); margin-top:0.1875rem; line-height:var(--line-height-small); }
   .balance-chip.today{ /* border-color: var(--gold); */background-color: var(--gold-soft); color: var(--gold); font-weight: var(--weight-medium);}
-
+  .balance-chip.past{filter: grayscale(1); pointer-events: none;}
+  .balance-chip.past div{opacity: 0.6;}
   .day-card{ padding:var(--card-block) 0px; border-bottom:var(--border) solid var(--line-light); border-top:var(--border) solid var(--line-light); position: relative; margin-top: -1px;}
   .day-card:last-child{ border-bottom:none; }
   .day-card.done{ background:color-mix(in srgb, var(--green-deep) 8%, transparent); }
