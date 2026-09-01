@@ -1169,7 +1169,8 @@ function renderWeekSection(weekIdx){
     const i = WEEK_DISPLAY_ORDER[pos];
     const d = DATA.week1[i];
     const cat = effectiveCategoria(weekIdx, i);
-    return `<div class="balance-chip">
+    const isToday = isSameDay(weekDates[pos], new Date());
+    return `<div class="balance-chip${isToday ? ' today' : ''}">
       <div class="bd">${d.giorno.slice(0,3)}</div>
       <div class="bc">${cat ? catIcon(cat) : '—'}</div>
     </div>`;
