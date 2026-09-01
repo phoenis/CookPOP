@@ -1296,10 +1296,6 @@ function renderWeekSection(weekIdx){
 
   const days = positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
-  const cappedDays = [0,1,2,3,4,5,6].filter(d => (state.dayTempoCap[d] || 'progetto') !== 'progetto');
-  const dayTempoHint = cappedDays.length
-    ? cappedDays.map(d => `${DATA.week1[d].giorno.slice(0,3)} max ${TEMPO_LABEL[state.dayTempoCap[d]].split(' — ')[0]}`).join(', ')
-    : 'Nessun limite di durata sui giorni.';
   const genSettingsBtn = genSettingsButton();
 
   const controls = weekIdx === 0 ? `
@@ -1308,7 +1304,7 @@ function renderWeekSection(weekIdx){
         <button class="btn is-outline" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg>Genera nuovo menù</button>
         ${genSettingsBtn}
       </div>
-      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. ${escapeHtml(dayTempoHint)}</p>
+      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno.</p>
     </div>` : `
     <div class="generate-week-block is-added">
       <div class="generate-week-row">
@@ -1429,7 +1425,7 @@ function renderMenu(){
         <button class="btn is-solid" id="add-week">+ Aggiungi settimana</button>
         ${genSettingsButton()}
       </div>
-      <p class="generate-week-hint">Pianifica un'altra settimana in più, con le stesse regole del menù generato.</p>
+      <p class="generate-week-hint">Pianifica un'altra settimana con le stesse regole.</p>
     </div>
   `;
 }
