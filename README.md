@@ -7,7 +7,7 @@ Nessuna build: si apre e basta. Online su https://phoenis.github.io/CookPOP/
 
 Tutto — dati e logica — vive in `index.html`:
 - Un oggetto `DATA` con 188 ricette (catalogo estratto da un file Excel originale),
-  di cui **106 già "curate"** con ingredienti reali, procedimento, tempi e link
+  di cui **127 già "curate"** con ingredienti reali, procedimento, tempi e link
   (vedi `DATA.recipeDetails`).
 - Persistenza condivisa su Firebase Realtime Database (menù della settimana,
   spesa spuntata, inventario freezer, ecc.): chi apre la pagina legge/scrive lo
@@ -36,7 +36,7 @@ reparto), **Prep** (ricettario filtrabile per categoria/tempo/stagione/ecc.),
 
 ## Cosa manca
 
-**71 ricette su 188** non hanno ancora `recipeDetails` (ingredienti precisi,
+**61 ricette su 188** non hanno ancora `recipeDetails` (ingredienti precisi,
 procedimento, tempo esatto, link). Per queste, l'app mostra solo i metadati
 del foglio originale e un avviso "ingredienti non ancora salvati" nella lista
 della spesa.
