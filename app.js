@@ -94,18 +94,43 @@ function isStapleConfirmed(it){
   return hasPantryStock(it.ingrediente);
 }
 
+// Estrae il numero di porzioni base da un testo tipo "3 porzioni" o
+// "4 porzioni (base per più pasti)": null se non parsabile (nessuno scaling).
+function parsePortionsBase(porzioniText){
+  const m = (porzioniText||'').match(/\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+// Scala ogni numero trovato nel testo per ratio, lasciando invariato il resto
+// (q.b., facoltativo, unità di misura, parentesi...). I numeri piccoli e interi
+// (es. spicchi, uova — fino a 12) si arrotondano a step di 0.5 per restare
+// realistici; il resto (grammi, ml...) si arrotonda all'intero più vicino.
+function scaleQtyText(text, ratio){
+  if(!text || !ratio || ratio === 1) return text;
+  return text.replace(/\d+(?:[.,]\d+)?/g, numStr=>{
+    const n = parseFloat(numStr.replace(',', '.'));
+    if(Number.isNaN(n)) return numStr;
+    let scaled = n * ratio;
+    scaled = (Number.isInteger(n) && n <= 12) ? Math.round(scaled*2)/2 : Math.round(scaled);
+    return Number.isInteger(scaled) ? String(scaled) : String(scaled.toFixed(1)).replace('.', ',');
+  });
+}
+
 // Lista ingredienti di una ricetta con badge IN CASA/MANCA (da hasPantryStock)
 // e un'azione per mandare solo i mancanti in Spesa: condivisa da Menù e Prep,
 // così il comportamento resta identico ovunque si apra il dettaglio di una ricetta.
-function renderIngredientsSection(ing, recipeName){
+// ratio scala le quantità visualizzate (e quelle mandate in Spesa) per un
+// eventuale numero di porzioni diverso da quello base — vedi renderDayCard.
+function renderIngredientsSection(ing, recipeName, ratio){
+  ratio = ratio || 1;
   if(!ing.length) return `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
   const rows = ing.map(it=>{
     const inCasa = hasPantryStock(it.ingrediente);
-    return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}</span><span class="ing-status ${inCasa?'in-casa':'manca'}">${inCasa?'In casa':'Manca'}</span><span style="color:var(--sage)">${escapeHtml(it.qta||'')}</span></li>`;
+    return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}</span><span class="ing-status ${inCasa?'in-casa':'manca'}">${inCasa?'In casa':'Manca'}</span><span style="color:var(--sage)">${escapeHtml(scaleQtyText(it.qta, ratio)||'')}</span></li>`;
   }).join('');
   const mancanti = ing.filter(it => !hasPantryStock(it.ingrediente));
   const mancantiBtn = mancanti.length
-    ? `<button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button>`
+    ? `<button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}" data-mancanti-ratio="${ratio}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button>`
     : '';
   return `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
 }
@@ -253,6 +278,7 @@ const state = {
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
   dayLinkNotes: {}, // giorno "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
+  dayPortions: {}, // "weekIdx_i" -> numero porzioni scelto per quel giorno (override delle porzioni base della ricetta, es. per ospiti)
   cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno
   shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
@@ -447,6 +473,7 @@ function persist(){
       extraWeeks: state.extraWeeks,
       dayLinks: state.dayLinks,
       dayLinkNotes: state.dayLinkNotes,
+      dayPortions: state.dayPortions,
       quickDays: state.quickDays,
       cooks: state.cooks,
       shopAssignees: state.shopAssignees,
@@ -736,12 +763,15 @@ function unlinkDaysPointingTo(dayKey){
     if(state.dayLinks[k] === dayKey) clearDayLink(k);
   });
 }
-// Rimuove un collegamento "avanzo di" e la sua eventuale nota (es. "fatta a
-// frittata"): le due mappe vanno sempre tenute in sincrono, altrimenti la nota
-// resterebbe orfana e ricomparirebbe se in futuro quella chiave viene riusata.
+// Rimuove tutto ciò che è specifico della ricetta assegnata a un giorno prima
+// che cambi identità (collegamento "avanzo di" + nota variante, e l'eventuale
+// override porzioni): altrimenti resterebbero agganciati alla nuova ricetta
+// per puro riuso della chiave "weekIdx_i", con effetti confusi (es. porzioni
+// scalate per una ricetta diversa da quella per cui erano state impostate).
 function clearDayLink(dayKey){
   delete state.dayLinks[dayKey];
   delete state.dayLinkNotes[dayKey];
+  delete state.dayPortions[dayKey];
 }
 // Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
 function toggleCook(dayKey){
@@ -1083,13 +1113,27 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   let detailHtml = '';
   if(state.expandedDay === dayKey){
     const det = getRecipeDetails(name);
+    // Porzioni scelte per questo giorno (default: quelle base della ricetta),
+    // usate per scalare le quantità mostrate qui e — se non già spuntate — in Spesa.
+    const basePortions = det ? parsePortionsBase(det.porzioni) : null;
+    const currentPortions = basePortions ? (state.dayPortions[dayKey] || basePortions) : null;
+    const portionsRatio = basePortions ? currentPortions / basePortions : 1;
     const ing = getIngredientsFor(name);
-    const ingHtml = renderIngredientsSection(ing, name);
+    const ingHtml = renderIngredientsSection(ing, name, portionsRatio);
+    const portionsControl = basePortions ? `
+      <div class="portions-row">
+        <span class="portions-label">Porzioni</span>
+        <span class="qty-stepper">
+          <button type="button" class="qty-btn" data-portions-dec="${dayKey}" aria-label="Diminuisci porzioni">−</button>
+          <span class="qty-num">${currentPortions}</span>
+          <button type="button" class="qty-btn" data-portions-inc="${dayKey}" aria-label="Aumenta porzioni">+</button>
+        </span>
+      </div>` : '';
     const tagsHtml = rec ? `
       <div class="detail-tags">
         <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
         <span class="tag tempo">${escapeHtml(det ? "⏱ " + det.tempo : TEMPO_LABEL[rec.tempoBucket])}</span>
-        ${det ? `<span class="tag">${escapeHtml(det.porzioni)}</span>` : ''}
+        ${(det && !basePortions) ? `<span class="tag">${escapeHtml(det.porzioni)}</span>` : ''}
         <span class="tag season">${rec.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
         ${(rec.freezerNew && rec.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${escapeHtml(FREEZER_LABEL[rec.freezerNew])}</span>` : ''}
         <span class="tag">🥡 ${escapeHtml(AVANZI_LABEL[rec.avanziNew])}</span>
@@ -1119,6 +1163,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       ${tagsHtml}
       ${dayMetaHtml}
       ${soakChip}
+      ${portionsControl}
       ${ingHtml}
       ${stepsHtml}
       ${noteBox}
@@ -1320,11 +1365,18 @@ function renderSpesa(){
   // costruisco una lista piatta di tutti gli articoli (settimana corrente + extra), con contesto e chiave stabile
   const flat = [];
   allPlannedDays().forEach(({weekIdx,i,giorno,dateLabel,name})=>{
+    const dayKey = `${weekIdx}_${i}`;
+    const det = getRecipeDetails(name);
+    const basePortions = det ? parsePortionsBase(det.porzioni) : null;
+    const ratio = basePortions ? (state.dayPortions[dayKey] || basePortions) / basePortions : 1;
     const items = getIngredientsFor(name);
     items.forEach((it,idx)=>{
       const key = dayIngKey(weekIdx, i, idx);
       if(state.shopDismissed[key]) return;
-      flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, staple: isStaple(it.ingrediente) });
+      // Le quantità scalate valgono solo finché non è già stato spuntato:
+      // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
+      const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio);
+      flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, staple: isStaple(it.ingrediente) });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
@@ -1991,6 +2043,28 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-cook]').forEach(btn=>{
     btn.addEventListener('click', e=>{ toggleCook(e.currentTarget.dataset.toggleCook); });
   });
+  document.querySelectorAll('[data-portions-inc]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const dayKey = e.currentTarget.dataset.portionsInc;
+      const [w,i] = dayKey.split('_');
+      const det = getRecipeDetails(effectiveRecipeName(parseInt(w,10), i));
+      const base = det ? parsePortionsBase(det.porzioni) : null;
+      const current = state.dayPortions[dayKey] || base || 1;
+      state.dayPortions[dayKey] = current + 1;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-portions-dec]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const dayKey = e.currentTarget.dataset.portionsDec;
+      const [w,i] = dayKey.split('_');
+      const det = getRecipeDetails(effectiveRecipeName(parseInt(w,10), i));
+      const base = det ? parsePortionsBase(det.porzioni) : null;
+      const current = state.dayPortions[dayKey] || base || 1;
+      state.dayPortions[dayKey] = Math.max(1, current - 1);
+      persist(); render();
+    });
+  });
   document.querySelectorAll('[data-toggle-assignee]').forEach(btn=>{
     btn.addEventListener('click', e=>{ toggleShopAssignee(e.currentTarget.dataset.toggleAssignee); });
   });
@@ -2004,11 +2078,12 @@ function attachHandlers(){
   document.querySelectorAll('[data-mancanti-in-spesa]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const recipeName = e.currentTarget.dataset.mancantiInSpesa;
+      const ratio = parseFloat(e.currentTarget.dataset.mancantiRatio) || 1;
       getIngredientsFor(recipeName).filter(it => !hasPantryStock(it.ingrediente)).forEach(it=>{
         const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
         if(already) return;
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-        state.shopExtras[id] = { ingrediente: it.ingrediente, qta: it.qta || '' };
+        state.shopExtras[id] = { ingrediente: it.ingrediente, qta: scaleQtyText(it.qta, ratio) || '' };
       });
       state.tab = 'spesa';
       window.location.hash = 'spesa';
