@@ -1155,13 +1155,17 @@ function renderDayCard(weekIdx, i, pos, weekDates){
 // 7 giorni, e i controlli per generare/rigenerare (e, per le extra, rimuovere).
 function renderWeekSection(weekIdx){
   const weekDates = weekDatesFor(weekIdx);
-  // Nella settimana corrente non ha senso mostrare i giorni già passati: si
-  // parte da oggi. Nelle settimane extra (sempre future) si mostrano tutti.
+  // Nella settimana corrente non ha senso mostrare le card dei giorni già
+  // passati: si parte da oggi. Nelle settimane extra (sempre future) si
+  // mostrano tutte. La striscia delle iconcine invece resta sull'intera
+  // settimana (anche i giorni passati), per avere sempre colpo d'occhio
+  // sulla variazione di categoria durante tutta la settimana.
   const startPos = weekIdx === 0 ? (findTodayPos() ?? 0) : 0;
-  const positions = [];
-  for(let pos=startPos; pos<WEEK_DISPLAY_ORDER.length; pos++) positions.push(pos);
+  const allPositions = [];
+  for(let pos=0; pos<WEEK_DISPLAY_ORDER.length; pos++) allPositions.push(pos);
+  const positions = allPositions.filter(pos => pos >= startPos);
 
-  const strip = positions.map(pos=>{
+  const strip = allPositions.map(pos=>{
     const i = WEEK_DISPLAY_ORDER[pos];
     const d = DATA.week1[i];
     const cat = effectiveCategoria(weekIdx, i);
