@@ -1478,7 +1478,7 @@ function renderPrep(){
     <div class="recipe-card-wrap">
       <div class="recipe-card" data-toggle-recipe="${escapeAttr(r.nome)}">
         <div>
-          <div class="recipe-name">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
+          <div class="day-menu">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
           <span class="day-time">${escapeHtml(r.tempo)}</span>
         </div>
         <div class="recipe-card-side">
