@@ -923,7 +923,7 @@ function renderRecipeEditModal(){
             <button type="button" class="btn is-chip" id="edit-add-step-row">+ aggiungi passaggio</button>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">📝 Da ricordare</div>
+            <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Da ricordare</div>
             <input type="text" id="edit-ricordare" value="${escapeAttr((det && det.ricordare) || '')}">
           </div>
           <div class="filter-group">
@@ -1099,8 +1099,8 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
         det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
       ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
-    const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title">📝 Note</div>${noteExtra}</div>` : '';
-    const linkHtml = det && det.link ? `<div class="detail-section"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a></div>` : '';
+    const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
+    const linkHtml = det && det.link ? `<div class="detail-section is-edit"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a></div>` : '';
     const addFormHtml = det ? '' : `
       <div class="add-ing-form">
         <input type="text" placeholder="Ingrediente" data-ning="${dayKey}">
@@ -1115,8 +1115,8 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       ${dayMetaHtml}
       ${soakChip}
       ${ingHtml}
-      ${noteBox}
       ${stepsHtml}
+      ${noteBox}
       ${linkHtml}
       ${addFormHtml}
       ${editRecipeBtn}
@@ -1496,8 +1496,8 @@ function renderPrep(){
           det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
           det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
         ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
-      const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title">📝 Note</div>${noteExtra}</div>` : '';
-      const linkHtml = det && det.link ? `<div class="detail-section"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a></div>` : '';
+      const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
+      const linkHtml = det && det.link ? `<div class="detail-section is-edit"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a></div>` : '';
       const addFormHtml = det ? '' : `
         <div class="add-ing-form">
           <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(r.nome)}">
@@ -1508,8 +1508,8 @@ function renderPrep(){
       <div class="detail-box">
         ${tagsHtml}
         ${ingHtml}
-        ${noteBox}
         ${stepsHtml}
+        ${noteBox}
         ${linkHtml}
         ${addFormHtml}
         <button class="btn is-chip" data-open-recipe-edit="${escapeAttr(r.nome)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>
