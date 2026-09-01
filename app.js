@@ -112,15 +112,16 @@ function renderIngredientsSection(ing, recipeName){
 // automatico quando si spunta un articolo in Spesa. Quantità = un contatore
 // numerico (stepper +/- in UI); finché non è impostata (o è 0) la voce non
 // compare nell'elenco.
-function upsertPantryItem(nome, luogo){
+function upsertPantryItem(nome, luogo, amount){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
   const key = trimmedName.toLowerCase();
   const existing = state.pantryItems[key];
   const currentQty = (existing && typeof existing.qty === 'number') ? existing.qty : 0;
+  const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
   state.pantryItems[key] = {
     nome: trimmedName,
-    qty: currentQty + 1,
+    qty: currentQty + add,
     luogo: (existing && existing.luogo) || luogo || 'dispensa'
   };
 }
@@ -224,6 +225,8 @@ const state = {
   shopChecked: {},
   shopDismissed: {},
   shopExtras: {},
+  shopQty: {},
+  shopQtyEditingKey: null,
   shopView: 'giorno',
   addIngModalOpen: false,
   pantryAddModalOpen: false,
@@ -426,6 +429,7 @@ function persist(){
       shopChecked: state.shopChecked,
       shopDismissed: state.shopDismissed,
       shopExtras: state.shopExtras,
+      shopQty: state.shopQty,
       pantryChecked: state.pantryChecked,
       shopView: state.shopView,
       weekOverrides: state.weekOverrides,
@@ -1277,16 +1281,26 @@ function renderSpesa(){
 
   function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked){
     const checked = forcedChecked !== undefined ? forcedChecked : isItemChecked(keys, ingrediente);
+    const rowKey = keys.join(',');
+    const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
+    const editingQty = state.shopQtyEditingKey === rowKey;
     return `
     <div class="shop-item-row">
       <label class="shop-item ${checked?'checked':''}">
-        <input type="checkbox" data-shop-keys="${keys.join(',')}" data-shop-name="${escapeAttr(ingrediente)}" ${checked?'checked':''}>
+        <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" ${checked?'checked':''}>
         <span>
           <span class="item-name">${escapeHtml(ingrediente)}</span>
           <span class="item-detail">${escapeHtml(qta||'')}${subtitle ? ' · ' + escapeHtml(subtitle) : ''}${note ? ' · ' + escapeHtml(note) : ''}</span>
         </span>
       </label>
-      <button class="btn-remove" data-shop-remove="${keys.join(',')}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+      <span class="qty-stepper" title="Quantità da prendere">
+        <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" aria-label="Diminuisci quantità">−</button>
+        ${editingQty
+          ? `<input type="number" min="1" class="qty-input" value="${qty}" data-shop-qty-edit="${escapeAttr(rowKey)}">`
+          : `<span class="qty-num" data-shop-qty-show="${escapeAttr(rowKey)}">${qty}</span>`}
+        <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" aria-label="Aumenta quantità">+</button>
+      </span>
+      <button class="btn-remove" data-shop-remove="${rowKey}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
 
@@ -1348,7 +1362,7 @@ function renderSpesa(){
         : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`;
       return `
       <div class="shop-day-group">
-        <div class="shop-day-title"><span class="font-weight-bold">${escapeHtml(name)}</span>${escapeHtml(giorno)} ${escapeHtml(dateLabel)}</div>
+        <div class="shop-day-title"><span class="font-weight-bold">${escapeHtml(name)}</span>${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)}</div>
         ${rows}
       </div>`;
     }).join('');
@@ -1730,12 +1744,52 @@ function attachHandlers(){
 
   document.querySelectorAll('.shop-item input[type=checkbox]').forEach(cb=>{
     cb.addEventListener('change', e=>{
-      const keys = e.target.dataset.shopKeys.split(',');
+      const rowKey = e.target.dataset.shopKeys;
+      const keys = rowKey.split(',');
       keys.forEach(k=>{ state.shopChecked[k] = e.target.checked; });
-      if(e.target.checked) upsertPantryItem(e.target.dataset.shopName, 'dispensa');
+      if(e.target.checked){
+        const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
+        upsertPantryItem(e.target.dataset.shopName, 'dispensa', qty);
+      }
       persist(); render();
     });
   });
+  document.querySelectorAll('[data-shop-qty-inc]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.shopQtyInc;
+      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : 1;
+      state.shopQty[key] = current + 1;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-shop-qty-dec]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.shopQtyDec;
+      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : 1;
+      state.shopQty[key] = Math.max(1, current - 1);
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-shop-qty-show]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      state.shopQtyEditingKey = e.currentTarget.dataset.shopQtyShow;
+      render();
+    });
+  });
+  const shopQtyEditInput = document.querySelector('[data-shop-qty-edit]');
+  if(shopQtyEditInput){
+    shopQtyEditInput.focus();
+    shopQtyEditInput.select();
+    const commitShopQtyEdit = ()=>{
+      const key = shopQtyEditInput.dataset.shopQtyEdit;
+      const n = parseInt(shopQtyEditInput.value, 10);
+      state.shopQty[key] = Number.isNaN(n) ? 1 : Math.max(1, n);
+      state.shopQtyEditingKey = null;
+      persist(); render();
+    };
+    shopQtyEditInput.addEventListener('blur', commitShopQtyEdit);
+    shopQtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') shopQtyEditInput.blur(); });
+  }
   const moveToPantryBtn = document.getElementById('move-checked-to-pantry');
   if(moveToPantryBtn){
     // La dispensa è già aggiornata voce per voce alla spunta (sopra): qui
