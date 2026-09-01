@@ -1424,7 +1424,7 @@ function renderSpesa(){
 
   return `
     <h2 class="section-title">Spesa</h2>
-    <p class="section-sub">Si aggiorna in automatico in base al menù attuale — spuntare un articolo lo aggiunge anche in Dispensa</p>
+    <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa parte già spuntato</p>
     ${missingBanner}
     <div class="view-toggle">
       <button class="btn is-outline view-btn ${state.shopView==='reparto'?'active':''}" data-shop-view="reparto">Per reparto</button>
@@ -1433,7 +1433,11 @@ function renderSpesa(){
     <div class="shop-progress">${done} / ${total} presi</div>
     <button class="btn is-ghost reset-btn" id="reset-shop">Svuota spunte</button>
     ${body}
-    ${done ? `<button class="btn is-solid is-block btn-primary-flat" id="move-checked-to-pantry" style="margin-top:16px;">Sposta ${done} spuntati in dispensa</button>` : ''}
+    ${done ? `
+    <div class="shop-checked-actions">
+      <button class="btn is-outline" id="delete-checked-shop">Elimina ${done} spuntati</button>
+      <button class="btn is-solid btn-primary-flat" id="move-checked-to-pantry">Sposta ${done} in dispensa</button>
+    </div>` : ''}
     ${addIngModal}
     <button class="btn is-solid is-icon fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
   `;
@@ -1756,13 +1760,10 @@ function attachHandlers(){
 
   document.querySelectorAll('.shop-item input[type=checkbox]').forEach(cb=>{
     cb.addEventListener('change', e=>{
-      const rowKey = e.target.dataset.shopKeys;
-      const keys = rowKey.split(',');
-      keys.forEach(k=>{ state.shopChecked[k] = e.target.checked; });
-      if(e.target.checked){
-        const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
-        upsertPantryItem(e.target.dataset.shopName, 'dispensa', qty);
-      }
+      // La spunta segna solo "preso/da tenere d'occhio": non tocca la Dispensa.
+      // È "Elimina spuntati" (per quello che avevi già) o "Sposta in dispensa"
+      // (per quello appena comprato) a decidere cosa succede a quello spuntato.
+      e.target.dataset.shopKeys.split(',').forEach(k=>{ state.shopChecked[k] = e.target.checked; });
       persist(); render();
     });
   });
@@ -1802,14 +1803,27 @@ function attachHandlers(){
     shopQtyEditInput.addEventListener('blur', commitShopQtyEdit);
     shopQtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') shopQtyEditInput.blur(); });
   }
-  const moveToPantryBtn = document.getElementById('move-checked-to-pantry');
-  if(moveToPantryBtn){
-    // La dispensa è già aggiornata voce per voce alla spunta (sopra): qui
-    // serve solo a "chiudere" il giro spesa, togliendo dalla lista quello
-    // che hai già preso (spuntato a mano o già in dispensa).
-    moveToPantryBtn.addEventListener('click', ()=>{
+  const deleteCheckedBtn = document.getElementById('delete-checked-shop');
+  if(deleteCheckedBtn){
+    // Per quello che era già spuntato perché ce l'hai già (basilare o
+    // aggiornato a mano): esce dalla lista senza toccare la Dispensa.
+    deleteCheckedBtn.addEventListener('click', ()=>{
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
         cb.dataset.shopKeys.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+      });
+      persist(); render();
+    });
+  }
+  const moveToPantryBtn = document.getElementById('move-checked-to-pantry');
+  if(moveToPantryBtn){
+    // Per quello che hai appena comprato: aggiunge alla Dispensa (con la
+    // quantità impostata nello stepper) e poi esce dalla lista.
+    moveToPantryBtn.addEventListener('click', ()=>{
+      document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
+        const rowKey = cb.dataset.shopKeys;
+        const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
+        upsertPantryItem(cb.dataset.shopName, 'dispensa', qty);
+        rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
       });
       persist(); render();
     });
