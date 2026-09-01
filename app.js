@@ -743,7 +743,6 @@ function nextCookDayFor(user){
     for(let pos=0; pos<WEEK_DISPLAY_ORDER.length; pos++){
       if(weekIdx===0 && pos<startPos) continue;
       const i = WEEK_DISPLAY_ORDER[pos];
-      if(linkedSourceDayKey(weekIdx, i)) continue;
       const dayKey = `${weekIdx}_${i}`;
       if(state.cooks[dayKey] === user){
         return {
