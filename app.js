@@ -337,6 +337,7 @@ const state = {
   dayTempoCap: {0:'normale',1:'normale',2:'normale',3:'normale',4:'normale',5:'progetto',6:'progetto'}, // giorno (0=Lun..6=Dom) -> tempoBucket massimo consentito in pickWeekRecipes ('progetto' = nessun limite)
   userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "tocca a te cucinare" già chiuso per quel giorno
+  mealsDoneReminderDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel giorno (senza segnarlo mangiato)
   genSettingsOpen: false,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
@@ -548,6 +549,7 @@ function persist(){
       dayTempoCap: state.dayTempoCap,
       userColors: state.userColors,
       notifDismissed: state.notifDismissed,
+      mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
       cooks: state.cooks,
       shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
@@ -1418,6 +1420,33 @@ function renderMenu(){
     }
   }
 
+  // Promemoria "ieri hai mangiato X?": se il giorno di ieri (nella settimana
+  // corrente) aveva una ricetta e nessuno l'ha ancora segnata come mangiata,
+  // lo chiede appena si riapre l'app — altrimenti gli ingredienti restano in
+  // Dispensa anche se in realtà sono stati usati. Non copre il salto sabato
+  // (ieri = venerdì della settimana appena chiusa, non più raggiungibile).
+  let eatenReminderBanner = '';
+  {
+    const startPos = findTodayPos() ?? 0;
+    if(startPos > 0){
+      const yestPos = startPos - 1;
+      const yestI = WEEK_DISPLAY_ORDER[yestPos];
+      const yestKey = `0_${yestI}`;
+      const yestMealsDone = weekMealsDoneRef(0);
+      const yestName = effectiveRecipeName(0, yestI);
+      if(yestName && !yestMealsDone[yestI] && !state.mealsDoneReminderDismissed[yestKey]){
+        eatenReminderBanner = `
+        <div class="eaten-reminder-banner">
+          <span>Ieri (${escapeHtml(DATA.week1[yestI].giorno)}) hai mangiato <b>${escapeHtml(yestName)}</b>?</span>
+          <div class="eaten-reminder-actions">
+            <button type="button" class="btn is-solid mini-add-btn" data-toggle-done="${yestKey}">Sì, segna</button>
+            <button type="button" class="btn is-ghost" data-dismiss-eaten-reminder="${yestKey}">No</button>
+          </div>
+        </div>`;
+      }
+    }
+  }
+
   let doneModal = '';
   if(state.doneModalDay !== null){
     const [dw, di] = state.doneModalDay.split('_');
@@ -1491,6 +1520,7 @@ function renderMenu(){
     </div>` : '';
 
   return `
+    ${eatenReminderBanner}
     ${reminderBanner}
     ${weekSections}
     ${doneModal}
@@ -2312,6 +2342,12 @@ function attachHandlers(){
   document.querySelectorAll('[data-dismiss-reminder]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.notifDismissed[e.currentTarget.dataset.dismissReminder] = true;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-dismiss-eaten-reminder]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.mealsDoneReminderDismissed[e.currentTarget.dataset.dismissEatenReminder] = true;
       persist(); render();
     });
   });
