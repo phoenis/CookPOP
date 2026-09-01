@@ -335,6 +335,8 @@ const state = {
   weekOverridePicked: {},
   weekBaseline: null,
   dayTempoCap: {0:'normale',1:'normale',2:'normale',3:'normale',4:'normale',5:'progetto',6:'progetto'}, // giorno (0=Lun..6=Dom) -> tempoBucket massimo consentito in pickWeekRecipes ('progetto' = nessun limite)
+  userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
+  notifDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "tocca a te cucinare" già chiuso per quel giorno
   genSettingsOpen: false,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
@@ -475,6 +477,14 @@ function getCurrentUser(){
   return null;
 }
 const COOK_LABEL = { mara:'Mara', ste:'Ste' };
+// Tavolozza di colori preimpostati tra cui scegliere il proprio "colore identità"
+// (profilo in Impostazioni): solo toni abbastanza scuri/saturi da restare leggibili
+// col testo chiaro sopra (--bg) del cook-pill.
+const USER_COLOR_PRESETS = ['#e03c1e','#87282b','#c9702e','#b08d2b','#5a7517','#2e7d6b','#546e7a','#7a5a8a'];
+function applyUserColors(){
+  document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#e03c1e');
+  document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#87282b');
+}
 
 async function loadState(){
   // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
@@ -536,6 +546,8 @@ function persist(){
       dayLinkNotes: state.dayLinkNotes,
       dayPortions: state.dayPortions,
       dayTempoCap: state.dayTempoCap,
+      userColors: state.userColors,
+      notifDismissed: state.notifDismissed,
       cooks: state.cooks,
       shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
@@ -718,6 +730,33 @@ function allPlannedDays(){
   pushWeek(0);
   state.extraWeeks.forEach((w,wi)=> pushWeek(wi+1));
   return days;
+}
+// Prossimo giorno, a partire da oggi, in cui cucina "user": scorre la settimana
+// corrente (solo dal giorno di oggi in poi) e le settimane extra già pianificate,
+// nello stesso ordine di visualizzazione del Menù. daysFromToday è 0/1 solo per
+// la settimana corrente (usato dal promemoria "oggi/domani cucini tu"), altrimenti null.
+function nextCookDayFor(user){
+  const startPos = findTodayPos() ?? 0;
+  const weeksToCheck = [0, ...state.extraWeeks.map((_,wi)=>wi+1)];
+  for(const weekIdx of weeksToCheck){
+    const dates = weekDatesFor(weekIdx);
+    for(let pos=0; pos<WEEK_DISPLAY_ORDER.length; pos++){
+      if(weekIdx===0 && pos<startPos) continue;
+      const i = WEEK_DISPLAY_ORDER[pos];
+      if(linkedSourceDayKey(weekIdx, i)) continue;
+      const dayKey = `${weekIdx}_${i}`;
+      if(state.cooks[dayKey] === user){
+        return {
+          dayKey,
+          giorno: DATA.week1[i].giorno,
+          dateLabel: formatShortDate(dates[pos]),
+          name: effectiveRecipeName(weekIdx, i),
+          daysFromToday: weekIdx===0 ? (pos - startPos) : null
+        };
+      }
+    }
+  }
+  return null;
 }
 // Chiave stabile per un ingrediente di un giorno: invariata per la settimana 0
 // (compatibilità con le spunte/dismissioni già salvate), con prefisso di settimana
@@ -1261,6 +1300,26 @@ function renderDayCard(weekIdx, i, pos, weekDates){
 // Bottone icona "impostazioni generazione" (giorni veloci): riusato ovunque
 // si possa generare/rigenerare/aggiungere una settimana, così apre sempre
 // lo stesso modale (renderMenu -> genSettingsModal).
+// Pannello profilo nel foglio Impostazioni: nome, prossimo turno di cucina,
+// colore identità. Ricostruito ogni volta che il foglio si apre e a ogni
+// cambio colore (vedi wiring in fondo al file), non fa parte del render() principale.
+function renderProfilePanel(){
+  const user = getCurrentUser();
+  if(!user) return '';
+  const next = nextCookDayFor(user);
+  const nextLine = next
+    ? `Prossimo turno: <b>${escapeHtml(next.giorno)} ${escapeHtml(next.dateLabel)}</b>${next.name ? ' — '+escapeHtml(next.name) : ''}`
+    : 'Nessun turno di cucina in programma.';
+  const swatches = USER_COLOR_PRESETS.map(c=>`<button type="button" class="color-swatch${state.userColors[user]===c?' active':''}" style="background:${c}" data-user-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
+  return `
+    <div class="profile-panel">
+      <div class="profile-name">${escapeHtml(COOK_LABEL[user])}</div>
+      <p class="profile-next-cook">${nextLine}</p>
+      <div class="filter-group-label">Il tuo colore</div>
+      <div class="color-swatch-row">${swatches}</div>
+    </div>`;
+}
+
 function genSettingsButton(){
   return `<button class="btn is-icon" type="button" data-open-gen-settings aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
 }
@@ -1343,6 +1402,23 @@ function renderMenu(){
   const weekSections = [0, ...state.extraWeeks.map((_,n)=>n+1)]
     .map(weekIdx => renderWeekSection(weekIdx)).join('');
 
+  // Promemoria "oggi/domani cucini tu", solo in app (niente push): un
+  // banner chiudibile, che resta chiuso per quel giorno finché non lo si
+  // riapre (stessa logica di dismissione già usata per lo shopping).
+  let reminderBanner = '';
+  const currentUser = getCurrentUser();
+  if(currentUser){
+    const next = nextCookDayFor(currentUser);
+    if(next && (next.daysFromToday === 0 || next.daysFromToday === 1) && !state.notifDismissed[next.dayKey]){
+      const when = next.daysFromToday === 0 ? 'Oggi' : 'Domani';
+      reminderBanner = `
+      <div class="cook-reminder-banner">
+        <span>${when} cucini tu${next.name ? ': <b>'+escapeHtml(next.name)+'</b>' : ''}</span>
+        <button type="button" class="btn is-icon" data-dismiss-reminder="${next.dayKey}" aria-label="Chiudi promemoria">✕</button>
+      </div>`;
+    }
+  }
+
   let doneModal = '';
   if(state.doneModalDay !== null){
     const [dw, di] = state.doneModalDay.split('_');
@@ -1416,6 +1492,7 @@ function renderMenu(){
     </div>` : '';
 
   return `
+    ${reminderBanner}
     ${weekSections}
     ${doneModal}
     ${renderRecipeEditModal()}
@@ -1552,7 +1629,7 @@ function renderSpesa(){
       <div class="shop-day-group">
         <div class="shop-day-title">
           <span>${escapeHtml(store)}</span>
-          <button type="button" class="btn is-text shop-assignee-btn${assignee ? ' assigned' : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>
+          <button type="button" class="btn is-text shop-assignee-btn${assignee ? ' assigned assignee-'+assignee : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>
         </div>
         ${deptSections}
       </div>`;
@@ -2233,6 +2310,12 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-dismiss-reminder]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.notifDismissed[e.currentTarget.dataset.dismissReminder] = true;
+      persist(); render();
+    });
+  });
   document.querySelectorAll('[data-tempo-cap-day]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const day = parseInt(e.currentTarget.dataset.tempoCapDay, 10);
@@ -2836,12 +2919,28 @@ function goToTab(delta){
   const settingsBtn = document.getElementById('settings-btn');
   const settingsBackdrop = document.getElementById('settings-backdrop');
   const settingsClose = document.getElementById('settings-close');
+  const profilePanel = document.getElementById('profile-panel');
   if(!settingsBtn || !settingsBackdrop) return;
-  const open = ()=> settingsBackdrop.classList.add('open');
+  const open = ()=>{
+    if(profilePanel) profilePanel.innerHTML = renderProfilePanel();
+    settingsBackdrop.classList.add('open');
+  };
   const close = ()=> settingsBackdrop.classList.remove('open');
   settingsBtn.addEventListener('click', open);
   if(settingsClose) settingsClose.addEventListener('click', close);
   settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
+  if(profilePanel){
+    profilePanel.addEventListener('click', e=>{
+      const swatch = e.target.closest('[data-user-color]');
+      if(!swatch) return;
+      const user = getCurrentUser();
+      if(!user) return;
+      state.userColors[user] = swatch.dataset.userColor;
+      applyUserColors();
+      persist();
+      profilePanel.innerHTML = renderProfilePanel();
+    });
+  }
 })();
 
 // Drag&drop per scambiare le ricette di due giorni nel Menù (Pointer Events,
@@ -2917,6 +3016,7 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
   await firebaseReady;
   await waitForAuth();
   await loadState();
+  applyUserColors();
   if(DATA.forcedWeekBaseline && state.appliedForcedWeekVersion !== DATA.forcedWeekVersion){
     state.weekBaseline = DATA.forcedWeekBaseline;
     state.weekOverrides = {};
