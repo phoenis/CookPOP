@@ -105,9 +105,9 @@ function renderIngredientsSection(ing, recipeName){
   }).join('');
   const mancanti = ing.filter(it => !hasPantryStock(it.ingrediente));
   const mancantiBtn = mancanti.length
-    ? `<button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}">Manda ${mancanti.length} mancant${mancanti.length===1?'e':'i'} in spesa</button>`
+    ? `<button class="btn is-chip" data-mancanti-in-spesa="${escapeAttr(recipeName)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button>`
     : '';
-  return `<div class="detail-section"><div class="detail-section-title">🛒 Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
+  return `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
 }
 
 // Inventario unico (dispensa/ripostiglio/frigo/freezer distinti solo dal
@@ -909,7 +909,7 @@ function renderRecipeEditModal(){
             <button type="button" class="btn is-chip" id="edit-add-ing-row">+ aggiungi ingrediente</button>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">👩🏻‍🍳 Procedimento</div>
+            <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div>
             <div id="edit-step-list">${stepRowsHtml}</div>
             <button type="button" class="btn is-chip" id="edit-add-step-row">+ aggiungi passaggio</button>
           </div>
@@ -1078,7 +1078,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         ${rec.pianificazione!=='nessuna' ? `<span class="tag">📅 ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
       </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
     const stepsHtml = det && det.procedimento && det.procedimento.length
-      ? `<div class="detail-section"><div class="detail-section-title">👩🏻‍🍳 Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+      ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
       : '';
     const noteExtra = det ? [
         det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
@@ -1471,7 +1471,7 @@ function renderPrep(){
         </div>`;
       const ingHtml = renderIngredientsSection(ing, r.nome);
       const stepsHtml = det && det.procedimento && det.procedimento.length
-        ? `<div class="detail-section"><div class="detail-section-title">👩🏻‍🍳 Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+        ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
         : '';
       const noteExtra = det ? [
           det.porzioni ? `<b>Porzioni:</b> ${escapeHtml(det.porzioni)}` : '',
@@ -1613,8 +1613,8 @@ function renderPrep(){
 // riusato per il flag staple così i due toggle si comportano allo stesso modo.
 function stapleToggleInner(active){
   return active
-    ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Ce l\'ho di solito'
-    : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Non sempre in casa';
+    ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Di solito c\'è'
+    : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2"></path></svg> Non sempre in casa';
 }
 
 function renderDispensa(){

@@ -69,6 +69,8 @@
     --padding-block: var(--padding-medium);
     --padding-inline: var(--padding-xsmall);
 
+    --gap-icon: 0.3rem;
+
     /* sfocatura dietro le modali */
     --blur-modal: 3px;
 
@@ -110,7 +112,7 @@
      del componente (es. .qty-btn) resta solo per dimensioni/dettagli che non
      fanno parte della variante. */
   .btn{
-    display:inline-flex; align-items:center; justify-content:center; gap:0.375rem;
+    display:flex; align-items:center; justify-content:center; align-items: center; gap:var(--gap-icon);
     padding: 0.6em 1em;
     font-size: 1rem;
     font-weight:var(--weight-medium);
@@ -258,14 +260,15 @@ height: 100%;}
   .done-ing-row.untracked{ color:var(--ink-light); }
   .done-ing-row .done-ing-hint{ font-size:var(--text-xsmall); color:var(--ink-light); font-style:italic; }
 
-  .detail-box{ margin-top:calc(-1 * var(--radius-modal)); padding:var(--padding-inline); background:var(--surface); border-radius:var(--radius-modal); }
+  .detail-box{ margin-top:calc(-1 * var(--radius-modal)); padding:var(--padding-inline); background:var(--surface); border-radius:var(--radius-modal); font-size: var(--text-small);}
   .day-card.today .detail-box {padding: 0px;}
   .detail-tags{ display:flex; flex-wrap:wrap; gap:0.3125rem; margin-bottom:0.5rem; }
   .ing-list{ list-style:none; padding:0; margin:0; }
   .ing-empty{ font-size:var(--text-xsmall); color:var(--ink-light); font-style:italic; margin-bottom:0.5rem; }
-  .detail-section{ padding:var(--padding-block) 0px; border-top:1px solid var(--line); }
+  .detail-section{ padding:var(--padding-large) 0px; border-top:1px solid var(--line); }
   .detail-section:first-child{ padding-top:0; margin-top:0; border-top:none; }
-  .detail-section-title{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-small); text-transform:uppercase; padding-bottom:0.375rem; margin-bottom:0.5rem; border-bottom:2px solid var(--line-strong); }
+  .detail-section-title{ font-family:var(--font-family); font-weight:var(--weight-bold); /* font-size:var(--text-small); */ text-transform:uppercase; padding-bottom:0.375rem; margin-bottom:0.5rem; border-bottom:2px solid var(--line-strong); gap:var(--gap-icon); display: flex; align-items: center;}
+  .detail-section-title svg{height: 1.3em; width: 1.3em;}
   .note-box{ background:rgba(var(--honey-rgb),0.09); border:1px solid rgba(var(--honey-rgb),0.25); border-radius:0; padding:0.5rem 0.625rem; border-top:1px solid rgba(var(--honey-rgb),0.25); }
   .detail-extra-note{ font-size:var(--text-xsmall); margin-bottom:0.25rem; line-height:1.4; }
   .detail-extra-note:last-child{ margin-bottom:0; }
