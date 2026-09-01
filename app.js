@@ -1609,6 +1609,14 @@ function renderPrep(){
   `;
 }
 
+// Stesso schema icona+testo del bottone "Mangiata/Da mangiare" in Menù,
+// riusato per il flag staple così i due toggle si comportano allo stesso modo.
+function stapleToggleInner(active){
+  return active
+    ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Ce l\'ho di solito'
+    : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Non sempre in casa';
+}
+
 function renderDispensa(){
   // Un'unica lista per dispensa/ripostiglio/frigo/freezer, distinti solo
   // dall'icona del luogo (si cambia toccandola). Si riempie da sola quando
@@ -1693,7 +1701,7 @@ function renderDispensa(){
             <input type="number" min="0" id="pantry-edit-qty" value="${editItem.qty}">
           </div>
           <div class="filter-group">
-            <button type="button" class="btn is-chip ${editItem.staple ? 'active' : ''}" id="pantry-edit-staple-toggle">🏠 Ce l'ho di solito in casa</button>
+            <button type="button" class="btn is-chip ${editItem.staple ? 'active' : ''}" id="pantry-edit-staple-toggle">${stapleToggleInner(!!editItem.staple)}</button>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -1722,7 +1730,7 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
-            <button type="button" class="btn is-chip" id="pantry-add-staple-toggle">🏠 Ce l'ho di solito in casa</button>
+            <button type="button" class="btn is-chip" id="pantry-add-staple-toggle">${stapleToggleInner(false)}</button>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -2343,7 +2351,11 @@ function attachHandlers(){
     pantryAddBtn.addEventListener('click', doAdd);
     nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
     // Non chiama render(): altrimenti il testo già digitato nel campo nome andrebbe perso.
-    if(stapleToggle) stapleToggle.addEventListener('click', ()=> stapleToggle.classList.toggle('active'));
+    if(stapleToggle) stapleToggle.addEventListener('click', ()=>{
+      const nowActive = !stapleToggle.classList.contains('active');
+      stapleToggle.classList.toggle('active', nowActive);
+      stapleToggle.innerHTML = stapleToggleInner(nowActive);
+    });
   }
   const dispensaFab = document.getElementById('dispensa-fab');
   if(dispensaFab) dispensaFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
