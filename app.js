@@ -248,6 +248,8 @@ const state = {
   weekOverrides: {},
   weekOverridePicked: {},
   weekBaseline: null,
+  quickDays: [0,1,2,3,4], // indici giorno (0=Lun..6=Dom) limitati a ricette veloci in pickWeekRecipes
+  genSettingsOpen: false,
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
   dayLinkNotes: {}, // giorno "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
@@ -445,6 +447,7 @@ function persist(){
       extraWeeks: state.extraWeeks,
       dayLinks: state.dayLinks,
       dayLinkNotes: state.dayLinkNotes,
+      quickDays: state.quickDays,
       cooks: state.cooks,
       shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
@@ -691,15 +694,16 @@ function pickWeekRecipes(){
   let prevCat = null;
 
   const WEEKDAY_TEMPO = ['express','veloce','normale']; // fino a 30-45 min
+  const quickDays = new Set(state.quickDays); // giorni (0=Lun..6=Dom) limitati a ricette veloci, configurabile dall'utente
 
   for(let day = 0; day < 7; day++){
-    const isWeekday = day <= 4; // 0=Lun ... 4=Ven, 5=Sab, 6=Dom
+    const isQuickDay = quickDays.has(day);
     // candidati non ancora usati, ordinati per preferenza: categoria diversa dal giorno prima
     // e categoria meno usata finora nella settimana
     let candidates = shuffled.filter(r => !usedNames.has(r.nome));
-    if(isWeekday){
+    if(isQuickDay){
       const limited = candidates.filter(r => WEEKDAY_TEMPO.includes(r.tempoBucket));
-      if(limited.length > 0) candidates = limited; // in settimana solo ricette fino a 30-45 min, se disponibili
+      if(limited.length > 0) candidates = limited; // solo ricette veloci in quel giorno, se disponibili
     }
     if(candidates.length === 0) candidates = shuffled; // esaurito il pool, riparto (raro)
 
@@ -1100,7 +1104,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
       ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
     const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-    const linkHtml = det && det.link ? `<div class="detail-section is-edit"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a></div>` : '';
+    const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
     const addFormHtml = det ? '' : `
       <div class="add-ing-form">
         <input type="text" placeholder="Ingrediente" data-ning="${dayKey}">
@@ -1108,6 +1112,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         <button class="btn is-solid" data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
       </div>`;
     const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
+    const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="detail-section is-edit">${linkHtml}${editRecipeBtn}</div>` : '';
     const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
     detailHtml = `
     <div class="detail-box">
@@ -1117,9 +1122,8 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       ${ingHtml}
       ${stepsHtml}
       ${noteBox}
-      ${linkHtml}
       ${addFormHtml}
-      ${editRecipeBtn}
+      ${sourceEditBox}
     </div>`;
   }
 
@@ -1176,13 +1180,24 @@ function renderWeekSection(weekIdx){
 
   const days = positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
+  const quickDaysHint = state.quickDays.length
+    ? `Ricette veloci (≤30–45 min) di ${state.quickDays.slice().sort((a,b)=>a-b).map(d=>DATA.week1[d].giorno.slice(0,3)).join(', ')}.`
+    : 'Nessun giorno limitato a ricette veloci.';
+  const genSettingsBtn = `<button class="btn is-icon is-outline" type="button" data-open-gen-settings aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 80a48 48 0 1 0 48 48a48.05 48.05 0 0 0-48-48m0 72a24 24 0 1 1 24-24a24 24 0 0 1-24 24m88-29.84q.06-2.16 0-4.32l14.92-18.64a8 8 0 0 0 1.48-7.06a107.6 107.6 0 0 0-10.88-26.25a8 8 0 0 0-6-3.93l-23.72-2.64q-1.48-1.56-3-3l-2.64-23.74a8 8 0 0 0-3.94-6a107.29 107.29 0 0 0-26.25-10.86a8 8 0 0 0-7.06 1.48L130.16 32q-2.16-.06-4.32 0L107.2 17.06a8 8 0 0 0-7.06-1.48a107.6 107.6 0 0 0-26.25 10.88a8 8 0 0 0-3.93 6l-2.64 23.72q-1.56 1.48-3 3l-23.74 2.64a8 8 0 0 0-6 3.94a107.71 107.71 0 0 0-10.86 26.25a8 8 0 0 0 1.48 7.06L40.16 118q-.06 2.16 0 4.32L25.06 148.8a8 8 0 0 0-1.48 7.06a107.6 107.6 0 0 0 10.88 26.25a8 8 0 0 0 6 3.93l23.72 2.64q1.48 1.56 3 3l2.64 23.74a8 8 0 0 0 3.94 6a107.71 107.71 0 0 0 26.25 10.86a8 8 0 0 0 7.06-1.48L125.84 216q2.16.06 4.32 0l18.64 14.92a8 8 0 0 0 7.06 1.48a107.6 107.6 0 0 0 26.25-10.88a8 8 0 0 0 3.93-6l2.64-23.72q1.56-1.48 3-3l23.74-2.64a8 8 0 0 0 6-3.94a107.29 107.29 0 0 0 10.86-26.25a8 8 0 0 0-1.48-7.06Z"></path></svg></button>`;
+
   const controls = weekIdx === 0 ? `
     <div class="generate-week-block">
-      <button class="btn is-outline" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg>Genera nuovo menù</button>
-      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. Da lunedì a venerdì solo ricette fino a 30–45 min.</p>
+      <div class="generate-week-row">
+        <button class="btn is-outline" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg>Genera nuovo menù</button>
+        ${genSettingsBtn}
+      </div>
+      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno. ${escapeHtml(quickDaysHint)}</p>
     </div>` : `
     <div class="generate-week-block is-added">
-      <button class="btn is-outline" data-generate-week="${weekIdx}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Rigenera questa settimana</button>
+      <div class="generate-week-row">
+        <button class="btn is-outline" data-generate-week="${weekIdx}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Rigenera questa settimana</button>
+        ${genSettingsBtn}
+      </div>
       <button class="btn is-outline color-delete" data-remove-week="${weekIdx}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Rimuovi settimana</button>
     </div>`;
 
@@ -1257,10 +1272,33 @@ function renderMenu(){
     </div>`;
   }
 
+  const genSettingsModal = state.genSettingsOpen ? `
+    <div class="filters-modal-backdrop" data-close-gen-settings>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Impostazioni generazione</h3>
+          <button class="btn is-icon filters-close-btn" data-close-gen-settings>✕</button>
+        </div>
+        <div class="filter-groups">
+          <div class="filter-group">
+            <div class="filter-group-label">Giorni con ricette veloci (≤30–45 min)</div>
+            <div class="chip-row">
+              ${DATA.week1.map((d,idx)=>`<button type="button" class="btn is-chip ${state.quickDays.includes(idx)?'active':''}" data-quick-day-chip="${idx}">${escapeHtml(d.giorno.slice(0,3))}</button>`).join('')}
+            </div>
+            <p class="section-sub" style="margin:0.5rem 0 0;">Nei giorni scelti la generazione preferisce ricette veloci — se sei in ferie togli i feriali, se il weekend è pieno aggiungilo.</p>
+          </div>
+        </div>
+        <div class="filters-modal-footer">
+          <button class="btn is-solid mini-add-btn" data-close-gen-settings>Fatto</button>
+        </div>
+      </div>
+    </div>` : '';
+
   return `
     ${weekSections}
     ${doneModal}
     ${renderRecipeEditModal()}
+    ${genSettingsModal}
     <div class="generate-week-block">
       <button class="btn is-solid" id="add-week">+ Aggiungi settimana</button>
       <p class="generate-week-hint">Pianifica un'altra settimana in più, con le stesse regole del menù generato.</p>
@@ -1497,22 +1535,22 @@ function renderPrep(){
           det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
         ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
       const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-      const linkHtml = det && det.link ? `<div class="detail-section is-edit"><a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a></div>` : '';
+      const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
       const addFormHtml = det ? '' : `
         <div class="add-ing-form">
           <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(r.nome)}">
           <input type="text" placeholder="Quantità" data-rnqta="${escapeAttr(r.nome)}">
           <button class="btn is-solid" data-add-ing-recipe="${escapeAttr(r.nome)}">+ aggiungi ingrediente</button>
         </div>`;
+      const editRecipeBtn = `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(r.nome)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>`;
       detail = `
       <div class="detail-box">
         ${tagsHtml}
         ${ingHtml}
         ${stepsHtml}
         ${noteBox}
-        ${linkHtml}
         ${addFormHtml}
-        <button class="btn is-chip" data-open-recipe-edit="${escapeAttr(r.nome)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>
+        <div class="detail-section is-edit">${linkHtml}${editRecipeBtn}</div>
       </div>`;
     }
     return `
@@ -1975,6 +2013,25 @@ function attachHandlers(){
   });
   const addWeekBtn = document.getElementById('add-week');
   if(addWeekBtn) addWeekBtn.addEventListener('click', ()=>{ addWeek(); });
+
+  document.querySelectorAll('[data-open-gen-settings]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.genSettingsOpen = true; render(); });
+  });
+  document.querySelectorAll('[data-close-gen-settings]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.genSettingsOpen = false;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-quick-day-chip]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const day = parseInt(e.currentTarget.dataset.quickDayChip, 10);
+      const idx = state.quickDays.indexOf(day);
+      if(idx === -1) state.quickDays.push(day); else state.quickDays.splice(idx, 1);
+      persist(); render();
+    });
+  });
 
   document.querySelectorAll('[data-reset-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
