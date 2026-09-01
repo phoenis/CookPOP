@@ -1452,6 +1452,16 @@ function renderSpesa(){
     if(state.shopDismissed[id]) return;
     flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
   });
+  // Ingredienti finiti in Dispensa (qty scesa a 0): la voce di Dispensa non
+  // viene mai cancellata quando arriva a 0, resta lì con la sua unità/luogo/
+  // categoria — quando la spunti e la sposti in Dispensa aggiorna quello
+  // stesso record invece di doverlo ricreare da capo.
+  Object.entries(state.pantryItems).forEach(([pantryKey, it])=>{
+    if(typeof it.qty !== 'number' || it.qty > 0) return;
+    const key = `oos_${pantryKey}`;
+    if(state.shopDismissed[key]) return;
+    flat.push({ key, ingrediente:it.nome, qta:'', dove:'', note:'', context:'Finiti in Dispensa', staple: isStaple(it.nome) });
+  });
 
   // I basilari già confermati - a mano o perché presenti in Dispensa - non
   // finiscono più in una sezione a parte: restano nella lista normale (per
@@ -1567,6 +1577,14 @@ function renderSpesa(){
       <div class="shop-day-group">
         <div class="shop-day-title">Aggiunti a mano</div>
         ${extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
+      </div>`;
+    }
+    const oosContext = mainFlat.filter(it => it.context === 'Finiti in Dispensa');
+    if(oosContext.length){
+      body += `
+      <div class="shop-day-group">
+        <div class="shop-day-title">Finiti in Dispensa</div>
+        ${oosContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
       </div>`;
     }
   }
