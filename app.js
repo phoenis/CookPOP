@@ -37,9 +37,9 @@ const GRAD_ORDER = ['preferita','ci-piace','ogni-tanto','da-provare'];
 const ATTREZZ_LABEL = { 'Padella':'Padella', 'Pentola':'Pentola', 'Forno':'Forno', 'Piastra':'Piastra', 'Moulinex':'Moulinex', 'Frullatore':'Frullatore', 'Fritto':'Fritto' };
 const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullatore','Fritto'];
 
-const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','utility','surgelati','altro'];
-const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', utility:'Utility', surgelati:'Surgelati', altro:'Altro' };
-const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', utility:'🧂', surgelati:'❄️', altro:'🛒' };
+const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro'];
+const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', altro:'Altro' };
+const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', altro:'🛒' };
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
@@ -59,26 +59,29 @@ const DEPT_RULES = [
   ['pane','pane'], ['farina','pane'], ['pasta','pane'], ['riso','pane'], ['lievito','pane'],
   // Le voci "peperoncino" e "peperon" (stem di peperone/peperoni) vanno controllate
   // prima di "pepe", altrimenti "pepe" le intercetta per prima essendo una sua sottostringa.
-  ['peperoncino','utility'], ['peperon','verdura'],
-  ['sale','utility'], ['olio','utility'], ['pepe','utility'], ['aceto','utility'], ['zucchero','utility'], ['spezie','utility'],
-  ['origano','utility'], ['rosmarino','utility'], ['timo','utility'], ['alloro','utility'], ['cannella','utility'], ['paprika','utility'], ['noce moscata','utility'],
+  ['peperoncino','dispensa'], ['peperon','verdura'],
+  ['sale','dispensa'], ['olio','dispensa'], ['pepe','dispensa'], ['aceto','dispensa'], ['zucchero','dispensa'], ['spezie','dispensa'],
+  ['origano','dispensa'], ['rosmarino','dispensa'], ['timo','dispensa'], ['alloro','dispensa'], ['cannella','dispensa'], ['paprika','dispensa'], ['noce moscata','dispensa'],
   ['senape','dispensa'], ['miele','dispensa'], ['pangrattato','dispensa'],
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
 ];
-// "Di solito li hai già" = reparto Utility (olio, sale, spezie, aceto...): stessa
-// classificazione già usata in Dispensa/Spesa per reparto, invece di un elenco di
-// parole chiave separato che poteva disallinearsi (es. basilico/aglio/prezzemolo
-// vi comparivano pur essendo classificati come verdura, non utility).
+// "Di solito li hai già" = flag manuale sulla voce di Dispensa (impostato
+// all'aggiunta o dalla modifica), indipendente dalla categoria/reparto: prima
+// era dedotto dalla categoria "Utility", ma così un ingrediente restava legato
+// a un solo reparto anche quando l'abitudine di averlo in casa non c'entrava
+// nulla con dove si compra. Un ingrediente mai aggiunto a Dispensa non è
+// considerato basilare finché non lo si spunta la prima volta.
 function isStaple(ingrediente){
-  return classifyDept(ingrediente) === 'utility';
+  const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
+  return !!(it && it.staple);
 }
 
 // Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
 // nome (non nome+quantità: altrimenti lo stesso ingrediente con una qta scritta
 // in modo leggermente diverso da una ricetta all'altra compariva due volte).
 
-// Un utility (basilare) parte "confermato" - quindi già spuntato in Spesa, al
+// Un basilare (staple) parte "confermato" - quindi già spuntato in Spesa, al
 // suo posto nella lista normale - se lo si ha già in dispensa; se l'utente ha
 // toccato la spunta a mano, quella scelta vince sempre.
 function hasPantryStock(ingrediente){
@@ -112,17 +115,20 @@ function renderIngredientsSection(ing, recipeName){
 // automatico quando si spunta un articolo in Spesa. Quantità = un contatore
 // numerico (stepper +/- in UI); finché non è impostata (o è 0) la voce non
 // compare nell'elenco.
-function upsertPantryItem(nome, luogo, amount){
+function upsertPantryItem(nome, luogo, amount, staple){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
   const key = trimmedName.toLowerCase();
   const existing = state.pantryItems[key];
   const currentQty = (existing && typeof existing.qty === 'number') ? existing.qty : 0;
   const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
+  const isStapleFlag = staple !== undefined ? !!staple : !!(existing && existing.staple);
   state.pantryItems[key] = {
     nome: trimmedName,
     qty: currentQty + add,
-    luogo: (existing && existing.luogo) || luogo || 'dispensa'
+    luogo: (existing && existing.luogo) || luogo || 'dispensa',
+    ...((existing && existing.cat) ? { cat: existing.cat } : {}),
+    ...(isStapleFlag ? { staple: true } : {})
   };
 }
 
@@ -1266,9 +1272,9 @@ function renderSpesa(){
     flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
   });
 
-  // Gli utility (basilari) già confermati - a mano o perché presenti in
-  // Dispensa - non finiscono più in una sezione a parte: restano nella lista
-  // normale (per giorno/per reparto) ma già spuntati, coerente con isStapleConfirmed.
+  // I basilari già confermati - a mano o perché presenti in Dispensa - non
+  // finiscono più in una sezione a parte: restano nella lista normale (per
+  // giorno/per reparto) ma già spuntati, coerente con isStapleConfirmed.
   const mainFlat = flat;
 
   function isItemChecked(keys, ingrediente){
@@ -1682,6 +1688,9 @@ function renderDispensa(){
             <div class="filter-group-label">Quantità</div>
             <input type="number" min="0" id="pantry-edit-qty" value="${editItem.qty}">
           </div>
+          <div class="filter-group">
+            <button type="button" class="btn is-chip ${editItem.staple ? 'active' : ''}" id="pantry-edit-staple-toggle">🏠 Ce l'ho di solito in casa</button>
+          </div>
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-ghost reset-btn" id="pantry-edit-delete">Elimina</button>
@@ -1707,6 +1716,9 @@ function renderDispensa(){
             <select id="pantry-add-luogo">
               ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
             </select>
+          </div>
+          <div class="filter-group">
+            <button type="button" class="btn is-chip" id="pantry-add-staple-toggle">🏠 Ce l'ho di solito in casa</button>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -2307,14 +2319,17 @@ function attachHandlers(){
   if(pantryAddBtn){
     const nameInput = document.getElementById('pantry-add-name');
     const luogoSelect = document.getElementById('pantry-add-luogo');
+    const stapleToggle = document.getElementById('pantry-add-staple-toggle');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
-      upsertPantryItem(nameInput.value, luogoSelect.value);
+      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'));
       state.pantryAddModalOpen = false;
       persist(); render();
     };
     pantryAddBtn.addEventListener('click', doAdd);
     nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
+    // Non chiama render(): altrimenti il testo già digitato nel campo nome andrebbe perso.
+    if(stapleToggle) stapleToggle.addEventListener('click', ()=> stapleToggle.classList.toggle('active'));
   }
   const dispensaFab = document.getElementById('dispensa-fab');
   if(dispensaFab) dispensaFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
@@ -2369,6 +2384,16 @@ function attachHandlers(){
       if(it){
         const n = parseInt(e.target.value, 10);
         it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+        persist(); render();
+      }
+    });
+  }
+  const editStapleToggle = document.getElementById('pantry-edit-staple-toggle');
+  if(editStapleToggle){
+    editStapleToggle.addEventListener('click', ()=>{
+      const it = state.pantryItems[state.pantryEditKey];
+      if(it){
+        it.staple = !it.staple;
         persist(); render();
       }
     });
@@ -2572,6 +2597,23 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
       if(it && it.luogo === 'utility') it.luogo = 'dispensa';
     });
     state.pantryUtilityLuogoMigrated = true;
+    persist();
+  }
+  // Una tantum: anche il reparto "Utility" come categoria viene rimosso, sostituito
+  // dal flag manuale "staple" (vedi isStaple) impostabile all'aggiunta/modifica in
+  // Dispensa. Le voci già categorizzate a mano come Utility, o il cui nome
+  // corrispondeva alle vecchie parole chiave utility, ricevono staple:true per non
+  // perdere il comportamento "di solito ce l'ho già" nella lista della spesa.
+  if(!state.pantryStapleMigrated){
+    const OLD_UTILITY_KEYWORDS = ['peperoncino','sale','olio','pepe','aceto','zucchero','spezie','origano','rosmarino','timo','alloro','cannella','paprika','noce moscata'];
+    Object.keys(state.pantryItems).forEach(key=>{
+      const it = state.pantryItems[key];
+      if(!it) return;
+      const wasUtilityCat = it.cat === 'utility';
+      if(wasUtilityCat || OLD_UTILITY_KEYWORDS.some(kw => key.includes(kw))) it.staple = true;
+      if(wasUtilityCat) delete it.cat;
+    });
+    state.pantryStapleMigrated = true;
     persist();
   }
   const todayPos = findTodayPos();
