@@ -207,14 +207,18 @@ function upsertPantryItem(nome, luogo, amount, staple, unit){
   const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
   const isStapleFlag = staple !== undefined ? !!staple : !!(existing && existing.staple);
   const finalUnit = unit !== undefined ? unit : (existing && existing.unit) || '';
+  const newQty = currentQty + add;
   state.pantryItems[key] = {
     nome: trimmedName,
-    qty: currentQty + add,
+    qty: newQty,
     luogo: (existing && existing.luogo) || luogo || 'dispensa',
     ...((existing && existing.cat) ? { cat: existing.cat } : {}),
     ...(isStapleFlag ? { staple: true } : {}),
     ...(finalUnit ? { unit: finalUnit } : {})
   };
+  // Torna in scorta: il flag "da comprare" ha esaurito il suo scopo, si
+  // azzera così una futura scorta a 0 richiede una nuova segnalazione esplicita.
+  if(newQty > 0) delete state.pantryToBuy[key];
 }
 
 // Rinominare cambia anche la chiave (derivata dal nome): se il nuovo nome
@@ -330,6 +334,8 @@ const state = {
   pantryEditingKey: null,
   pantryLuogoPicker: null,
   pantryFinishedOpen: false,
+  pantryToBuy: {}, // pantryKey -> true, ingredienti finiti segnati esplicitamente "da comprare" (solo questi entrano in Spesa)
+  pantryFinishedSelected: {}, // pantryKey -> true, selezione in corso nell'accordion "Finiti" (non persistita: si azzera a ogni sessione)
   pantryEditKey: null,
   weekOverrides: {},
   weekOverridePicked: {},
@@ -550,6 +556,7 @@ function persist(){
       userColors: state.userColors,
       notifDismissed: state.notifDismissed,
       mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
+      pantryToBuy: state.pantryToBuy,
       cooks: state.cooks,
       shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
@@ -1563,12 +1570,16 @@ function renderSpesa(){
     if(state.shopDismissed[id]) return;
     flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
   });
-  // Ingredienti finiti in Dispensa (qty scesa a 0): la voce di Dispensa non
-  // viene mai cancellata quando arriva a 0, resta lì con la sua unità/luogo/
-  // categoria — quando la spunti e la sposti in Dispensa aggiorna quello
-  // stesso record invece di doverlo ricreare da capo.
+  // Ingredienti finiti in Dispensa (qty scesa a 0): entrano in Spesa solo se
+  // segnati esplicitamente "da comprare" dall'accordion Finiti in Dispensa
+  // (non automaticamente al solo scendere a 0, per non intasare la lista con
+  // cose che magari non servono subito). La voce di Dispensa non viene mai
+  // cancellata quando arriva a 0, resta lì con la sua unità/luogo/categoria —
+  // quando la spunti e la sposti in Dispensa aggiorna quello stesso record
+  // invece di doverlo ricreare da capo.
   Object.entries(state.pantryItems).forEach(([pantryKey, it])=>{
     if(typeof it.qty !== 'number' || it.qty > 0) return;
+    if(!state.pantryToBuy[pantryKey]) return;
     const key = `oos_${pantryKey}`;
     if(state.shopDismissed[key]) return;
     flat.push({ key, ingrediente:it.nome, qta:'', dove:'', note:'', context:'Finiti in Dispensa', staple: isStaple(it.nome) });
@@ -1619,7 +1630,7 @@ function renderSpesa(){
     // (o nel reparto merceologico vero, che a colpo d'occhio non spiegherebbe il perché sono lì).
     const classified = mainFlat.map(it=>{
       const dept = it.context === 'Finiti in Dispensa' ? 'finiti' : classifyDept(it.ingrediente);
-      const store = dept === 'verdura' ? 'Fruttivendolo' : (it.dove || 'Da definire');
+      const store = dept === 'verdura' ? 'Fruttivendolo' : (it.dove || 'Supermercato');
       return {...it, dept, store};
     });
     // unisco articoli identici (stesso ingrediente + stessa quantità) comparsi in più ricette
@@ -1654,11 +1665,14 @@ function renderSpesa(){
             ${byDept[dept].map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '))).join('')}
           </div>`).join('');
       const assignee = state.shopAssignees[store];
+      // "Supermercato" è il negozio di default (nessun "dove" specifico sull'ingrediente):
+      // la spesa lì non si assegna a nessuno per ora, quindi niente bottone Assegna.
+      const assigneeBtn = store === 'Supermercato' ? '' : `<button type="button" class="btn is-text shop-assignee-btn${assignee ? ' assigned assignee-'+assignee : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>`;
       return `
       <div class="shop-day-group">
         <div class="shop-day-title">
           <span>${escapeHtml(store)}</span>
-          <button type="button" class="btn is-text shop-assignee-btn${assignee ? ' assigned assignee-'+assignee : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>
+          ${assigneeBtn}
         </div>
         ${deptSections}
       </div>`;
@@ -1939,11 +1953,13 @@ function renderDispensa(){
     .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0);
 
-  function itemRow(it){
+  function itemRow(it, selectable){
     const editing = state.pantryEditingKey === it.key;
     const step = qtyStepFor(it.unit);
+    const selectCb = selectable ? `<input type="checkbox" class="finished-select-cb" data-finished-select="${escapeAttr(it.key)}" ${state.pantryFinishedSelected[it.key] ? 'checked' : ''} aria-label="Seleziona ${escapeAttr(it.nome)} per segnarlo da comprare">` : '';
     return `
     <div class="inv-item">
+      ${selectCb}
       <button class="btn is-icon luogo-picker-opt is-selected" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${LUOGO_ICON[it.luogo]}</button>
       ${state.pantryLuogoPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-luogo-picker-close></div>
@@ -2065,21 +2081,26 @@ function renderDispensa(){
       </div>
     </div>` : '';
 
-  // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
-  // qui restano fuori dalle viste normali per luogo/categoria e finiscono in un
-  // accordion a parte, chiuso di default — non è un luogo assegnabile, solo
-  // uno stato. Riusa itemRow: stesso stepper/edit/luogo-picker degli altri.
+  // Ingredienti a scorta 0: mai cancellati, qui restano fuori dalle viste
+  // normali per luogo/categoria e finiscono in un accordion a parte, chiuso
+  // di default — non è un luogo assegnabile, solo uno stato. Riusa itemRow:
+  // stesso stepper/edit/luogo-picker degli altri, con in più una checkbox per
+  // selezionarli e segnarli "da comprare" (solo così entrano in Spesa).
   const finishedItems = Object.entries(state.pantryItems)
     .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty <= 0)
     .sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
+  const selectedFinishedCount = finishedItems.filter(it=>state.pantryFinishedSelected[it.key]).length;
   const finishedSection = finishedItems.length ? `
     <div class="dept-block">
       <div class="dept-title finished-toggle${state.pantryFinishedOpen ? ' open' : ''}" data-toggle-finished>
         <span class="dept-icon">${DEPT_ICON.finiti}</span>${DEPT_LABEL.finiti} (${finishedItems.length})
         <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
       </div>
-      ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}
+      ${state.pantryFinishedOpen ? `
+        ${finishedItems.map(it=>itemRow(it, true)).join('')}
+        ${selectedFinishedCount ? `<button type="button" class="btn is-solid mark-to-buy-btn" id="mark-finished-to-buy">Segna da comprare (${selectedFinishedCount})</button>` : ''}
+      ` : ''}
     </div>` : '';
 
   return `
@@ -2730,6 +2751,26 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-finished-select]').forEach(cb=>{
+    cb.addEventListener('click', e=> e.stopPropagation());
+    cb.addEventListener('change', e=>{
+      const key = e.currentTarget.dataset.finishedSelect;
+      if(e.currentTarget.checked) state.pantryFinishedSelected[key] = true;
+      else delete state.pantryFinishedSelected[key];
+      render();
+    });
+  });
+  const markFinishedToBuyBtn = document.getElementById('mark-finished-to-buy');
+  if(markFinishedToBuyBtn){
+    markFinishedToBuyBtn.addEventListener('click', ()=>{
+      Object.keys(state.pantryFinishedSelected).forEach(key=>{
+        state.pantryToBuy[key] = true;
+        delete state.shopDismissed[`oos_${key}`];
+        delete state.pantryFinishedSelected[key];
+      });
+      persist(); render();
+    });
+  }
   document.querySelectorAll('[data-luogo-toggle]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.luogoToggle;
@@ -2750,10 +2791,12 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-qty-inc]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const it = state.pantryItems[e.currentTarget.dataset.qtyInc];
+      const key = e.currentTarget.dataset.qtyInc;
+      const it = state.pantryItems[key];
       if(!it) return;
       const step = qtyStepFor(it.unit);
       it.qty = Math.round(((typeof it.qty === 'number' ? it.qty : 0) + step) * 100) / 100;
+      if(it.qty > 0) delete state.pantryToBuy[key];
       persist(); render();
     });
   });
@@ -2777,10 +2820,12 @@ function attachHandlers(){
     qtyEditInput.focus();
     qtyEditInput.select();
     const commitQtyEdit = ()=>{
-      const it = state.pantryItems[qtyEditInput.dataset.qtyEdit];
+      const key = qtyEditInput.dataset.qtyEdit;
+      const it = state.pantryItems[key];
       if(it){
         const n = parseFloat(qtyEditInput.value);
         it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+        if(it.qty > 0) delete state.pantryToBuy[key];
       }
       state.pantryEditingKey = null;
       persist(); render();
