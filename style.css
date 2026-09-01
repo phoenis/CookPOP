@@ -131,7 +131,7 @@
   .btn.is-solid:hover{ background:var(--gold-dark); border-color:var(--gold-dark); }
 
   /* col bordo: azione secondaria/filtro, selezionabile (.active) */
-  .btn.is-outline{ background:var(--surface); border-color:var(--line); color:var(--ink-light); }
+  .btn.is-outline{ background:var(--surface); border-color:var(--line); }
   .btn.is-outline:hover, .btn.is-outline.color-delete:hover{ border-color:var(--gold-dark); color:var(--gold-dark); }
   .btn.is-outline.active{ background:var(--gold); border-color:var(--gold); color:var(--bg); }
 
@@ -160,8 +160,8 @@
   nav.tabs{ position:fixed; left:0; right:0; bottom:0; z-index:90; display:flex; background:var(--bg); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); }
   nav.tabs button{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; /* gap:0.1875rem; */ background:transparent; border:none; border-top:2px solid transparent; color:var(--ink-light); font-family:var(--font-family); font-weight:var(--weight-medium); font-size:var(--text-xsmall); /* text-transform:uppercase;  */padding:var(--space-xsmall) var(--space-xxsmall) var(--space-xxsmall); cursor:pointer; transition:color .15s ease, border-color .15s ease; }
   nav.tabs button .bn-icon{ height:1.3rem; width: 1.3rem; }
-  .btn svg{ display: flex; align-content:center; justify-content:center; height:1em; width:1em; }
-  .btn.is-icon svg{ height:1.3em; width:2.2em; color: var(--ink-light);}
+  .btn svg{ display: flex; align-content:center; justify-content:center; height:1em; width:1em; color: inherit;}
+  .btn.is-icon svg{ height:1.3em; width:2.2em; color: inherit;}
   nav.tabs button:hover{ color:var(--ink); }
   nav.tabs button.active{ color:var(--gold); border-top-color:var(--gold); }
   nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
@@ -177,7 +177,7 @@
   p.section-sub{ font-size:var(--text-small); color:var(--ink-light); margin:0 0 1rem; }
   .week-title{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-small); text-transform:uppercase; margin:0 0 0.25rem; }
   .btn-primary-flat{ font-size:var(--text-small); padding:var(--space-xsmall) var(--space-medium); text-align:left; }
-
+  .color-delete{color: var(--delete);}
   /* balance strip */
   .balance-strip{ display:flex; gap:0.375rem; margin-bottom:1.125rem; overflow-x:auto; padding-bottom:0.125rem; }
   .balance-chip{ flex:1; min-width:4rem; text-align:center; border-radius:var(--radius-pill); padding:var(--space-xsmall) var(--space-xxsmall) var(--space-xsmall); background:var(--surface-2); border: var(--border) solid transparent; font-family:var(--font-family); font-size:var(--text-xsmall); /* color:var(--ink-light);  */text-transform:uppercase; }
@@ -292,7 +292,7 @@ height: 100%;}
   .dept-block{ margin-top:var(--space-xsmall); }
   .dept-block:first-child{ margin-top:0; }
   .dept-title{ display:flex; align-items:center; gap:0.375rem; font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-small); text-transform:uppercase; letter-spacing:0.08em; padding:1rem 0 0.5rem; border-bottom:2px solid var(--line-strong); margin-bottom:0.125rem; }
-  .dept-icon{ font-size:var(--text-small); }
+  .dept-icon{ display: flex; align-items: center;}
   .shop-item-row{ display:flex; align-items:center; gap:0.125rem; border-bottom:1px dashed var(--line); }
   .shop-item-row:last-of-type{ border-bottom:none; }
   .shop-item{ flex:1; min-width:0; display:flex; align-items:flex-start; gap:0.625rem; padding:var(--space-xsmall) 0.125rem; font-size:var(--text-small); }
@@ -365,7 +365,6 @@ height: 100%;}
     justify-content: center;
   gap: var(--space-xsmall);}
   .generate-week-row{ display:flex; align-items:center; gap:var(--space-xsmall); }
-  .btn.is-outline.color-delete{ color: var(--delete); border-color: var(--delete);}
   .generate-week-hint{ font-size:var(--text-xsmall); color:var(--ink-light); margin:0.5rem 0 0; }
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
