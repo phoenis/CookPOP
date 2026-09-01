@@ -55,6 +55,15 @@ combinato non trova mai corrispondenza. Va bene solo quando è davvero un solo
 ingrediente usato in più modi (es. `"Limone (scorza e succo)"`) o una scelta
 tra alternative (es. `"Filetti di pesce bianco (orata, branzino o simili)"`).
 
+Per lo stesso motivo, usa un nome coerente con quello già usato altrove nel
+catalogo invece di inventarne uno nuovo per dettagli di preparazione (es.
+`"Pepe"` non `"Pepe nero"`, `"Prezzemolo"` non `"Prezzemolo fresco tritato"`):
+il taglio/formato si scrive nella quantità o nel procedimento, non nel nome —
+altrimenti la stessa cosa compare come due ingredienti diversi in Dispensa e
+il confronto "ce l'ho" si rompe. Fanno eccezione i casi in cui il nome
+descrive davvero un prodotto diverso da comprare (es. `"Ricotta"` vs
+`"Ricotta salata"`, `"Farina"` vs `"Farina di ceci"`).
+
 ## Tassonomia dei filtri
 
 Ogni ricetta ha, oltre ai campi originali del foglio:
