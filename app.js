@@ -351,6 +351,7 @@ const state = {
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
   pantryFinishedOpen: false,
+  shopFinitiOpen: false, // accordion "Finiti" nella vista Spesa Per reparto, chiuso di default
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
   weekOverrides: {},
@@ -1701,22 +1702,21 @@ function renderSpesa(){
 
   let body = '';
   if(state.shopView === 'reparto'){
-    // classifico ogni articolo per reparto, e per la verdura forzo il negozio Fruttivendolo.
+    // Solo reparto merceologico, niente più negozio: si compra dove capita.
     // I "Finiti in Dispensa" vanno nel loro reparto dedicato invece che in "Altro"
     // (o nel reparto merceologico vero, che a colpo d'occhio non spiegherebbe il perché sono lì)
     // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
-    // nel loro reparto vero, tra le sezioni normali del negozio.
+    // nel loro reparto vero, tra le sezioni normali.
     const classified = mainFlat.map(it=>{
       const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : classifyDept(it.ingrediente);
-      const store = dept === 'verdura' ? 'Fruttivendolo' : (it.dove || 'Supermercato');
-      return {...it, dept, store};
+      return {...it, dept};
     });
     // unisco articoli identici (stesso ingrediente + stessa quantità) comparsi in più ricette
     const merged = {};
     classified.forEach(it=>{
       const mergeKey = (it.ingrediente||'').trim().toLowerCase() + '|' + (it.qta||'').trim().toLowerCase();
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.note, dept: it.dept, store: it.store, keys: [it.key], contexts: [it.context] };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.note, dept: it.dept, keys: [it.key], contexts: [it.context] };
       } else {
         merged[mergeKey].keys.push(it.key);
         if(!merged[mergeKey].contexts.includes(it.context)) merged[mergeKey].contexts.push(it.context);
@@ -1724,44 +1724,44 @@ function renderSpesa(){
     });
     const mergedList = Object.values(merged);
 
-    const stores = {};
+    const byDept = {};
     mergedList.forEach(it=>{
-      if(!stores[it.store]) stores[it.store] = [];
-      stores[it.store].push(it);
+      if(!byDept[it.dept]) byDept[it.dept] = [];
+      byDept[it.dept].push(it);
     });
-    body = Object.entries(stores).map(([store, items])=>{
-      const byDept = {};
-      items.forEach(it=>{
-        if(!byDept[it.dept]) byDept[it.dept] = [];
-        byDept[it.dept].push(it);
-      });
-      const deptSections = DEPT_ORDER
-        .filter(dept => byDept[dept] && byDept[dept].length)
-        .map(dept => {
-          const isFinitiDept = dept === 'finiti';
-          const finitiCheckedCount = isFinitiDept ? byDept[dept].filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
-          return `
-          <div class="dept-block${isFinitiDept ? ' finished-shop-group' : ''}">
-            <div class="dept-title"><span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}</div>
-            ${byDept[dept].map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '))).join('')}
-            ${finitiCheckedCount ? `
-            <div class="finished-shop-actions">
-              <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${finitiCheckedCount})</button>
-              <button type="button" class="btn is-solid" data-finished-shop-addlist>Segna da comprare (${finitiCheckedCount})</button>
-            </div>` : ''}
-          </div>`;
-        }).join('');
-      const assignee = state.shopAssignees[store];
-      // "Supermercato" è il negozio di default (nessun "dove" specifico sull'ingrediente):
-      // la spesa lì non si assegna a nessuno per ora, quindi niente bottone Assegna.
-      const assigneeBtn = store === 'Supermercato' ? '' : `<button type="button" class="btn is-text shop-assignee-btn${assignee ? ' assigned assignee-'+assignee : ''}" data-toggle-assignee="${escapeAttr(store)}">${assignee ? escapeHtml(COOK_LABEL[assignee]) : 'Assegna'}</button>`;
+
+    // Alfabetico per nome reparto, ma "Altro" resta penultimo e "Finiti" ultimo.
+    const deptsPresent = DEPT_ORDER.filter(dept => byDept[dept] && byDept[dept].length);
+    const sortedDepts = deptsPresent.filter(d => d !== 'altro' && d !== 'finiti')
+      .sort((a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
+    if(deptsPresent.includes('altro')) sortedDepts.push('altro');
+    if(deptsPresent.includes('finiti')) sortedDepts.push('finiti');
+
+    body = sortedDepts.map(dept => {
+      const isFinitiDept = dept === 'finiti';
+      const items = byDept[dept];
+      const finitiCheckedCount = isFinitiDept ? items.filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
+      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '))).join('');
+      const finishedActions = finitiCheckedCount ? `
+        <div class="finished-shop-actions">
+          <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${finitiCheckedCount})</button>
+          <button type="button" class="btn is-solid" data-finished-shop-addlist>Segna da comprare (${finitiCheckedCount})</button>
+        </div>` : '';
+      if(isFinitiDept){
+        return `
+        <div class="dept-block finished-shop-group">
+          <div class="dept-title finished-toggle${state.shopFinitiOpen ? ' open' : ''}" data-toggle-shop-finiti>
+            <span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]} (${items.length})
+            <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+          </div>
+          ${state.shopFinitiOpen ? rowsHtml : ''}
+          ${finishedActions}
+        </div>`;
+      }
       return `
-      <div class="shop-day-group">
-        <div class="shop-day-title">
-          <span>${escapeHtml(store)}</span>
-          ${assigneeBtn}
-        </div>
-        ${deptSections}
+      <div class="dept-block">
+        <div class="dept-title"><span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}</div>
+        ${rowsHtml}
       </div>`;
     }).join('');
   } else {
@@ -2950,6 +2950,12 @@ function attachHandlers(){
   document.querySelectorAll('[data-pantry-view]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.pantryView = e.target.dataset.pantryView;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-toggle-shop-finiti]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.shopFinitiOpen = !state.shopFinitiOpen;
       render();
     });
   });
