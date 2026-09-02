@@ -347,9 +347,9 @@ height: 100%;}
   .dept-block:first-child{ margin-top:0; }
   .dept-title{ display:flex; align-items:center; gap:var(--gap-icon); font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-small); text-transform:uppercase; padding:1rem 0 0.5rem; border-bottom:var(--border) solid var(--line-strong); margin-bottom:0.125rem; }
   .dept-icon{ display: flex; align-items: center;}
-  .dept-title.finished-toggle{ cursor:pointer; }
+  .dept-title.finished-toggle, .shop-day-title.finished-toggle{ cursor:pointer; }
   .finished-chevron{ width:0.875em; height:0.875em; margin-left:auto; flex-shrink:0; transition:transform .15s ease; }
-  .dept-title.finished-toggle.open .finished-chevron{ transform:rotate(180deg); }
+  .dept-title.finished-toggle.open .finished-chevron, .shop-day-title.finished-toggle.open .finished-chevron{ transform:rotate(180deg); }
   .finished-select-cb{ width:1.125rem; height:1.125rem; flex-shrink:0; accent-color:var(--gold); }
   .mark-to-buy-btn{ width:100%; margin-top:var(--space-xsmall); }
   .shop-item-row{ display:flex; align-items:center; gap:0.125rem; border-bottom:1px dashed var(--line); }

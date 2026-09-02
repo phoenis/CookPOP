@@ -360,7 +360,8 @@ const state = {
   pantryLuogoPicker: null,
   pantryFinishedOpen: false,
   pantryFinishedSelected: {}, // pantryKey -> true, selezione in corso nell'accordion "Finiti" di Dispensa (non persistita)
-  shopFinitiOpen: false, // accordion "Finiti" nella vista Spesa Per reparto, chiuso di default
+  shopFinitiOpen: false, // accordion "Finiti", condiviso da Per reparto e Per giorno, chiuso di default
+  shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
   weekOverrides: {},
@@ -1777,10 +1778,15 @@ function renderSpesa(){
           ${finishedActions}
         </div>`;
       }
+      const sectionId = `reparto_${dept}`;
+      const isOpen = !state.shopSectionCollapsed[sectionId];
       return `
       <div class="dept-block">
-        <div class="dept-title"><span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}</div>
-        ${rowsHtml}
+        <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
+          <span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+        </div>
+        ${isOpen ? rowsHtml : ''}
       </div>`;
     }).join('');
   } else {
@@ -1789,32 +1795,45 @@ function renderSpesa(){
     const todayPos = findTodayPos() ?? 0;
     body = allPlannedDays()
       .filter(({weekIdx, i}) => weekIdx !== 0 || WEEK_DISPLAY_ORDER.indexOf(i) >= todayPos)
-      .map(({giorno,dateLabel,name})=>{
+      .map(({weekIdx,i,giorno,dateLabel,name})=>{
       const context = `${giorno} ${dateLabel} · ${name}`;
       const dayItems = mainFlat.filter(it => it.context === context);
       const rows = dayItems.length
         ? dayItems.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')
         : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`;
+      const sectionId = `giorno_${weekIdx}_${i}`;
+      const isOpen = !state.shopSectionCollapsed[sectionId];
       return `
       <div class="shop-day-group">
-        <div class="shop-day-title"><span class="font-weight-bold">${escapeHtml(name)}</span>${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)}</div>
-        ${rows}
+        <div class="shop-day-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
+          <span class="font-weight-bold">${escapeHtml(name)}</span>${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)}
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+        </div>
+        ${isOpen ? rows : ''}
       </div>`;
     }).join('');
     const genContext = mainFlat.filter(it => it.context === 'Ogni settimana');
     if(genContext.length){
+      const genOpen = !state.shopSectionCollapsed['giorno_ogni-settimana'];
       body += `
       <div class="shop-day-group">
-        <div class="shop-day-title">Ogni settimana</div>
-        ${genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
+        <div class="shop-day-title finished-toggle${genOpen ? ' open' : ''}" data-toggle-shop-section="giorno_ogni-settimana">
+          Ogni settimana
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+        </div>
+        ${genOpen ? genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('') : ''}
       </div>`;
     }
     const extraContext = mainFlat.filter(it => it.context === 'Aggiunti a mano');
     if(extraContext.length){
+      const extraOpen = !state.shopSectionCollapsed['giorno_aggiunti-a-mano'];
       body += `
       <div class="shop-day-group">
-        <div class="shop-day-title">Aggiunti a mano</div>
-        ${extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
+        <div class="shop-day-title finished-toggle${extraOpen ? ' open' : ''}" data-toggle-shop-section="giorno_aggiunti-a-mano">
+          Aggiunti a mano
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+        </div>
+        ${extraOpen ? extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('') : ''}
       </div>`;
     }
     // Chi è già stato segnato "da comprare" (vedi data-finished-shop-addlist)
@@ -1825,8 +1844,11 @@ function renderSpesa(){
       const oosCheckedCount = oosContext.filter(it => state.shopChecked[it.key]).length;
       body += `
       <div class="shop-day-group finished-shop-group">
-        <div class="shop-day-title">Finiti</div>
-        ${oosContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
+        <div class="shop-day-title finished-toggle${state.shopFinitiOpen ? ' open' : ''}" data-toggle-shop-finiti>
+          Finiti (${oosContext.length})
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+        </div>
+        ${state.shopFinitiOpen ? oosContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('') : ''}
         ${oosCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${oosCheckedCount})</button>
@@ -2984,6 +3006,13 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-shop-finiti]').forEach(el=>{
     el.addEventListener('click', ()=>{
       state.shopFinitiOpen = !state.shopFinitiOpen;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-toggle-shop-section]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      const id = e.currentTarget.dataset.toggleShopSection;
+      state.shopSectionCollapsed[id] = !state.shopSectionCollapsed[id];
       render();
     });
   });
