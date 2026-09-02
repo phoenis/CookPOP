@@ -1641,17 +1641,21 @@ function renderSpesa(){
       // Le quantità scalate valgono solo finché non è già stato spuntato:
       // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
       const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio);
-      flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, staple: isStaple(it.ingrediente) });
+      // contextShort: solo per il sottotitolo in Per reparto, dove non serve il
+      // nome intero del giorno né il mese — "Ven 11" basta per orientarsi nella
+      // settimana. "context" resta invariato: è anche la chiave con cui Per
+      // giorno ritrova gli ingredienti del suo giorno, non va accorciato.
+      flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, contextShort:`${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${name}`, staple: isStaple(it.ingrediente) });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
     const key = `gen_${idx}`;
     if(state.shopDismissed[key]) return;
-    flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:'Ogni settimana', staple: isStaple(it.ingrediente) });
+    flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:'Ogni settimana', contextShort:'Ogni settimana', staple: isStaple(it.ingrediente) });
   });
   Object.entries(state.shopExtras).forEach(([id, it])=>{
     if(state.shopDismissed[id]) return;
-    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
+    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', contextShort:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
   });
   // Ingredienti finiti in Dispensa (qty scesa a 0): la voce di Dispensa non
   // viene mai cancellata quando arriva a 0, resta lì con la sua unità/luogo/
@@ -1661,7 +1665,7 @@ function renderSpesa(){
     if(typeof it.qty !== 'number' || it.qty > 0) return;
     const key = `oos_${pantryKey}`;
     if(state.shopDismissed[key]) return;
-    flat.push({ key, ingrediente:it.nome, qta:'', dove:'', note:'', context:'Finiti in Dispensa', staple: isStaple(it.nome), confirmed: !!state.pantryConfirmedShop[pantryKey] });
+    flat.push({ key, ingrediente:it.nome, qta:'', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', staple: isStaple(it.nome), confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
 
   // I basilari già confermati - a mano o perché presenti in Dispensa - non
@@ -1730,10 +1734,10 @@ function renderSpesa(){
     classified.forEach(it=>{
       const mergeKey = (it.ingrediente||'').trim().toLowerCase() + '|' + (it.qta||'').trim().toLowerCase();
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.note, dept: it.dept, keys: [it.key], contexts: [it.context] };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.note, dept: it.dept, keys: [it.key], contexts: [it.contextShort] };
       } else {
         merged[mergeKey].keys.push(it.key);
-        if(!merged[mergeKey].contexts.includes(it.context)) merged[mergeKey].contexts.push(it.context);
+        if(!merged[mergeKey].contexts.includes(it.contextShort)) merged[mergeKey].contexts.push(it.contextShort);
       }
     });
     const mergedList = Object.values(merged);
