@@ -113,6 +113,27 @@ function isStaple(ingrediente){
   return !!(it && it.staple);
 }
 
+// Alcuni ingredienti nelle ricette sono generici ("Pasta corta") ma in
+// Dispensa ci sono i formati specifici (Fusilli, Penne...): se il nome esatto
+// non c'è, si controlla se c'è scorta di uno qualsiasi dei formati equivalenti,
+// prendendo il primo trovato con scorta > 0.
+const PANTRY_ALIAS_GROUPS = {
+  'pasta corta': ['fusilli','penne','pennette','rigatoni','mezze maniche','farfalle','sedani','sedanini','ditalini','tubetti','tortiglioni','pipe','conchiglie','conchiglioni','orecchiette','gomiti','caserecce','gemelli','pasta mista'],
+  'pasta lunga': ['spaghetti','spaghettoni','linguine','tagliatelle','bucatini','tonnarelli','fettuccine','vermicelli','capellini','trenette','pappardelle','trofie']
+};
+function resolvePantryItem(ingrediente){
+  const key = (ingrediente||'').trim().toLowerCase();
+  const direct = state.pantryItems[key];
+  if(direct) return direct;
+  const group = PANTRY_ALIAS_GROUPS[key];
+  if(!group) return null;
+  for(const alias of group){
+    const candidate = state.pantryItems[alias];
+    if(candidate && typeof candidate.qty === 'number' && candidate.qty > 0) return candidate;
+  }
+  return null;
+}
+
 // Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
 // nome (non nome+quantità: altrimenti lo stesso ingrediente con una qta scritta
 // in modo leggermente diverso da una ricetta all'altra compariva due volte).
@@ -121,7 +142,7 @@ function isStaple(ingrediente){
 // suo posto nella lista normale - se lo si ha già in dispensa; se l'utente ha
 // toccato la spunta a mano, quella scelta vince sempre.
 function hasPantryStock(ingrediente){
-  const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
+  const it = resolvePantryItem(ingrediente);
   return !!(it && typeof it.qty === 'number' && it.qty > 0);
 }
 
@@ -156,8 +177,7 @@ function toComparableUnit(value, unit){
 // riconosciuta e tracciata sulla voce di Dispensa — vedi UNIT_ORDER);
 // altrimenti 'in-casa' (semplice presenza, come prima di avere le unità).
 function pantryStatusFor(ingrediente, neededQtaText){
-  const key = (ingrediente||'').trim().toLowerCase();
-  const it = state.pantryItems[key];
+  const it = resolvePantryItem(ingrediente);
   if(!it || typeof it.qty !== 'number' || it.qty <= 0) return 'manca';
   if(!it.unit) return 'in-casa';
   const have = toComparableUnit(it.qty, it.unit);
