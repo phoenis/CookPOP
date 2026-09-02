@@ -2164,7 +2164,6 @@ function renderDispensa(){
         ${editing
           ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}"><span class="qty-unit">${escapeHtml(it.unit || 'pz')}</span>`
           : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty} ${escapeHtml(it.unit || 'pz')}</span>`}
-        <button class="qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
       </span>
     </div>`;
   }
@@ -3231,17 +3230,6 @@ function attachHandlers(){
       const it = state.pantryItems[e.currentTarget.dataset.luogoSet];
       if(it) it.luogo = e.currentTarget.dataset.luogoValue;
       state.pantryLuogoPicker = null;
-      persist(); render();
-    });
-  });
-  document.querySelectorAll('[data-qty-inc]').forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      const key = e.currentTarget.dataset.qtyInc;
-      const it = state.pantryItems[key];
-      if(!it) return;
-      const step = qtyStepFor(it.unit);
-      it.qty = Math.round(((typeof it.qty === 'number' ? it.qty : 0) + step) * 100) / 100;
-      if(it.qty > 0) delete state.pantryConfirmedShop[key];
       persist(); render();
     });
   });
