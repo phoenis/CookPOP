@@ -113,22 +113,70 @@ function isStaple(ingrediente){
   return !!(it && it.staple);
 }
 
+// Un nome ingrediente tipo "Scalogno o cipolla" o "Pasta corta (ditalini o
+// mista)" descrive alternative intercambiabili: genera, dal più specifico al
+// più generico, tutti i singoli nomi che potrebbero corrispondere a una voce
+// di Dispensa — il testo intero, il testo prima di un'eventuale parentesi
+// finale, e le parti separate da "o"/virgola sia fuori che dentro la
+// parentesi. Per un nome senza alternative restituisce solo il nome stesso.
+function splitIngredientCandidates(text){
+  const raw = (text||'').trim();
+  if(!raw) return [];
+  const out = [raw];
+  const parenMatch = raw.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  let base = raw, inner = '';
+  if(parenMatch){
+    base = parenMatch[1].trim();
+    inner = parenMatch[2].trim();
+    if(base) out.push(base);
+  }
+  [base, inner].forEach(part=>{
+    if(!part) return;
+    part.split(/\s*,\s*|\s+o\s+/i).forEach(p=>{
+      const t = p.trim();
+      if(t) out.push(t);
+    });
+  });
+  return [...new Set(out)];
+}
+
 // Alcuni ingredienti nelle ricette sono generici ("Pasta corta") ma in
 // Dispensa ci sono i formati specifici (Fusilli, Penne...): un ingrediente
 // può avere un "gruppo" assegnato in Dispensa (campo Gruppo, in Aggiungi/
 // Modifica), e una ricetta che chiede il generico viene soddisfatta da
-// qualsiasi voce con lo stesso gruppo e scorta > 0. I gruppi sono gestiti
-// dall'utente (state.pantryGroups, vedi "Gestisci gruppi" in Dispensa), non
-// più fissi nel codice: { label, matchName (il testo esatto che una ricetta
-// usa per il generico), cat (categoria suggerita quando scegli il gruppo) }.
+// qualsiasi voce con lo stesso gruppo. I gruppi sono gestiti dall'utente
+// (state.pantryGroups, vedi "Gestisci gruppi" in Dispensa), non più fissi
+// nel codice: { label, matchName (il testo esatto che una ricetta usa per il
+// generico), cat (categoria suggerita quando scegli il gruppo) }.
+//
+// Per i nomi con alternative dirette ("Scalogno o cipolla") non serve un
+// gruppo: si prova a risolvere ogni singola alternativa (vedi
+// splitIngredientCandidates) contro Dispensa o i gruppi, e vince la prima
+// che ha scorta > 0 — così avere anche solo uno dei due basta, senza dover
+// impostare nulla a mano. Se nessuna alternativa è in scorta, si restituisce
+// comunque la prima voce trovata (anche a 0), per mostrare "manca"/"poco"
+// invece di far sparire l'ingrediente.
 function resolvePantryItem(ingrediente){
-  const key = (ingrediente||'').trim().toLowerCase();
-  const direct = state.pantryItems[key];
-  if(direct) return direct;
-  const groupEntry = Object.entries(state.pantryGroups || {}).find(([id,g]) => (g.matchName||'').trim().toLowerCase() === key);
-  const group = groupEntry ? groupEntry[0] : null;
-  if(!group) return null;
-  return Object.values(state.pantryItems).find(it => it.group === group && typeof it.qty === 'number' && it.qty > 0) || null;
+  let fallback = null;
+  for(const cand of splitIngredientCandidates(ingrediente)){
+    const key = cand.toLowerCase();
+    const direct = state.pantryItems[key];
+    if(direct){
+      if(typeof direct.qty === 'number' && direct.qty > 0) return direct;
+      if(!fallback) fallback = direct;
+      continue;
+    }
+    const groupEntry = Object.entries(state.pantryGroups || {}).find(([id,g]) => (g.matchName||'').trim().toLowerCase() === key);
+    const group = groupEntry ? groupEntry[0] : null;
+    if(!group) continue;
+    const inStock = Object.values(state.pantryItems).find(it => it.group === group && typeof it.qty === 'number' && it.qty > 0);
+    if(inStock) return inStock;
+    if(!fallback){
+      const anyInGroup = Object.values(state.pantryItems).find(it => it.group === group);
+      if(anyInGroup) fallback = anyInGroup;
+    }
+  }
+  return fallback;
 }
 
 // Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
