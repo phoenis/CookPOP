@@ -380,6 +380,57 @@ function allKnownIngredientNames(){
   return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
 }
 
+// Come sopra ma con in più i nomi generici dei gruppi (es. "Pasta corta"),
+// per quando si scrive l'ingrediente di una ricetta: scrivere il generico
+// invece di un formato specifico fa scattare il riconoscimento per gruppo
+// (vedi resolvePantryItem) su qualsiasi formato tu abbia in Dispensa.
+function allKnownIngredientNamesWithGroups(){
+  const names = new Set(allKnownIngredientNames());
+  Object.values(state.pantryGroups || {}).forEach(g=>{ if(g.label) names.add(g.label.trim()); });
+  return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
+}
+
+// Combobox "leggera" per un campo nome-ingrediente creato fuori dal normale
+// ciclo render() (righe aggiunte a mano nella modale Modifica ricetta): pura
+// manipolazione DOM, non tocca state/render per non perdere quanto già
+// scritto nelle altre righe. Suggerisce ingredienti e gruppi noti mentre
+// scrivi; se quello che hai scritto non esiste, propone di "crearlo" — un
+// tocco esplicito, così un nome nuovo è una scelta voluta e non un refuso.
+function attachIngredientCombobox(input){
+  if(!input || input.dataset.comboAttached) return;
+  input.dataset.comboAttached = '1';
+  input.setAttribute('autocomplete', 'off');
+  const wrapper = document.createElement('div');
+  wrapper.className = 'add-ing-combo';
+  input.parentNode.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+  const list = document.createElement('div');
+  list.className = 'add-ing-suggestions';
+  wrapper.appendChild(list);
+
+  function renderSuggestions(){
+    const q = input.value.trim().toLowerCase();
+    if(!q){ list.innerHTML = ''; return; }
+    const pool = allKnownIngredientNamesWithGroups();
+    const matches = pool.filter(n => n.toLowerCase().includes(q)).slice(0, 8);
+    const exact = pool.some(n => n.toLowerCase() === q);
+    let html = matches.map(n=>`<button type="button" class="add-ing-suggestion" data-combo-pick>${escapeHtml(n)}</button>`).join('');
+    if(!exact) html += `<button type="button" class="add-ing-suggestion add-ing-suggestion-new" data-combo-create>+ Crea "${escapeHtml(input.value.trim())}" come nuovo ingrediente</button>`;
+    list.innerHTML = html;
+  }
+  input.addEventListener('input', renderSuggestions);
+  input.addEventListener('focus', renderSuggestions);
+  // mousedown, non click: precede il blur dell'input, altrimenti la lista
+  // sparirebbe (per il blur) prima che il tap sul suggerimento venga registrato.
+  list.addEventListener('mousedown', e=>{
+    const pick = e.target.closest('[data-combo-pick]');
+    if(pick){ e.preventDefault(); input.value = pick.textContent; list.innerHTML = ''; input.dispatchEvent(new Event('change', {bubbles:true})); }
+    const create = e.target.closest('[data-combo-create]');
+    if(create){ e.preventDefault(); list.innerHTML = ''; input.dispatchEvent(new Event('change', {bubbles:true})); }
+  });
+  input.addEventListener('blur', ()=>{ setTimeout(()=>{ list.innerHTML = ''; }, 150); });
+}
+
 const state = {
   tab: 'menu',
   shopChecked: {},
@@ -2458,6 +2509,12 @@ function escapeAttr(s){ return escapeHtml(s); }
 function stripHtml(s){ return (s||'').replace(/<[^>]*>/g, '').trim(); }
 
 function attachHandlers(){
+  // Combobox ingrediente: righe già presenti al momento del render (nuove
+  // righe aggiunte dopo, con la modale già aperta, si agganciano da sole nel
+  // loro punto di inserimento — vedi #edit-add-ing-row — perché quella parte
+  // non passa da un render() completo).
+  document.querySelectorAll('.edit-ing-name, [data-ning], [data-rning]').forEach(attachIngredientCombobox);
+
   document.querySelectorAll('[data-shop-view]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.shopView = e.target.dataset.shopView;
@@ -3097,7 +3154,9 @@ function attachHandlers(){
         return;
       }
       if(e.target.closest('#edit-add-ing-row')){
-        document.getElementById('edit-ing-list').insertAdjacentHTML('beforeend', editIngRowHtml('', ''));
+        const list = document.getElementById('edit-ing-list');
+        list.insertAdjacentHTML('beforeend', editIngRowHtml('', ''));
+        attachIngredientCombobox(list.lastElementChild.querySelector('.edit-ing-name'));
         return;
       }
       if(e.target.closest('#edit-add-step-row')){
