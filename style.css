@@ -77,6 +77,7 @@
     --card-block: var(--padding-large);
 
     --gap-icon: 0.3rem;
+    --gap-btn: var(--space-xsmall);
 
     /* sfocatura dietro le modali */
     --blur-modal: 3px;
@@ -121,7 +122,7 @@
      fanno parte della variante. */
   .btn{
     display:flex; align-items:center; justify-content:center; align-items: center; gap:var(--gap-icon);
-    padding: 0.5em 0.9em;
+    padding: 0.6em 1em;
     font-size: var(--text-small);
     font-weight:var(--weight-medium);
     font-family:var(--font-family); cursor:pointer; white-space:nowrap;
@@ -252,7 +253,7 @@ height: 100%;}
   .swap-suggestion-motivo{ display:block; font-size:var(--text-xsmall); font-weight:var(--weight-strong); color:var(--gold); margin-top:0.1875rem; }
   .swap-search{ width:100%; font-family:var(--font-family); font-size:var(--text-small); padding:var(--space-xsmall) var(--space-xsmall); border-radius:0; border:1px solid var(--line); background:var(--surface); margin-bottom:var(--space-xsmall); }
   .swap-cat-chips{ display:flex; flex-wrap:wrap; gap:0.375rem; margin-bottom:var(--space-xsmall); }
-  .is-chip{ border: var(--border) solid var(--ink-light);}
+  .is-chip{ font-size:var(--text-small); border: var(--border) solid var(--ink-light);}
   .is-chip.is-eat{ color: var(--green-mid); border-color: var(--green-mid);}
   .is-dashed{border: var(--border) dashed var(--ink-light); color: var(--ink-light); background-color: transparent;}
   .is-chip.active{ background:var(--green-deep); border-color:var(--green-deep); color:var(--bg); }
@@ -263,6 +264,9 @@ height: 100%;}
   .swap-result-icon{ font-size:var(--text-small); flex-shrink:0; }
   .swap-result-name{ flex:1; font-weight:var(--weight-medium); }
   .swap-result-time{ font-family:var(--font-family); font-size:var(--text-xsmall); color:var(--ink-light); flex-shrink:0; }
+
+.section-footer{display: flex; flex-direction: column; gap: var(--gap-btn); margin-top: var(--space-medium);}
+.section-footer-row{display: flex; gap: var(--gap-btn); flex-wrap: wrap; align-content: center; justify-content: center;}
 
   .filter-group {display: flex; flex-direction:column;}
   .filter-group select{ width:100%; font-family:var(--font-family); font-size:var(--text-body); padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:var(--border) solid var(--line); background:var(--form-background); }
