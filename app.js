@@ -1669,9 +1669,15 @@ function renderSpesa(){
   // giorno/per reparto) ma già spuntati, coerente con isStapleConfirmed.
   const mainFlat = flat;
 
+  // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
+  // quantità testuale) in Per reparto: se ne hai spuntata una qualsiasi in
+  // Per giorno, la riga unita deve leggersi spuntata anche qui — un de-spuntato
+  // esplicito vince comunque, per non perdere di vista quello che manca ancora.
   function isItemChecked(keys, ingrediente){
     if(isStaple(ingrediente)) return isStapleConfirmed({keys, ingrediente});
-    return keys.every(k=>state.shopChecked[k]);
+    if(keys.some(k=>state.shopChecked[k] === false)) return false;
+    if(keys.some(k=>state.shopChecked[k] === true)) return true;
+    return false;
   }
 
   const total = mainFlat.length;
