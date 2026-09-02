@@ -1628,7 +1628,7 @@ function renderSpesa(){
     // classifico ogni articolo per reparto, e per la verdura forzo il negozio Fruttivendolo.
     // I "Finiti in Dispensa" vanno nel loro reparto dedicato invece che in "Altro"
     // (o nel reparto merceologico vero, che a colpo d'occhio non spiegherebbe il perché sono lì)
-    // — a meno che non siano stati "aggiunti alla lista" da Spesa: a quel punto si mescolano
+    // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
     // nel loro reparto vero, tra le sezioni normali del negozio.
     const classified = mainFlat.map(it=>{
       const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : classifyDept(it.ingrediente);
@@ -1708,7 +1708,7 @@ function renderSpesa(){
         ${extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')}
       </div>`;
     }
-    // Chi è già stato "aggiunto alla lista" (vedi data-finished-shop-addlist)
+    // Chi è già stato segnato "da comprare" (vedi data-finished-shop-addlist)
     // esce da qui: lo si ritrova nella vista Per reparto, mescolato al suo
     // reparto vero — qui in Per giorno non ha un posto naturale dove stare.
     const oosContext = mainFlat.filter(it => it.context === 'Finiti in Dispensa' && !it.confirmed);
@@ -1721,7 +1721,7 @@ function renderSpesa(){
         ${oosCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${oosCheckedCount})</button>
-          <button type="button" class="btn is-solid" data-finished-shop-addlist>Aggiungi alla lista (${oosCheckedCount})</button>
+          <button type="button" class="btn is-solid" data-finished-shop-addlist>Segna da comprare (${oosCheckedCount})</button>
         </div>` : ''}
       </div>`;
     }
