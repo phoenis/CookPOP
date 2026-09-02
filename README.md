@@ -5,15 +5,16 @@ Nessuna build: si apre e basta. Online su https://phoenis.github.io/CookPOP/
 
 ## Come funziona
 
-Tutto — dati e logica — vive in `index.html`:
-- Un oggetto `DATA` con 188 ricette (catalogo estratto da un file Excel originale),
-  di cui **127 già "curate"** con ingredienti reali, procedimento, tempi e link
-  (vedi `DATA.recipeDetails`).
+Dati e logica vivono in `app.js` (un oggetto `DATA` incorporato come JSON
+compatto in cima al file, più tutta la logica dell'app), lo stile in
+`style.css`, `index.html` li carica entrambi:
+- Un oggetto `DATA` con **188 ricette**, tutte "curate" con ingredienti reali,
+  procedimento, tempi e (dove trovato) link alla fonte (vedi `DATA.recipeDetails`).
 - Persistenza condivisa su Firebase Realtime Database (menù della settimana,
   spesa spuntata, inventario freezer, ecc.): chi apre la pagina legge/scrive lo
   stesso stato, con aggiornamenti in tempo reale su tutti i dispositivi. La
   configurazione Firebase (progetto `cookpop-c91d6`) è incorporata in
-  `index.html`; le regole del Realtime Database consentono lettura/scrittura
+  `app.js`; le regole del Realtime Database consentono lettura/scrittura
   solo sul path `quaderno-state`, tutto il resto è bloccato. Se Firebase non è
   raggiungibile (rete assente), l'app resta funzionante in locale su
   `localStorage` come cache/fallback.
@@ -40,22 +41,21 @@ resto dell'app (non viene incorporato in `index.html`).
   Usalo come fonte quando devi curare una nuova ricetta e vuoi sapere il nome
   esatto, la categoria originale ecc.
 - `app-data-current.json` — lo stato completo attualmente incorporato in
-  `index.html` (`DATA`). È il file da modificare se aggiorni le ricette:
-  poi va reiniettato in `index.html` (vedi sotto).
+  `app.js` (`DATA`), byte-per-byte identico al JSON che segue `const DATA = `
+  sulla prima riga del file. È il file da modificare se aggiorni le ricette:
+  poi va reiniettato in `app.js` sostituendo quella riga.
 
-## Cosa manca
+## Curatela delle ricette
 
-**61 ricette su 188** non hanno ancora `recipeDetails` (ingredienti precisi,
-procedimento, tempo esatto, link). Per queste, l'app mostra solo i metadati
-del foglio originale e un avviso "ingredienti non ancora salvati" nella lista
-della spesa.
+Tutte le 188 ricette hanno ormai `recipeDetails` (ingredienti precisi,
+procedimento, tempo esatto, e link alla fonte dove trovato).
 
-Per completarne una: cerca la ricetta online (2-3 fonti italiane affidabili),
+Per curare o correggere una ricetta: cerca fonti italiane affidabili (2-3),
 scrivi ingredienti/procedimento con parole proprie (mai copiare testo, per
-diritto d'autore), aggiungi una entry a `DATA.recipeDetails` nello stesso
-formato delle altre 127, e aggiorna `DATA.recipeIngredientsInitial` per quella
-ricetta. Poi rigenera `index.html` sostituendo il blocco `const DATA = {...}`
-con il JSON aggiornato.
+diritto d'autore), aggiorna la entry in `DATA.recipeDetails` nello stesso
+formato delle altre, e allinea `DATA.recipeIngredientsInitial` per quella
+ricetta. Poi rigenera `app.js` sostituendo la prima riga (`const DATA = {...}`)
+con il JSON aggiornato di `app-data-current.json`.
 
 Ogni ingrediente va tenuto come voce separata in `ingredienti` — mai
 raggruppato tipo `"Sale e pepe"` o `"Carota, sedano, cipolla"` — perché il
