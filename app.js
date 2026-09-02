@@ -49,6 +49,30 @@ const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Fri
 // confronto quantitativo con quanto richiesto dalla ricetta (vedi pantryStatusFor).
 const UNIT_ORDER = ['', 'g', 'kg', 'ml', 'l'];
 const UNIT_LABEL = { '':'pezzi/generico', g:'grammi (g)', kg:'chili (kg)', ml:'millilitri (ml)', l:'litri (l)' };
+
+// Revisione unità di misura per gli ingredienti da dispensa veri (non i
+// freschi, comprati a vista) — solo quelli con un'unità in cui ha senso
+// confrontare la scorta con quanto serve in ricetta (vedi pantryStatusFor).
+// Concordata con l'utente; usata dalla migrazione "pantryUnitReviewed" più
+// sotto, che la applica solo dove l'unità non è già stata impostata a mano.
+const PANTRY_UNIT_BY_NAME = {
+  'sale':'kg', 'sale grosso':'kg',
+  'farina':'g', 'farina 0':'g', 'farina 00':'g', 'farina di ceci':'g', 'farina di mais':'g', 'farina di mais per polenta':'g',
+  'zucchero':'g',
+  'pasta':'g', 'pasta corta':'g', 'pasta piccola':'g', 'pasta mista':'g', 'spaghetti':'g', 'rigatoni':'g',
+  'riso':'g', 'riso carnaroli':'g', 'riso vialone nano':'g',
+  'pangrattato':'g', 'semolino':'g',
+  'formaggio grattugiato':'g', 'parmigiano grattugiato':'g', 'parmigiano':'g', 'pecorino grattugiato':'g', 'pecorino romano grattugiato':'g', 'pecorino romano':'g', 'grana grattugiato':'g', 'grana':'g',
+  'noci sgusciate':'g', 'pinoli':'g',
+  'ceci secchi':'g', 'lenticchie':'g', 'lenticchie secche':'g',
+  'concentrato di pomodoro':'g',
+  'miele':'g',
+  'olio evo':'ml', 'olio di semi':'ml', 'olio per friggere':'ml',
+  'aceto':'ml', 'aceto balsamico':'ml', 'aceto di vino bianco':'ml', 'aceto di vino':'ml',
+  'latte':'ml', 'panna da cucina':'ml', 'panna':'ml',
+  'vino bianco':'ml', 'vino rosso':'ml',
+  'passata di pomodoro':'ml', 'passata':'ml'
+};
 // Passo dello stepper +/- in Dispensa, adeguato all'unità (1g o 1ml alla volta non avrebbe senso).
 function qtyStepFor(unit){
   if(unit === 'g' || unit === 'ml') return 50;
@@ -355,6 +379,7 @@ const state = {
   pantrySeeded: false,
   pantryQtyMigrated: false,
   pantryUtilityLuogoMigrated: false,
+  pantryUnitReviewed: false,
   pantryView: 'categoria',
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
@@ -602,6 +627,7 @@ function persist(){
       pantrySeeded: state.pantrySeeded,
       pantryQtyMigrated: state.pantryQtyMigrated,
       pantryUtilityLuogoMigrated: state.pantryUtilityLuogoMigrated,
+      pantryUnitReviewed: state.pantryUnitReviewed,
       pantryView: state.pantryView
     };
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
@@ -3604,6 +3630,17 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
       if(wasUtilityCat) delete it.cat;
     });
     state.pantryStapleMigrated = true;
+    persist();
+  }
+  // Una tantum: assegna l'unità di misura agli ingredienti da dispensa che
+  // non ne hanno ancora una, riconoscendoli per nome (vedi PANTRY_UNIT_BY_NAME,
+  // concordata con l'utente). Non tocca chi ha già un'unità impostata a mano.
+  if(!state.pantryUnitReviewed){
+    Object.keys(state.pantryItems).forEach(key=>{
+      const it = state.pantryItems[key];
+      if(it && !it.unit && PANTRY_UNIT_BY_NAME[key]) it.unit = PANTRY_UNIT_BY_NAME[key];
+    });
+    state.pantryUnitReviewed = true;
     persist();
   }
   const todayPos = findTodayPos();
