@@ -359,6 +359,7 @@ const state = {
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
   pantryFinishedOpen: false,
+  pantrySectionCollapsed: {}, // id sezione (luogo_X / cat_X) -> true se chiusa; aperta di default se assente
   pantrySelectMode: false, // true dopo una pressione lunga: un tap semplice seleziona/deseleziona invece di aprire il luogo-picker
   pantrySelected: {}, // pantryKey -> true, selezione corrente in Dispensa (qualsiasi riga, non solo Finiti; non persistita)
   shopFinitiOpen: false, // accordion "Finiti", condiviso da Per reparto e Per giorno, chiuso di default
@@ -2149,19 +2150,33 @@ function renderDispensa(){
   } else if(state.pantryView === 'luogo'){
     const byLuogo = {};
     items.forEach(it=>{ (byLuogo[it.luogo] = byLuogo[it.luogo] || []).push(it); });
-    body = LUOGO_ORDER.filter(l=>byLuogo[l] && byLuogo[l].length).map(l=>`
+    body = LUOGO_ORDER.filter(l=>byLuogo[l] && byLuogo[l].length).map(l=>{
+      const sectionId = `luogo_${l}`;
+      const isOpen = !state.pantrySectionCollapsed[sectionId];
+      return `
       <div class="dept-block">
-        <div class="dept-title"><span class="dept-icon">${LUOGO_ICON[l]}</span>${LUOGO_LABEL[l]}</div>
-        ${byLuogo[l].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('')}
-      </div>`).join('');
+        <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
+          <span class="dept-icon">${LUOGO_ICON[l]}</span>${LUOGO_LABEL[l]}
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+        </div>
+        ${isOpen ? byLuogo[l].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+      </div>`;
+    }).join('');
   } else {
     const byDept = {};
     items.forEach(it=>{ const d = it.cat || classifyDept(it.nome); (byDept[d] = byDept[d] || []).push(it); });
-    body = DEPT_ORDER.filter(d=>byDept[d] && byDept[d].length).map(d=>`
+    body = DEPT_ORDER.filter(d=>byDept[d] && byDept[d].length).map(d=>{
+      const sectionId = `cat_${d}`;
+      const isOpen = !state.pantrySectionCollapsed[sectionId];
+      return `
       <div class="dept-block">
-        <div class="dept-title"><span class="dept-icon">${DEPT_ICON[d]}</span>${DEPT_LABEL[d]}</div>
-        ${byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('')}
-      </div>`).join('');
+        <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
+          <span class="dept-icon">${DEPT_ICON[d]}</span>${DEPT_LABEL[d]}
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+        </div>
+        ${isOpen ? byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+      </div>`;
+    }).join('');
   }
 
   const editItem = state.pantryEditKey ? state.pantryItems[state.pantryEditKey] : null;
@@ -2282,6 +2297,7 @@ function renderDispensa(){
       <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
     </div>
+    ${items.length ? `<button type="button" class="btn is-ghost" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? 'Espandi tutto' : 'Comprimi tutto'}</button>` : ''}
     ${body}
     ${finishedSection}
     ${selectionBar}
@@ -2489,6 +2505,21 @@ function attachHandlers(){
         else state.shopSectionCollapsed[id] = true;
       });
       if(finitiEls.length) state.shopFinitiOpen = anyCollapsed;
+      render();
+    });
+  }
+  const pantryToggleAllBtn = document.getElementById('pantry-toggle-all-sections');
+  if(pantryToggleAllBtn){
+    pantryToggleAllBtn.addEventListener('click', ()=>{
+      const sectionEls = document.querySelectorAll('[data-toggle-pantry-section]');
+      const finishedEl = document.querySelector('[data-toggle-finished]');
+      const anyCollapsed = Array.from(sectionEls).some(el=>!el.classList.contains('open')) || (!!finishedEl && !state.pantryFinishedOpen);
+      sectionEls.forEach(el=>{
+        const id = el.dataset.togglePantrySection;
+        if(anyCollapsed) delete state.pantrySectionCollapsed[id];
+        else state.pantrySectionCollapsed[id] = true;
+      });
+      if(finishedEl) state.pantryFinishedOpen = anyCollapsed;
       render();
     });
   }
@@ -3049,6 +3080,13 @@ function attachHandlers(){
     el.addEventListener('click', e=>{
       const id = e.currentTarget.dataset.toggleShopSection;
       state.shopSectionCollapsed[id] = !state.shopSectionCollapsed[id];
+      render();
+    });
+  });
+  document.querySelectorAll('[data-toggle-pantry-section]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      const id = e.currentTarget.dataset.togglePantrySection;
+      state.pantrySectionCollapsed[id] = !state.pantrySectionCollapsed[id];
       render();
     });
   });
