@@ -117,19 +117,16 @@ function isStaple(ingrediente){
 // Dispensa ci sono i formati specifici (Fusilli, Penne...): un ingrediente
 // può avere un "gruppo" assegnato in Dispensa (campo Gruppo, in Aggiungi/
 // Modifica), e una ricetta che chiede il generico viene soddisfatta da
-// qualsiasi voce con lo stesso gruppo e scorta > 0. Gestibile in autonomia:
-// per un nuovo formato basta scegliere il gruppo giusto quando lo aggiungi,
-// non serve toccare il codice — l'unica cosa fissa è quali nomi generici le
-// ricette possono chiedere (i gruppi stessi), qui sotto.
-const PANTRY_GROUP_ORDER = ['pasta-corta', 'pasta-lunga'];
-const PANTRY_GROUP_LABEL = { 'pasta-corta':'Pasta corta', 'pasta-lunga':'Pasta lunga' };
-// Nome dell'ingrediente generico come compare nelle ricette -> chiave del gruppo.
-const PANTRY_GROUP_BY_INGREDIENT_NAME = { 'pasta corta':'pasta-corta', 'pasta lunga':'pasta-lunga' };
+// qualsiasi voce con lo stesso gruppo e scorta > 0. I gruppi sono gestiti
+// dall'utente (state.pantryGroups, vedi "Gestisci gruppi" in Dispensa), non
+// più fissi nel codice: { label, matchName (il testo esatto che una ricetta
+// usa per il generico), cat (categoria suggerita quando scegli il gruppo) }.
 function resolvePantryItem(ingrediente){
   const key = (ingrediente||'').trim().toLowerCase();
   const direct = state.pantryItems[key];
   if(direct) return direct;
-  const group = PANTRY_GROUP_BY_INGREDIENT_NAME[key];
+  const groupEntry = Object.entries(state.pantryGroups || {}).find(([id,g]) => (g.matchName||'').trim().toLowerCase() === key);
+  const group = groupEntry ? groupEntry[0] : null;
   if(!group) return null;
   return Object.values(state.pantryItems).find(it => it.group === group && typeof it.qty === 'number' && it.qty > 0) || null;
 }
@@ -403,6 +400,11 @@ const state = {
   pantryUtilityLuogoMigrated: false,
   pantryUnitReviewed: false,
   pantryGroupMigrated: false,
+  pantryGroups: {
+    'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
+    'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' }
+  },
+  pantryGroupsModalOpen: false,
   pantryView: 'categoria',
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
@@ -652,6 +654,7 @@ function persist(){
       pantryUtilityLuogoMigrated: state.pantryUtilityLuogoMigrated,
       pantryUnitReviewed: state.pantryUnitReviewed,
       pantryGroupMigrated: state.pantryGroupMigrated,
+      pantryGroups: state.pantryGroups,
       pantryView: state.pantryView
     };
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
@@ -2275,10 +2278,10 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta)</div>
+            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
             <select id="pantry-edit-group">
               <option value="">Nessuno</option>
-              ${PANTRY_GROUP_ORDER.map(g=>`<option value="${g}" ${editItem.group===g?'selected':''}>${escapeHtml(PANTRY_GROUP_LABEL[g])}</option>`).join('')}
+              ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${editItem.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
@@ -2328,10 +2331,10 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta)</div>
+            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
             <select id="pantry-add-group">
               <option value="">Nessuno</option>
-              ${PANTRY_GROUP_ORDER.map(g=>`<option value="${g}">${escapeHtml(PANTRY_GROUP_LABEL[g])}</option>`).join('')}
+              ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}">${escapeHtml(g.label)}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
@@ -2353,6 +2356,48 @@ function renderDispensa(){
         <div class="filters-modal-footer">
           <button class="btn is-ghost reset-btn" data-close-pantry-add-modal>Annulla</button>
           <button class="btn is-solid mini-add-btn" id="pantry-add-btn" type="button">Aggiungi</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  // Gestione gruppi (Pasta corta/lunga e quelli che l'utente crea): "matchName"
+  // è il testo esatto usato nelle ricette per il generico — un gruppo senza
+  // corrispondenza in nessuna ricetta è comunque salvabile, semplicemente non
+  // farà mai scattare il riconoscimento "ce l'ho" (vedi resolvePantryItem).
+  const groupsModal = state.pantryGroupsModalOpen ? `
+    <div class="filters-modal-backdrop" data-close-pantry-groups>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Gestisci gruppi</h3>
+          <button class="btn is-icon filters-close-btn" data-close-pantry-groups>✕</button>
+        </div>
+        <p class="section-sub">Un gruppo unisce più formati (es. Fusilli, Penne) sotto il nome generico che una ricetta usa (es. "Pasta corta"): se hai scorta di uno qualsiasi dei formati assegnati a quel gruppo, la ricetta risulta "ce l'ho".</p>
+        <div class="filter-groups">
+          ${Object.entries(state.pantryGroups).map(([id,g])=>`
+            <div class="pantry-group-row" data-pantry-group-row="${id}">
+              <input type="text" data-group-label="${id}" value="${escapeAttr(g.label)}" placeholder="Nome del gruppo">
+              <input type="text" data-group-match="${id}" value="${escapeAttr(g.matchName)}" placeholder="Testo esatto nella ricetta">
+              <select data-group-cat="${id}">
+                <option value="">Nessuna categoria suggerita</option>
+                ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${g.cat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              </select>
+              <button type="button" class="btn is-icon color-delete" data-group-delete="${id}" aria-label="Elimina gruppo"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+            </div>`).join('')}
+        </div>
+        <div class="filter-groups">
+          <div class="filter-group">
+            <div class="filter-group-label">Nuovo gruppo</div>
+            <input type="text" id="new-group-label" placeholder="Nome (es. Formaggio grattugiato)">
+            <input type="text" id="new-group-match" placeholder="Testo esatto come compare nelle ricette">
+            <select id="new-group-cat">
+              <option value="">Nessuna categoria suggerita</option>
+              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+            </select>
+            <button type="button" class="btn is-solid" id="add-group-btn">+ Aggiungi gruppo</button>
+          </div>
+        </div>
+        <div class="filters-modal-footer">
+          <button class="btn is-solid mini-add-btn" data-close-pantry-groups>Fatto</button>
         </div>
       </div>
     </div>` : '';
@@ -2400,6 +2445,7 @@ function renderDispensa(){
     <div class="save-hint"></div>
     ${editModal}
     ${addModal}
+    ${groupsModal}
     <button class="btn is-solid is-icon fab" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
   `;
 }
@@ -3368,6 +3414,71 @@ function attachHandlers(){
       render();
     });
   });
+  // Se scegli un gruppo mentre la Categoria è ancora su "Automatica", la
+  // precompiliamo dal gruppo — ma senza toccarla se l'hai già scelta a mano,
+  // e senza chiamare render() (altrimenti il nome già digitato andrebbe perso).
+  const addGroupSelect = document.getElementById('pantry-add-group');
+  if(addGroupSelect){
+    addGroupSelect.addEventListener('change', e=>{
+      const catSelect = document.getElementById('pantry-add-cat');
+      const group = state.pantryGroups[e.target.value];
+      if(catSelect && !catSelect.value && group && group.cat) catSelect.value = group.cat;
+    });
+  }
+  document.querySelectorAll('[data-open-pantry-groups]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.pantryGroupsModalOpen = true; render(); });
+  });
+  document.querySelectorAll('[data-close-pantry-groups]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.pantryGroupsModalOpen = false;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-group-label]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const id = e.currentTarget.dataset.groupLabel;
+      if(state.pantryGroups[id]){ state.pantryGroups[id].label = e.currentTarget.value.trim() || state.pantryGroups[id].label; persist(); render(); }
+    });
+  });
+  document.querySelectorAll('[data-group-match]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const id = e.currentTarget.dataset.groupMatch;
+      if(state.pantryGroups[id]){ state.pantryGroups[id].matchName = e.currentTarget.value.trim().toLowerCase(); persist(); render(); }
+    });
+  });
+  document.querySelectorAll('[data-group-cat]').forEach(sel=>{
+    sel.addEventListener('change', e=>{
+      const id = e.currentTarget.dataset.groupCat;
+      if(state.pantryGroups[id]){ state.pantryGroups[id].cat = e.currentTarget.value; persist(); render(); }
+    });
+  });
+  document.querySelectorAll('[data-group-delete]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.currentTarget.dataset.groupDelete;
+      delete state.pantryGroups[id];
+      // Le voci di Dispensa che lo usavano restano, solo senza più un gruppo:
+      // non è un dato perso, si può riassegnare in un secondo momento.
+      Object.values(state.pantryItems).forEach(it=>{ if(it.group === id) delete it.group; });
+      persist(); render();
+    });
+  });
+  const addGroupBtn = document.getElementById('add-group-btn');
+  if(addGroupBtn){
+    addGroupBtn.addEventListener('click', ()=>{
+      const labelInput = document.getElementById('new-group-label');
+      const matchInput = document.getElementById('new-group-match');
+      const catSelect = document.getElementById('new-group-cat');
+      const label = labelInput.value.trim();
+      const matchName = matchInput.value.trim().toLowerCase();
+      if(!label || !matchName) return;
+      let slug = label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,'') || 'gruppo';
+      let candidate = slug, n = 2;
+      while(state.pantryGroups[candidate]) candidate = `${slug}-${n++}`;
+      state.pantryGroups[candidate] = { label, matchName, cat: catSelect.value || '' };
+      persist(); render();
+    });
+  }
 
   document.querySelectorAll('[data-pantry-edit]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -3404,6 +3515,10 @@ function attachHandlers(){
       const it = state.pantryItems[state.pantryEditKey];
       if(it){
         if(e.target.value) it.group = e.target.value; else delete it.group;
+        // Precompila la categoria dal gruppo solo se non l'avevi già scelta a
+        // mano — una scelta manuale esistente vince sempre.
+        const group = state.pantryGroups[e.target.value];
+        if(!it.cat && group && group.cat) it.cat = group.cat;
         persist(); render();
       }
     });
@@ -3694,8 +3809,8 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
   }
   // Una tantum: assegna il gruppo "Pasta corta"/"Pasta lunga" ai formati di
   // pasta specifici già in Dispensa, riconoscendoli per nome — da qui in poi
-  // il gruppo si assegna dal campo in Aggiungi/Modifica, non serve più questa
-  // lista fissa (vedi PANTRY_GROUP_BY_INGREDIENT_NAME/resolvePantryItem).
+  // il gruppo si assegna dal campo in Aggiungi/Modifica, o si gestisce da
+  // "Gestisci gruppi" in Dispensa (state.pantryGroups).
   if(!state.pantryGroupMigrated){
     const SEED_GROUP_NAMES = {
       'pasta-corta': ['fusilli','penne','pennette','rigatoni','mezze maniche','farfalle','sedani','sedanini','ditalini','tubetti','tortiglioni','pipe','conchiglie','conchiglioni','orecchiette','gomiti','caserecce','gemelli','pasta mista'],
@@ -3704,7 +3819,7 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
     Object.keys(state.pantryItems).forEach(key=>{
       const it = state.pantryItems[key];
       if(!it || it.group) return;
-      const group = PANTRY_GROUP_ORDER.find(g => SEED_GROUP_NAMES[g].includes(key));
+      const group = Object.keys(SEED_GROUP_NAMES).find(g => SEED_GROUP_NAMES[g].includes(key));
       if(group) it.group = group;
     });
     state.pantryGroupMigrated = true;
