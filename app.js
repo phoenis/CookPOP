@@ -2068,6 +2068,10 @@ function renderSpesa(){
   const addIngSuggestions = (addIngQuery && state.addIngSuggestOpen)
     ? allKnownIngredientNames().filter(n => n.toLowerCase().includes(addIngQuery)).slice(0, 8)
     : [];
+  // Se il nome scritto coincide con una voce già in Dispensa, l'unità è già
+  // nota (es. "Latte" in ml): la propongo di default invece di farla
+  // reinventare da capo. Se è nuovo, resta comunque scegliebile dal menu.
+  const matchedPantryUnit = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].unit) || '';
   const addIngModal = state.addIngModalOpen ? `
     <div class="filters-modal-backdrop" data-close-add-ing-modal>
       <div class="filters-modal" data-stop-close>
@@ -2088,7 +2092,12 @@ function renderSpesa(){
           </div>
           <div class="filter-group">
             <div class="filter-group-label">Quantità</div>
-            <input type="text" id="shop-add-qta" placeholder="Es. 1 rotolo">
+            <div class="pantry-group-row">
+              <input type="text" id="shop-add-qta" placeholder="Es. 1 rotolo" value="${escapeAttr(matchedPantryUnit ? `1 ${matchedPantryUnit}` : '')}">
+              <select id="shop-add-unit" title="Unità — aggiorna il numero scritto a sinistra">
+                ${UNIT_ORDER.map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
+              </select>
+            </div>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -2702,6 +2711,16 @@ function attachHandlers(){
   if(shopAddBtn){
     const nameInput = document.getElementById('shop-add-name');
     const qtaInput = document.getElementById('shop-add-qta');
+    const unitSelect = document.getElementById('shop-add-unit');
+    // Scegliere un'unità dal menu aggiorna il numero già scritto in Quantità
+    // (o propone "1 <unità>" se è ancora vuoto) invece di dover scrivere
+    // tutto a mano — utile soprattutto per un ingrediente nuovo, mai visto
+    // in Dispensa, dove non c'è nessuna unità da riproporre in automatico.
+    if(unitSelect) unitSelect.addEventListener('change', ()=>{
+      const numMatch = qtaInput.value.match(/^\s*([\d.,]+)/);
+      const num = numMatch ? numMatch[1] : '1';
+      qtaInput.value = unitSelect.value ? `${num} ${unitSelect.value}` : num;
+    });
     // Se il nome coincide con un ingrediente già in Dispensa ma a scorta 0,
     // "Aggiungi" non crea una voce doppia: riattiva quello (stessa azione di
     // "Segna da comprare" nella sezione Finiti), così resta un unico record.
