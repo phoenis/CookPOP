@@ -23,6 +23,15 @@ Le 4 tab dell'app: **Menù** (settimana corrente + generatore automatico),
 reparto), **Prep** (ricettario filtrabile per categoria/tempo/stagione/ecc.),
 **Dispensa** (inventario + freezer).
 
+## Aggiungere alla spesa dettando a Google Home
+
+`scripts/google-home-shopping-sync.gs` collega Google Home alla lista della
+spesa di CookPOP passando per un'automazione IFTTT e un foglio Google, senza
+bisogno di un vero server: chi dice "Ok Google, aggiungi X alla lista della
+spesa" lo vede comparire in Spesa come se l'avesse scritto a mano dall'app.
+Il file spiega il collegamento nei commenti in testa; è indipendente dal
+resto dell'app (non viene incorporato in `index.html`).
+
 ## File in `data/`
 
 - `raw-xlsx-export.json` — estrazione grezza del foglio Excel originale
