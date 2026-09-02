@@ -1661,11 +1661,20 @@ function renderSpesa(){
       });
       const deptSections = DEPT_ORDER
         .filter(dept => byDept[dept] && byDept[dept].length)
-        .map(dept => `
-          <div class="dept-block">
+        .map(dept => {
+          const isFinitiDept = dept === 'finiti';
+          const finitiCheckedCount = isFinitiDept ? byDept[dept].filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
+          return `
+          <div class="dept-block${isFinitiDept ? ' finished-shop-group' : ''}">
             <div class="dept-title"><span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}</div>
             ${byDept[dept].map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '))).join('')}
-          </div>`).join('');
+            ${finitiCheckedCount ? `
+            <div class="finished-shop-actions">
+              <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${finitiCheckedCount})</button>
+              <button type="button" class="btn is-solid" data-finished-shop-addlist>Segna da comprare (${finitiCheckedCount})</button>
+            </div>` : ''}
+          </div>`;
+        }).join('');
       const assignee = state.shopAssignees[store];
       // "Supermercato" è il negozio di default (nessun "dove" specifico sull'ingrediente):
       // la spesa lì non si assegna a nessuno per ora, quindi niente bottone Assegna.
