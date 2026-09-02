@@ -143,9 +143,17 @@ function pantryStatusFor(ingrediente, neededQtaText){
   return have.value >= needComparable.value ? 'in-casa' : 'poco';
 }
 
+// Un basilare può comparire con più chiavi (una per occorrenza/giorno in Per
+// giorno, unite in una sola riga in Per reparto quando la quantità coincide):
+// senza questa riconciliazione, spuntarne una in Per giorno e lasciarne
+// un'altra intonsa faceva risultare la riga unita "non spuntata" in Per
+// reparto pur avendone spuntata almeno una — le due viste devono concordare
+// sullo stesso fatto (ce l'hai o no), non dipendere da come sono raggruppate.
+// Un "de-spuntato" esplicito (l'hai tolto perché in realtà manca) vince su uno
+// "spuntato" esplicito altrove, che a sua volta vince sul solo dato di Dispensa.
 function isStapleConfirmed(it){
-  const touched = it.keys.some(k => state.shopChecked[k] !== undefined);
-  if(touched) return it.keys.every(k => state.shopChecked[k]);
+  if(it.keys.some(k => state.shopChecked[k] === false)) return false;
+  if(it.keys.some(k => state.shopChecked[k] === true)) return true;
   return hasPantryStock(it.ingrediente);
 }
 
