@@ -947,6 +947,7 @@ function removeWeek(weekIdx){
   state.extraWeeks.splice(weekIdx-1, 1);
   state.expandedDay = null;
   state.swapOpenDay = null;
+  state.genSettingsOpen = null;
   persist();
   render();
 }
@@ -1441,21 +1442,13 @@ function renderWeekSection(weekIdx){
 
   const days = pastToggle + pastDays + positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
-  // Genera/Rigenera vive ora nella modale impostazioni, aperta dal bottoncino
-  // sul titolo della settimana (vedi genSettingsModal in renderMenu) — qui in
-  // fondo resta solo, per le settimane extra, l'eliminazione (azione a sé,
-  // più definitiva di una rigenerazione).
-  const controls = weekIdx === 0 ? '' : `
-    <div class="generate-week-block is-added">
-      <button class="btn is-icon color-delete" data-remove-week="${weekIdx}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
-    </div>`;
-
+  // Genera/Rigenera ed Elimina vivono ora nella modale impostazioni, aperta
+  // dal bottoncino sul titolo della settimana (vedi genSettingsModal in renderMenu).
   return `
     <section class="week-section">
       <h2 class="week-title">Settimana del ${weekLabelFor(weekIdx)} ${genSettingsButton(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
       ${days}
-      ${controls}
     </section>`;
 }
 
@@ -1594,7 +1587,11 @@ function renderMenu(){
         <p class="generate-week-hint">${genSettingsTargetWeek === 0 ? "Sceglie 7 ricette di stagione, variando le categorie giorno per giorno." : ''}</p>
         <div class="filters-modal-footer">
           <button class="btn is-double is-left" data-generate-week="${genSettingsTargetWeek}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> ${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : 'Rigenera questa settimana'}</button>
-        </div>` : ''}
+        </div>
+        ${genSettingsTargetWeek > 0 ? `
+        <div class="filters-modal-footer">
+          <button class="btn is-outline color-delete" data-remove-week="${genSettingsTargetWeek}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina questa settimana</button>
+        </div>` : ''}` : ''}
         <div class="filters-modal-footer">
           <button class="btn is-solid mini-add-btn" data-close-gen-settings>Fatto</button>
         </div>
