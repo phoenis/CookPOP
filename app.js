@@ -39,7 +39,7 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 
 const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro','finiti'];
 const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', finiti:'Finiti', altro:'Altro' };
-const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', finiti:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M253.76 93A12 12 0 0 0 237 90.24l-9 6.44V80a12 12 0 0 0-12-12H40a12 12 0 0 0-12 12v16.68l-9-6.44a12 12 0 1 0-14 19.52l23 16.42V184a36 36 0 0 0 36 36h128a36 36 0 0 0 36-36v-57.82l23-16.42A12 12 0 0 0 253.76 93M204 184a12 12 0 0 1-12 12H64a12 12 0 0 1-12-12V92h152ZM76 40V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0m40 0V16a12 12 0 0 1 24 0v24a12 12 0 0 1-24 0"></path></svg>', altro:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg>' };
+const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', finiti:'🗑️', altro:'🛒' };
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
@@ -1810,7 +1810,7 @@ function renderSpesa(){
       return `
       <div class="shop-day-group">
         <div class="shop-day-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
-          <span class="font-weight-bold">${escapeHtml(name)}</span>${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)}
+          <span class="font-weight-bold">${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)}</span><span class="spesa-recipe">&nbsp;- ${escapeHtml(name)}</span>
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
         ${isOpen ? rows : ''}
@@ -1913,12 +1913,14 @@ function renderSpesa(){
       <button class="view-btn ${state.shopView==='reparto'?'active':''}" data-shop-view="reparto">Per reparto</button>
       <button class="view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
     </div>
+    <div class="shop-checks">
     <div class="shop-progress">${done} / ${total} presi</div>
-    <div class="shop-top-actions">
-      <button class="btn is-ghost reset-btn" id="reset-shop">Svuota spunte</button>
-      ${total ? `<button type="button" class="btn is-ghost" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? 'Espandi tutto' : 'Comprimi tutto'}</button>` : ''}
+    ${total ? `<button type="button" class="btn is-chip" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? 'Espandi tutto' : 'Comprimi tutto'}</button>` : ''}
     </div>
     ${body}
+    <div class="shop-top-actions">
+      <button class="btn is-outline reset-btn" id="reset-shop">Svuota spunte</button>
+    </div>
     ${doneShoppable ? `
     <div class="shop-checked-actions">
       <button class="btn is-outline" id="delete-checked-shop">Elimina ${doneShoppable} spuntati</button>
@@ -2140,10 +2142,10 @@ function renderDispensa(){
           : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' '+escapeHtml(it.unit) : ''}</span>`}
         <button class="qty-btn" type="button" data-qty-inc="${escapeAttr(it.key)}" aria-label="Aumenta">+</button>
       </span>
-      <button class="btn-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
   }
-
+/*       <button class="btn-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+ */
   let body;
   if(!items.length){
     body = `<p class="ing-empty">Vuota per ora — spunta qualcosa in Spesa o tocca il + per aggiungere un ingrediente.</p>`;
