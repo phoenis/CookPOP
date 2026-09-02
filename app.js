@@ -359,6 +359,7 @@ const state = {
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
   pantryFinishedOpen: false,
+  pantryFinishedSelected: {}, // pantryKey -> true, selezione in corso nell'accordion "Finiti" di Dispensa (non persistita)
   shopFinitiOpen: false, // accordion "Finiti" nella vista Spesa Per reparto, chiuso di default
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
@@ -2082,11 +2083,13 @@ function renderDispensa(){
     .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0);
 
-  function itemRow(it){
+  function itemRow(it, selectable){
     const editing = state.pantryEditingKey === it.key;
     const step = qtyStepFor(it.unit);
+    const selectCb = selectable ? `<input type="checkbox" class="finished-select-cb" data-finished-select="${escapeAttr(it.key)}" ${state.pantryFinishedSelected[it.key] ? 'checked' : ''} aria-label="Seleziona ${escapeAttr(it.nome)} per segnarlo da comprare">` : '';
     return `
     <div class="inv-item">
+      ${selectCb}
       <button class="btn is-icon luogo-picker-opt is-selected" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${LUOGO_ICON[it.luogo]}</button>
       ${state.pantryLuogoPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-luogo-picker-close></div>
@@ -2211,18 +2214,25 @@ function renderDispensa(){
   // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
   // qui restano fuori dalle viste normali per luogo/categoria e finiscono in un
   // accordion a parte, chiuso di default — non è un luogo assegnabile, solo
-  // uno stato. Riusa itemRow: stesso stepper/edit/luogo-picker degli altri.
+  // uno stato. Riusa itemRow: stesso stepper/edit/luogo-picker degli altri, con
+  // in più una checkbox (solo qui, non sugli ingredienti che hai già) per
+  // segnarli "da comprare" — stessa azione già disponibile da Spesa, comoda
+  // anche da qui senza dover prima passare da lì.
   const finishedItems = Object.entries(state.pantryItems)
     .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty <= 0)
     .sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
+  const finishedSelectedCount = finishedItems.filter(it=>state.pantryFinishedSelected[it.key]).length;
   const finishedSection = finishedItems.length ? `
     <div class="dept-block">
       <div class="dept-title finished-toggle${state.pantryFinishedOpen ? ' open' : ''}" data-toggle-finished>
         <span class="dept-icon">${DEPT_ICON.finiti}</span>${DEPT_LABEL.finiti} (${finishedItems.length})
         <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
       </div>
-      ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}
+      ${state.pantryFinishedOpen ? `
+        ${finishedItems.map(it=>itemRow(it, true)).join('')}
+        ${finishedSelectedCount ? `<button type="button" class="btn is-solid mark-to-buy-btn" id="pantry-mark-to-buy">Segna da comprare (${finishedSelectedCount})</button>` : ''}
+      ` : ''}
     </div>` : '';
 
   return `
@@ -2983,6 +2993,26 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-finished-select]').forEach(cb=>{
+    cb.addEventListener('click', e=> e.stopPropagation());
+    cb.addEventListener('change', e=>{
+      const key = e.currentTarget.dataset.finishedSelect;
+      if(e.currentTarget.checked) state.pantryFinishedSelected[key] = true;
+      else delete state.pantryFinishedSelected[key];
+      render();
+    });
+  });
+  const pantryMarkToBuyBtn = document.getElementById('pantry-mark-to-buy');
+  if(pantryMarkToBuyBtn){
+    pantryMarkToBuyBtn.addEventListener('click', ()=>{
+      Object.keys(state.pantryFinishedSelected).forEach(key=>{
+        state.pantryConfirmedShop[key] = true;
+        delete state.shopDismissed[`oos_${key}`];
+        delete state.pantryFinishedSelected[key];
+      });
+      persist(); render();
+    });
+  }
   document.querySelectorAll('[data-luogo-toggle]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.luogoToggle;
