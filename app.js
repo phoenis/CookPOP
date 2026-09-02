@@ -367,6 +367,7 @@ const state = {
   cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno
   shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
+  avanzoDiPickerOpenDay: null,
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
   recipeEdits: {},
@@ -1180,6 +1181,27 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       </div>
     </div>`;
   }
+  // Direzione opposta di "È avanzata": utile quando il giorno sorgente è ormai
+  // passato (e quindi la sua card non è più visibile per collegarla da lì) —
+  // si collega da qui, scegliendo tra i giorni precedenti.
+  let avanzoDiPanelHtml = '';
+  if(state.avanzoDiPickerOpenDay === dayKey){
+    const allDays = allPlannedDays();
+    const selfPos = allDays.findIndex(o => `${o.weekIdx}_${o.i}` === dayKey);
+    const pastOptions = allDays.filter((o, idx) => idx < selfPos).reverse();
+    const pastOptionsHtml = pastOptions.map(o=>`
+      <div class="swap-result" data-avanzodi-pick="${o.weekIdx}_${o.i}" data-avanzodi-day="${dayKey}">
+        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)}</span>
+        <span class="swap-result-time">${escapeHtml(o.name)}</span>
+      </div>`).join('');
+    avanzoDiPanelHtml = `
+    <div class="swap-panel">
+      <p class="section-sub" style="margin:0 0 8px;">Scegli il giorno in cui è stata cucinata:</p>
+      <div class="swap-results">
+        ${pastOptionsHtml || '<div class="ing-empty">Nessun giorno precedente disponibile.</div>'}
+      </div>
+    </div>`;
+  }
 
   const isDone = !!weekMealsDoneRef(weekIdx)[i];
   let swapControls;
@@ -1200,10 +1222,12 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       <div class="section-footer-row">
         <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
         <button class="btn is-chip is-dashed" data-open-link-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzata</button>
+        <button class="btn is-chip is-dashed" data-open-avanzodi-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzo di</button>
       </div>
     </div>
     ${swapPanelHtml}
-    ${linkPanelHtml}`;
+    ${linkPanelHtml}
+    ${avanzoDiPanelHtml}`;
   }
 
   // tempo: se cambiata (a mano o generata) e in catalogo, usa il tempo della nuova ricetta; altrimenti quello originale del giorno
@@ -2367,6 +2391,7 @@ function attachHandlers(){
       const key = e.target.dataset.openSwap;
       state.swapOpenDay = state.swapOpenDay === key ? null : key;
       state.linkPickerOpenDay = null;
+      state.avanzoDiPickerOpenDay = null;
       render();
     });
   });
@@ -2374,8 +2399,33 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.openLinkPicker;
       state.linkPickerOpenDay = state.linkPickerOpenDay === key ? null : key;
+      state.avanzoDiPickerOpenDay = null;
       state.swapOpenDay = null;
       render();
+    });
+  });
+  document.querySelectorAll('[data-open-avanzodi-picker]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.openAvanzodiPicker;
+      state.avanzoDiPickerOpenDay = state.avanzoDiPickerOpenDay === key ? null : key;
+      state.linkPickerOpenDay = null;
+      state.swapOpenDay = null;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-avanzodi-pick]').forEach(row=>{
+    row.addEventListener('click', e=>{
+      const el = e.currentTarget;
+      const sourceKey = el.dataset.avanzodiPick; // giorno passato scelto, in cui è stata cucinata davvero
+      const targetKey = el.dataset.avanzodiDay; // questo giorno, che ne mangia gli avanzi
+      const [w,i] = targetKey.split('_');
+      const weekIdx = parseInt(w,10);
+      state.dayLinks[targetKey] = sourceKey;
+      delete weekOverridesRef(weekIdx)[i];
+      delete weekOverridePickedRef(weekIdx)[i];
+      delete weekMealsDoneRef(weekIdx)[i];
+      state.avanzoDiPickerOpenDay = null;
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-link-pick]').forEach(row=>{
