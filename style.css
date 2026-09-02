@@ -200,7 +200,7 @@
   .panel{ padding:var(--padding-inline) 0 var(--padding-block); }
   h2.section-title{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-large); line-height:var(--line-height-small); margin:0 0 0.25rem; text-align:left; }
   p.section-sub{ font-size:var(--text-small); color:var(--ink-light); margin:0 0 1rem; }
-  .week-title{ font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); text-transform:uppercase; margin:0 0 0.25rem; }
+  .week-title{ font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); text-transform:uppercase; margin-bottom:var(--space-medium); padding-bottom: var(--padding-small); border-bottom: var(--border) solid var(--line-strong); display: flex; justify-content:space-between; align-items: center;}
   .btn-primary-flat{ font-size:var(--text-small); padding:var(--space-xsmall) var(--space-medium); text-align:left; }
   .color-delete{color: var(--delete);}
   /* balance strip */
