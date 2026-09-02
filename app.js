@@ -114,24 +114,24 @@ function isStaple(ingrediente){
 }
 
 // Alcuni ingredienti nelle ricette sono generici ("Pasta corta") ma in
-// Dispensa ci sono i formati specifici (Fusilli, Penne...): se il nome esatto
-// non c'è, si controlla se c'è scorta di uno qualsiasi dei formati equivalenti,
-// prendendo il primo trovato con scorta > 0.
-const PANTRY_ALIAS_GROUPS = {
-  'pasta corta': ['fusilli','penne','pennette','rigatoni','mezze maniche','farfalle','sedani','sedanini','ditalini','tubetti','tortiglioni','pipe','conchiglie','conchiglioni','orecchiette','gomiti','caserecce','gemelli','pasta mista'],
-  'pasta lunga': ['spaghetti','spaghettoni','linguine','tagliatelle','bucatini','tonnarelli','fettuccine','vermicelli','capellini','trenette','pappardelle','trofie']
-};
+// Dispensa ci sono i formati specifici (Fusilli, Penne...): un ingrediente
+// può avere un "gruppo" assegnato in Dispensa (campo Gruppo, in Aggiungi/
+// Modifica), e una ricetta che chiede il generico viene soddisfatta da
+// qualsiasi voce con lo stesso gruppo e scorta > 0. Gestibile in autonomia:
+// per un nuovo formato basta scegliere il gruppo giusto quando lo aggiungi,
+// non serve toccare il codice — l'unica cosa fissa è quali nomi generici le
+// ricette possono chiedere (i gruppi stessi), qui sotto.
+const PANTRY_GROUP_ORDER = ['pasta-corta', 'pasta-lunga'];
+const PANTRY_GROUP_LABEL = { 'pasta-corta':'Pasta corta', 'pasta-lunga':'Pasta lunga' };
+// Nome dell'ingrediente generico come compare nelle ricette -> chiave del gruppo.
+const PANTRY_GROUP_BY_INGREDIENT_NAME = { 'pasta corta':'pasta-corta', 'pasta lunga':'pasta-lunga' };
 function resolvePantryItem(ingrediente){
   const key = (ingrediente||'').trim().toLowerCase();
   const direct = state.pantryItems[key];
   if(direct) return direct;
-  const group = PANTRY_ALIAS_GROUPS[key];
+  const group = PANTRY_GROUP_BY_INGREDIENT_NAME[key];
   if(!group) return null;
-  for(const alias of group){
-    const candidate = state.pantryItems[alias];
-    if(candidate && typeof candidate.qty === 'number' && candidate.qty > 0) return candidate;
-  }
-  return null;
+  return Object.values(state.pantryItems).find(it => it.group === group && typeof it.qty === 'number' && it.qty > 0) || null;
 }
 
 // Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
@@ -250,7 +250,7 @@ function renderIngredientsSection(ing, recipeName, ratio){
 // automatico quando si spunta un articolo in Spesa. Quantità = un contatore
 // numerico (stepper +/- in UI); finché non è impostata (o è 0) la voce non
 // compare nell'elenco.
-function upsertPantryItem(nome, luogo, amount, staple, unit, cat){
+function upsertPantryItem(nome, luogo, amount, staple, unit, cat, group){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
   const key = trimmedName.toLowerCase();
@@ -260,6 +260,7 @@ function upsertPantryItem(nome, luogo, amount, staple, unit, cat){
   const isStapleFlag = staple !== undefined ? !!staple : !!(existing && existing.staple);
   const finalUnit = unit !== undefined ? unit : (existing && existing.unit) || '';
   const finalCat = cat !== undefined ? cat : (existing && existing.cat) || '';
+  const finalGroup = group !== undefined ? group : (existing && existing.group) || '';
   const newQty = currentQty + add;
   state.pantryItems[key] = {
     nome: trimmedName,
@@ -267,7 +268,8 @@ function upsertPantryItem(nome, luogo, amount, staple, unit, cat){
     luogo: (existing && existing.luogo) || luogo || 'dispensa',
     ...(finalCat ? { cat: finalCat } : {}),
     ...(isStapleFlag ? { staple: true } : {}),
-    ...(finalUnit ? { unit: finalUnit } : {})
+    ...(finalUnit ? { unit: finalUnit } : {}),
+    ...(finalGroup ? { group: finalGroup } : {})
   };
   // Torna in scorta: una volta rifinito serve una nuova conferma esplicita da Spesa.
   if(newQty > 0) delete state.pantryConfirmedShop[key];
@@ -400,6 +402,7 @@ const state = {
   pantryQtyMigrated: false,
   pantryUtilityLuogoMigrated: false,
   pantryUnitReviewed: false,
+  pantryGroupMigrated: false,
   pantryView: 'categoria',
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
@@ -648,6 +651,7 @@ function persist(){
       pantryQtyMigrated: state.pantryQtyMigrated,
       pantryUtilityLuogoMigrated: state.pantryUtilityLuogoMigrated,
       pantryUnitReviewed: state.pantryUnitReviewed,
+      pantryGroupMigrated: state.pantryGroupMigrated,
       pantryView: state.pantryView
     };
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
@@ -2271,6 +2275,13 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
+            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta)</div>
+            <select id="pantry-edit-group">
+              <option value="">Nessuno</option>
+              ${PANTRY_GROUP_ORDER.map(g=>`<option value="${g}" ${editItem.group===g?'selected':''}>${escapeHtml(PANTRY_GROUP_LABEL[g])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
             <div class="filter-group-label">Luogo</div>
             <select id="pantry-edit-luogo">
               ${LUOGO_ORDER.map(l=>`<option value="${l}" ${(editItem.luogo||'dispensa')===l?'selected':''}>${LUOGO_ICON[l]} ${escapeHtml(LUOGO_LABEL[l])}</option>`).join('')}
@@ -2314,6 +2325,13 @@ function renderDispensa(){
             <select id="pantry-add-cat">
               <option value="">Automatica (dal nome)</option>
               ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta)</div>
+            <select id="pantry-add-group">
+              <option value="">Nessuno</option>
+              ${PANTRY_GROUP_ORDER.map(g=>`<option value="${g}">${escapeHtml(PANTRY_GROUP_LABEL[g])}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
@@ -3322,12 +3340,13 @@ function attachHandlers(){
   if(pantryAddBtn){
     const nameInput = document.getElementById('pantry-add-name');
     const catSelect = document.getElementById('pantry-add-cat');
+    const groupSelect = document.getElementById('pantry-add-group');
     const luogoSelect = document.getElementById('pantry-add-luogo');
     const stapleToggle = document.getElementById('pantry-add-staple-toggle');
     const unitSelect = document.getElementById('pantry-add-unit');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
-      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'), unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '');
+      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'), unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
       state.pantryAddModalOpen = false;
       persist(); render();
     };
@@ -3375,6 +3394,16 @@ function attachHandlers(){
       const it = state.pantryItems[state.pantryEditKey];
       if(it){
         if(e.target.value) it.cat = e.target.value; else delete it.cat;
+        persist(); render();
+      }
+    });
+  }
+  const editGroupSelect = document.getElementById('pantry-edit-group');
+  if(editGroupSelect){
+    editGroupSelect.addEventListener('change', e=>{
+      const it = state.pantryItems[state.pantryEditKey];
+      if(it){
+        if(e.target.value) it.group = e.target.value; else delete it.group;
         persist(); render();
       }
     });
@@ -3661,6 +3690,24 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
       if(it && !it.unit && PANTRY_UNIT_BY_NAME[key]) it.unit = PANTRY_UNIT_BY_NAME[key];
     });
     state.pantryUnitReviewed = true;
+    persist();
+  }
+  // Una tantum: assegna il gruppo "Pasta corta"/"Pasta lunga" ai formati di
+  // pasta specifici già in Dispensa, riconoscendoli per nome — da qui in poi
+  // il gruppo si assegna dal campo in Aggiungi/Modifica, non serve più questa
+  // lista fissa (vedi PANTRY_GROUP_BY_INGREDIENT_NAME/resolvePantryItem).
+  if(!state.pantryGroupMigrated){
+    const SEED_GROUP_NAMES = {
+      'pasta-corta': ['fusilli','penne','pennette','rigatoni','mezze maniche','farfalle','sedani','sedanini','ditalini','tubetti','tortiglioni','pipe','conchiglie','conchiglioni','orecchiette','gomiti','caserecce','gemelli','pasta mista'],
+      'pasta-lunga': ['spaghetti','spaghettoni','linguine','tagliatelle','bucatini','tonnarelli','fettuccine','vermicelli','capellini','trenette','pappardelle','trofie']
+    };
+    Object.keys(state.pantryItems).forEach(key=>{
+      const it = state.pantryItems[key];
+      if(!it || it.group) return;
+      const group = PANTRY_GROUP_ORDER.find(g => SEED_GROUP_NAMES[g].includes(key));
+      if(group) it.group = group;
+    });
+    state.pantryGroupMigrated = true;
     persist();
   }
   const todayPos = findTodayPos();
