@@ -267,6 +267,11 @@ height: 100%;}
   .filter-group {display: flex; flex-direction:column;}
   .filter-group select{ width:100%; font-family:var(--font-family); font-size:var(--text-body); padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:var(--border) solid var(--line); background:var(--form-background); }
   .filter-group input[type=text],.filters input[type=search]{ font-family: var(--font-family); font-size: var(--text-body); flex:1; padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:var(--border) solid var(--line); background:var(--form-background); }
+  .add-ing-combo{ position:relative; }
+  .add-ing-suggestions{ position:absolute; z-index:20; left:0; right:0; top:calc(100% + 0.25rem); background:var(--surface); border:var(--border) solid var(--line); border-radius:var(--form-border-radius); box-shadow:var(--shadow-dropdown); max-height:11rem; overflow-y:auto; display:flex; flex-direction:column; }
+  .add-ing-suggestion{ display:block; width:100%; text-align:left; padding:var(--space-xsmall) var(--space-small); border:none; background:none; font-family:var(--font-family); font-size:var(--text-small); color:var(--ink); cursor:pointer; }
+  .add-ing-suggestion:hover, .add-ing-suggestion:focus{ background:var(--surface-2); }
+  .add-ing-suggestion + .add-ing-suggestion{ border-top:1px solid var(--line-light); }
 
   .done-ing-list{ display:flex; flex-direction:column; gap:0.125rem; }
   .done-ing-row{ display:flex; align-items:center; justify-content:space-between; gap:0.5625rem; font-size:var(--text-small); padding:var(--space-xsmall) 0.125rem; border-bottom:1px dashed var(--line); }

@@ -314,6 +314,20 @@ function getIngredientsFor(name){
   });
 }
 
+// Vocabolario di nomi ingrediente noti, per il suggeritore di "Aggiungi" in
+// Spesa: unione dei nomi già in Dispensa (anche finiti) e di quelli usati in
+// tutte le ricette — così anche un ingrediente mai avuto in Dispensa ma già
+// presente in una ricetta suggerisce il nome esatto, invece di farlo
+// reinventare a mano (e magari sbagliare la corrispondenza).
+function allKnownIngredientNames(){
+  const names = new Set();
+  Object.values(state.pantryItems).forEach(it=>{ if(it.nome) names.add(it.nome.trim()); });
+  allRecipeMetas().forEach(r=>{
+    getIngredientsFor(r.nome).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
+  });
+  return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
+}
+
 const state = {
   tab: 'menu',
   shopChecked: {},
@@ -323,6 +337,9 @@ const state = {
   shopQtyEditingKey: null,
   shopView: 'giorno',
   addIngModalOpen: false,
+  addIngName: '', // ephemeral, non persistito: testo corrente del campo "Ingrediente" in Aggiungi (Spesa)
+  addIngSuggestOpen: false, // ephemeral: se il menu dei suggerimenti è visibile
+  addIngCursorPos: null, // ephemeral: posizione del cursore da ripristinare dopo il re-render a ogni tasto premuto
   pantryAddModalOpen: false,
   pantryChecked: {},
   pantryItems: {},
@@ -1749,6 +1766,10 @@ function renderSpesa(){
       ⚠️ Ingredienti non ancora salvati per: ${missingDays.map(d=>`${escapeHtml(d.giorno)} ${escapeHtml(d.dateLabel)} (${escapeHtml(d.nome)})`).join(', ')}. Aprili dal Menù per aggiungerli.
     </div>` : '';
 
+  const addIngQuery = (state.addIngName || '').trim().toLowerCase();
+  const addIngSuggestions = (addIngQuery && state.addIngSuggestOpen)
+    ? allKnownIngredientNames().filter(n => n.toLowerCase().includes(addIngQuery)).slice(0, 8)
+    : [];
   const addIngModal = state.addIngModalOpen ? `
     <div class="filters-modal-backdrop" data-close-add-ing-modal>
       <div class="filters-modal" data-stop-close>
@@ -1759,7 +1780,13 @@ function renderSpesa(){
         <div class="filter-groups">
           <div class="filter-group">
             <div class="filter-group-label">Ingrediente</div>
-            <input type="text" id="shop-add-name" placeholder="Es. Carta forno">
+            <div class="add-ing-combo">
+              <input type="text" id="shop-add-name" placeholder="Es. Carta forno" value="${escapeAttr(state.addIngName || '')}" autocomplete="off">
+              ${addIngSuggestions.length ? `
+              <div class="add-ing-suggestions">
+                ${addIngSuggestions.map(n=>`<button type="button" class="add-ing-suggestion" data-pick-ing-suggestion="${escapeAttr(n)}">${escapeHtml(n)}</button>`).join('')}
+              </div>` : ''}
+            </div>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">Quantità</div>
@@ -2259,24 +2286,62 @@ function attachHandlers(){
   if(shopAddBtn){
     const nameInput = document.getElementById('shop-add-name');
     const qtaInput = document.getElementById('shop-add-qta');
+    // Se il nome coincide con un ingrediente già in Dispensa ma a scorta 0,
+    // "Aggiungi" non crea una voce doppia: riattiva quello (stessa azione di
+    // "Segna da comprare" nella sezione Finiti), così resta un unico record.
     const doAdd = ()=>{
-      if(!nameInput.value.trim()) return;
-      const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-      state.shopExtras[id] = { ingrediente: nameInput.value.trim(), qta: qtaInput.value.trim() };
+      const name = nameInput.value.trim();
+      if(!name) return;
+      const pantryKey = name.toLowerCase();
+      const pantryIt = state.pantryItems[pantryKey];
+      if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
+        state.pantryConfirmedShop[pantryKey] = true;
+        delete state.shopDismissed[`oos_${pantryKey}`];
+      } else {
+        const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+        state.shopExtras[id] = { ingrediente: name, qta: qtaInput.value.trim() };
+      }
       state.addIngModalOpen = false;
+      state.addIngName = '';
+      state.addIngSuggestOpen = false;
+      state.addIngCursorPos = null;
       persist(); render();
     };
     shopAddBtn.addEventListener('click', doAdd);
     [nameInput, qtaInput].forEach(inp=>{
       inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
     });
+    nameInput.addEventListener('input', e=>{
+      state.addIngName = e.target.value;
+      state.addIngSuggestOpen = true;
+      state.addIngCursorPos = e.target.selectionStart;
+      render();
+    });
+    nameInput.addEventListener('focus', ()=>{ state.addIngSuggestOpen = true; });
+    // il re-render sostituisce l'input con uno nuovo: rimette a fuoco e
+    // ripristina la posizione del cursore, altrimenti si perderebbero a ogni tasto.
+    if(document.activeElement !== nameInput){
+      nameInput.focus();
+      if(typeof state.addIngCursorPos === 'number') nameInput.setSelectionRange(state.addIngCursorPos, state.addIngCursorPos);
+    }
   }
+  document.querySelectorAll('[data-pick-ing-suggestion]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.addIngName = e.currentTarget.dataset.pickIngSuggestion;
+      state.addIngSuggestOpen = false;
+      state.addIngCursorPos = state.addIngName.length;
+      render();
+    });
+  });
   const spesaFab = document.getElementById('spesa-fab');
   if(spesaFab) spesaFab.addEventListener('click', ()=>{ state.addIngModalOpen = true; render(); });
   document.querySelectorAll('[data-close-add-ing-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
       state.addIngModalOpen = false;
+      state.addIngName = '';
+      state.addIngSuggestOpen = false;
+      state.addIngCursorPos = null;
       render();
     });
   });
