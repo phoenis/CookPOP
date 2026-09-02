@@ -3165,8 +3165,11 @@ function attachHandlers(){
       if(state.pantrySelected[key]) delete state.pantrySelected[key];
       else state.pantrySelected[key] = true;
     };
+    // Lo stepper +/- resta sempre fuori dalla selezione (né pressione lunga né
+    // tap-per-selezionare): altrimenti un doppio tocco rapido per aggiustare
+    // la quantità finisce per selezionare la riga invece di cambiare il numero.
     row.addEventListener('pointerdown', e=>{
-      if(e.target.closest('[data-luogo-toggle]')) return;
+      if(e.target.closest('[data-luogo-toggle]') || e.target.closest('.qty-stepper')) return;
       longPressed = false;
       pressTimer = setTimeout(()=>{
         longPressed = true;
@@ -3182,7 +3185,7 @@ function attachHandlers(){
     row.addEventListener('click', e=>{
       if(longPressed){ longPressed = false; e.stopPropagation(); return; }
       if(!state.pantrySelectMode) return;
-      if(e.target.closest('[data-luogo-toggle]') || e.target.closest('.luogo-picker') || e.target.closest('.luogo-picker-backdrop')) return;
+      if(e.target.closest('[data-luogo-toggle]') || e.target.closest('.luogo-picker') || e.target.closest('.luogo-picker-backdrop') || e.target.closest('.qty-stepper')) return;
       e.stopPropagation();
       toggleSelected();
       render();
