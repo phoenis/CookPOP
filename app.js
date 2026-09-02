@@ -360,6 +360,7 @@ const state = {
   notifDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "tocca a te cucinare" già chiuso per quel giorno
   mealsDoneReminderDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel giorno (senza segnarlo mangiato)
   genSettingsOpen: false,
+  showPastDays: false, // mostra le card degli ultimi 3 giorni passati (nascoste di default) nella settimana corrente
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
   dayLinkNotes: {}, // giorno "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
@@ -1414,7 +1415,17 @@ function renderWeekSection(weekIdx){
     </div>`;
   }).join('');
 
-  const days = positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
+  // Gli ultimi 3 giorni passati restano raggiungibili dietro un bottone,
+  // chiusi di default: servono soprattutto per rimediare a uno scollegamento
+  // avanzi fatto per sbaglio, riaprendo la card sorgente originale.
+  const pastPositions = weekIdx === 0 ? allPositions.filter(pos => pos < startPos).slice(-3) : [];
+  const pastToggle = pastPositions.length ? `
+    <button type="button" class="btn is-ghost past-days-toggle" data-toggle-past-days="${weekIdx}">${state.showPastDays ? 'Nascondi' : 'Mostra'} giorni precedenti</button>` : '';
+  const pastDays = (state.showPastDays && pastPositions.length)
+    ? pastPositions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('')
+    : '';
+
+  const days = pastToggle + pastDays + positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
   const genSettingsBtn = genSettingsButton();
 
@@ -2521,6 +2532,9 @@ function attachHandlers(){
   const addWeekBtn = document.getElementById('add-week');
   if(addWeekBtn) addWeekBtn.addEventListener('click', ()=>{ addWeek(); });
 
+  document.querySelectorAll('[data-toggle-past-days]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.showPastDays = !state.showPastDays; render(); });
+  });
   document.querySelectorAll('[data-open-gen-settings]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.genSettingsOpen = true; render(); });
   });
