@@ -1701,6 +1701,15 @@ function renderSpesa(){
   // un'azione ("Sposta in dispensa") che per un ingrediente già in Dispensa
   // non ha senso.
   const doneShoppable = mainFlat.filter(it=> it.context !== 'Finiti in Dispensa' && isItemChecked([it.key], it.ingrediente)).length;
+  // Il conteggio mostrato in cima deve contare quello che vedi davvero: in
+  // Per giorno ogni occorrenza è una riga (mainFlat), ma in Per reparto più
+  // occorrenze dello stesso ingrediente+quantità si uniscono in una riga sola
+  // — altrimenti il numero non torna con quante righe hai sotto gli occhi.
+  // Di default (Per giorno) coincide con total/done; Per reparto lo
+  // ricalcola sulla lista unita non appena è pronta, poco più sotto.
+  let displayTotal = total;
+  let displayDone = done;
+  let displayDoneShoppable = doneShoppable;
 
   function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked){
     const checked = forcedChecked !== undefined ? forcedChecked : isItemChecked(keys, ingrediente);
@@ -1757,6 +1766,9 @@ function renderSpesa(){
       }
     });
     const mergedList = Object.values(merged);
+    displayTotal = mergedList.length;
+    displayDone = mergedList.filter(it=>isItemChecked(it.keys, it.ingrediente)).length;
+    displayDoneShoppable = mergedList.filter(it=> it.dept !== 'finiti' && isItemChecked(it.keys, it.ingrediente)).length;
 
     const byDept = {};
     mergedList.forEach(it=>{
@@ -1925,7 +1937,7 @@ function renderSpesa(){
       <button class="view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
     </div>
     <div class="shop-checks">
-    <div class="shop-progress">${done} / ${total} presi</div>
+    <div class="shop-progress">${displayDone} / ${displayTotal} presi</div>
     ${total ? `<button type="button" class="btn is-chip" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? 'Espandi tutto' : 'Comprimi tutto'}</button>` : ''}
     </div>
     ${body}
@@ -1933,10 +1945,10 @@ function renderSpesa(){
       <button class="btn is-outline reset-btn" id="reset-shop">Svuota spunte</button>
       <button class="btn is-outline" id="check-have-shop">Spunta quello che ho già</button>
     </div>
-    ${doneShoppable ? `
+    ${displayDoneShoppable ? `
     <div class="shop-checked-actions">
-      <button class="btn is-outline" id="delete-checked-shop">Elimina ${doneShoppable} spuntati</button>
-      <button class="btn is-solid" id="move-checked-to-pantry">Sposta ${doneShoppable} in dispensa</button>
+      <button class="btn is-outline" id="delete-checked-shop">Elimina ${displayDoneShoppable} spuntati</button>
+      <button class="btn is-solid" id="move-checked-to-pantry">Sposta ${displayDoneShoppable} in dispensa</button>
     </div>` : ''}
     ${addIngModal}
     <button class="btn is-solid is-icon fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
