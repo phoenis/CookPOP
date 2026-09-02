@@ -1591,6 +1591,12 @@ function renderSpesa(){
 
   const total = mainFlat.length;
   const done = mainFlat.filter(it=>isItemChecked([it.key], it.ingrediente)).length;
+  // Le spuntate in "Finiti" hanno le loro azioni dedicate (Elimina/Aggiungi
+  // alla lista, vedi la sezione più sotto) — non contano per la barra globale
+  // Elimina/Sposta in dispensa, che altrimenti comparirebbe due volte con
+  // un'azione ("Sposta in dispensa") che per un ingrediente già in Dispensa
+  // non ha senso.
+  const doneShoppable = mainFlat.filter(it=> it.context !== 'Finiti in Dispensa' && isItemChecked([it.key], it.ingrediente)).length;
 
   function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked){
     const checked = forcedChecked !== undefined ? forcedChecked : isItemChecked(keys, ingrediente);
@@ -1764,10 +1770,10 @@ function renderSpesa(){
     <div class="shop-progress">${done} / ${total} presi</div>
     <button class="btn is-ghost reset-btn" id="reset-shop">Svuota spunte</button>
     ${body}
-    ${done ? `
+    ${doneShoppable ? `
     <div class="shop-checked-actions">
-      <button class="btn is-outline" id="delete-checked-shop">Elimina ${done} spuntati</button>
-      <button class="btn is-solid" id="move-checked-to-pantry">Sposta ${done} in dispensa</button>
+      <button class="btn is-outline" id="delete-checked-shop">Elimina ${doneShoppable} spuntati</button>
+      <button class="btn is-solid" id="move-checked-to-pantry">Sposta ${doneShoppable} in dispensa</button>
     </div>` : ''}
     ${addIngModal}
     <button class="btn is-solid is-icon fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
@@ -2183,6 +2189,7 @@ function attachHandlers(){
     // aggiornato a mano): esce dalla lista senza toccare la Dispensa.
     deleteCheckedBtn.addEventListener('click', ()=>{
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
+        if(cb.closest('.finished-shop-group')) return;
         cb.dataset.shopKeys.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
       });
       persist(); render();
@@ -2194,6 +2201,7 @@ function attachHandlers(){
     // quantità impostata nello stepper) e poi esce dalla lista.
     moveToPantryBtn.addEventListener('click', ()=>{
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
+        if(cb.closest('.finished-shop-group')) return;
         const rowKey = cb.dataset.shopKeys;
         const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
         upsertPantryItem(cb.dataset.shopName, 'dispensa', qty);
