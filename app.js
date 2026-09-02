@@ -2115,16 +2115,17 @@ function renderDispensa(){
   function itemRow(it){
     const editing = state.pantryEditingKey === it.key;
     const step = qtyStepFor(it.unit);
-    // Selezione multipla: tieni premuto sull'icona del luogo per entrare in
-    // modalità selezione (l'icona diventa un segno di spunta), poi basta un
-    // tap sulle altre righe — nessuna checkbox separata da imparare.
+    // Selezione multipla: tieni premuto sulla riga per entrare in modalità
+    // selezione (l'icona del luogo diventa un segno di spunta), poi basta un
+    // tap sulle altre righe — nessuna checkbox separata da imparare. L'icona
+    // del luogo resta sempre un tap = cambia luogo, anche in modalità selezione.
     const isSelected = !!state.pantrySelected[it.key];
     const luogoIconContent = isSelected
       ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg>'
       : LUOGO_ICON[it.luogo];
     return `
-    <div class="inv-item">
-      <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere, tieni premuto per selezionare">${luogoIconContent}</button>
+    <div class="inv-item" data-pantry-row="${escapeAttr(it.key)}">
+      <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${luogoIconContent}</button>
       ${state.pantryLuogoPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-luogo-picker-close></div>
       <div class="luogo-picker">
@@ -2262,14 +2263,16 @@ function renderDispensa(){
       ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}
     </div>` : '';
 
-  // Barra di selezione globale (tieni premuto su un'icona luogo per attivarla):
+  // Barra di selezione globale (pressione lunga su una riga per attivarla):
   // vale per qualsiasi ingrediente, non solo i finiti — anche uno che hai
   // ancora ma di cui vuoi comunque ricomprare, va in Spesa come "Aggiunto a mano".
+  // Resta visibile finché sei in modalità selezione, anche a zero selezionati,
+  // altrimenti "Deseleziona tutto" sparirebbe proprio quando serve per uscire.
   const pantrySelectedCount = Object.keys(state.pantrySelected).length;
-  const selectionBar = pantrySelectedCount ? `
+  const selectionBar = state.pantrySelectMode ? `
     <div class="finished-shop-actions pantry-selection-bar">
-      <button type="button" class="btn is-ghost" id="pantry-selection-cancel">Annulla</button>
-      <button type="button" class="btn is-solid" id="pantry-selection-mark">Segna da comprare (${pantrySelectedCount})</button>
+      <button type="button" class="btn is-ghost" id="pantry-selection-cancel">Deseleziona tutto</button>
+      ${pantrySelectedCount ? `<button type="button" class="btn is-solid" id="pantry-selection-mark">Segna da comprare (${pantrySelectedCount})</button>` : ''}
     </div>` : '';
 
   return `
@@ -3085,14 +3088,28 @@ function attachHandlers(){
     persist(); render();
   });
   document.querySelectorAll('[data-luogo-toggle]').forEach(btn=>{
-    const key = btn.dataset.luogoToggle;
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.luogoToggle;
+      state.pantryLuogoPicker = state.pantryLuogoPicker === key ? null : key;
+      render();
+    });
+  });
+  // Selezione multipla in Dispensa: pressione lunga sulla riga per entrare in
+  // modalità selezione, poi un tap semplice sulle altre righe seleziona/
+  // deseleziona. L'icona del luogo resta un'eccezione — un suo tap cambia
+  // sempre luogo, anche in modalità selezione, quindi qui si esclude sempre
+  // dal toggle (il click page-level la intercetta comunque per prima, in fase
+  // di cattura, prima che i bottoni annidati facciano la loro azione normale).
+  document.querySelectorAll('[data-pantry-row]').forEach(row=>{
+    const key = row.dataset.pantryRow;
     let pressTimer = null;
     let longPressed = false;
     const toggleSelected = ()=>{
       if(state.pantrySelected[key]) delete state.pantrySelected[key];
       else state.pantrySelected[key] = true;
     };
-    btn.addEventListener('pointerdown', ()=>{
+    row.addEventListener('pointerdown', e=>{
+      if(e.target.closest('[data-luogo-toggle]')) return;
       longPressed = false;
       pressTimer = setTimeout(()=>{
         longPressed = true;
@@ -3102,19 +3119,17 @@ function attachHandlers(){
       }, 500);
     });
     const cancelPress = ()=> clearTimeout(pressTimer);
-    btn.addEventListener('pointerup', cancelPress);
-    btn.addEventListener('pointerleave', cancelPress);
-    btn.addEventListener('pointercancel', cancelPress);
-    btn.addEventListener('click', ()=>{
-      if(longPressed){ longPressed = false; return; } // il click che segue la pressione lunga non deve rifare il toggle
-      if(state.pantrySelectMode){
-        toggleSelected();
-        render();
-        return;
-      }
-      state.pantryLuogoPicker = state.pantryLuogoPicker === key ? null : key;
+    row.addEventListener('pointerup', cancelPress);
+    row.addEventListener('pointerleave', cancelPress);
+    row.addEventListener('pointercancel', cancelPress);
+    row.addEventListener('click', e=>{
+      if(longPressed){ longPressed = false; e.stopPropagation(); return; }
+      if(!state.pantrySelectMode) return;
+      if(e.target.closest('[data-luogo-toggle]') || e.target.closest('.luogo-picker') || e.target.closest('.luogo-picker-backdrop')) return;
+      e.stopPropagation();
+      toggleSelected();
       render();
-    });
+    }, true);
   });
   document.querySelectorAll('[data-luogo-picker-close]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.pantryLuogoPicker = null; render(); });
