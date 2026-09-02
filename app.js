@@ -359,7 +359,8 @@ const state = {
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
   pantryFinishedOpen: false,
-  pantryFinishedSelected: {}, // pantryKey -> true, selezione in corso nell'accordion "Finiti" di Dispensa (non persistita)
+  pantrySelectMode: false, // true dopo una pressione lunga: un tap semplice seleziona/deseleziona invece di aprire il luogo-picker
+  pantrySelected: {}, // pantryKey -> true, selezione corrente in Dispensa (qualsiasi riga, non solo Finiti; non persistita)
   shopFinitiOpen: false, // accordion "Finiti", condiviso da Per reparto e Per giorno, chiuso di default
   shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
@@ -1721,6 +1722,7 @@ function renderSpesa(){
   }
 
   let body = '';
+  let hasFinitiThisView = false;
   if(state.shopView === 'reparto'){
     // Solo reparto merceologico, niente più negozio: si compra dove capita.
     // I "Finiti in Dispensa" vanno nel loro reparto dedicato invece che in "Altro"
@@ -1756,6 +1758,7 @@ function renderSpesa(){
       .sort((a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
     if(deptsPresent.includes('altro')) sortedDepts.push('altro');
     if(deptsPresent.includes('finiti')) sortedDepts.push('finiti');
+    hasFinitiThisView = deptsPresent.includes('finiti');
 
     body = sortedDepts.map(dept => {
       const isFinitiDept = dept === 'finiti';
@@ -1840,6 +1843,7 @@ function renderSpesa(){
     // esce da qui: lo si ritrova nella vista Per reparto, mescolato al suo
     // reparto vero — qui in Per giorno non ha un posto naturale dove stare.
     const oosContext = mainFlat.filter(it => it.context === 'Finiti in Dispensa' && !it.confirmed);
+    hasFinitiThisView = oosContext.length > 0;
     if(oosContext.length){
       const oosCheckedCount = oosContext.filter(it => state.shopChecked[it.key]).length;
       body += `
@@ -1909,7 +1913,10 @@ function renderSpesa(){
       <button class="view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
     </div>
     <div class="shop-progress">${done} / ${total} presi</div>
-    <button class="btn is-ghost reset-btn" id="reset-shop">Svuota spunte</button>
+    <div class="shop-top-actions">
+      <button class="btn is-ghost reset-btn" id="reset-shop">Svuota spunte</button>
+      ${total ? `<button type="button" class="btn is-ghost" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? 'Espandi tutto' : 'Comprimi tutto'}</button>` : ''}
+    </div>
     ${body}
     ${doneShoppable ? `
     <div class="shop-checked-actions">
@@ -2105,14 +2112,19 @@ function renderDispensa(){
     .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0);
 
-  function itemRow(it, selectable){
+  function itemRow(it){
     const editing = state.pantryEditingKey === it.key;
     const step = qtyStepFor(it.unit);
-    const selectCb = selectable ? `<input type="checkbox" class="finished-select-cb" data-finished-select="${escapeAttr(it.key)}" ${state.pantryFinishedSelected[it.key] ? 'checked' : ''} aria-label="Seleziona ${escapeAttr(it.nome)} per segnarlo da comprare">` : '';
+    // Selezione multipla: tieni premuto sull'icona del luogo per entrare in
+    // modalità selezione (l'icona diventa un segno di spunta), poi basta un
+    // tap sulle altre righe — nessuna checkbox separata da imparare.
+    const isSelected = !!state.pantrySelected[it.key];
+    const luogoIconContent = isSelected
+      ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg>'
+      : LUOGO_ICON[it.luogo];
     return `
     <div class="inv-item">
-      ${selectCb}
-      <button class="btn is-icon luogo-picker-opt is-selected" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${LUOGO_ICON[it.luogo]}</button>
+      <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere, tieni premuto per selezionare">${luogoIconContent}</button>
       ${state.pantryLuogoPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-luogo-picker-close></div>
       <div class="luogo-picker">
@@ -2236,25 +2248,28 @@ function renderDispensa(){
   // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
   // qui restano fuori dalle viste normali per luogo/categoria e finiscono in un
   // accordion a parte, chiuso di default — non è un luogo assegnabile, solo
-  // uno stato. Riusa itemRow: stesso stepper/edit/luogo-picker degli altri, con
-  // in più una checkbox (solo qui, non sugli ingredienti che hai già) per
-  // segnarli "da comprare" — stessa azione già disponibile da Spesa, comoda
-  // anche da qui senza dover prima passare da lì.
+  // uno stato. Riusa itemRow: stesso stepper/edit/luogo-picker/selezione degli altri.
   const finishedItems = Object.entries(state.pantryItems)
     .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
     .filter(it => typeof it.qty === 'number' && it.qty <= 0)
     .sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
-  const finishedSelectedCount = finishedItems.filter(it=>state.pantryFinishedSelected[it.key]).length;
   const finishedSection = finishedItems.length ? `
     <div class="dept-block">
       <div class="dept-title finished-toggle${state.pantryFinishedOpen ? ' open' : ''}" data-toggle-finished>
         <span class="dept-icon">${DEPT_ICON.finiti}</span>${DEPT_LABEL.finiti} (${finishedItems.length})
         <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
       </div>
-      ${state.pantryFinishedOpen ? `
-        ${finishedItems.map(it=>itemRow(it, true)).join('')}
-        ${finishedSelectedCount ? `<button type="button" class="btn is-solid mark-to-buy-btn" id="pantry-mark-to-buy">Segna da comprare (${finishedSelectedCount})</button>` : ''}
-      ` : ''}
+      ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}
+    </div>` : '';
+
+  // Barra di selezione globale (tieni premuto su un'icona luogo per attivarla):
+  // vale per qualsiasi ingrediente, non solo i finiti — anche uno che hai
+  // ancora ma di cui vuoi comunque ricomprare, va in Spesa come "Aggiunto a mano".
+  const pantrySelectedCount = Object.keys(state.pantrySelected).length;
+  const selectionBar = pantrySelectedCount ? `
+    <div class="finished-shop-actions pantry-selection-bar">
+      <button type="button" class="btn is-ghost" id="pantry-selection-cancel">Annulla</button>
+      <button type="button" class="btn is-solid" id="pantry-selection-mark">Segna da comprare (${pantrySelectedCount})</button>
     </div>` : '';
 
   return `
@@ -2266,6 +2281,7 @@ function renderDispensa(){
     </div>
     ${body}
     ${finishedSection}
+    ${selectionBar}
     <div class="save-hint"></div>
     ${editModal}
     ${addModal}
@@ -2456,6 +2472,23 @@ function attachHandlers(){
   });
   const resetBtn = document.getElementById('reset-shop');
   if(resetBtn) resetBtn.addEventListener('click', ()=>{ state.shopChecked = {}; state.shopDismissed = {}; persist(); render(); });
+  const toggleAllSectionsBtn = document.getElementById('shop-toggle-all-sections');
+  if(toggleAllSectionsBtn){
+    toggleAllSectionsBtn.addEventListener('click', ()=>{
+      // Guarda lo stato reale nel DOM (solo le sezioni della vista attuale sono
+      // presenti) invece di ricalcolare la stessa logica una seconda volta qui.
+      const sectionEls = document.querySelectorAll('[data-toggle-shop-section]');
+      const finitiEls = document.querySelectorAll('[data-toggle-shop-finiti]');
+      const anyCollapsed = Array.from(sectionEls).some(el=>!el.classList.contains('open')) || (finitiEls.length > 0 && !state.shopFinitiOpen);
+      sectionEls.forEach(el=>{
+        const id = el.dataset.toggleShopSection;
+        if(anyCollapsed) delete state.shopSectionCollapsed[id];
+        else state.shopSectionCollapsed[id] = true;
+      });
+      if(finitiEls.length) state.shopFinitiOpen = anyCollapsed;
+      render();
+    });
+  }
 
   document.querySelectorAll('[data-open-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -3022,29 +3055,63 @@ function attachHandlers(){
       render();
     });
   });
-  document.querySelectorAll('[data-finished-select]').forEach(cb=>{
-    cb.addEventListener('click', e=> e.stopPropagation());
-    cb.addEventListener('change', e=>{
-      const key = e.currentTarget.dataset.finishedSelect;
-      if(e.currentTarget.checked) state.pantryFinishedSelected[key] = true;
-      else delete state.pantryFinishedSelected[key];
-      render();
-    });
+  const pantrySelectionCancelBtn = document.getElementById('pantry-selection-cancel');
+  if(pantrySelectionCancelBtn) pantrySelectionCancelBtn.addEventListener('click', ()=>{
+    state.pantrySelectMode = false;
+    state.pantrySelected = {};
+    render();
   });
-  const pantryMarkToBuyBtn = document.getElementById('pantry-mark-to-buy');
-  if(pantryMarkToBuyBtn){
-    pantryMarkToBuyBtn.addEventListener('click', ()=>{
-      Object.keys(state.pantryFinishedSelected).forEach(key=>{
+  const pantrySelectionMarkBtn = document.getElementById('pantry-selection-mark');
+  if(pantrySelectionMarkBtn) pantrySelectionMarkBtn.addEventListener('click', ()=>{
+    Object.keys(state.pantrySelected).forEach(key=>{
+      const it = state.pantryItems[key];
+      if(!it) return;
+      if(typeof it.qty === 'number' && it.qty <= 0){
+        // Finito: riusa lo stesso record già in Spesa, non ne crea uno nuovo.
         state.pantryConfirmedShop[key] = true;
         delete state.shopDismissed[`oos_${key}`];
-        delete state.pantryFinishedSelected[key];
-      });
-      persist(); render();
+      } else {
+        // Ce l'hai ancora ma lo vuoi comunque in lista (es. sta per finire):
+        // stessa strada di un'aggiunta manuale da Spesa, solo se non c'è già.
+        const already = Object.values(state.shopExtras).some(ex => (ex.ingrediente||'').trim().toLowerCase() === key);
+        if(!already){
+          const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+          state.shopExtras[id] = { ingrediente: it.nome, qta: '' };
+        }
+      }
     });
-  }
+    state.pantrySelectMode = false;
+    state.pantrySelected = {};
+    persist(); render();
+  });
   document.querySelectorAll('[data-luogo-toggle]').forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      const key = e.currentTarget.dataset.luogoToggle;
+    const key = btn.dataset.luogoToggle;
+    let pressTimer = null;
+    let longPressed = false;
+    const toggleSelected = ()=>{
+      if(state.pantrySelected[key]) delete state.pantrySelected[key];
+      else state.pantrySelected[key] = true;
+    };
+    btn.addEventListener('pointerdown', ()=>{
+      longPressed = false;
+      pressTimer = setTimeout(()=>{
+        longPressed = true;
+        state.pantrySelectMode = true;
+        toggleSelected();
+        render();
+      }, 500);
+    });
+    const cancelPress = ()=> clearTimeout(pressTimer);
+    btn.addEventListener('pointerup', cancelPress);
+    btn.addEventListener('pointerleave', cancelPress);
+    btn.addEventListener('pointercancel', cancelPress);
+    btn.addEventListener('click', ()=>{
+      if(longPressed){ longPressed = false; return; } // il click che segue la pressione lunga non deve rifare il toggle
+      if(state.pantrySelectMode){
+        toggleSelected();
+        render();
+        return;
+      }
       state.pantryLuogoPicker = state.pantryLuogoPicker === key ? null : key;
       render();
     });
