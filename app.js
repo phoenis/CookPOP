@@ -1833,7 +1833,7 @@ function buildShopFlat(){
     if(typeof it.qty !== 'number' || it.qty > 0) return;
     const key = `oos_${pantryKey}`;
     if(state.shopDismissed[key]) return;
-    flat.push({ key, ingrediente:it.nome, qta:'', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', staple: isStaple(it.nome), confirmed: !!state.pantryConfirmedShop[pantryKey] });
+    flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', staple: isStaple(it.nome), confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
   return flat;
 }
@@ -3409,7 +3409,7 @@ function attachHandlers(){
         const already = Object.values(state.shopExtras).some(ex => (ex.ingrediente||'').trim().toLowerCase() === key);
         if(!already){
           const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-          state.shopExtras[id] = { ingrediente: it.nome, qta: '' };
+          state.shopExtras[id] = { ingrediente: it.nome, qta: it.unit ? `1 ${it.unit}` : '' };
         }
       }
     });
