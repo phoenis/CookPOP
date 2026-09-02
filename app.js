@@ -1813,7 +1813,7 @@ function buildShopFlat(){
       // nome intero del giorno né il mese — "Ven 11" basta per orientarsi nella
       // settimana. "context" resta invariato: è anche la chiave con cui Per
       // giorno ritrova gli ingredienti del suo giorno, non va accorciato.
-      flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, contextShort:`${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${name}`, staple: isStaple(it.ingrediente) });
+      flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, contextShort:`${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${name}`, staple: isStaple(it.ingrediente), isRecipe: true });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
@@ -1929,10 +1929,10 @@ function renderSpesa(){
     classified.forEach(it=>{
       const mergeKey = (it.ingrediente||'').trim().toLowerCase() + '|' + (it.qta||'').trim().toLowerCase();
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.note, dept: it.dept, keys: [it.key], contexts: [it.contextShort] };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [it.contextShort] : [] };
       } else {
         merged[mergeKey].keys.push(it.key);
-        if(!merged[mergeKey].contexts.includes(it.contextShort)) merged[mergeKey].contexts.push(it.contextShort);
+        if(it.isRecipe && !merged[mergeKey].contexts.includes(it.contextShort)) merged[mergeKey].contexts.push(it.contextShort);
       }
     });
     const mergedList = Object.values(merged);
@@ -2018,7 +2018,7 @@ function renderSpesa(){
           Ogni settimana
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${genOpen ? genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('') : ''}
+        ${genOpen ? genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('') : ''}
       </div>`;
     }
     const extraContext = mainFlat.filter(it => it.context === 'Aggiunti a mano');
@@ -2030,7 +2030,7 @@ function renderSpesa(){
           Aggiunti a mano
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${extraOpen ? extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('') : ''}
+        ${extraOpen ? extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('') : ''}
       </div>`;
     }
     // Chi è già stato segnato "da comprare" (vedi data-finished-shop-addlist)
@@ -2046,7 +2046,7 @@ function renderSpesa(){
           Finiti (${oosContext.length})
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${state.shopFinitiOpen ? oosContext.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('') : ''}
+        ${state.shopFinitiOpen ? oosContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('') : ''}
         ${oosCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${oosCheckedCount})</button>
