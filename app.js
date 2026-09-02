@@ -2492,7 +2492,10 @@ function attachHandlers(){
     });
   });
   const resetBtn = document.getElementById('reset-shop');
-  if(resetBtn) resetBtn.addEventListener('click', ()=>{ state.shopChecked = {}; state.shopDismissed = {}; persist(); render(); });
+  // Solo le spunte: azzerare anche gli eliminati farebbe ricomparire tutto
+  // quello che avevi tolto con "Elimina" (spesso già spuntato di default se
+  // basilare), gonfiando il conteggio invece di limitarsi a deselezionare.
+  if(resetBtn) resetBtn.addEventListener('click', ()=>{ state.shopChecked = {}; persist(); render(); });
   const toggleAllSectionsBtn = document.getElementById('shop-toggle-all-sections');
   if(toggleAllSectionsBtn){
     toggleAllSectionsBtn.addEventListener('click', ()=>{
