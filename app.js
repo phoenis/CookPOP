@@ -1876,7 +1876,15 @@ function renderSpesa(){
   function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked){
     const checked = forcedChecked !== undefined ? forcedChecked : isItemChecked(keys, ingrediente);
     const rowKey = keys.join(',');
-    const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
+    // La quantità/unità di partenza viene dal testo della ricetta ("300 g",
+    // "1 spicchio"...) invece di un generico "1" scollegato — allineato a come
+    // Dispensa mostra numero+unità nello stepper. Se il testo non è
+    // interpretabile (es. "q.b.", "circa 80 ml") resta il vecchio fallback:
+    // un contatore da 1 senza unità, comunque modificabile con +/-.
+    const parsedQta = parseQtyValue(qta);
+    const unit = parsedQta ? (parsedQta.unit || 'pz') : '';
+    const step = parsedQta ? qtyStepFor(parsedQta.unit) : 1;
+    const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (parsedQta ? parsedQta.value : 1);
     const editingQty = state.shopQtyEditingKey === rowKey;
     // Solo in Per reparto più occorrenze (giorni diversi) si uniscono in una
     // riga sola: se ne hai spuntata qualcuna ma non tutte, un segno lo dice a
@@ -1887,18 +1895,18 @@ function renderSpesa(){
     return `
     <div class="shop-item-row">
       <label class="shop-item ${checked?'checked':''}">
-        <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" ${checked?'checked':''}>
+        <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
         <span>
           <span class="item-name">${escapeHtml(ingrediente)}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}</span>
-          <span class="item-detail">${escapeHtml(qta||'')}${subtitle ? ' · ' + escapeHtml(subtitle) : ''}${note ? ' · ' + escapeHtml(note) : ''}</span>
+          ${(subtitle || note) ? `<span class="item-detail">${escapeHtml(subtitle||'')}${subtitle && note ? ' · ' : ''}${escapeHtml(note||'')}</span>` : ''}
         </span>
       </label>
       <span class="qty-stepper" title="Quantità da prendere">
-        <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" aria-label="Diminuisci quantità">−</button>
+        <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" data-shop-qty-default="${qty}" data-shop-qty-step="${step}" aria-label="Diminuisci quantità">−</button>
         ${editingQty
-          ? `<input type="number" min="1" class="qty-input" value="${qty}" data-shop-qty-edit="${escapeAttr(rowKey)}">`
-          : `<span class="qty-num" data-shop-qty-show="${escapeAttr(rowKey)}">${qty}</span>`}
-        <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" aria-label="Aumenta quantità">+</button>
+          ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qty}" data-shop-qty-edit="${escapeAttr(rowKey)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
+          : `<span class="qty-num" data-shop-qty-show="${escapeAttr(rowKey)}">${qty}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
+        <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" data-shop-qty-default="${qty}" data-shop-qty-step="${step}" aria-label="Aumenta quantità">+</button>
       </span>
       <button class="btn-remove" data-shop-remove="${rowKey}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
@@ -2592,16 +2600,20 @@ function attachHandlers(){
   document.querySelectorAll('[data-shop-qty-inc]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.shopQtyInc;
-      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : 1;
-      state.shopQty[key] = current + 1;
+      const step = parseFloat(e.currentTarget.dataset.shopQtyStep) || 1;
+      const fallback = parseFloat(e.currentTarget.dataset.shopQtyDefault);
+      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : (Number.isNaN(fallback) ? 1 : fallback);
+      state.shopQty[key] = Math.round((current + step) * 100) / 100;
       persist(); render();
     });
   });
   document.querySelectorAll('[data-shop-qty-dec]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.shopQtyDec;
-      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : 1;
-      state.shopQty[key] = Math.max(1, current - 1);
+      const step = parseFloat(e.currentTarget.dataset.shopQtyStep) || 1;
+      const fallback = parseFloat(e.currentTarget.dataset.shopQtyDefault);
+      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : (Number.isNaN(fallback) ? 1 : fallback);
+      state.shopQty[key] = Math.max(0, Math.round((current - step) * 100) / 100);
       persist(); render();
     });
   });
@@ -2617,8 +2629,8 @@ function attachHandlers(){
     shopQtyEditInput.select();
     const commitShopQtyEdit = ()=>{
       const key = shopQtyEditInput.dataset.shopQtyEdit;
-      const n = parseInt(shopQtyEditInput.value, 10);
-      state.shopQty[key] = Number.isNaN(n) ? 1 : Math.max(1, n);
+      const n = parseFloat(shopQtyEditInput.value);
+      state.shopQty[key] = Number.isNaN(n) ? 0 : Math.max(0, n);
       state.shopQtyEditingKey = null;
       persist(); render();
     };
@@ -2645,8 +2657,11 @@ function attachHandlers(){
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
         if(cb.closest('.finished-shop-group')) return;
         const rowKey = cb.dataset.shopKeys;
-        const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
-        upsertPantryItem(cb.dataset.shopName, 'dispensa', qty);
+        const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
+        const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
+        const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 1 : fallback);
+        const unit = cb.dataset.shopUnit || undefined;
+        upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, undefined, unit);
         rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
       });
       persist(); render();
