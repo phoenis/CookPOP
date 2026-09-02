@@ -206,7 +206,7 @@ function renderIngredientsSection(ing, recipeName, ratio){
 // automatico quando si spunta un articolo in Spesa. Quantità = un contatore
 // numerico (stepper +/- in UI); finché non è impostata (o è 0) la voce non
 // compare nell'elenco.
-function upsertPantryItem(nome, luogo, amount, staple, unit){
+function upsertPantryItem(nome, luogo, amount, staple, unit, cat){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
   const key = trimmedName.toLowerCase();
@@ -215,12 +215,13 @@ function upsertPantryItem(nome, luogo, amount, staple, unit){
   const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
   const isStapleFlag = staple !== undefined ? !!staple : !!(existing && existing.staple);
   const finalUnit = unit !== undefined ? unit : (existing && existing.unit) || '';
+  const finalCat = cat !== undefined ? cat : (existing && existing.cat) || '';
   const newQty = currentQty + add;
   state.pantryItems[key] = {
     nome: trimmedName,
     qty: newQty,
     luogo: (existing && existing.luogo) || luogo || 'dispensa',
-    ...((existing && existing.cat) ? { cat: existing.cat } : {}),
+    ...(finalCat ? { cat: finalCat } : {}),
     ...(isStapleFlag ? { staple: true } : {}),
     ...(finalUnit ? { unit: finalUnit } : {})
   };
@@ -1135,9 +1136,6 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   const isToday = isSameDay(weekDates[pos], new Date());
   const name = effectiveRecipeName(weekIdx, i);
   const hasOverride = !!weekOverridesRef(weekIdx)[i];
-  // "↺ Originale" ha senso solo dopo una scelta manuale dal catalogo, non dopo
-  // uno scambio tra giorni (che riguarda l'intera settimana, non un giorno solo).
-  const hasPickedOverride = !!weekOverridePickedRef(weekIdx)[i];
   const isChanged = !!linkSource || weekIdx !== 0 || hasOverride || !!(state.weekBaseline && state.weekBaseline[i]);
   const rec = effectiveRecipeMeta(weekIdx, i); // dati di catalogo, se disponibili
   const currentCat = effectiveCategoria(weekIdx, i);
@@ -1349,7 +1347,7 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   // sia già segnato mangiato.
   const statusBadges = `
     ${isDone ? `<button type="button" class="status-badge status-done" data-toggle-done="${dayKey}">Cucinata <span class="status-badge-reset">✕</span></button>` : ''}
-    ${hasPickedOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${dayKey}">Cambiata <span class="status-badge-reset">✕</span></button>` : ''}
+    ${hasOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${dayKey}">Cambiata <span class="status-badge-reset">✕</span></button>` : ''}
     ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${dayKey}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
   `;
 
@@ -1709,12 +1707,18 @@ function renderSpesa(){
     const rowKey = keys.join(',');
     const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : 1;
     const editingQty = state.shopQtyEditingKey === rowKey;
+    // Solo in Per reparto più occorrenze (giorni diversi) si uniscono in una
+    // riga sola: se ne hai spuntata qualcuna ma non tutte, un segno lo dice a
+    // colpo d'occhio — altrimenti sembra spuntato (o non spuntato) del tutto
+    // mentre in realtà è parziale (es. il sale servito solo per alcune ricette).
+    const checkedCount = keys.filter(k=>state.shopChecked[k]===true).length;
+    const isPartial = keys.length > 1 && checkedCount > 0 && checkedCount < keys.length;
     return `
     <div class="shop-item-row">
       <label class="shop-item ${checked?'checked':''}">
         <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" ${checked?'checked':''}>
         <span>
-          <span class="item-name">${escapeHtml(ingrediente)}</span>
+          <span class="item-name">${escapeHtml(ingrediente)}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}</span>
           <span class="item-detail">${escapeHtml(qta||'')}${subtitle ? ' · ' + escapeHtml(subtitle) : ''}${note ? ' · ' + escapeHtml(note) : ''}</span>
         </span>
       </label>
@@ -1927,6 +1931,7 @@ function renderSpesa(){
     ${body}
     <div class="shop-top-actions">
       <button class="btn is-outline reset-btn" id="reset-shop">Svuota spunte</button>
+      <button class="btn is-outline" id="check-have-shop">Spunta quello che ho già</button>
     </div>
     ${doneShoppable ? `
     <div class="shop-checked-actions">
@@ -2248,6 +2253,13 @@ function renderDispensa(){
             <input type="text" id="pantry-add-name" placeholder="Nuovo ingrediente">
           </div>
           <div class="filter-group">
+            <div class="filter-group-label">Categoria</div>
+            <select id="pantry-add-cat">
+              <option value="">Automatica (dal nome)</option>
+              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
             <div class="filter-group-label">Luogo</div>
             <select id="pantry-add-luogo">
               ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
@@ -2508,6 +2520,14 @@ function attachHandlers(){
   // niente eccezioni per i basilari.
   if(resetBtn) resetBtn.addEventListener('click', ()=>{
     buildShopFlat().forEach(it => { state.shopChecked[it.key] = false; });
+    persist(); render();
+  });
+  // Comando manuale per spuntare quello che hai già, oltre al comportamento
+  // automatico dei basilari: utile per gli ingredienti normali (che non
+  // hanno un fallback sulla scorta) o per ri-applicarlo dopo "Svuota spunte".
+  const checkHaveBtn = document.getElementById('check-have-shop');
+  if(checkHaveBtn) checkHaveBtn.addEventListener('click', ()=>{
+    buildShopFlat().forEach(it => { if(hasPantryStock(it.ingrediente)) state.shopChecked[it.key] = true; });
     persist(); render();
   });
   const toggleAllSectionsBtn = document.getElementById('shop-toggle-all-sections');
@@ -3255,12 +3275,13 @@ function attachHandlers(){
   const pantryAddBtn = document.getElementById('pantry-add-btn');
   if(pantryAddBtn){
     const nameInput = document.getElementById('pantry-add-name');
+    const catSelect = document.getElementById('pantry-add-cat');
     const luogoSelect = document.getElementById('pantry-add-luogo');
     const stapleToggle = document.getElementById('pantry-add-staple-toggle');
     const unitSelect = document.getElementById('pantry-add-unit');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
-      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'), unitSelect ? unitSelect.value : '');
+      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'), unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '');
       state.pantryAddModalOpen = false;
       persist(); render();
     };

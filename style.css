@@ -360,6 +360,7 @@ height: 100%;}
   .shop-item.checked input[type=checkbox]{ accent-color:var(--green-deep); }
   .shop-item.checked .item-name{ text-decoration:line-through; opacity:0.45; }
   .item-name{ font-weight:var(--weight-medium); font-size:var(--text-small); }
+  .partial-mark{ color:var(--steel); font-size:0.7em; margin-left:0.3em; vertical-align:middle; }
   .item-detail{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); margin-top:0.0625rem; }
   .shop-progress{ font-family:var(--font-family); font-size:var(--text-xsmall); color:var(--gold-dark); margin-bottom:var(--space-small); }
   .missing-ing-banner{ font-size:var(--text-xsmall); line-height:1.5; background:var(--amber); border:1px solid var(--steel); border-radius:0; padding:var(--space-xsmall) var(--space-small); margin-bottom:0.875rem; }
