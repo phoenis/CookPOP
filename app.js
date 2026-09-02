@@ -1182,7 +1182,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       </div>
     </div>`;
   }
-  // Direzione opposta di "È avanzata": utile quando il giorno sorgente è ormai
+  // Direzione opposta di "Avanzata": utile quando il giorno sorgente è ormai
   // passato (e quindi la sua card non è più visibile per collegarla da lì) —
   // si collega da qui, scegliendo tra i giorni precedenti.
   let avanzoDiPanelHtml = '';
@@ -1209,27 +1209,28 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   if(linkSource){
     swapControls = `
     <div class="section-footer">
-      <input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[dayKey] || '')}" data-link-note="${dayKey}">
       <div class="section-footer-row">
-        <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
+        <input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[dayKey] || '')}" data-link-note="${dayKey}">
+      </div>  
+      <div class="section-footer-row">
+      <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
       </div>
     </div>`;
   } else {
     swapControls = `
     <div class="section-footer">
       <div class="section-footer-row">
+        <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
         <button class="btn is-chip is-dashed" data-open-swap="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Cambia</button>
-      </div>
-      <div class="section-footer-row">
-        <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
-        <button class="btn is-chip is-dashed" data-open-link-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzata</button>
-        <button class="btn is-chip is-dashed" data-open-avanzodi-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzo di</button>
-      </div>
+        <button class="btn is-chip is-dashed" data-open-link-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Avanzata</button>
+        </div>
     </div>
     ${swapPanelHtml}
     ${linkPanelHtml}
     ${avanzoDiPanelHtml}`;
   }
+  /* <button class="btn is-chip is-dashed" data-open-avanzodi-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzo di</button>
+       */
 
   // tempo: se cambiata (a mano o generata) e in catalogo, usa il tempo della nuova ricetta; altrimenti quello originale del giorno
   const timeDisplay = (isChanged && rec) ? rec.tempo : d.tempo;
@@ -1297,7 +1298,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
         det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
       ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
     const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-    const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
+    const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
     const addFormHtml = det ? '' : `
       <div class="add-ing-form">
         <input type="text" placeholder="Ingrediente" data-ning="${dayKey}">
@@ -1322,7 +1323,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   }
 
   // Badge di stato accanto al tempo, ognuno tocca-per-annullare: "Cucinata"
-  // (ri-tocca Mangiata per segnarla di nuovo da fare), "Cambiata" (torna alla
+  // (ri-tocca Cucinata per segnarla di nuovo da fare), "Cambiata" (torna alla
   // ricetta originale del giorno) e "Avanzo di GG" (scollega dal giorno
   // sorgente). Non mutuamente esclusivi: un giorno può essere sia cambiato
   // sia già segnato mangiato.
@@ -1492,7 +1493,7 @@ function renderMenu(){
   }
 
   // Promemoria "ieri hai mangiato X?": se il giorno di ieri (nella settimana
-  // corrente) aveva una ricetta e nessuno l'ha ancora segnata come mangiata,
+  // corrente) aveva una ricetta e nessuno l'ha ancora segnata come Cucinata,
   // lo chiede appena si riapre l'app — altrimenti gli ingredienti restano in
   // Dispensa anche se in realtà sono stati usati. Non copre il salto sabato
   // (ieri = venerdì della settimana appena chiusa, non più raggiungibile).
@@ -1907,7 +1908,7 @@ function renderPrep(){
           det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
         ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
       const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-      const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Fonte della ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
+      const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
       const addFormHtml = det ? '' : `
         <div class="add-ing-form">
           <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(r.nome)}">
@@ -2036,7 +2037,7 @@ function renderPrep(){
   `;
 }
 
-// Stesso schema icona+testo del bottone "Mangiata/Da mangiare" in Menù,
+// Stesso schema icona+testo del bottone "Cucinata/Da cucinare" in Menù,
 // riusato per il flag staple così i due toggle si comportano allo stesso modo.
 function stapleToggleInner(active){
   return active
@@ -2442,7 +2443,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-link-pick]').forEach(row=>{
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
-      const sourceKey = el.dataset.linkDay; // giorno in cui è stata cucinata (dove hai cliccato "È avanzata")
+      const sourceKey = el.dataset.linkDay; // giorno in cui è stata cucinata (dove hai cliccato "Avanzata")
       const targetKey = el.dataset.linkPick; // giorno scelto in cui la mangerete
       const [w,i] = targetKey.split('_');
       const weekIdx = parseInt(w,10);
