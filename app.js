@@ -1630,8 +1630,12 @@ function renderMenu(){
   `;
 }
 
-function renderSpesa(){
-  // costruisco una lista piatta di tutti gli articoli (settimana corrente + extra), con contesto e chiave stabile
+// Lista piatta di tutti gli articoli di Spesa in questo momento (giorni
+// pianificati, basilari settimanali, aggiunti a mano, finiti in Dispensa),
+// con contesto e chiave stabile. Fattorizzata fuori da renderSpesa perché
+// serve anche a "Svuota spunte" per sapere quali chiavi esistono davvero,
+// a prescindere da cosa sia visibile/aperto in quel momento sullo schermo.
+function buildShopFlat(){
   const flat = [];
   allPlannedDays().forEach(({weekIdx,i,giorno,dateLabel,name})=>{
     const dayKey = `${weekIdx}_${i}`;
@@ -1671,11 +1675,14 @@ function renderSpesa(){
     if(state.shopDismissed[key]) return;
     flat.push({ key, ingrediente:it.nome, qta:'', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', staple: isStaple(it.nome), confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
+  return flat;
+}
 
+function renderSpesa(){
   // I basilari già confermati - a mano o perché presenti in Dispensa - non
   // finiscono più in una sezione a parte: restano nella lista normale (per
   // giorno/per reparto) ma già spuntati, coerente con isStapleConfirmed.
-  const mainFlat = flat;
+  const mainFlat = buildShopFlat();
 
   // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
   // quantità testuale) in Per reparto: se ne hai spuntata una qualsiasi in
@@ -2495,7 +2502,14 @@ function attachHandlers(){
   // Solo le spunte: azzerare anche gli eliminati farebbe ricomparire tutto
   // quello che avevi tolto con "Elimina" (spesso già spuntato di default se
   // basilare), gonfiando il conteggio invece di limitarsi a deselezionare.
-  if(resetBtn) resetBtn.addEventListener('click', ()=>{ state.shopChecked = {}; persist(); render(); });
+  // "Falso" esplicito e non solo cancellato: un basilare che hai in Dispensa,
+  // se solo cancellato, tornerebbe subito spuntato da solo (vedi
+  // isStapleConfirmed) — "Svuota spunte" deve fare una cosa sola e precisa,
+  // niente eccezioni per i basilari.
+  if(resetBtn) resetBtn.addEventListener('click', ()=>{
+    buildShopFlat().forEach(it => { state.shopChecked[it.key] = false; });
+    persist(); render();
+  });
   const toggleAllSectionsBtn = document.getElementById('shop-toggle-all-sections');
   if(toggleAllSectionsBtn){
     toggleAllSectionsBtn.addEventListener('click', ()=>{
