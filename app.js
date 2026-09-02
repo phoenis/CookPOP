@@ -348,6 +348,7 @@ const state = {
   pantryUtilityLuogoMigrated: false,
   pantryView: 'categoria',
   pantryEditingKey: null,
+  linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
   pantryFinishedOpen: false,
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
@@ -1109,7 +1110,7 @@ function renderRecipeEditModal(){
 // Un giorno di una qualunque settimana (weekIdx 0 = corrente, >=1 = extra).
 // dayKey identifica il giorno in modo univoco tra tutte le settimane mostrate
 // insieme, usato per lo state ephemeral (espanso, swap aperto, modale fatta...).
-function renderDayCard(weekIdx, i, pos, weekDates){
+function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   const dayKey = `${weekIdx}_${i}`;
   const linkSource = linkedSourceDayKey(weekIdx, i);
   const sourceGiorno = linkSource ? DATA.week1[linkSource.split('_')[1]].giorno : '';
@@ -1210,8 +1211,11 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     swapControls = `
     <div class="section-footer">
       <div class="section-footer-row">
-        <input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[dayKey] || '')}" data-link-note="${dayKey}">
-      </div>  
+        ${state.linkNoteEditingKey === dayKey
+          ? `<input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[dayKey] || '')}" data-link-note="${dayKey}">`
+          : `<span class="avanzo-note-text" data-link-note-show="${dayKey}">${state.dayLinkNotes[dayKey] ? escapeHtml(state.dayLinkNotes[dayKey]) : 'Nessuna variante'}</span>
+             <button type="button" class="btn is-icon" data-link-note-show="${dayKey}" aria-label="Modifica variante"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg></button>`}
+      </div>
       <div class="section-footer-row">
       <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
       </div>
@@ -1341,7 +1345,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
 
   return `
-  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
+  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}${isOpen ? ' open' : ''}${isPastCard ? ' day-card-past' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
     <div class="day-row">
       <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
       ${cookPill}
@@ -1430,7 +1434,7 @@ function renderWeekSection(weekIdx){
     <button type="button" class="btn is-chip past-days-toggle" data-toggle-past-days="${weekIdx}">${state.showPastDays ? 'Nascondi' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M140 80v41.21l34.17 20.5a12 12 0 1 1-12.34 20.58l-40-24A12 12 0 0 1 116 128V80a12 12 0 0 1 24 0m-12-52a99.38 99.38 0 0 0-70.76 29.34c-4.69 4.74-9 9.37-13.24 14V64a12 12 0 0 0-24 0v40a12 12 0 0 0 12 12h40a12 12 0 0 0 0-24H57.77c5.23-6 10.6-11.78 16.49-17.74a76 76 0 1 1 1.58 109a12 12 0 0 0-16.48 17.46A100 100 0 1 0 128 28"></path></svg> Mostra'} giorni precedenti</button>
     </div>` : '';
   const pastDays = (state.showPastDays && pastPositions.length)
-    ? pastPositions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('')
+    ? pastPositions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates, true)).join('')
     : '';
 
   const days = pastToggle + pastDays + positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
@@ -2468,12 +2472,21 @@ function attachHandlers(){
       persist(); render();
     });
   });
+  document.querySelectorAll('[data-link-note-show]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      state.linkNoteEditingKey = e.currentTarget.dataset.linkNoteShow;
+      render();
+    });
+  });
+  const linkNoteInput = document.querySelector('[data-link-note]');
+  if(linkNoteInput){ linkNoteInput.focus(); linkNoteInput.select(); }
   document.querySelectorAll('[data-link-note]').forEach(inp=>{
     const commit = e=>{
       const key = e.target.dataset.linkNote;
       const val = e.target.value.trim();
       if(val) state.dayLinkNotes[key] = val; else delete state.dayLinkNotes[key];
-      persist();
+      state.linkNoteEditingKey = null;
+      persist(); render();
     };
     inp.addEventListener('blur', commit);
     inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') e.target.blur(); });
