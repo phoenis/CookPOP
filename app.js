@@ -1110,6 +1110,7 @@ function renderRecipeEditModal(){
 function renderDayCard(weekIdx, i, pos, weekDates){
   const dayKey = `${weekIdx}_${i}`;
   const linkSource = linkedSourceDayKey(weekIdx, i);
+  const sourceGiorno = linkSource ? DATA.week1[linkSource.split('_')[1]].giorno : '';
   const d = DATA.week1[i];
   const dateLabel = formatShortDate(weekDates[pos]);
   const isToday = isSameDay(weekDates[pos], new Date());
@@ -1183,21 +1184,16 @@ function renderDayCard(weekIdx, i, pos, weekDates){
   const isDone = !!weekMealsDoneRef(weekIdx)[i];
   let swapControls;
   if(linkSource){
-    const [slw, sli] = linkSource.split('_');
-    const sourceGiorno = DATA.week1[sli].giorno;
     swapControls = `
-    <div class="avanzo-chip"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Avanzo di ${escapeHtml(sourceGiorno)}</div>
     <input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[dayKey] || '')}" data-link-note="${dayKey}">
     <div class="swap-controls">
       <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
-      <button class="btn is-chip" data-unlink-day="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M117.18 188.74a12 12 0 0 1 0 17l-5.12 5.12A58.26 58.26 0 0 1 70.6 228a58.62 58.62 0 0 1-41.46-100.08l34.75-34.75a58.64 58.64 0 0 1 98.56 28.11a12 12 0 1 1-23.37 5.44a34.65 34.65 0 0 0-58.22-16.58l-34.75 34.75A34.62 34.62 0 0 0 70.57 204a34.4 34.4 0 0 0 24.49-10.14l5.11-5.12a12 12 0 0 1 17.01 0M226.83 45.17a58.65 58.65 0 0 0-82.93 0l-5.11 5.11a12 12 0 0 0 17 17l5.12-5.12a34.63 34.63 0 1 1 49 49l-34.81 34.7A34.4 34.4 0 0 1 150.61 156a34.63 34.63 0 0 1-33.69-26.72a12 12 0 0 0-23.38 5.44A58.64 58.64 0 0 0 150.56 180h.05a58.28 58.28 0 0 0 41.47-17.17l34.75-34.75a58.62 58.62 0 0 0 0-82.91"></path></svg> Scollega</button>
     </div>`;
   } else {
     swapControls = `
     <div class="swap-controls">
       <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
       <button class="btn is-chip is-dashed" data-open-swap="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Cambia</button>
-      ${hasPickedOverride ? `<button class="btn is-chip is-dashed" data-reset-swap="${dayKey}">↺ Originale</button>` : ''}
       <button class="btn is-chip is-dashed" data-open-link-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzata</button>
     </div>
     ${swapPanelHtml}
@@ -1294,6 +1290,17 @@ function renderDayCard(weekIdx, i, pos, weekDates){
     </div>`;
   }
 
+  // Badge di stato accanto al tempo, ognuno tocca-per-annullare: "Cucinata"
+  // (ri-tocca Mangiata per segnarla di nuovo da fare), "Cambiata" (torna alla
+  // ricetta originale del giorno) e "Avanzo di GG" (scollega dal giorno
+  // sorgente). Non mutuamente esclusivi: un giorno può essere sia cambiato
+  // sia già segnato mangiato.
+  const statusBadges = `
+    ${isDone ? `<button type="button" class="status-badge status-done" data-toggle-done="${dayKey}">Cucinata <span class="status-badge-reset">✕</span></button>` : ''}
+    ${hasPickedOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${dayKey}">Cambiata <span class="status-badge-reset">✕</span></button>` : ''}
+    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${dayKey}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
+  `;
+
   const cook = state.cooks[dayKey];
   const isOpen = state.expandedDay === dayKey;
   // Un'unica fonte per "chi cucina": iniziale sola a card chiusa, nome per
@@ -1315,6 +1322,7 @@ function renderDayCard(weekIdx, i, pos, weekDates){
       <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
     </div>
     <span class="day-time">${escapeHtml(timeDisplay)}</span>
+    ${statusBadges}
     ${detailHtml}
     ${swapControls}
   </div>`;
@@ -2490,7 +2498,7 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-reset-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const key = e.target.dataset.resetSwap;
+      const key = e.currentTarget.dataset.resetSwap;
       const [w,i] = key.split('_');
       const weekIdx = parseInt(w,10);
       delete weekOverridesRef(weekIdx)[i];
