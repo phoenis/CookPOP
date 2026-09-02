@@ -360,7 +360,7 @@ const state = {
   userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "tocca a te cucinare" già chiuso per quel giorno
   mealsDoneReminderDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel giorno (senza segnarlo mangiato)
-  genSettingsOpen: false,
+  genSettingsOpen: null, // null = chiuso; 'plain' = solo impostazioni (da "Aggiungi settimana"); un numero = impostazioni + genera/rigenera per quella settimana (dal titolo settimana)
   showPastDays: false, // mostra le card degli ultimi 3 giorni passati (nascoste di default) nella settimana corrente
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
   dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
@@ -732,9 +732,10 @@ function weekLabelFor(weekIdx){
   const dates = weekDatesFor(weekIdx);
   const saturday = dates[0], friday = dates[6];
   const dm = saturday.getDate(), ds = friday.getDate();
-  const mm = MONTHS_IT[saturday.getMonth()], ms = MONTHS_IT[friday.getMonth()];
-  if(mm === ms) return `${dm}–${ds} ${mm}`;
-  return `${dm} ${mm} – ${ds} ${ms}`;
+  // Stesso mese: nome intero ("5-11 settembre"). Mesi diversi: abbreviati per
+  // stare nello spazio del titolo ("29 ago - 4 set").
+  if(saturday.getMonth() === friday.getMonth()) return `${dm}-${ds} ${MONTHS_IT[saturday.getMonth()]}`;
+  return `${dm} ${MONTHS_IT_SHORT[saturday.getMonth()]} - ${ds} ${MONTHS_IT_SHORT[friday.getMonth()]}`;
 }
 // Tutti i giorni pianificati (settimana corrente + eventuali extra), nell'ordine di
 // visualizzazione: usato da Spesa per aggregare gli ingredienti di ogni settimana.
@@ -931,6 +932,7 @@ function generateWeek(weekIdx){
   }
   state.expandedDay = null;
   state.swapOpenDay = null;
+  state.genSettingsOpen = null;
   persist();
   render();
 }
@@ -1389,11 +1391,11 @@ function renderProfilePanel(){
     </div>`;
 }
 
-function genSettingsButton(){
-  return `<button class="btn is-double is-right" type="button" data-open-gen-settings aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
+function genSettingsButton(target){
+  return `<button class="btn is-double is-right" type="button" data-open-gen-settings="${target}" aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
 }
-function genSettingsButtonAccent(){
-  return `<button class="btn is-double is-right is-accent" type="button" data-open-gen-settings aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
+function genSettingsButtonAccent(target){
+  return `<button class="btn is-double is-right is-accent" type="button" data-open-gen-settings="${target}" aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
 }
 
 // Un blocco settimana completo: intestazione con data, striscia categorie,
@@ -1439,27 +1441,18 @@ function renderWeekSection(weekIdx){
 
   const days = pastToggle + pastDays + positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
-  const genSettingsBtn = genSettingsButton();
-
-  const controls = weekIdx === 0 ? `
-    <div class="generate-week-block">
-      <div class="generate-week-row">
-        <button class="btn is-double is-left" data-generate-week="0"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg>Genera nuovo menù</button>
-        ${genSettingsBtn}
-      </div>
-      <p class="generate-week-hint">Sceglie 7 ricette di stagione, variando le categorie giorno per giorno.</p>
-    </div>` : `
+  // Genera/Rigenera vive ora nella modale impostazioni, aperta dal bottoncino
+  // sul titolo della settimana (vedi genSettingsModal in renderMenu) — qui in
+  // fondo resta solo, per le settimane extra, l'eliminazione (azione a sé,
+  // più definitiva di una rigenerazione).
+  const controls = weekIdx === 0 ? '' : `
     <div class="generate-week-block is-added">
-      <div class="generate-week-row">
-        <button class="btn is-double is-left" data-generate-week="${weekIdx}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Rigenera questa settimana</button>
-        ${genSettingsBtn}
-      </div>
       <button class="btn is-icon color-delete" data-remove-week="${weekIdx}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
 
   return `
     <section class="week-section">
-      <h2 class="week-title">Settimana del ${weekLabelFor(weekIdx)}</h2>
+      <h2 class="week-title">Settimana del ${weekLabelFor(weekIdx)} ${genSettingsButton(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
       ${days}
       ${controls}
@@ -1572,7 +1565,8 @@ function renderMenu(){
     </div>`;
   }
 
-  const genSettingsModal = state.genSettingsOpen ? `
+  const genSettingsTargetWeek = typeof state.genSettingsOpen === 'number' ? state.genSettingsOpen : null;
+  const genSettingsModal = state.genSettingsOpen !== null ? `
     <div class="filters-modal-backdrop" data-close-gen-settings>
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
@@ -1596,6 +1590,11 @@ function renderMenu(){
             <p class="section-sub" style="margin:0.5rem 0 0;">Tocca fino a dove vuoi arrivare: quel giorno la generazione sceglierà solo ricette entro quella durata.</p>
           </div>
         </div>
+        ${genSettingsTargetWeek !== null ? `
+        <p class="generate-week-hint">${genSettingsTargetWeek === 0 ? "Sceglie 7 ricette di stagione, variando le categorie giorno per giorno." : ''}</p>
+        <div class="filters-modal-footer">
+          <button class="btn is-double is-left" data-generate-week="${genSettingsTargetWeek}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> ${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : 'Rigenera questa settimana'}</button>
+        </div>` : ''}
         <div class="filters-modal-footer">
           <button class="btn is-solid mini-add-btn" data-close-gen-settings>Fatto</button>
         </div>
@@ -1612,7 +1611,7 @@ function renderMenu(){
     <div class="generate-week-block">
       <div class="generate-week-row">
         <button class="btn is-double is-left is-accent" id="add-week">+ Aggiungi settimana</button>
-        ${genSettingsButtonAccent()}
+        ${genSettingsButtonAccent('plain')}
       </div>
       <p class="generate-week-hint">Pianifica un'altra settimana con le stesse regole.</p>
     </div>
@@ -2557,12 +2556,16 @@ function attachHandlers(){
     btn.addEventListener('click', ()=>{ state.showPastDays = !state.showPastDays; render(); });
   });
   document.querySelectorAll('[data-open-gen-settings]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ state.genSettingsOpen = true; render(); });
+    btn.addEventListener('click', e=>{
+      const val = e.currentTarget.dataset.openGenSettings;
+      state.genSettingsOpen = val === 'plain' ? 'plain' : parseInt(val, 10);
+      render();
+    });
   });
   document.querySelectorAll('[data-close-gen-settings]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
-      state.genSettingsOpen = false;
+      state.genSettingsOpen = null;
       render();
     });
   });
