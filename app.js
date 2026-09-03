@@ -1743,80 +1743,6 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     }
   }
 
-  let detailHtml = '';
-  if(state.expandedDay === mk){
-    const det = name ? getRecipeDetails(name) : null;
-    // Porzioni scelte per questo pasto (default: 2, o quelle base della
-    // ricetta se non impostate — vedi generateWeek per il default 2/3),
-    // usate per scalare le quantità mostrate qui e — se non già spuntate — in Spesa.
-    const basePortions = det ? parsePortionsBase(det.porzioni) : null;
-    const currentPortions = basePortions ? (state.dayPortions[mk] || basePortions) : null;
-    const portionsRatio = basePortions ? currentPortions / basePortions : 1;
-    const ing = name ? getIngredientsFor(name) : [];
-    const ingHtml = renderIngredientsSection(ing, portionsRatio);
-    // Ogni contorno ha il proprio dettaglio completo (tag/ingredienti/
-    // procedimento/note), scalato sulle stesse porzioni-obiettivo del pasto
-    // ma rispetto alle porzioni BASE di quella ricetta (può differire da
-    // quella del principale) — non più solo mescolato nella lista sopra.
-    const contorniDetailHtml = contorni.map(c=>{
-      const cDet = getRecipeDetails(c);
-      const cBase = cDet ? parsePortionsBase(cDet.porzioni) : null;
-      const cRatio = (cBase && currentPortions) ? currentPortions / cBase : 1;
-      return renderContornoDetailBox(c, cRatio);
-    }).join('');
-    const portionsControl = basePortions ? `
-      <div class="portions-row">
-        <span class="portions-label">Porzioni</span>
-        <span class="qty-stepper">
-          <button type="button" class="qty-btn" data-portions-dec="${mk}" aria-label="Diminuisci porzioni">−</button>
-          <span class="qty-num">${currentPortions}</span>
-          <button type="button" class="qty-btn" data-portions-inc="${mk}" aria-label="Aumenta porzioni">+</button>
-        </span>
-      </div>` : '';
-    const tagsHtml = rec ? `
-      <div class="detail-tags">
-        <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
-        <span class="tag tempo">${det ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> ' + escapeHtml(det.tempo) : escapeHtml(TEMPO_LABEL[rec.tempoBucket])}</span>
-        ${(det && !basePortions) ? `<span class="tag">${escapeHtml(det.porzioni)}</span>` : ''}
-        <span class="tag season">${rec.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
-        ${(rec.freezerNew && rec.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[rec.freezerNew]}</span>` : ''}
-        <span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> ${escapeHtml(AVANZI_LABEL[rec.avanziNew])}</span>
-        ${rec.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
-      </div>` : `<div class="ing-empty">${name ? 'Ricetta non presente nel catalogo — solo ingredienti disponibili qui.' : 'Nessuna ricetta scelta per questo pasto.'}</div>`;
-    const stepsHtml = det && det.procedimento && det.procedimento.length
-      ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
-      : '';
-    const noteExtra = det ? [
-        det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
-        det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
-        det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
-      ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
-    const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-    const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
-    const addFormHtml = (name && !det) ? `
-      <div class="add-ing-form">
-        <input type="text" placeholder="Ingrediente" data-ning="${mk}">
-        <input type="text" placeholder="Quantità" data-nqta="${mk}">
-        <button class="btn is-solid" data-add-ing="${mk}">+ aggiungi ingrediente</button>
-      </div>` : '';
-    const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
-    const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>` : '';
-    const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
-    detailHtml = `
-    <div class="detail-box">
-      ${tagsHtml}
-      ${dayMetaHtml}
-      ${soakChip}
-      ${portionsControl}
-      ${ingHtml}
-      ${stepsHtml}
-      ${noteBox}
-      ${addFormHtml}
-      ${sourceEditBox}
-    </div>
-    ${contorniDetailHtml}`;
-  }
-
   // Badge di stato accanto al tempo, ognuno tocca-per-annullare: "Cucinato"
   // (ri-tocca per segnarlo di nuovo da fare), "Cambiato" (torna al pasto
   // originale) e "Avanzo di GG" (scollega dal pasto sorgente). Non mutuamente
@@ -1852,8 +1778,133 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       <span class="day-time">${escapeHtml(timeDisplay)}</span>
       ${statusBadges}
     </div>
-    ${detailHtml}
     ${swapControls}
+  </div>`;
+}
+
+// Schermata a tutto schermo col dettaglio di un pasto (tag, porzioni,
+// ingredienti, procedimento, note, modifica) — sostituisce il vecchio
+// accordion inline nella card (vedi state.expandedDay). Calcolata una sola
+// volta da renderMenu(), non per ogni blocco pasto: ricalcola in proprio i
+// dati che in renderMealBlock erano variabili locali condivise, perché qui
+// vive fuori da quella funzione.
+function renderMealDetailScreen(weekIdx, i, meal){
+  const mk = mealKey(weekIdx, i, meal);
+  const d = DATA.week1[i];
+  const pos = WEEK_DISPLAY_ORDER.indexOf(i);
+  const dateLabel = formatShortDate(weekDatesFor(weekIdx)[pos]);
+  const mealData = effectiveMeal(weekIdx, i, meal);
+  const name = mealData.principale || '';
+  const contorni = mealData.contorni || [];
+  const rec = name ? effectiveRecipeMeta(weekIdx, i, meal) : null;
+  const linkSource = linkedSourceMealKey(weekIdx, i, meal);
+  const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
+  const hasOverride = !!(override && override.principale);
+  const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
+  const isChanged = !!linkSource || weekIdx !== 0 || hasOverride || !!(baseline && baseline.principale);
+
+  let metaLines = [];
+  if(isChanged){
+    if(rec){
+      if(rec.prep && rec.prep !== 'No') metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
+      if(rec.freezer === 'Sì') metaLines.push(`<b>Nota:</b> congela bene — valuta doppia dose per il freezer`);
+    } else if(name) {
+      metaLines.push(`<b>Nota:</b> ricetta non presente nel catalogo, dettagli non disponibili`);
+    }
+  } else {
+    if(d.ricordare && d.ricordare !== 'Niente') metaLines.push(`<b>Da ricordare:</b> ${escapeHtml(d.ricordare)}`);
+    if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
+  }
+
+  let soakChip = '';
+  if(meal === 'cena' && pos < WEEK_DISPLAY_ORDER.length - 1){
+    const nextCat = effectiveCategoria(weekIdx, WEEK_DISPLAY_ORDER[pos+1], 'cena');
+    if(nextCat === 'legumi'){
+      soakChip = `<div class="soak-chip">💧 Domani legumi — valuta l'ammollo stasera</div>`;
+    }
+  }
+
+  const det = name ? getRecipeDetails(name) : null;
+  // Porzioni scelte per questo pasto (default: 2, o quelle base della
+  // ricetta se non impostate — vedi generateWeek per il default 2/3),
+  // usate per scalare le quantità mostrate qui e — se non già spuntate — in Spesa.
+  const basePortions = det ? parsePortionsBase(det.porzioni) : null;
+  const currentPortions = basePortions ? (state.dayPortions[mk] || basePortions) : null;
+  const portionsRatio = basePortions ? currentPortions / basePortions : 1;
+  const ing = name ? getIngredientsFor(name) : [];
+  const ingHtml = renderIngredientsSection(ing, portionsRatio);
+  // Ogni contorno ha il proprio dettaglio completo (tag/ingredienti/
+  // procedimento/note), scalato sulle stesse porzioni-obiettivo del pasto
+  // ma rispetto alle porzioni BASE di quella ricetta (può differire da
+  // quella del principale) — non più solo mescolato nella lista sopra.
+  const contorniDetailHtml = contorni.map(c=>{
+    const cDet = getRecipeDetails(c);
+    const cBase = cDet ? parsePortionsBase(cDet.porzioni) : null;
+    const cRatio = (cBase && currentPortions) ? currentPortions / cBase : 1;
+    return renderContornoDetailBox(c, cRatio);
+  }).join('');
+  const portionsControl = basePortions ? `
+    <div class="portions-row">
+      <span class="portions-label">Porzioni</span>
+      <span class="qty-stepper">
+        <button type="button" class="qty-btn" data-portions-dec="${mk}" aria-label="Diminuisci porzioni">−</button>
+        <span class="qty-num">${currentPortions}</span>
+        <button type="button" class="qty-btn" data-portions-inc="${mk}" aria-label="Aumenta porzioni">+</button>
+      </span>
+    </div>` : '';
+  const tagsHtml = rec ? `
+    <div class="detail-tags">
+      <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
+      <span class="tag tempo">${det ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> ' + escapeHtml(det.tempo) : escapeHtml(TEMPO_LABEL[rec.tempoBucket])}</span>
+      ${(det && !basePortions) ? `<span class="tag">${escapeHtml(det.porzioni)}</span>` : ''}
+      <span class="tag season">${rec.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
+      ${(rec.freezerNew && rec.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[rec.freezerNew]}</span>` : ''}
+      <span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> ${escapeHtml(AVANZI_LABEL[rec.avanziNew])}</span>
+      ${rec.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
+    </div>` : `<div class="ing-empty">${name ? 'Ricetta non presente nel catalogo — solo ingredienti disponibili qui.' : 'Nessuna ricetta scelta per questo pasto.'}</div>`;
+  const stepsHtml = det && det.procedimento && det.procedimento.length
+    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+    : '';
+  const noteExtra = det ? [
+      det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
+      det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
+      det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
+    ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
+  const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
+  const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
+  const addFormHtml = (name && !det) ? `
+    <div class="add-ing-form">
+      <input type="text" placeholder="Ingrediente" data-ning="${mk}">
+      <input type="text" placeholder="Quantità" data-nqta="${mk}">
+      <button class="btn is-solid" data-add-ing="${mk}">+ aggiungi ingrediente</button>
+    </div>` : '';
+  const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
+  const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>` : '';
+  const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
+
+  return `
+  <div class="meal-detail-screen">
+    <div class="meal-detail-header">
+      <div class="meal-detail-header-text">
+        <div class="meal-detail-kicker">${escapeHtml(MEAL_LABEL[meal])} · ${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)}</div>
+        <div class="meal-detail-title">${escapeHtml(name) || 'Nessuna ricetta scelta'}</div>
+      </div>
+      <button type="button" class="btn is-icon meal-detail-close" data-close-meal-detail aria-label="Chiudi">✕</button>
+    </div>
+    <div class="meal-detail-body">
+      <div class="detail-box">
+        ${tagsHtml}
+        ${dayMetaHtml}
+        ${soakChip}
+        ${portionsControl}
+        ${ingHtml}
+        ${stepsHtml}
+        ${noteBox}
+        ${addFormHtml}
+        ${sourceEditBox}
+      </div>
+      ${contorniDetailHtml}
+    </div>
   </div>`;
 }
 
@@ -2112,6 +2163,10 @@ function renderMenu(){
         <div class="filters-modal-footer">
           <button class="btn is-solid mini-add-btn" data-close-gen-settings>Fatto</button>
         </div> */
+  const mealDetailScreen = state.expandedDay ? (()=>{
+    const { weekIdx, i, meal } = parseMealKey(state.expandedDay);
+    return renderMealDetailScreen(weekIdx, i, meal);
+  })() : '';
   return `
     ${eatenReminderBanner}
     ${reminderBanner}
@@ -2119,6 +2174,7 @@ function renderMenu(){
     ${doneModal}
     ${renderRecipeEditModal()}
     ${genSettingsModal}
+    ${mealDetailScreen}
     <div class="generate-week-block">
       <div class="generate-week-row">
         <button class="btn is-double is-left is-accent" id="add-week">+ Aggiungi settimana</button>
@@ -3542,24 +3598,21 @@ function attachHandlers(){
     });
   });
 
+  // Il dettaglio del pasto ora apre a tutto schermo (vedi
+  // renderMealDetailScreen) invece che ad accordion nella card: niente più
+  // scroll-fino-alla-card, l'overlay è "position:fixed" e parte già in
+  // cima da solo, essendo un elemento nuovo a ogni apertura.
   document.querySelectorAll('[data-toggle-day]').forEach(el=>{
     el.addEventListener('click', e=>{
       const key = e.target.dataset.toggleDay;
-      const opening = state.expandedDay !== key;
-      state.expandedDay = opening ? key : null;
+      state.expandedDay = state.expandedDay !== key ? key : null;
       render();
-      if(opening){
-        const menuEl = document.querySelector(`[data-toggle-day="${CSS.escape(key)}"]`);
-        const card = menuEl ? menuEl.closest('.day-card') : null;
-        if(card){
-          // la topbar è sticky: scrollIntoView da solo nasconderebbe l'inizio
-          // della card sotto di lei, quindi calcolo l'offset a mano (come in Ricette).
-          const topbar = document.querySelector('.topbar');
-          const offset = (topbar ? topbar.offsetHeight : 0) + 8;
-          const top = card.getBoundingClientRect().top + window.scrollY - offset;
-          window.scrollTo({ top, behavior: 'smooth' });
-        }
-      }
+    });
+  });
+  document.querySelectorAll('[data-close-meal-detail]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.expandedDay = null;
+      render();
     });
   });
   document.querySelectorAll('[data-scroll-to-day]').forEach(el=>{

@@ -205,7 +205,8 @@
   .panel{ padding:var(--padding-inline) 0 var(--padding-block); }
   h2.section-title{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-large); line-height:var(--line-height-small); margin:0 0 0.25rem; text-align:left; }
   p.section-sub{ font-size:var(--text-small); color:var(--ink-light); margin:0 0 1rem; }
-  .week-title, .shop-day-title{ font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); text-transform:uppercase; margin-top: var(--space-large); margin-bottom:var(--space-medium); padding: var(--padding-xsmall) var(--padding-page); border-bottom: var(--border) solid var(--ink); border-top: var(--border) solid var(--ink); display: flex; justify-content:space-between; align-items: center;}
+  .week-title, .shop-day-title{ font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); text-transform:uppercase; /* margin-top: var(--space-large); */ margin-bottom:var(--space-medium); padding: var(--padding-xsmall) var(--padding-page); border-bottom: var(--border) solid var(--ink); border-top: var(--border) solid var(--ink); display: flex; justify-content:space-between; align-items: center;}
+  .week-title{position: sticky; top: 3.75rem; z-index: 80; background-color: var(--bg);}
   .btn-primary-flat{ font-size:var(--text-small); padding:var(--space-xsmall) var(--space-medium); text-align:left; }
   .color-delete{color: var(--delete);}
   /* balance strip */
@@ -219,7 +220,7 @@
 /*   .day-card:last-child{ border-bottom:none; }
  */  .day-card.done{ background:color-mix(in srgb, var(--green-deep) 8%, transparent); }
   .day-card.done .day-menu{ text-decoration:line-through; opacity:0.6; }
-  .day-row{ display:flex; flex-direction: column; align-items:center; position: sticky; top: 5rem; width: 1.5rem;}
+  .day-row{ display:flex; flex-direction: column; align-items:center; position: sticky; top: 7rem; width: 1.5rem;}
   .day-row-side{ display:flex; align-items:center; flex-shrink:0; height: 1rem; gap: var(--gap-icon);}
   .day-name{ font-family:var(--font-family); font-weight:var(--weight-medium); font-size:var(--text-small); display: flex; flex-direction: column; text-align: center;}
   /* .day-date{ font-family:var(--font-family); font-weight:var(--weight-normal); font-size:var(--text-xsmall); color:var(--ink-light); } */
@@ -257,6 +258,18 @@ height: 100%;}
 .meal-block.done .day-menu{ text-decoration:line-through; opacity:0.6; }
 .meal-block.dragging{ opacity:0.4; }
 .meal-block.drag-over{ box-shadow:var(--shadow-drag-over); }
+
+/* Dettaglio pasto a tutto schermo (sostituisce il vecchio accordion inline):
+   sopra la topbar/barra tab (z-index 90) ma sotto gli altri modali (200) —
+   così "Modifica ricetta"/"Ricetta fatta!" aperti da qui restano impilati
+   correttamente sopra. */
+.meal-detail-screen{ position:fixed; inset:0; z-index:180; background:var(--bg); overflow-y:auto; }
+.meal-detail-header{ position:sticky; top:0; z-index:1; background:var(--bg); border-bottom:1px solid var(--line); display:flex; align-items:flex-start; gap:var(--space-small); padding:var(--space-small) var(--padding-page); }
+.meal-detail-header-text{ flex:1; min-width:0; }
+.meal-detail-kicker{ font-size:var(--text-xsmall); text-transform:uppercase; font-weight:var(--weight-bold); color:var(--ink-light); letter-spacing:0.02em; }
+.meal-detail-title{ font-family:var(--font-family); font-weight:var(--weight-medium); font-size:var(--text-large); margin-top:0.125rem; }
+.meal-detail-close{ width:2.25rem; height:2.25rem; flex-shrink:0; }
+.meal-detail-body{ padding:var(--space-medium) var(--padding-page) var(--space-xlarge); }
 .day-card.today .drag-handle{ right: calc(-0.8 * var(--padding-inline));}
   .is-icon.drag-handle{ padding:var(--space-xxsmall) var(--space-xxsmall); }
   .drag-handle:hover{ color:var(--gold-dark); }
