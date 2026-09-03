@@ -1836,10 +1836,10 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
 
   return `
   <div class="meal-block${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}" data-meal="${meal}">
-    <div class="day-row">
+    <div class="day-meal">
       <div class="meal-block-label">${escapeHtml(MEAL_LABEL[meal])}</div>
       ${cookPill}
-      <div class="day-row-side">
+      <div class="day-row-side display-none">
         ${currentCat ? `<span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>` : ''}
       </div>
     </div>
@@ -1863,16 +1863,22 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
 function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   const d = DATA.week1[i];
   const dateLabel = formatShortDate(weekDates[pos]);
+  const [dayNumber, month] = dateLabel.split(' ');
   const isToday = isSameDay(weekDates[pos], new Date());
   const pranzoOpen = state.expandedDay === mealKey(weekIdx, i, 'pranzo');
   const cenaOpen = state.expandedDay === mealKey(weekIdx, i, 'cena');
+
   return `
   <div class="day-card${(pranzoOpen||cenaOpen) ? ' open' : ''}${isToday ? ' today' : ''}${isPastCard ? ' day-card-past' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
     <div class="day-row">
-      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
+      <div class="day-name">  ${d.giorno.slice(0, 3)} 
+          <span class="day-number">${dayNumber}</span>        
+      </div>
     </div>
-    ${renderMealBlock(weekIdx, i, 'pranzo', pos, weekDates, isPastCard, d, dateLabel, isToday)}
-    ${renderMealBlock(weekIdx, i, 'cena', pos, weekDates, isPastCard, d, dateLabel, isToday)}
+    <div class="meals-block">
+      ${renderMealBlock(weekIdx, i, 'pranzo', pos, weekDates, isPastCard, d, dateLabel, isToday)}
+      ${renderMealBlock(weekIdx, i, 'cena', pos, weekDates, isPastCard, d, dateLabel, isToday)}
+    </div>
   </div>`;
 }
 
