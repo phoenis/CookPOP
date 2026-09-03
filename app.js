@@ -43,7 +43,7 @@ const AVANZI_ORDER = ['ottima','buona','meglio-fatta'];
 const FREEZER_LABEL = { 'non-adatta':'❄️ Non adatta', 'congelabile':'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.65 149.14a12 12 0 0 1-8.79 14.51l-20.67 5.08l5.4 20.16a12 12 0 0 1-23.18 6.22l-7.29-27.2L140 148.78V187l20.48 20.48a12 12 0 0 1-17 17L128 209l-15.51 15.52a12 12 0 0 1-17-17L116 187v-38.22l-33.12 19.13l-7.29 27.2a12 12 0 0 1-23.18-6.22l5.4-20.16l-20.67-5.08a12 12 0 1 1 5.72-23.3l27.89 6.85L104 128l-33.25-19.2l-27.89 6.85A11.8 11.8 0 0 1 40 116a12 12 0 0 1-2.85-23.65l20.67-5.08l-5.4-20.16a12 12 0 0 1 23.18-6.22l7.29 27.2L116 107.21V69L95.52 48.48a12 12 0 0 1 17-17L128 47l15.51-15.52a12 12 0 1 1 17 17L140 69v38.24l33.12-19.12l7.29-27.2a12 12 0 0 1 23.18 6.22l-5.4 20.16l20.67 5.08A12 12 0 0 1 216 116a11.8 11.8 0 0 1-2.87-.35l-27.89-6.85L152 128l33.25 19.2l27.89-6.85a12 12 0 0 1 14.51 8.79"></path></svg> Si può congelare', 'meal-prep':'🍱 Meal prep', 'base':'🧱 Base congelabile' };
 const FREEZER_ORDER = ['congelabile','meal-prep','base'];
 
-const GRAD_LABEL = { 'preferita':'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M240 102c0 70-103.79 126.66-108.21 129a8 8 0 0 1-7.58 0C119.79 228.66 16 172 16 102a62.07 62.07 0 0 1 62-62c20.65 0 38.73 8.88 50 23.89C139.27 48.88 157.35 40 178 40a62.07 62.07 0 0 1 62 62"></path></svg> Preferita', 'ci-piace':'🙂 Ci piace', 'ogni-tanto':'😐 Ogni tanto', 'da-provare':'🧪 Da provare' };
+const GRAD_LABEL = { 'preferita':'❤️ Preferita', 'ci-piace':'🙂 Ci piace', 'ogni-tanto':'😐 Ogni tanto', 'da-provare':'🧪 Da provare' };
 const GRAD_ORDER = ['preferita','ci-piace','ogni-tanto','da-provare'];
 
 const ATTREZZ_LABEL = { 'Padella':'Padella', 'Pentola':'Pentola', 'Forno':'Forno', 'Piastra':'Piastra', 'Moulinex':'Moulinex', 'Frullatore':'Frullatore', 'Fritto':'Fritto' };
@@ -2365,20 +2365,27 @@ function renderSpesa(){
     </div>
     <div class="shop-checks">
     <div class="shop-progress">${displayDone} / ${displayTotal} presi</div>
-    ${total ? `<button type="button" class="btn is-chip" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? 'Espandi tutto' : 'Comprimi tutto'}</button>` : ''}
     </div>
     ${body}
+          
     <div class="shop-top-actions">
-      <button class="btn is-outline reset-btn" id="reset-shop">Svuota spunte</button>
-      <button class="btn is-outline" id="check-have-shop">Spunta quello che ho già</button>
+      <button class="btn is-outline" id="reset-shop"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M100 40a12 12 0 0 1 12-12h32a12 12 0 0 1 0 24h-32a12 12 0 0 1-12-12m44 164h-32a12 12 0 0 0 0 24h32a12 12 0 0 0 0-24m64-176h-24a12 12 0 0 0 0 24h20v20a12 12 0 0 0 24 0V48a20 20 0 0 0-20-20m8 72a12 12 0 0 0-12 12v32a12 12 0 0 0 24 0v-32a12 12 0 0 0-12-12m0 72a12 12 0 0 0-12 12v20h-20a12 12 0 0 0 0 24h24a20 20 0 0 0 20-20v-24a12 12 0 0 0-12-12M40 156a12 12 0 0 0 12-12v-32a12 12 0 0 0-24 0v32a12 12 0 0 0 12 12m32 48H52v-20a12 12 0 0 0-24 0v24a20 20 0 0 0 20 20h24a12 12 0 0 0 0-24M40 84a12 12 0 0 0 12-12V52h20a12 12 0 0 0 0-24H48a20 20 0 0 0-20 20v24a12 12 0 0 0 12 12m40-16h96a12 12 0 0 1 12 12v96a12 12 0 0 1-12 12H80a12 12 0 0 1-12-12V80a12 12 0 0 1 12-12m12 96h72V92H92Z"></path></svg> Svuota spunte</button>
+      <button class="btn is-outline" id="check-have-shop"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Spunta quello che ho già</button>
+    
+ ${displayDoneShoppable ? `
+      <button class="btn is-outline color-delete" id="delete-checked-shop"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina ${displayDoneShoppable}</button>
+    ` : ''}
     </div>
-    ${displayDoneShoppable ? `
-    <div class="shop-checked-actions">
-      <button class="btn is-outline" id="delete-checked-shop">Elimina ${displayDoneShoppable} spuntati</button>
-      <button class="btn is-solid" id="move-checked-to-pantry">Sposta ${displayDoneShoppable} in dispensa</button>
-    </div>` : ''}
-    ${addIngModal}
-    <button class="btn is-solid is-icon fab" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
+    
+  ${addIngModal}
+    <div class="buttons-fixed">
+      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
+        ${displayDoneShoppable ? `
+    <div class="finished-shop-actions">
+      <button class="btn is-fixed is-total" id="move-checked-to-pantry"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M220 151.67V216a12 12 0 0 1-12 12H48a12 12 0 0 1-12-12v-64.33a12 12 0 1 1 24 0v52.23h136v-52.23a12 12 0 1 1 24 0M88 183.81h80a12.06 12.06 0 0 0 0-24.11H88a12.06 12.06 0 0 0 0 24.11M96.2 113l75.17 27.49a12.05 12.05 0 0 0 8.21-22.66l-75.17-27.48A12 12 0 0 0 96.2 113M128 49.29l61.29 51.64a12 12 0 0 0 16.9-1.48a12.09 12.09 0 0 0-1.48-17l-61.27-51.63a12 12 0 0 0-16.91 1.49A12.1 12.1 0 0 0 128 49.29"></path></svg> ${displayDoneShoppable}</button>
+    </div>` : '<button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>'}
+    
+    </div>
   `;
 }
 
@@ -2470,15 +2477,15 @@ function renderPrep(){
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Categoria</div>
             <div class="chip-row">
-              <button class="btn is-chip ${!state.filters.cat.length?'active':''}" data-cat-clear>Tutte</button>
-              ${CAT_ORDER.map(c=>`<button class="btn is-chip ${state.filters.cat.includes(c)?'active':''}" data-cat-chip="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
+              <button class="btn is-filter ${!state.filters.cat.length?'active':''}" data-cat-clear>Tutte</button>
+              ${CAT_ORDER.map(c=>`<button class="btn is-filter ${state.filters.cat.includes(c)?'active':''}" data-cat-chip="${c}">${catIcon(c)} ${escapeHtml(CAT_LABEL[c])}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">🍽️ Tipologia</div>
             <div class="chip-row">
-              <button class="btn is-chip ${!state.filters.tipo.length?'active':''}" data-tipo-clear>Tutte</button>
-              ${TIPO_ORDER.map(t=>`<button class="btn is-chip ${state.filters.tipo.includes(t)?'active':''}" data-tipo-chip="${t}">${tipoIcon(t)} ${escapeHtml(TIPO_LABEL[t])}</button>`).join('')}
+              <button class="btn is-filter ${!state.filters.tipo.length?'active':''}" data-tipo-clear>Tutte</button>
+              ${TIPO_ORDER.map(t=>`<button class="btn is-filter ${state.filters.tipo.includes(t)?'active':''}" data-tipo-chip="${t}">${tipoIcon(t)} ${escapeHtml(TIPO_LABEL[t])}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
@@ -2552,7 +2559,9 @@ function renderPrep(){
     <div class="recipe-list">${cards || '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>'}</div>
     ${renderRecipeEditModal()}
     ${newRecipeModal}
-    <button class="btn is-solid is-icon fab" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
+    <div class="buttons-fixed">
+      <button class="btn is-fixed" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
+    </div>
   `;
 }
 
@@ -2683,12 +2692,12 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
-            <button type="button" class="btn is-chip ${editItem.staple ? 'active' : ''}" id="pantry-edit-staple-toggle">${stapleToggleInner(!!editItem.staple)}</button>
+            <button type="button" class="btn is-filter ${editItem.staple ? 'active' : ''}" id="pantry-edit-staple-toggle">${stapleToggleInner(!!editItem.staple)}</button>
           </div>
         </div>
         <div class="filters-modal-footer">
-          <button class="btn is-ghost reset-btn" id="pantry-edit-delete">Elimina</button>
-          <button class="btn is-solid mini-add-btn" data-close-pantry-edit>Chiudi</button>
+          <button class="btn is-outline color-delete" id="pantry-edit-delete"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina</button>
+          <button class="btn is-solid mini-add-btn" data-close-pantry-edit>Salva</button>
         </div>
       </div>
     </div>` : '';
@@ -2809,9 +2818,9 @@ function renderDispensa(){
   const pantrySelectedCount = Object.keys(state.pantrySelected).length;
   const selectionBar = state.pantrySelectMode ? `
     <div class="finished-shop-actions pantry-selection-bar">
-      <button type="button" class="btn is-ghost" id="pantry-selection-cancel">Deseleziona tutto</button>
-      ${pantrySelectedCount ? `<button type="button" class="btn is-solid" id="pantry-selection-mark">Segna da comprare (${pantrySelectedCount})</button>` : ''}
-    </div>` : '';
+      <button type="button" class="btn is-fixed is-secondary is-neutral" id="pantry-selection-cancel"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"></path></svg></button>
+      ${pantrySelectedCount ? `<button type="button" class="btn is-fixed" id="pantry-selection-mark"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg></button>` : ''}
+    </div>` : '<button class="btn is-fixed" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>';
 
   return `
     <h2 class="section-title">Dispensa</h2>
@@ -2820,15 +2829,17 @@ function renderDispensa(){
       <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
     </div>
-    ${items.length ? `<button type="button" class="btn is-ghost" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? 'Espandi tutto' : 'Comprimi tutto'}</button>` : ''}
     ${body}
     ${finishedSection}
-    ${selectionBar}
     <div class="save-hint"></div>
     ${editModal}
     ${addModal}
     ${groupsModal}
-    <button class="btn is-solid is-icon fab" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
+    <div class="buttons-fixed">      ${items.length ? `<button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
+
+    ${selectionBar}
+      
+    </div>
   `;
 }
 

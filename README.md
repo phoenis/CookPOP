@@ -1,4 +1,4 @@
-# Quaderno della Cucina — Mara & Ste
+# CookPOP
 
 App web a file singolo (`index.html`) per la pianificazione settimanale dei pasti.
 Nessuna build: si apre e basta. Online su https://phoenis.github.io/CookPOP/
