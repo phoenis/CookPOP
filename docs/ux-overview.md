@@ -202,10 +202,19 @@ propria sezione.
 - **Modali**: quasi tutte seguono lo stesso schema — sfondo semitrasparente
   cliccabile per chiudere, intestazione con ✕, corpo scorrevole, footer con
   le azioni. Le uniche eccezioni sono i pannelli inline (Cambia/È
-  avanzata/È avanzo di), che si aprono *dentro* la card invece che sopra
-  tutto lo schermo.
+  avanzata/È avanzo di/+ ricetta), che si aprono *dentro* la card invece
+  che sopra tutto lo schermo.
+- **Swipe orizzontale**: due gesti distinti, solo touch, che non si rubano a
+  vicenda il tocco. Sulla **barra in basso**: cambia tab (come in
+  WhatsApp), soglia ~60px, tollerante a un po' di deriva verticale. Sul
+  **contenuto** della pagina: cambia la sotto-vista dove ce n'è una (Per
+  reparto ↔ Per giorno in Spesa, Per categoria ↔ Per luogo in Dispensa) —
+  ignorato sopra campi di testo, stepper, la maniglia di trascinamento dei
+  pasti e qualunque modale/pannello aperto, per non interferire con gesti
+  che lì hanno già un significato loro.
 - **Colore identità**: ogni persona ha un colore scelto tra 8 preimpostati
-  (pannello profilo), usato per il pallino "chi cucina" nel Menù.
+  (pannello profilo), usato per il pallino "chi cucina" nel Menù (uno per
+  pasto).
 
 ---
 
