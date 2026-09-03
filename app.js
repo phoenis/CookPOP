@@ -2328,13 +2328,30 @@ function renderSpesa(){
     // I giorni già passati della settimana corrente restano fuori, come nel
     // Menù: non serve più fare la spesa per un pasto già cucinato.
     const todayPos = findTodayPos() ?? 0;
+    // Principale e contorni dello stesso pasto possono chiedere lo stesso
+    // ingrediente (sale, olio, pepe...): senza unire le occorrenze per
+    // sezione-pasto come già fa "Per reparto" tra giorni diversi,
+    // comparirebbero due righe identiche nella stessa sezione — spuntarne/
+    // eliminarne una lascia l'altra lì, sembrando che la spunta "non elimini"
+    // l'ingrediente. Accumulo qui le righe unite di ogni sezione per
+    // ricalcolare i conteggi in cima coerenti con quello che si vede davvero
+    // (stesso motivo del ricalcolo già fatto per "Per reparto" sotto).
+    const giornoMergedAll = [];
     body = allPlannedShoppingMeals()
       .filter(({weekIdx, i}) => weekIdx !== 0 || WEEK_DISPLAY_ORDER.indexOf(i) >= todayPos)
       .map(({weekIdx,i,meal,giorno,dateLabel,dishLabel})=>{
       const context = `${giorno} ${dateLabel} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
       const dayItems = mainFlat.filter(it => it.context === context);
-      const rows = dayItems.length
-        ? dayItems.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')
+      const mergedDay = {};
+      dayItems.forEach(it=>{
+        const mergeKey = (it.ingrediente||'').trim().toLowerCase() + '|' + (it.qta||'').trim().toLowerCase();
+        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.note, dove: it.dove, keys: [it.key] };
+        else mergedDay[mergeKey].keys.push(it.key);
+      });
+      const mergedDayItems = Object.values(mergedDay);
+      giornoMergedAll.push(...mergedDayItems);
+      const rows = mergedDayItems.length
+        ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.dove)).join('')
         : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`;
       const sectionId = `giorno_${weekIdx}_${i}_${meal}`;
       const isOpen = !state.shopSectionCollapsed[sectionId];
@@ -2347,6 +2364,12 @@ function renderSpesa(){
         ${isOpen ? rows : ''}
       </div>`;
     }).join('');
+    const nonDayItems = mainFlat.filter(it => !it.isRecipe);
+    displayTotal = giornoMergedAll.length + nonDayItems.length;
+    displayDone = giornoMergedAll.filter(it=>isItemChecked(it.keys, it.ingrediente)).length
+      + nonDayItems.filter(it=>isItemChecked([it.key], it.ingrediente)).length;
+    displayDoneShoppable = giornoMergedAll.filter(it=>isItemChecked(it.keys, it.ingrediente)).length
+      + nonDayItems.filter(it=> it.context !== 'Finiti in Dispensa' && isItemChecked([it.key], it.ingrediente)).length;
     const genContext = mainFlat.filter(it => it.context === 'Ogni settimana');
     if(genContext.length){
       const genOpen = !state.shopSectionCollapsed['giorno_ogni-settimana'];
