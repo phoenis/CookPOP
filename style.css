@@ -242,6 +242,9 @@
   .day-menu{ font-size: var(--text-medium); font-weight:var(--weight-medium); line-height: var(--line-height-small); cursor:pointer; border-bottom:1px dotted var(--ink-light); }
   .open .day-menu{ font-size: var(--text-large); cursor:pointer; border-bottom:1px dotted var(--ink-light); }
   .day-menu:hover{ color:var(--gold-dark); }
+  .day-menu-empty{ width:100%; justify-content:space-between; text-align:left; background:transparent; border:0; padding:0; font-family:var(--font-family); font-size:var(--text-medium); font-weight:var(--weight-medium); color:var(--ink-light); cursor:pointer; }
+  .day-menu-empty:hover{ color:var(--gold-dark); }
+  .day-menu-empty::after{ content:'+'; font-size:var(--text-large); line-height:1; color:var(--gold); }
   .drag-handle{     position: absolute;
     right: 0;
     color: var(--ink-light);

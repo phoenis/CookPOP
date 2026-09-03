@@ -1769,10 +1769,12 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         ${currentCat ? `<span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>` : ''}
       </div>
     </div>
+    ${name ? `
     <div class="day-menu-row">
-      <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(name) || 'Nessuna ricetta scelta'}</span>
+      <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(name)}</span>
       <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare con un altro giorno">⠿</button>
-    </div>
+    </div>` : `
+    <button type="button" class="day-menu-row day-menu-empty" data-open-swap="${mk}">Scegli una ricetta</button>`}
     ${contorniHtml}
     <div class="recipe-info">
       <span class="day-time">${escapeHtml(timeDisplay)}</span>
