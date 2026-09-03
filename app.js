@@ -879,8 +879,8 @@ function clearMealFlag(map, i, meal){
 
 // Un pasto "avanzo" (state.dayLinks, chiave "weekIdx_i_meal") rimanda
 // semplicemente al pasto sorgente per nome/meta ricetta: stessa ricetta
-// ovunque venga letta, senza duplicare nulla. allPlannedDays() lo esclude
-// dall'aggregazione Spesa (ingredienti già contati sul pasto sorgente); il
+// ovunque venga letta, senza duplicare nulla. allPlannedShoppingMeals() lo
+// esclude dall'aggregazione Spesa (ingredienti già contati sul pasto sorgente); il
 // link si rompe da solo se il pasto sorgente cambia ricetta (vedi
 // unlinkDaysPointingTo).
 function linkedSourceMealKey(weekIdx, i, meal){
@@ -1002,34 +1002,45 @@ function weekLabelFor(weekIdx){
   if(saturday.getMonth() === friday.getMonth()) return `${dm}-${ds} ${MONTHS_IT[saturday.getMonth()]}`;
   return `${dm} ${MONTHS_IT_SHORT[saturday.getMonth()]} - ${ds} ${MONTHS_IT_SHORT[friday.getMonth()]}`;
 }
-// Tutti i giorni pianificati (settimana corrente + eventuali extra), nell'ordine di
-// visualizzazione: usato da Spesa per aggregare gli ingredienti di ogni settimana.
-// I giorni "avanzo di un altro giorno" sono esclusi: i loro ingredienti sono già
-// contati sul giorno sorgente, altrimenti finirebbero comprati due volte.
-function allPlannedDays(){
-  const days = [];
+// Pasti pianificati "per la spesa": pranzo e cena di ogni giorno pianificato
+// (settimana corrente + eventuali extra), nell'ordine di visualizzazione —
+// usato da Spesa per aggregare gli ingredienti. Salta i pasti "avanzo" (i
+// loro ingredienti sono già contati sul pasto sorgente, altrimenti
+// finirebbero comprati due volte) e quelli senza nessuna ricetta scelta.
+// dishLabel è il nome mostrato: principale, con gli eventuali contorni
+// aggiunti in coda — è anche quello che finisce nel "context" degli
+// ingredienti, così principale e contorni di uno stesso pasto si aggregano
+// sempre sotto lo stesso titolo di sezione in Spesa.
+function allPlannedShoppingMeals(){
+  const meals = [];
   const pushWeek = (weekIdx) => {
     const dates = weekDatesFor(weekIdx);
     WEEK_DISPLAY_ORDER.forEach((i,pos)=>{
-      if(linkedSourceMealKey(weekIdx, i, 'cena')) return;
-      days.push({
-        weekIdx, i,
-        giorno: DATA.week1[i].giorno,
-        dateLabel: formatShortDate(dates[pos]),
-        name: effectiveRecipeName(weekIdx, i)
+      ['pranzo','cena'].forEach(meal=>{
+        if(linkedSourceMealKey(weekIdx, i, meal)) return;
+        const mealData = effectiveMeal(weekIdx, i, meal);
+        if(!mealData.principale) return;
+        meals.push({
+          weekIdx, i, meal,
+          key: mealKey(weekIdx, i, meal),
+          giorno: DATA.week1[i].giorno,
+          dateLabel: formatShortDate(dates[pos]),
+          principale: mealData.principale,
+          contorni: mealData.contorni,
+          dishLabel: mealData.principale + (mealData.contorni.length ? ' + ' + mealData.contorni.join(', ') : '')
+        });
       });
     });
   };
   pushWeek(0);
   state.extraWeeks.forEach((w,wi)=> pushWeek(wi+1));
-  return days;
+  return meals;
 }
 // Tutti i PASTI pianificati (pranzo e cena, settimana corrente + eventuali
 // extra), nell'ordine di visualizzazione: usato dai picker "Avanzata"/"È
 // avanzo di" per elencare i pasti a cui agganciare un avanzo. A differenza di
-// allPlannedDays() (usato da Spesa, ancora sulla sola cena in questo stadio),
-// include entrambi i pasti di ogni giorno e salta solo quelli senza nessuna
-// ricetta scelta (niente da collegare).
+// allPlannedShoppingMeals() (usato da Spesa) NON salta i pasti già linkati
+// (restano scegliebili come sorgente/bersaglio) e non include i contorni.
 function allPlannedMeals(){
   const meals = [];
   const pushWeek = (weekIdx) => {
@@ -1082,11 +1093,15 @@ function nextCookDayFor(user){
   }
   return null;
 }
-// Chiave stabile per un ingrediente di un giorno: invariata per la settimana 0
-// (compatibilità con le spunte/dismissioni già salvate), con prefisso di settimana
-// per le extra dato che non possono esistere collisioni con le chiavi già in uso.
-function dayIngKey(weekIdx, i, idx){
-  return weekIdx === 0 ? `d${i}_${idx}` : `d${weekIdx}_${i}_${idx}`;
+// Chiave stabile per un ingrediente di un pasto: "role" distingue il
+// principale ('p') dai contorni ('c0', 'c1'...), altrimenti due ricette dello
+// stesso pasto con un ingrediente alla stessa posizione si scontrerebbero
+// sulla stessa chiave. Cambia formato rispetto a prima di avere pranzo/cena
+// (era solo "d{i}_{idx}") — le vecchie spunte/dismissioni restano quindi
+// orfane invece di riapparire nel posto sbagliato: accettabile, si
+// riazzerano da sole al primo giro di spesa dopo l'aggiornamento.
+function dayIngKey(weekIdx, i, meal, role, idx){
+  return weekIdx === 0 ? `d${i}_${meal}_${role}_${idx}` : `d${weekIdx}_${i}_${meal}_${role}_${idx}`;
 }
 
 function currentSeasonKey(){
@@ -2045,23 +2060,28 @@ function renderMenu(){
 // a prescindere da cosa sia visibile/aperto in quel momento sullo schermo.
 function buildShopFlat(){
   const flat = [];
-  allPlannedDays().forEach(({weekIdx,i,giorno,dateLabel,name})=>{
-    const dayKey = `${weekIdx}_${i}`;
-    const det = getRecipeDetails(name);
+  allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,principale,contorni,dishLabel})=>{
+    // Le porzioni sono per pasto (non per singola ricetta): il rapporto si
+    // calcola una volta sola dal principale e si applica uniformemente anche
+    // agli ingredienti dei contorni, così basta un solo stepper per pasto.
+    const det = getRecipeDetails(principale);
     const basePortions = det ? parsePortionsBase(det.porzioni) : null;
-    const ratio = basePortions ? (state.dayPortions[dayKey] || basePortions) / basePortions : 1;
-    const items = getIngredientsFor(name);
-    items.forEach((it,idx)=>{
-      const key = dayIngKey(weekIdx, i, idx);
-      if(state.shopDismissed[key]) return;
-      // Le quantità scalate valgono solo finché non è già stato spuntato:
-      // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
-      const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio);
-      // contextShort: solo per il sottotitolo in Per reparto, dove non serve il
-      // nome intero del giorno né il mese — "Ven 11" basta per orientarsi nella
-      // settimana. "context" resta invariato: è anche la chiave con cui Per
-      // giorno ritrova gli ingredienti del suo giorno, non va accorciato.
-      flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context:`${giorno} ${dateLabel} · ${name}`, contextShort:`${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${name}`, staple: isStaple(it.ingrediente), isRecipe: true });
+    const ratio = basePortions ? (state.dayPortions[mk] || basePortions) / basePortions : 1;
+    // context/contextShort sono condivisi da principale e contorni: così le
+    // loro righe si aggregano sempre sotto lo stesso titolo di sezione in
+    // Spesa (un pasto = una sezione, non una per ricetta).
+    const context = `${giorno} ${dateLabel} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
+    const contextShort = `${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
+    const dishes = [{ role:'p', name: principale }].concat(contorni.map((c,ci)=>({ role:`c${ci}`, name:c })));
+    dishes.forEach(({role, name})=>{
+      getIngredientsFor(name).forEach((it,idx)=>{
+        const key = dayIngKey(weekIdx, i, meal, role, idx);
+        if(state.shopDismissed[key]) return;
+        // Le quantità scalate valgono solo finché non è già stato spuntato:
+        // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
+        const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio);
+        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context, contextShort, staple: isStaple(it.ingrediente), isRecipe: true });
+      });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
@@ -2238,20 +2258,20 @@ function renderSpesa(){
     // I giorni già passati della settimana corrente restano fuori, come nel
     // Menù: non serve più fare la spesa per un pasto già cucinato.
     const todayPos = findTodayPos() ?? 0;
-    body = allPlannedDays()
+    body = allPlannedShoppingMeals()
       .filter(({weekIdx, i}) => weekIdx !== 0 || WEEK_DISPLAY_ORDER.indexOf(i) >= todayPos)
-      .map(({weekIdx,i,giorno,dateLabel,name})=>{
-      const context = `${giorno} ${dateLabel} · ${name}`;
+      .map(({weekIdx,i,meal,giorno,dateLabel,dishLabel})=>{
+      const context = `${giorno} ${dateLabel} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
       const dayItems = mainFlat.filter(it => it.context === context);
       const rows = dayItems.length
         ? dayItems.map(it=>itemRow([it.key], it.ingrediente, it.qta, it.note, it.dove)).join('')
         : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`;
-      const sectionId = `giorno_${weekIdx}_${i}`;
+      const sectionId = `giorno_${weekIdx}_${i}_${meal}`;
       const isOpen = !state.shopSectionCollapsed[sectionId];
       return `
       <div class="shop-day-group">
         <div class="shop-day-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
-          <span class="font-weight-bold">${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)}</span><span class="spesa-recipe">&nbsp;- ${escapeHtml(name)}</span>
+          <span class="font-weight-bold">${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)} · ${escapeHtml(MEAL_LABEL[meal])}</span><span class="spesa-recipe">&nbsp;- ${escapeHtml(dishLabel)}</span>
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
         ${isOpen ? rows : ''}
@@ -2304,8 +2324,8 @@ function renderSpesa(){
     }
   }
 
-  const missingDays = allPlannedDays()
-    .map(({giorno,dateLabel,name})=>({giorno, dateLabel, nome:name}))
+  const missingDays = allPlannedShoppingMeals()
+    .flatMap(({giorno,dateLabel,principale,contorni})=> [principale, ...contorni].map(nome=>({giorno, dateLabel, nome})))
     .filter(d => !(getIngredientsFor(d.nome) && getIngredientsFor(d.nome).length));
   const missingBanner = missingDays.length ? `
     <div class="missing-ing-banner">
