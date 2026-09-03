@@ -1589,14 +1589,16 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       </div>
     </div>`;
   }
-  // Contorno: sempre modificabile a mano, che sia stato scelto dal generatore
-  // o no — un pasto "avanzo" può comunque avere un contorno tutto suo (vedi
-  // setMealContorni/effectiveMeal).
+  // Ricette aggiuntive del pasto (di solito un contorno, ma qualsiasi
+  // ricetta va bene): sempre modificabili a mano, che siano state scelte dal
+  // generatore o no — un pasto "avanzo" può comunque averne una tutta sua
+  // (vedi setMealContorni/effectiveMeal). Niente filtro di tipologia: la
+  // ricerca elenca tutto il catalogo, come "Cambia".
   let contornoPanelHtml = '';
   if(state.contornoPickerOpenMeal === mk){
     const cf = state.swapFilters[`${mk}_contorno`] || {search:''};
     state.swapFilters[`${mk}_contorno`] = cf;
-    let cResults = allRecipeMetas().filter(r => r.tipologia === 'contorno' && !contorni.includes(r.nome));
+    let cResults = allRecipeMetas().filter(r => !contorni.includes(r.nome));
     if(cf.search) cResults = cResults.filter(r=>r.nome.toLowerCase().includes(cf.search.toLowerCase()));
     const cResultsHtml = cResults.slice(0, 40).map(r=>`
       <div class="swap-result" data-contorno-pick="${escapeAttr(r.nome)}" data-contorno-day="${mk}">
@@ -1606,16 +1608,17 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       </div>`).join('');
     contornoPanelHtml = `
     <div class="swap-panel">
-      <input type="search" class="swap-search" placeholder="Cerca un contorno…" data-contorno-search="${mk}" value="${escapeAttr(cf.search)}">
+      <input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-contorno-search="${mk}" value="${escapeAttr(cf.search)}">
       <div class="swap-results">
-        ${cResultsHtml || '<div class="ing-empty">Nessun contorno trovato.</div>'}
+        ${cResultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+        ${cResults.length > 40 ? `<div class="ing-empty">Altri ${cResults.length-40} risultati — affina la ricerca.</div>` : ''}
       </div>
     </div>`;
   }
   const contorniHtml = `
     <div class="contorni-row">
       ${contorni.map(c=>`<button type="button" class="status-badge" data-contorno-remove="${mk}" data-contorno-name="${escapeAttr(c)}">${escapeHtml(c)} <span class="status-badge-reset">✕</span></button>`).join('')}
-      <button type="button" class="btn is-chip is-dashed" data-open-contorno-picker="${mk}">+ contorno</button>
+      <button type="button" class="btn is-chip is-dashed" data-open-contorno-picker="${mk}">+ ricetta</button>
     </div>
     ${contornoPanelHtml}`;
 

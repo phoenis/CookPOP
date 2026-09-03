@@ -226,7 +226,7 @@
   .week-section{ display:block; margin-bottom:var(--space-xsmall); }
   .week-section + .week-section{ margin-top:1.625rem; padding-top:3rem; padding-bottom:3rem;/* border-top:1px solid var(--line); */ }
   .day-time{ display:inline-block; /*margin-top:0.25rem; font-family:var(--font-family); font-weight:var(--weight-medium); */font-size:var(--text-xsmall); opacity:0.75; padding:var(--space-xxsmall) 0px 0px 0px; /*background:var(--surface-2); border-radius:var(--radius-pill); */}
-  .day-menu-row{ display:flex; align-items:center; gap:var(--space-xsmall); margin-top:0.375rem; flex-wrap:wrap; }
+  .day-menu-row{ display:flex; align-items:center; gap:var(--space-xsmall); margin-top:0.375rem; flex-wrap:wrap; position:relative; }
   .cook-pill{ min-width:var(--text-large); height:var(--text-large); border:var(--border) solid transparent; background:var(--gold-soft); color:var(--bg); /* font-family:var(--font-family); */line-height: var(--line-height-xsmall); font-weight:var(--weight-medium); font-size:var(--text-xsmall); border-radius: var(--radius-pill); padding: 0px; margin-right: auto; display: flex; align-items: center; justify-content: center; transition: width .15s ease, padding .15s ease;}
   .cook-pill.cook-mara{ background:var(--user-color-mara);}
   .cook-pill.cook-ste{ background:var(--user-color-ste);}
