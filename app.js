@@ -3739,11 +3739,37 @@ function goToTab(delta){
   }
 }
 
-// Swipe orizzontale per cambiare tab, come in WhatsApp. Solo touch (è un gesto
-// mobile): non intercetta il mouse, così non interferisce col drag&drop dei
-// giorni nel Menù (che usa Pointer Events separatamente). Ignora i gesti che
-// partono da elementi con un loro scroll orizzontale, campi di input o dentro
-// una modale, per non rubargli il tocco.
+// Swipe orizzontale sulla barra in basso per cambiare tab, come in WhatsApp.
+// Solo touch (è un gesto mobile): non intercetta il mouse. Prima lo swipe per
+// cambiare tab funzionava su tutto il contenuto, ma così rubava il gesto a
+// chi voleva scorrere lateralmente dentro la pagina (vedi sotto) — ora vive
+// solo sulla barra, che altrimenti si usa solo a tap.
+(function(){
+  const nav = document.querySelector('nav.tabs');
+  if(!nav) return;
+  const THRESHOLD = 60, MAX_VERTICAL = 60;
+  let startX = 0, startY = 0, tracking = false;
+  nav.addEventListener('touchstart', e=>{
+    if(e.touches.length !== 1){ tracking = false; return; }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+  nav.addEventListener('touchend', e=>{
+    if(!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX, dy = t.clientY - startY;
+    if(Math.abs(dx) < THRESHOLD || Math.abs(dy) > MAX_VERTICAL) return;
+    goToTab(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
+// Swipe orizzontale sul contenuto per cambiare sotto-vista, dove ce n'è una:
+// Per reparto/Per giorno in Spesa, Per categoria/Per luogo in Dispensa. Stessa
+// logica di soglia/tolleranza verticale dello swipe-tab qui sopra, e stessa
+// lista di elementi da ignorare (campi, drag&drop dei giorni, modali) per non
+// interferire con gesti che hanno già un loro significato.
 (function(){
   const panel = document.getElementById('panel');
   if(!panel) return;
@@ -3764,7 +3790,13 @@ function goToTab(delta){
     const t = e.changedTouches[0];
     const dx = t.clientX - startX, dy = t.clientY - startY;
     if(Math.abs(dx) < THRESHOLD || Math.abs(dy) > MAX_VERTICAL) return;
-    goToTab(dx < 0 ? 1 : -1);
+    if(state.tab === 'spesa'){
+      state.shopView = state.shopView === 'reparto' ? 'giorno' : 'reparto';
+      render();
+    } else if(state.tab === 'dispensa'){
+      state.pantryView = state.pantryView === 'luogo' ? 'categoria' : 'luogo';
+      render();
+    }
   }, { passive: true });
 })();
 
