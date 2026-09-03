@@ -2309,7 +2309,7 @@ function renderSpesa(){
             <span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]} (${items.length})
             <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
           </div>
-          ${state.shopFinitiOpen ? rowsHtml : ''}
+          <div class="accordion-body${state.shopFinitiOpen ? '' : ' is-collapsed'}">${rowsHtml}</div>
           ${finishedActions}
         </div>`;
       }
@@ -2321,7 +2321,7 @@ function renderSpesa(){
           <span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${isOpen ? rowsHtml : ''}
+        <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">${rowsHtml}</div>
       </div>`;
     }).join('');
   } else {
@@ -2361,7 +2361,7 @@ function renderSpesa(){
           <span class="font-weight-bold">${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)} · ${escapeHtml(MEAL_LABEL[meal])}</span><span class="spesa-recipe">&nbsp;- ${escapeHtml(dishLabel)}</span>
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${isOpen ? rows : ''}
+        <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">${rows}</div>
       </div>`;
     }).join('');
     const nonDayItems = mainFlat.filter(it => !it.isRecipe);
@@ -2379,7 +2379,7 @@ function renderSpesa(){
           Ogni settimana
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${genOpen ? genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('') : ''}
+        <div class="accordion-body${genOpen ? '' : ' is-collapsed'}">${genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('')}</div>
       </div>`;
     }
     const extraContext = mainFlat.filter(it => it.context === 'Aggiunti a mano');
@@ -2391,7 +2391,7 @@ function renderSpesa(){
           Aggiunti a mano
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${extraOpen ? extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('') : ''}
+        <div class="accordion-body${extraOpen ? '' : ' is-collapsed'}">${extraContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('')}</div>
       </div>`;
     }
     // Chi è già stato segnato "da comprare" (vedi data-finished-shop-addlist)
@@ -2407,7 +2407,7 @@ function renderSpesa(){
           Finiti (${oosContext.length})
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${state.shopFinitiOpen ? oosContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('') : ''}
+        <div class="accordion-body${state.shopFinitiOpen ? '' : ' is-collapsed'}">${oosContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('')}</div>
         ${oosCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${oosCheckedCount})</button>

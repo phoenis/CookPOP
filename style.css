@@ -359,6 +359,12 @@ height: 100%;}
 .shop-checks{display: flex; width: 100%; justify-content: space-between; color: var(--ink-light);}
 
   .shop-day-group{ margin-bottom:1.25rem; }
+  /* Le righe restano sempre nel DOM anche ad accordion chiuso (solo nascoste
+     via CSS): "Elimina"/"Sposta in dispensa" leggono le checkbox spuntate
+     dal DOM, e una riga tolta del tutto dall'HTML quando la sezione è chiusa
+     sparirebbe alla loro vista pur restando spuntata in stato — spuntare e
+     chiudere l'accordion prima di premere Elimina non eliminava nulla. */
+  .accordion-body.is-collapsed{ display:none; }
   .font-weight-bold{ font-weight: var(--weight-bold);}
   .spesa-recipe{ font-weight: var(--weight-medium); text-transform:none;}
 /*   .shop-day-title{ display:flex; justify-content:space-between; align-items:baseline; font-family:var(--font-family); font-size:var(--text-xsmall); text-transform:uppercase; letter-spacing:0.08em; padding:1rem 0 0.5rem; border-bottom:2px solid var(--line-strong); margin-bottom:0.125rem; }
