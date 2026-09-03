@@ -4589,10 +4589,17 @@ document.addEventListener('click', e=>{
       // cache:'reload' bypassa la cache in lettura ma aggiorna comunque quella
       // HTTP con la risposta fresca, così la navigazione qui sotto (verso lo
       // stesso identico URL) la trova già pronta invece di quella stantia.
+      // L'URL dev'essere IDENTICO (query string inclusa, es. "style.css?rev02")
+      // a quello che <link>/<script> caricano davvero: la cache HTTP è tenuta
+      // per URL completo, quindi rinfrescare "style.css" senza il "?rev02" non
+      // tocca affatto la voce di cache che la pagina usa — il CSS restava
+      // vecchio anche dopo "Aggiorna app".
+      const cssLink = document.querySelector('link[rel="stylesheet"][href*="style.css"]');
+      const scriptTag = document.querySelector('script[src*="app.js"]');
       await Promise.all([
         fetch(window.location.pathname, { cache: 'reload' }),
-        fetch('style.css', { cache: 'reload' }),
-        fetch('app.js', { cache: 'reload' })
+        fetch(cssLink ? cssLink.getAttribute('href') : 'style.css', { cache: 'reload' }),
+        fetch(scriptTag ? scriptTag.getAttribute('src') : 'app.js', { cache: 'reload' })
       ]);
     }catch(e){ /* ignora: il reload sotto tenta comunque */ }
     window.location.replace(window.location.pathname);
