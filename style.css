@@ -380,7 +380,7 @@ height: 100%;}
   .view-btn{ background-color: transparent; flex:1; border-radius: 0; font-size: var(--text-body); padding: var(--padding-inline) var(--padding-block); border: 0px; border-bottom: var(--border-strong) solid transparent; margin-bottom: -1px;}
   .view-btn.active{ color:var(--ink); border-color: var(--ink); font-weight: var(--weight-medium);}
   .reset-btn{ /*font-size:11px; padding:6px 10px;*/ margin-bottom:1rem; }
-  .shop-top-actions{ display:flex; gap:var(--gap-btn); flex-wrap: wrap; align-content: center; justify-content: center; margin-top: var(--space-xlarge);}
+  .shop-top-actions{ display:flex; gap:var(--gap-btn); flex-direction: column; align-content: center; justify-content: center; margin-top: var(--space-xlarge);}
   .shop-checked-actions{ display:flex; gap:var(--space-xsmall); margin-top:var(--space-medium); }
   .shop-checked-actions .btn{ flex:1; }
   .finished-shop-actions{ display:flex; gap:var(--space-xsmall); /* margin-top:var(--space-small); */ align-items: flex-end;}
