@@ -535,20 +535,21 @@ const state = {
   shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
-  weekOverrides: {},
-  weekOverridePicked: {},
-  weekBaseline: null,
+  mealsModelMigrated: false, // una tantum: passaggio da "una ricetta al giorno" a due pasti (pranzo/cena), ognuno {principale, contorni[]} — vedi il blocco di migrazione più sotto
+  weekOverrides: {}, // {i: {pranzo:{principale,contorni[]}, cena:{principale,contorni[]}}}
+  weekOverridePicked: {}, // {i: {pranzo:bool, cena:bool}}
+  weekBaseline: null, // stessa forma di weekOverrides, riempita dal generatore
   dayTempoCap: {0:'normale',1:'normale',2:'normale',3:'normale',4:'normale',5:'progetto',6:'progetto'}, // giorno (0=Lun..6=Dom) -> tempoBucket massimo consentito in pickWeekRecipes ('progetto' = nessun limite)
   userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
-  notifDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "tocca a te cucinare" già chiuso per quel giorno
-  mealsDoneReminderDismissed: {}, // dayKey ("weekIdx_i") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel giorno (senza segnarlo mangiato)
+  notifDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "tocca a te cucinare" già chiuso per quel pasto
+  mealsDoneReminderDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel pasto (senza segnarlo mangiato)
   genSettingsOpen: null, // null = chiuso; 'plain' = solo impostazioni (da "Aggiungi settimana"); un numero = impostazioni + genera/rigenera per quella settimana (dal titolo settimana)
   showPastDays: false, // mostra le card degli ultimi 3 giorni passati (nascoste di default) nella settimana corrente
-  extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:nome}, overrides:{}, mealsDone:{} }, ...]
-  dayLinks: {}, // giorno "avanzo" -> giorno sorgente, entrambi come chiave "weekIdx_i"
-  dayLinkNotes: {}, // giorno "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
-  dayPortions: {}, // "weekIdx_i" -> numero porzioni scelto per quel giorno (override delle porzioni base della ricetta, es. per ospiti)
-  cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno
+  extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:{pranzo,cena}}, overrides:{}, overridePicked:{}, mealsDone:{} }, ...]
+  dayLinks: {}, // pasto "avanzo" -> pasto sorgente, entrambi come chiave "weekIdx_i_meal" (es. "0_1_pranzo" -> "0_0_cena")
+  dayLinkNotes: {}, // pasto "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
+  dayPortions: {}, // "weekIdx_i_meal" -> numero porzioni scelto per quel pasto (default 2, 3 per le cene-apripista — vedi generateWeek)
+  cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno (diventerà per pasto in uno stadio successivo, vedi piano)
   shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
   avanzoDiPickerOpenDay: null,
@@ -564,8 +565,8 @@ const state = {
   expandedRecipe: null,
   swapOpenDay: null,
   swapFilters: {},
-  mealsDone: {},
-  doneModalDay: null,
+  mealsDone: {}, // {i: {pranzo:bool, cena:bool}}
+  doneModalDay: null, // chiave "weekIdx_i" del giorno per cui è aperta la modale "Ricetta fatta!" (sempre riferita alla cena, come il resto della UI in questo stadio)
   doneModalQty: {},
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
   filters: { cat:[], tipo:[], tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' } // cat e tipo sono multi-selezione (array), gli altri restano a valore singolo
@@ -745,6 +746,7 @@ function persist(){
       shopQty: state.shopQty,
       pantryChecked: state.pantryChecked,
       shopView: state.shopView,
+      mealsModelMigrated: state.mealsModelMigrated,
       weekOverrides: state.weekOverrides,
       weekOverridePicked: state.weekOverridePicked,
       weekBaseline: state.weekBaseline,
@@ -838,44 +840,80 @@ function weekOverridePickedRef(weekIdx){
   if(!w) return {};
   return w.overridePicked || (w.overridePicked = {});
 }
-// Un giorno "avanzo" (state.dayLinks) rimanda semplicemente al giorno sorgente
-// per nome/meta ricetta: stessa ricetta ovunque venga letta, senza duplicare
-// nulla. allPlannedDays() lo esclude dall'aggregazione Spesa (ingredienti già
-// contati sul giorno sorgente); il link si rompe da solo se il giorno sorgente
-// cambia ricetta (vedi unlinkDaysPointingTo).
-function linkedSourceDayKey(weekIdx, i){
-  return state.dayLinks[`${weekIdx}_${i}`] || null;
+
+// Un pasto (weekOverrides/weekBaseline, chiave "weekIdx_i") è
+// { pranzo:{principale,contorni[]}, cena:{principale,contorni[]} } invece di
+// una stringa: i due helper sotto centralizzano lettura/scrittura di un
+// singolo pasto, così il resto del codice non deve conoscere la forma esatta.
+function emptyMealSlot(){ return { principale: null, contorni: [] }; }
+function emptyDaySlot(){ return { pranzo: emptyMealSlot(), cena: emptyMealSlot() }; }
+// Legge il pasto "meal" del giorno i da una mappa {i: {pranzo,cena}} (weekOverrides
+// o weekBaseline): null se il giorno non ha ancora nulla lì.
+function readMealSlot(map, i, meal){
+  const day = map && map[i];
+  return (day && day[meal]) || null;
 }
-function effectiveRecipeName(weekIdx, i){
-  const link = linkedSourceDayKey(weekIdx, i);
-  if(link){ const [sw,si] = link.split('_'); return effectiveRecipeName(parseInt(sw,10), si); }
-  const overrides = weekOverridesRef(weekIdx);
-  if(overrides[i]) return overrides[i];
-  const baseline = weekBaselineRef(weekIdx);
-  if(baseline && baseline[i]) return baseline[i];
-  if(weekIdx === 0) return DATA.week1[i].cena;
-  return '';
+// Scrive/aggiorna il principale del pasto "meal" del giorno i in una mappa
+// {i: {pranzo,cena}}, creando la struttura del giorno/pasto se manca. Azzera i
+// contorni: un principale nuovo non eredita il contorno di quello sostituito.
+function writeMealPrincipale(map, i, meal, principale){
+  if(!map[i]) map[i] = emptyDaySlot();
+  map[i][meal] = { principale, contorni: [] };
 }
-// Ricetta "vera" del catalogo per il giorno i della settimana weekIdx: se sostituita
-// manualmente è la sostituzione, se fa parte di un menù generato è la ricetta generata,
-// altrimenti (solo settimana 0) si prova ad abbinarla al catalogo (catalogMatch).
-function effectiveRecipeMeta(weekIdx, i){
-  const link = linkedSourceDayKey(weekIdx, i);
-  if(link){ const [sw,si] = link.split('_'); return effectiveRecipeMeta(parseInt(sw,10), si); }
-  const overrideName = weekOverridesRef(weekIdx)[i];
-  if(overrideName) return getRecipeMeta(overrideName);
-  const baseline = weekBaselineRef(weekIdx);
-  if(baseline && baseline[i]) return getRecipeMeta(baseline[i]);
-  if(weekIdx === 0){
+// Cancella solo il pasto "meal" da un giorno di una mappa {i:{pranzo,cena}}
+// di soli booleani (weekOverridePicked/mealsDone), lasciando intatto l'altro
+// pasto dello stesso giorno.
+function clearMealFlag(map, i, meal){
+  if(map[i]) delete map[i][meal];
+}
+
+// Un pasto "avanzo" (state.dayLinks, chiave "weekIdx_i_meal") rimanda
+// semplicemente al pasto sorgente per nome/meta ricetta: stessa ricetta
+// ovunque venga letta, senza duplicare nulla. allPlannedDays() lo esclude
+// dall'aggregazione Spesa (ingredienti già contati sul pasto sorgente); il
+// link si rompe da solo se il pasto sorgente cambia ricetta (vedi
+// unlinkDaysPointingTo).
+function linkedSourceMealKey(weekIdx, i, meal){
+  return state.dayLinks[`${weekIdx}_${i}_${meal}`] || null;
+}
+// Risolve un pasto (weekIdx, i, meal) fino a {principale, contorni[]}: segue
+// l'eventuale avanzo, poi l'override manuale, poi la generazione automatica,
+// poi — solo per la cena della settimana 0, l'unico caso con un foglio
+// originale alle spalle — il fallback statico di DATA.week1[i].cena.
+function effectiveMeal(weekIdx, i, meal){
+  const link = linkedSourceMealKey(weekIdx, i, meal);
+  if(link){ const [sw,si,sm] = link.split('_'); return effectiveMeal(parseInt(sw,10), si, sm); }
+  const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
+  if(override && override.principale) return override;
+  const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
+  if(baseline && baseline.principale) return baseline;
+  if(weekIdx === 0 && meal === 'cena' && DATA.week1[i].cena) return { principale: DATA.week1[i].cena, contorni: [] };
+  return { principale: null, contorni: [] };
+}
+function effectiveRecipeName(weekIdx, i, meal='cena'){
+  return effectiveMeal(weekIdx, i, meal).principale || '';
+}
+// Ricetta "vera" del catalogo per il pasto (weekIdx,i,meal): se sostituita
+// manualmente è la sostituzione, se fa parte di un menù generato è la ricetta
+// generata, altrimenti (solo cena, settimana 0) si prova ad abbinarla al
+// catalogo (catalogMatch).
+function effectiveRecipeMeta(weekIdx, i, meal='cena'){
+  const link = linkedSourceMealKey(weekIdx, i, meal);
+  if(link){ const [sw,si,sm] = link.split('_'); return effectiveRecipeMeta(parseInt(sw,10), si, sm); }
+  const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
+  if(override && override.principale) return getRecipeMeta(override.principale);
+  const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
+  if(baseline && baseline.principale) return getRecipeMeta(baseline.principale);
+  if(weekIdx === 0 && meal === 'cena'){
     const match = DATA.week1[i].catalogMatch;
     return match ? getRecipeMeta(match) : null;
   }
   return null;
 }
-function effectiveCategoria(weekIdx, i){
-  const rec = effectiveRecipeMeta(weekIdx, i);
+function effectiveCategoria(weekIdx, i, meal='cena'){
+  const rec = effectiveRecipeMeta(weekIdx, i, meal);
   if(rec) return rec.categoriaNew;
-  return weekIdx === 0 ? (DATA.week1[i].fallbackCategoria || '') : '';
+  return (weekIdx === 0 && meal === 'cena') ? (DATA.week1[i].fallbackCategoria || '') : '';
 }
 
 const MONTHS_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
@@ -932,7 +970,7 @@ function allPlannedDays(){
   const pushWeek = (weekIdx) => {
     const dates = weekDatesFor(weekIdx);
     WEEK_DISPLAY_ORDER.forEach((i,pos)=>{
-      if(linkedSourceDayKey(weekIdx, i)) return;
+      if(linkedSourceMealKey(weekIdx, i, 'cena')) return;
       days.push({
         weekIdx, i,
         giorno: DATA.week1[i].giorno,
@@ -1016,6 +1054,15 @@ function suggestSwaps(weekIdx, i){
   return scored.slice(0,3);
 }
 
+// Sceglie principale (+ eventuale contorno) di cena per ogni giorno, e di
+// pranzo solo per Ven/Sab/Dom (indici 4/5/6) — Lun-Gio pranzo restano vuoti,
+// li popola l'avanzo automatico della cena di ieri (vedi generateWeek). Un
+// principale con tipologia "secondo" prova ad agganciarsi un contorno dallo
+// stesso pool filtrato per tetto tempo: se il pool contorni è vuoto per quel
+// giorno si salta senza bloccare nulla. I contorni non contano nel
+// bilanciamento categoria, che riguarda solo la varietà dei principali.
+// Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
+// (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
 function pickWeekRecipes(){
   const season = currentSeasonKey();
   let pool = allRecipeMetas().filter(r => r.stagioni.includes(season) || r.stagioni.includes('tutto'));
@@ -1028,12 +1075,11 @@ function pickWeekRecipes(){
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  const picked = [];
   const usedNames = new Set();
   const catCount = {};
   let prevCat = null;
 
-  for(let day = 0; day < 7; day++){
+  function pickPrincipale(day){
     const cap = state.dayTempoCap[day] || 'progetto';
     const capIdx = TEMPO_ORDER.indexOf(cap);
     // candidati non ancora usati, ordinati per preferenza: categoria diversa dal giorno prima
@@ -1056,34 +1102,58 @@ function pickWeekRecipes(){
     });
 
     const chosen = candidates[0];
-    picked.push(chosen);
     usedNames.add(chosen.nome);
     catCount[chosen.categoriaNew] = (catCount[chosen.categoriaNew] || 0) + 1;
     prevCat = chosen.categoriaNew;
+    return chosen;
+  }
+  function pickContorno(day){
+    const cap = state.dayTempoCap[day] || 'progetto';
+    const capIdx = TEMPO_ORDER.indexOf(cap);
+    let candidates = shuffled.filter(r => r.tipologia === 'contorno' && !usedNames.has(r.nome));
+    if(capIdx < TEMPO_ORDER.length - 1){
+      const allowed = TEMPO_ORDER.slice(0, capIdx + 1);
+      const limited = candidates.filter(r => allowed.includes(r.tempoBucket));
+      if(limited.length > 0) candidates = limited;
+    }
+    if(!candidates.length) return null; // nessun contorno disponibile: va bene comunque
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    usedNames.add(chosen.nome);
+    return chosen;
+  }
+  function pickMeal(day){
+    const principale = pickPrincipale(day);
+    const contorno = principale.tipologia === 'secondo' ? pickContorno(day) : null;
+    return { principale, contorni: contorno ? [contorno] : [] };
   }
 
-  return picked;
+  const days = [];
+  for(let day = 0; day < 7; day++){
+    days.push({
+      cena: pickMeal(day),
+      pranzo: (day === 4 || day === 5 || day === 6) ? pickMeal(day) : null
+    });
+  }
+  return days;
 }
 
-// Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
-// state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
-// Rimuove ogni collegamento "avanzo di" che punta a dayKey: usata ogni volta
-// che la ricetta di un giorno cambia, per non lasciare un giorno "fantasma"
-// che continua a mostrare una ricetta di cui in realtà non ci sono più avanzi.
-function unlinkDaysPointingTo(dayKey){
+// Rimuove ogni collegamento "avanzo di" che punta a mealKey: usata ogni volta
+// che la ricetta di un pasto cambia, per non lasciare un pasto "fantasma" che
+// continua a mostrare una ricetta di cui in realtà non ci sono più avanzi.
+function unlinkDaysPointingTo(mealKey){
   Object.keys(state.dayLinks).forEach(k=>{
-    if(state.dayLinks[k] === dayKey) clearDayLink(k);
+    if(state.dayLinks[k] === mealKey) clearDayLink(k);
   });
 }
-// Rimuove tutto ciò che è specifico della ricetta assegnata a un giorno prima
+// Rimuove tutto ciò che è specifico della ricetta assegnata a un pasto prima
 // che cambi identità (collegamento "avanzo di" + nota variante, e l'eventuale
 // override porzioni): altrimenti resterebbero agganciati alla nuova ricetta
-// per puro riuso della chiave "weekIdx_i", con effetti confusi (es. porzioni
-// scalate per una ricetta diversa da quella per cui erano state impostate).
-function clearDayLink(dayKey){
-  delete state.dayLinks[dayKey];
-  delete state.dayLinkNotes[dayKey];
-  delete state.dayPortions[dayKey];
+// per puro riuso della chiave "weekIdx_i_meal", con effetti confusi (es.
+// porzioni scalate per una ricetta diversa da quella per cui erano impostate).
+function clearDayLink(mealKey){
+  delete state.dayLinks[mealKey];
+  delete state.dayLinkNotes[mealKey];
+  delete state.dayPortions[mealKey];
 }
 // Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
 function toggleCook(dayKey){
@@ -1100,9 +1170,17 @@ function toggleShopAssignee(store){
   else delete state.shopAssignees[store];
   persist(); render();
 }
+// Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
+// state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
 function generateWeek(weekIdx){
+  const days = pickWeekRecipes();
   const baseline = {};
-  pickWeekRecipes().forEach((r, i) => { baseline[i] = r.nome; });
+  days.forEach((d, i) => {
+    baseline[i] = {
+      cena: { principale: d.cena.principale.nome, contorni: d.cena.contorni.map(c=>c.nome) },
+      pranzo: d.pranzo ? { principale: d.pranzo.principale.nome, contorni: d.pranzo.contorni.map(c=>c.nome) } : emptyMealSlot()
+    };
+  });
   if(weekIdx === 0){
     state.weekBaseline = baseline;
     state.weekOverrides = {};
@@ -1112,9 +1190,26 @@ function generateWeek(weekIdx){
     state.extraWeeks[weekIdx-1] = { baseline, overrides:{}, overridePicked:{}, mealsDone:{} };
   }
   for(let i=0;i<7;i++){
-    const dayKey = `${weekIdx}_${i}`;
-    clearDayLink(dayKey);
-    unlinkDaysPointingTo(dayKey);
+    ['pranzo','cena'].forEach(meal=>{
+      const mealKey = `${weekIdx}_${i}_${meal}`;
+      clearDayLink(mealKey);
+      unlinkDaysPointingTo(mealKey);
+    });
+  }
+  // Pranzo Lun-Gio (indici 0-3) = avanzo automatico della cena di ieri sera:
+  // Dom(6)cena->Lun(0)pranzo, Lun(0)cena->Mar(1)pranzo, Mar(1)cena->Mer(2)pranzo,
+  // Mer(2)cena->Gio(3)pranzo. È un link come uno scelto a mano con "è avanzo
+  // di": sostituibile/rimuovibile allo stesso identico modo.
+  for(let i = 0; i <= 3; i++){
+    const sourceDay = (i - 1 + 7) % 7;
+    state.dayLinks[`${weekIdx}_${i}_pranzo`] = `${weekIdx}_${sourceDay}_cena`;
+  }
+  // Porzioni di base: 2, tranne le cene "apripista" di Dom/Lun/Mar/Mer (indici
+  // 6,0,1,2 — quelle da cui Lun-Gio pranzo prende l'avanzo), che partono a 3
+  // per coprire anche il pranzo del giorno dopo.
+  for(let i = 0; i < 7; i++){
+    state.dayPortions[`${weekIdx}_${i}_cena`] = [6,0,1,2].includes(i) ? 3 : 2;
+    if(i === 4 || i === 5 || i === 6) state.dayPortions[`${weekIdx}_${i}_pranzo`] = 2;
   }
   state.expandedDay = null;
   state.swapOpenDay = null;
@@ -1138,24 +1233,25 @@ function removeWeek(weekIdx){
   render();
 }
 
-// Scambia le ricette di due giorni, anche tra settimane diverse (drag&drop nel
-// Menù): entrambi diventano override manuali, coerente con "Cambia ricetta" —
-// il "fatta" non ha più senso dopo lo scambio, quindi si azzera per entrambi.
+// Scambia le cene di due giorni, anche tra settimane diverse (drag&drop nel
+// Menù): entrambe diventano override manuali, coerente con "Cambia ricetta" —
+// il "fatta" non ha più senso dopo lo scambio, quindi si azzera per entrambe.
+// Il pranzo di ciascun giorno non viene toccato.
 function swapDayRecipes(weekIdxA, i, weekIdxB, j){
   if(weekIdxA === weekIdxB && i === j) return;
   const nameI = effectiveRecipeName(weekIdxA, i);
   const nameJ = effectiveRecipeName(weekIdxB, j);
-  const dayKeyA = `${weekIdxA}_${i}`, dayKeyB = `${weekIdxB}_${j}`;
-  weekOverridesRef(weekIdxA)[i] = nameJ;
-  weekOverridesRef(weekIdxB)[j] = nameI;
-  delete weekOverridePickedRef(weekIdxA)[i];
-  delete weekOverridePickedRef(weekIdxB)[j];
-  delete weekMealsDoneRef(weekIdxA)[i];
-  delete weekMealsDoneRef(weekIdxB)[j];
-  clearDayLink(dayKeyA);
-  clearDayLink(dayKeyB);
-  unlinkDaysPointingTo(dayKeyA);
-  unlinkDaysPointingTo(dayKeyB);
+  const mealKeyA = `${weekIdxA}_${i}_cena`, mealKeyB = `${weekIdxB}_${j}_cena`;
+  writeMealPrincipale(weekOverridesRef(weekIdxA), i, 'cena', nameJ);
+  writeMealPrincipale(weekOverridesRef(weekIdxB), j, 'cena', nameI);
+  clearMealFlag(weekOverridePickedRef(weekIdxA), i, 'cena');
+  clearMealFlag(weekOverridePickedRef(weekIdxB), j, 'cena');
+  clearMealFlag(weekMealsDoneRef(weekIdxA), i, 'cena');
+  clearMealFlag(weekMealsDoneRef(weekIdxB), j, 'cena');
+  clearDayLink(mealKeyA);
+  clearDayLink(mealKeyB);
+  unlinkDaysPointingTo(mealKeyA);
+  unlinkDaysPointingTo(mealKeyB);
   state.swapOpenDay = null;
   persist();
   render();
@@ -1307,14 +1403,16 @@ function renderRecipeEditModal(){
 // insieme, usato per lo state ephemeral (espanso, swap aperto, modale fatta...).
 function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   const dayKey = `${weekIdx}_${i}`;
-  const linkSource = linkedSourceDayKey(weekIdx, i);
+  const linkSource = linkedSourceMealKey(weekIdx, i, 'cena');
   const sourceGiorno = linkSource ? DATA.week1[linkSource.split('_')[1]].giorno : '';
   const d = DATA.week1[i];
   const dateLabel = formatShortDate(weekDates[pos]);
   const isToday = isSameDay(weekDates[pos], new Date());
   const name = effectiveRecipeName(weekIdx, i);
-  const hasOverride = !!weekOverridesRef(weekIdx)[i];
-  const isChanged = !!linkSource || weekIdx !== 0 || hasOverride || !!(state.weekBaseline && state.weekBaseline[i]);
+  const overrideCena = readMealSlot(weekOverridesRef(weekIdx), i, 'cena');
+  const hasOverride = !!(overrideCena && overrideCena.principale);
+  const baselineCena = readMealSlot(weekBaselineRef(weekIdx), i, 'cena');
+  const isChanged = !!linkSource || weekIdx !== 0 || hasOverride || !!(baselineCena && baselineCena.principale);
   const rec = effectiveRecipeMeta(weekIdx, i); // dati di catalogo, se disponibili
   const currentCat = effectiveCategoria(weekIdx, i);
   let swapPanelHtml = '';
@@ -1397,15 +1495,15 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
     </div>`;
   }
 
-  const isDone = !!weekMealsDoneRef(weekIdx)[i];
+  const isDone = !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i].cena);
   let swapControls;
   if(linkSource){
     swapControls = `
     <div class="section-footer">
       <div class="section-footer-row">
         ${state.linkNoteEditingKey === dayKey
-          ? `<input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[dayKey] || '')}" data-link-note="${dayKey}">`
-          : `<span class="avanzo-note-text" data-link-note-show="${dayKey}">${state.dayLinkNotes[dayKey] ? escapeHtml(state.dayLinkNotes[dayKey]) : 'Nessuna variante'}</span>
+          ? `<input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[`${dayKey}_cena`] || '')}" data-link-note="${dayKey}_cena">`
+          : `<span class="avanzo-note-text" data-link-note-show="${dayKey}">${state.dayLinkNotes[`${dayKey}_cena`] ? escapeHtml(state.dayLinkNotes[`${dayKey}_cena`]) : 'Nessuna variante'}</span>
              <button type="button" class="btn is-icon" data-link-note-show="${dayKey}" aria-label="Modifica variante"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg></button>`}
       </div>
       <div class="section-footer-row">
@@ -1526,7 +1624,7 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   const statusBadges = `
     ${isDone ? `<button type="button" class="status-badge status-done" data-toggle-done="${dayKey}">Cucinata <span class="status-badge-reset">✕</span></button>` : ''}
     ${hasOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${dayKey}">Cambiata <span class="status-badge-reset">✕</span></button>` : ''}
-    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${dayKey}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
+    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${dayKey}_cena">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
   `;
 
   const cook = state.cooks[dayKey];
@@ -1693,7 +1791,7 @@ function renderMenu(){
       const yestKey = `0_${yestI}`;
       const yestMealsDone = weekMealsDoneRef(0);
       const yestName = effectiveRecipeName(0, yestI);
-      if(yestName && !yestMealsDone[yestI] && !state.mealsDoneReminderDismissed[yestKey]){
+      if(yestName && !(yestMealsDone[yestI] && yestMealsDone[yestI].cena) && !state.mealsDoneReminderDismissed[yestKey]){
         eatenReminderBanner = `
         <div class="eaten-reminder-banner">
           <span>Ieri (${escapeHtml(DATA.week1[yestI].giorno)}) hai mangiato <b>${escapeHtml(yestName)}</b>?</span>
@@ -2889,10 +2987,10 @@ function attachHandlers(){
       const targetKey = el.dataset.avanzodiDay; // questo giorno, che ne mangia gli avanzi
       const [w,i] = targetKey.split('_');
       const weekIdx = parseInt(w,10);
-      state.dayLinks[targetKey] = sourceKey;
-      delete weekOverridesRef(weekIdx)[i];
-      delete weekOverridePickedRef(weekIdx)[i];
-      delete weekMealsDoneRef(weekIdx)[i];
+      state.dayLinks[`${targetKey}_cena`] = `${sourceKey}_cena`;
+      clearMealFlag(weekOverridesRef(weekIdx), i, 'cena');
+      clearMealFlag(weekOverridePickedRef(weekIdx), i, 'cena');
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
       state.avanzoDiPickerOpenDay = null;
       persist(); render();
     });
@@ -2904,10 +3002,10 @@ function attachHandlers(){
       const targetKey = el.dataset.linkPick; // giorno scelto in cui la mangerete
       const [w,i] = targetKey.split('_');
       const weekIdx = parseInt(w,10);
-      state.dayLinks[targetKey] = sourceKey;
-      delete weekOverridesRef(weekIdx)[i];
-      delete weekOverridePickedRef(weekIdx)[i];
-      delete weekMealsDoneRef(weekIdx)[i];
+      state.dayLinks[`${targetKey}_cena`] = `${sourceKey}_cena`;
+      clearMealFlag(weekOverridesRef(weekIdx), i, 'cena');
+      clearMealFlag(weekOverridePickedRef(weekIdx), i, 'cena');
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
       state.linkPickerOpenDay = null;
       persist(); render();
     });
@@ -3042,11 +3140,11 @@ function attachHandlers(){
       const key = e.currentTarget.dataset.resetSwap;
       const [w,i] = key.split('_');
       const weekIdx = parseInt(w,10);
-      delete weekOverridesRef(weekIdx)[i];
-      delete weekOverridePickedRef(weekIdx)[i];
-      delete weekMealsDoneRef(weekIdx)[i];
-      clearDayLink(key);
-      unlinkDaysPointingTo(key);
+      clearMealFlag(weekOverridesRef(weekIdx), i, 'cena');
+      clearMealFlag(weekOverridePickedRef(weekIdx), i, 'cena');
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
+      clearDayLink(`${key}_cena`);
+      unlinkDaysPointingTo(`${key}_cena`);
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -3076,11 +3174,12 @@ function attachHandlers(){
       const [w,i] = key.split('_');
       const weekIdx = parseInt(w,10);
       const recipeName = el.dataset.swapPick;
-      weekOverridesRef(weekIdx)[i] = recipeName;
-      weekOverridePickedRef(weekIdx)[i] = true;
-      delete weekMealsDoneRef(weekIdx)[i];
-      clearDayLink(key);
-      unlinkDaysPointingTo(key);
+      writeMealPrincipale(weekOverridesRef(weekIdx), i, 'cena', recipeName);
+      if(!weekOverridePickedRef(weekIdx)[i]) weekOverridePickedRef(weekIdx)[i] = {};
+      weekOverridePickedRef(weekIdx)[i].cena = true;
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
+      clearDayLink(`${key}_cena`);
+      unlinkDaysPointingTo(`${key}_cena`);
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -3092,14 +3191,15 @@ function attachHandlers(){
       const [w,i] = key.split('_');
       const weekIdx = parseInt(w,10);
       const mealsDone = weekMealsDoneRef(weekIdx);
-      if(mealsDone[i]){
-        delete mealsDone[i];
+      if(mealsDone[i] && mealsDone[i].cena){
+        clearMealFlag(mealsDone, i, 'cena');
         persist(); render();
-      } else if(linkedSourceDayKey(weekIdx, i)){
+      } else if(linkedSourceMealKey(weekIdx, i, 'cena')){
         // giorno "avanzo": nessun nuovo ingrediente consumato (già scalato sul
         // giorno sorgente), quindi si segna direttamente senza passare dalla
         // modale di aggiornamento Dispensa.
-        mealsDone[i] = true;
+        if(!mealsDone[i]) mealsDone[i] = {};
+        mealsDone[i].cena = true;
         persist(); render();
       } else {
         const recipeName = effectiveRecipeName(weekIdx, i);
@@ -3146,7 +3246,9 @@ function attachHandlers(){
         const pantryKey = ingrediente.trim().toLowerCase();
         if(state.pantryItems[pantryKey]) state.pantryItems[pantryKey].qty = qtyMap[ingrediente];
       });
-      weekMealsDoneRef(parseInt(w,10))[i] = true;
+      const mealsDone = weekMealsDoneRef(parseInt(w,10));
+      if(!mealsDone[i]) mealsDone[i] = {};
+      mealsDone[i].cena = true;
       state.doneModalDay = null;
       state.doneModalQty = {};
       persist(); render();
@@ -3939,7 +4041,12 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
   await waitForAuth();
   await loadState();
   applyUserColors();
-  if(DATA.forcedWeekBaseline && state.appliedForcedWeekVersion !== DATA.forcedWeekVersion){
+  // Disattivato dal passaggio a due pasti/giorno: DATA.forcedWeekBaseline è
+  // ancora nel formato vecchio (stringa per giorno) e sovrascriverebbe
+  // state.weekBaseline con una forma che effectiveMeal non sa più leggere.
+  // Il blocco resta qui come riferimento se si vuole reintrodurre il
+  // meccanismo, riscritto per la nuova forma {pranzo,cena}.
+  if(false && DATA.forcedWeekBaseline && state.appliedForcedWeekVersion !== DATA.forcedWeekVersion){
     state.weekBaseline = DATA.forcedWeekBaseline;
     state.weekOverrides = {};
     state.weekOverridePicked = {};
@@ -4076,6 +4183,55 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
       if(group) it.group = group;
     });
     state.pantryGroupMigrated2 = true;
+    persist();
+  }
+  // Una tantum: passaggio dal modello "una ricetta per giorno" (weekOverrides/
+  // weekBaseline con un nome ricetta come stringa, mealsDone/overridePicked con
+  // un booleano) al nuovo modello a due pasti (pranzo/cena, ognuno
+  // {principale, contorni[]}). Il valore esistente diventa la cena; il pranzo
+  // parte vuoto (lo riempie una rigenerazione della settimana). Le chiavi
+  // esistenti di dayLinks/dayLinkNotes/dayPortions ("weekIdx_i", perché finora
+  // descrivevano solo la sera) diventano "weekIdx_i_cena" — compresi i valori
+  // di dayLinks, che sono anch'essi chiavi verso un pasto sorgente.
+  if(!state.mealsModelMigrated){
+    function migrateOverridesOrBaseline(map){
+      if(!map) return;
+      Object.keys(map).forEach(i=>{
+        const val = map[i];
+        if(typeof val === 'string') map[i] = { cena: { principale: val, contorni: [] }, pranzo: emptyMealSlot() };
+      });
+    }
+    function migrateBoolMap(map){
+      if(!map) return;
+      Object.keys(map).forEach(i=>{
+        const val = map[i];
+        if(typeof val === 'boolean') map[i] = { cena: val, pranzo: false };
+      });
+    }
+    migrateOverridesOrBaseline(state.weekOverrides);
+    migrateOverridesOrBaseline(state.weekBaseline);
+    migrateBoolMap(state.mealsDone);
+    migrateBoolMap(state.weekOverridePicked);
+    state.extraWeeks.forEach(w=>{
+      migrateOverridesOrBaseline(w.overrides);
+      migrateOverridesOrBaseline(w.baseline);
+      migrateBoolMap(w.mealsDone);
+      migrateBoolMap(w.overridePicked);
+    });
+    ['dayLinks','dayLinkNotes','dayPortions'].forEach(field=>{
+      const map = state[field];
+      const renamed = {};
+      Object.keys(map).forEach(key=>{
+        const newKey = key.split('_').length === 2 ? `${key}_cena` : key;
+        renamed[newKey] = map[key];
+      });
+      state[field] = renamed;
+    });
+    Object.keys(state.dayLinks).forEach(key=>{
+      const val = state.dayLinks[key];
+      if(typeof val === 'string' && val.split('_').length === 2) state.dayLinks[key] = `${val}_cena`;
+    });
+    state.mealsModelMigrated = true;
     persist();
   }
   const todayPos = findTodayPos();
