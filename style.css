@@ -347,6 +347,9 @@ height: 100%;}
   .status-badge.status-avanzo{background-color: var(--amber);}
   .status-badge.status-changed{background-color: var(--line-light);}
   .status-badge.status-done{background-color: var(--green-deep);}
+  .status-badge.status-locked{background-color: color-mix(in srgb, var(--tomato) 15%, transparent); color: var(--tomato);}
+  .meal-lock-btn{ margin-left:auto; color:var(--ink-light); width:2.5rem; height:2.5rem; }
+  .meal-lock-btn.active{ color:var(--tomato); background-color: color-mix(in srgb, var(--tomato) 12%, transparent); border-radius:var(--radius-pill); }
   
   .ing-list{ list-style:none; padding:0; margin:0; }
   .ing-empty{ font-size:var(--text-xsmall); color:var(--ink-light); font-style:italic; margin-bottom:var(--space-xsmall); }

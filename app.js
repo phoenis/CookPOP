@@ -608,6 +608,7 @@ const state = {
   dayLinks: {}, // pasto "avanzo" -> pasto sorgente, entrambi come chiave "weekIdx_i_meal" (es. "0_1_pranzo" -> "0_0_cena")
   dayLinkNotes: {}, // pasto "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
   dayPortions: {}, // "weekIdx_i_meal" -> numero porzioni scelto per quel pasto (default 2, 3 per le cene-apripista — vedi generateWeek)
+  mealLocked: {}, // "weekIdx_i_meal" -> true: la rigenerazione della settimana non lo tocca (vedi generateWeek). Solo pasti non-avanzo.
   cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno (diventerà per pasto in uno stadio successivo, vedi piano)
   shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
@@ -815,6 +816,7 @@ function persist(){
       dayLinks: state.dayLinks,
       dayLinkNotes: state.dayLinkNotes,
       dayPortions: state.dayPortions,
+      mealLocked: state.mealLocked,
       dayTempoCap: state.dayTempoCap,
       userColors: state.userColors,
       notifDismissed: state.notifDismissed,
@@ -1318,6 +1320,21 @@ function toggleShopAssignee(store){
 // Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
 // state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
 function generateWeek(weekIdx){
+  // Pasti bloccati (state.mealLocked) di questa settimana: catturo la loro
+  // ricetta effettiva ATTUALE (principale+contorni) e l'eventuale link avanzo
+  // prima di rigenerare, per riscriverli identici dopo — vedi il ripristino
+  // più sotto. Il generatore non sa nulla dei blocchi: può comunque
+  // "spendere" una scelta su un giorno che poi viene riscritto, la varietà
+  // non si ottimizza intorno ai pasti bloccati (semplificazione accettata).
+  const lockedMeals = [];
+  for(let li=0; li<7; li++){
+    ['pranzo','cena'].forEach(lm=>{
+      const lkey = `${weekIdx}_${li}_${lm}`;
+      if(state.mealLocked[lkey]){
+        lockedMeals.push({ i: li, meal: lm, data: effectiveMeal(weekIdx, li, lm), link: linkedSourceMealKey(weekIdx, li, lm) });
+      }
+    });
+  }
   const days = pickWeekRecipes();
   const baseline = {};
   days.forEach((d, i) => {
@@ -1355,6 +1372,18 @@ function generateWeek(weekIdx){
   for(let i = 0; i < 7; i++){
     state.dayPortions[`${weekIdx}_${i}_cena`] = [6,0,1,2].includes(i) ? 3 : 2;
     if(i === 4 || i === 5 || i === 6) state.dayPortions[`${weekIdx}_${i}_pranzo`] = 2;
+  }
+  // Ripristino i pasti bloccati: stessa ricetta/contorni di prima nella
+  // baseline appena generata, ed eventuale link avanzo preservato al posto
+  // di quello appena assegnato dal loop lun-gio sopra (o rimosso, se non ne
+  // aveva uno — es. un pranzo bloccato di ven-dom pianificato a mano).
+  if(lockedMeals.length){
+    const targetBaseline = weekIdx === 0 ? state.weekBaseline : state.extraWeeks[weekIdx-1].baseline;
+    lockedMeals.forEach(({i, meal, data, link})=>{
+      targetBaseline[i][meal] = { principale: data.principale, contorni: data.contorni };
+      const lkey = `${weekIdx}_${i}_${meal}`;
+      if(link) state.dayLinks[lkey] = link; else delete state.dayLinks[lkey];
+    });
   }
   state.expandedDay = null;
   state.swapOpenDay = null;
@@ -1672,14 +1701,21 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       </div>
     </div>`;
   }
-  const contorniHtml = `
+  // "+ ricetta" non ha senso finché il pasto non ha almeno un principale:
+  // sparisce insieme al resto (chi cucina, riga bottoni) quando è vuoto —
+  // vedi anche il bottone dedicato "Scegli una ricetta" al posto del titolo.
+  const contorniHtml = name ? `
     <div class="contorni-row">
       ${contorni.map(c=>`<button type="button" class="status-badge" data-contorno-remove="${mk}" data-contorno-name="${escapeAttr(c)}">${escapeHtml(c)} <span class="status-badge-reset">✕</span></button>`).join('')}
       <button type="button" class="btn is-chip is-dashed" data-open-contorno-picker="${mk}">+ ricetta</button>
     </div>
-    ${contornoPanelHtml}`;
+    ${contornoPanelHtml}` : '';
 
   const isDone = !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i][meal]);
+  // Un pasto bloccato non viene toccato da "Rigenera settimana" (vedi
+  // generateWeek). Solo sui pasti normali: un pranzo-avanzo segue sempre il
+  // principale del collegamento, bloccarlo non avrebbe un effetto chiaro.
+  const isLocked = !!state.mealLocked[mk];
   let swapControls;
   if(linkSource){
     swapControls = `
@@ -1707,6 +1743,9 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         <button class="btn is-chip is-dashed" data-open-swap="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Cambia</button>
         <button class="btn is-chip is-dashed" data-open-link-picker="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Avanzata</button>
         <button class="btn is-chip is-dashed" data-open-avanzodi-picker="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzo di</button>
+        <button type="button" class="btn is-icon meal-lock-btn${isLocked ? ' active' : ''}" data-toggle-lock="${mk}" aria-label="${isLocked ? 'Sblocca questo pasto' : 'Blocca questo pasto'}" title="${isLocked ? 'Bloccato: la rigenerazione della settimana non lo tocca' : 'Blocca: la rigenerazione della settimana non lo toccherà'}">${isLocked
+          ? '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" width="1.125em" height="1.125em"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></g></svg>'
+          : '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" width="1.125em" height="1.125em"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></g></svg>'}</button>
         </div>
     </div>` : '';
     swapControls = `${footerButtons}
@@ -1753,10 +1792,13 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // (ri-tocca per segnarlo di nuovo da fare), "Cambiato" (torna al pasto
   // originale) e "Avanzo di GG" (scollega dal pasto sorgente). Non mutuamente
   // esclusivi: un pasto può essere sia cambiato sia già segnato mangiato.
+  // "Bloccato" è sola lettura: l'annullo sta nel lucchetto nella riga
+  // bottoni, non si ripete il controllo qui.
   const statusBadges = `
     ${isDone ? `<button type="button" class="status-badge status-done" data-toggle-done="${mk}">Cucinat${meal==='cena'?'a':'o'} <span class="status-badge-reset">✕</span></button>` : ''}
     ${hasOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${mk}">Cambiat${meal==='cena'?'a':'o'} <span class="status-badge-reset">✕</span></button>` : ''}
     ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
+    ${isLocked ? `<span class="status-badge status-locked">Bloccat${meal==='cena'?'a':'o'}</span>` : ''}
   `;
 
   const cook = state.cooks[mk];
@@ -3571,6 +3613,14 @@ function attachHandlers(){
         state.doneModalQty = qtyMap;
         render();
       }
+    });
+  });
+  document.querySelectorAll('[data-toggle-lock]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.toggleLock;
+      if(state.mealLocked[key]) delete state.mealLocked[key];
+      else state.mealLocked[key] = true;
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-close-done-modal]').forEach(el=>{
