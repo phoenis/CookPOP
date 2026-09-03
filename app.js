@@ -3173,28 +3173,8 @@ function attachHandlers(){
       if(el){ el.focus(); el.selectionStart = el.value.length; }
     });
   });
-  document.querySelectorAll('[data-contorno-pick]').forEach(row=>{
-    row.addEventListener('click', e=>{
-      const el = e.currentTarget;
-      const key = el.dataset.contornoDay;
-      const { weekIdx, i, meal } = parseMealKey(key);
-      const current = effectiveMeal(weekIdx, i, meal).contorni;
-      const name = el.dataset.contornoPick;
-      if(!current.includes(name)) setMealContorni(weekIdx, i, meal, current.concat(name));
-      state.contornoPickerOpenMeal = null;
-      persist(); render();
-    });
-  });
-  document.querySelectorAll('[data-contorno-remove]').forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      const key = e.currentTarget.dataset.contornoRemove;
-      const { weekIdx, i, meal } = parseMealKey(key);
-      const name = e.currentTarget.dataset.contornoName;
-      const current = effectiveMeal(weekIdx, i, meal).contorni;
-      setMealContorni(weekIdx, i, meal, current.filter(c => c !== name));
-      persist(); render();
-    });
-  });
+  // data-contorno-pick/data-contorno-remove: delegati su document, vedi in
+  // fondo al file (non ri-agganciati per singolo elemento a ogni render).
   document.querySelectorAll('[data-avanzodi-pick]').forEach(row=>{
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
@@ -4250,6 +4230,31 @@ function endDayDrag(commit){
 }
 document.addEventListener('pointerup', ()=> endDayDrag(true));
 document.addEventListener('pointercancel', ()=> endDayDrag(false));
+
+// "+ ricetta" (contorni/ricette aggiuntive di un pasto): delegato su document
+// una sola volta, invece che riagganciato riga per riga a ogni render come il
+// resto di attachHandlers() — elimina qualunque rischio di righe della lista
+// che restano senza handler agganciato dopo un re-render ravvicinato.
+document.addEventListener('click', e=>{
+  const pickEl = e.target.closest('[data-contorno-pick]');
+  if(pickEl){
+    const { weekIdx, i, meal } = parseMealKey(pickEl.dataset.contornoDay);
+    const current = effectiveMeal(weekIdx, i, meal).contorni;
+    const name = pickEl.dataset.contornoPick;
+    if(!current.includes(name)) setMealContorni(weekIdx, i, meal, current.concat(name));
+    state.contornoPickerOpenMeal = null;
+    persist(); render();
+    return;
+  }
+  const removeEl = e.target.closest('[data-contorno-remove]');
+  if(removeEl){
+    const { weekIdx, i, meal } = parseMealKey(removeEl.dataset.contornoRemove);
+    const name = removeEl.dataset.contornoName;
+    const current = effectiveMeal(weekIdx, i, meal).contorni;
+    setMealContorni(weekIdx, i, meal, current.filter(c => c !== name));
+    persist(); render();
+  }
+});
 
 (async function init(){
   await firebaseReady;
