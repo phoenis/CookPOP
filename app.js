@@ -2166,8 +2166,12 @@ function renderMenu(){
         <div class="filters-modal-footer">
           <button class="btn is-solid mini-add-btn" data-close-gen-settings>Fatto</button>
         </div> */
+  // Controllo su "meal" valido (non solo "expandedDay valorizzato"): una
+  // chiave orfana/malformata rimasta in stato vecchio non deve far comparire
+  // una schermata vuota — vedi il bug della vecchia chiave a 2 parti nell'IIFE di init.
   const mealDetailScreen = state.expandedDay ? (()=>{
     const { weekIdx, i, meal } = parseMealKey(state.expandedDay);
+    if(meal !== 'pranzo' && meal !== 'cena') return '';
     return renderMealDetailScreen(weekIdx, i, meal);
   })() : '';
   return `
@@ -4618,8 +4622,14 @@ document.addEventListener('click', e=>{
     state.mealsModelMigrated2 = true;
     persist();
   }
-  const todayPos = findTodayPos();
-  if(todayPos !== null) state.expandedDay = `0_${WEEK_DISPLAY_ORDER[todayPos]}`;
+  // Apriva in automatico la cena di oggi al caricamento, ma con una chiave
+  // ormai nel vecchio formato a 2 parti (da prima del modello a due pasti):
+  // con l'accordion inline era innocuo (il confronto con la chiave a 3 parti
+  // di ogni blocco pasto non trovava mai corrispondenza), ma ora che il
+  // dettaglio apre a tutto schermo in base al solo "state.expandedDay è
+  // valorizzato" (vedi mealDetailScreen in renderMenu), quella chiave rotta
+  // faceva aprire una schermata vuota a ogni avvio. Rimosso: Mara ha confermato
+  // di preferire nessuna apertura automatica.
   render();
 })();
 
