@@ -2007,7 +2007,7 @@ function renderMenu(){
     if(startPos > 0){
       const yestPos = startPos - 1;
       const yestI = WEEK_DISPLAY_ORDER[yestPos];
-      const yestKey = `0_${yestI}`;
+      const yestKey = mealKey(0, yestI, 'cena');
       const yestMealsDone = weekMealsDoneRef(0);
       const yestName = effectiveRecipeName(0, yestI);
       if(yestName && !(yestMealsDone[yestI] && yestMealsDone[yestI].cena) && !state.mealsDoneReminderDismissed[yestKey]){
