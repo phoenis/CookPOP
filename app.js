@@ -861,7 +861,13 @@ function emptyDaySlot(){ return { pranzo: emptyMealSlot(), cena: emptyMealSlot()
 // o weekBaseline): null se il giorno non ha ancora nulla lì.
 function readMealSlot(map, i, meal){
   const day = map && map[i];
-  return (day && day[meal]) || null;
+  const slot = (day && day[meal]) || null;
+  if(!slot) return null;
+  // Firebase RTDB elimina i campi il cui valore serializza a "vuoto": un array
+  // contorni:[] appena scritto sparisce dal documento al giro successivo,
+  // lasciando lo slot con solo {principale}. Normalizzo qui, unico punto di
+  // lettura, così tutto il resto del codice può contare su .contorni sempre array.
+  return { principale: slot.principale != null ? slot.principale : null, contorni: slot.contorni || [] };
 }
 // Scrive/aggiorna il principale del pasto "meal" del giorno i in una mappa
 // {i: {pranzo,cena}}, creando la struttura del giorno/pasto se manca. Azzera i
