@@ -2093,8 +2093,8 @@ function renderSpesa(){
           <div class="filter-group">
             <div class="filter-group-label">Quantità</div>
             <div class="pantry-group-row">
-              <input type="text" id="shop-add-qta" placeholder="Es. 1 rotolo" value="${escapeAttr(matchedPantryUnit ? `1 ${matchedPantryUnit}` : '')}">
-              <select id="shop-add-unit" title="Unità — aggiorna il numero scritto a sinistra">
+              <input type="text" id="shop-add-qta" placeholder="Es. 1 o 1 rotolo" value="${escapeAttr(matchedPantryUnit ? '1' : '')}">
+              <select id="shop-add-unit" title="Unità (si aggiunge da sola al numero, non serve scriverla)">
                 ${UNIT_ORDER.map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
               </select>
             </div>
@@ -2712,15 +2712,6 @@ function attachHandlers(){
     const nameInput = document.getElementById('shop-add-name');
     const qtaInput = document.getElementById('shop-add-qta');
     const unitSelect = document.getElementById('shop-add-unit');
-    // Scegliere un'unità dal menu aggiorna il numero già scritto in Quantità
-    // (o propone "1 <unità>" se è ancora vuoto) invece di dover scrivere
-    // tutto a mano — utile soprattutto per un ingrediente nuovo, mai visto
-    // in Dispensa, dove non c'è nessuna unità da riproporre in automatico.
-    if(unitSelect) unitSelect.addEventListener('change', ()=>{
-      const numMatch = qtaInput.value.match(/^\s*([\d.,]+)/);
-      const num = numMatch ? numMatch[1] : '1';
-      qtaInput.value = unitSelect.value ? `${num} ${unitSelect.value}` : num;
-    });
     // Se il nome coincide con un ingrediente già in Dispensa ma a scorta 0,
     // "Aggiungi" non crea una voce doppia: riattiva quello (stessa azione di
     // "Segna da comprare" nella sezione Finiti), così resta un unico record.
@@ -2733,8 +2724,15 @@ function attachHandlers(){
         state.pantryConfirmedShop[pantryKey] = true;
         delete state.shopDismissed[`oos_${pantryKey}`];
       } else {
+        // L'unità dalla select si aggiunge solo se il campo Quantità è un
+        // numero "pulito" (es. "2"): se hai scritto qualcosa di tuo (es.
+        // "1 rotolo") lo rispetto così com'è, senza aggiungere altro in coda.
+        const rawQta = qtaInput.value.trim();
+        const qta = (unitSelect && unitSelect.value && /^[\d.,]*$/.test(rawQta))
+          ? `${rawQta || '1'} ${unitSelect.value}`
+          : rawQta;
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-        state.shopExtras[id] = { ingrediente: name, qta: qtaInput.value.trim() };
+        state.shopExtras[id] = { ingrediente: name, qta };
       }
       state.addIngModalOpen = false;
       state.addIngName = '';
