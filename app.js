@@ -1791,7 +1791,10 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
 function renderMealDetailScreen(weekIdx, i, meal){
   const mk = mealKey(weekIdx, i, meal);
   const d = DATA.week1[i];
-  const pos = WEEK_DISPLAY_ORDER.indexOf(i);
+  // i arriva da parseMealKey come stringa (key.split('_')): WEEK_DISPLAY_ORDER
+  // contiene numeri, .indexOf con una stringa non troverebbe mai nulla
+  // (nessuna coercizione con ===) e farebbe fallire tutto il render.
+  const pos = WEEK_DISPLAY_ORDER.indexOf(parseInt(i, 10));
   const dateLabel = formatShortDate(weekDatesFor(weekIdx)[pos]);
   const mealData = effectiveMeal(weekIdx, i, meal);
   const name = mealData.principale || '';
