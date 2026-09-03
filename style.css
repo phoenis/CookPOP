@@ -313,6 +313,8 @@ height: 100%;}
   .done-ing-row .done-ing-hint{ font-size:var(--text-xsmall); color:var(--ink-light); font-style:italic; }
 
   .detail-box{ /* margin-top:calc(-1 * var(--radius-modal)); padding:var(--padding-inline); */ margin:var(--space-large) 0px; background:var(--surface); border-radius:var(--radius-modal); font-size: var(--text-small);}
+  .contorno-detail-box{ margin-top:0; border-top:1px dashed var(--line); padding-top:var(--space-medium); }
+  .contorno-detail-title{ font-family:var(--font-family); font-weight:var(--weight-medium); font-size:var(--text-small); color:var(--gold-dark); margin-bottom:var(--space-xsmall); }
   .day-card.today .detail-box {padding: 0px;}
   .day-card.today .day-name, .day-card.today .day-date{color: var(--gold-dark);}
   .detail-tags{ display:flex; flex-wrap:wrap; gap:0.3125rem; margin-bottom:var(--space-xsmall); }
