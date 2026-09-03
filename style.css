@@ -239,6 +239,13 @@
     background: transparent; 
   top: 0px;
 height: 100%;}
+.meal-block{ position:relative; }
+.meal-block + .meal-block{ margin-top:var(--space-large); padding-top:var(--space-large); border-top:var(--border) dashed var(--line-light); }
+.meal-block-label{ font-size:var(--text-xsmall); text-transform:uppercase; font-weight:var(--weight-bold); color:var(--ink-light); letter-spacing:0.02em; }
+.contorni-row{ display:flex; flex-wrap:wrap; gap:0.375rem; margin-top:0.25rem; align-items:center; }
+.meal-block.done .day-menu{ text-decoration:line-through; opacity:0.6; }
+.meal-block.dragging{ opacity:0.4; }
+.meal-block.drag-over{ box-shadow:var(--shadow-drag-over); }
 .day-card.today .drag-handle{ right: calc(-0.8 * var(--padding-inline));}
   .is-icon.drag-handle{ padding:var(--space-xxsmall) var(--space-xxsmall); }
   .drag-handle:hover{ color:var(--gold-dark); }

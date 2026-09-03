@@ -26,6 +26,8 @@ const TIPO_ICON = { antipasto:'🥗', primo:'🍜', secondo:'🍖', contorno:'�
 function tipoIcon(t){ return TIPO_ICON[t] || '🍴'; }
 const TIPO_ORDER = ['antipasto','primo','secondo','contorno','unico'];
 
+const MEAL_LABEL = { pranzo:'Pranzo', cena:'Cena' };
+
 const TEMPO_LABEL = { 'express':'⚡ Express — fino a 20 min', 'veloce':'🟢 Veloce — 20–30 min', 'normale':'🟡 Normale — 30–45 min', 'lunga':'🟠 Lunga — 45–90 min', 'progetto':'🔴 Progetto — oltre 90 min' };
 const TEMPO_ORDER = ['express','veloce','normale','lunga','progetto'];
 
@@ -284,7 +286,7 @@ function scaleQtyText(text, ratio){
 // ovunque si apra il dettaglio di una ricetta.
 // ratio scala le quantità visualizzate (e quelle mandate in Spesa) per un
 // eventuale numero di porzioni diverso da quello base — vedi renderDayCard.
-function renderIngredientsSection(ing, recipeName, ratio){
+function renderIngredientsSection(ing, ratio){
   ratio = ratio || 1;
   if(!ing.length) return `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
   const STATUS_LABEL = { 'in-casa':'In casa', 'poco':'Scorta bassa', 'manca':'Manca' };
@@ -293,9 +295,14 @@ function renderIngredientsSection(ing, recipeName, ratio){
     const status = pantryStatusFor(it.ingrediente, scaledQta);
     return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}</span><span class="ing-status ${status}" title="${escapeAttr(STATUS_LABEL[status])}"></span><span style="color:var(--sage)">${escapeHtml(scaledQta||'')}</span></li>`;
   }).join('');
-  const mancanti = ing.filter(it => pantryStatusFor(it.ingrediente, scaleQtyText(it.qta, ratio)) !== 'in-casa');
+  // Le quantità mancanti si incollano già scalate qui (invece di far
+  // ri-derivare al click gli ingredienti dal solo nome ricetta): necessario
+  // da quando questa lista può unire più ricette (principale + contorni di
+  // uno stesso pasto), che il vecchio "solo nome" non saprebbe più ricostruire.
+  const mancanti = ing.filter(it => pantryStatusFor(it.ingrediente, scaleQtyText(it.qta, ratio)) !== 'in-casa')
+    .map(it => ({ ingrediente: it.ingrediente, qta: scaleQtyText(it.qta, ratio) || '' }));
   const mancantiBtn = mancanti.length
-    ? `<div class="button-wrapper"><button class="btn is-small" data-mancanti-in-spesa="${escapeAttr(recipeName)}" data-mancanti-ratio="${ratio}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button></div>`
+    ? `<div class="button-wrapper"><button class="btn is-small" data-mancanti-in-spesa="${escapeAttr(JSON.stringify(mancanti))}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button></div>`
     : '';
   return `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Ingredienti</div><ul class="ing-list">${rows}</ul>${mancantiBtn}</div>`;
 }
@@ -536,6 +543,7 @@ const state = {
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
   mealsModelMigrated: false, // una tantum: passaggio da "una ricetta al giorno" a due pasti (pranzo/cena), ognuno {principale, contorni[]} — vedi il blocco di migrazione più sotto
+  mealsModelMigrated2: false, // una tantum: "chi cucina" da per giorno a per pasto
   weekOverrides: {}, // {i: {pranzo:{principale,contorni[]}, cena:{principale,contorni[]}}}
   weekOverridePicked: {}, // {i: {pranzo:bool, cena:bool}}
   weekBaseline: null, // stessa forma di weekOverrides, riempita dal generatore
@@ -553,6 +561,7 @@ const state = {
   shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
   avanzoDiPickerOpenDay: null,
+  contornoPickerOpenMeal: null, // ephemeral: mealKey del pasto per cui è aperto il pannello "+ contorno"
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
   recipeEdits: {},
@@ -747,6 +756,7 @@ function persist(){
       pantryChecked: state.pantryChecked,
       shopView: state.shopView,
       mealsModelMigrated: state.mealsModelMigrated,
+      mealsModelMigrated2: state.mealsModelMigrated2,
       weekOverrides: state.weekOverrides,
       weekOverridePicked: state.weekOverridePicked,
       weekBaseline: state.weekBaseline,
@@ -876,19 +886,50 @@ function clearMealFlag(map, i, meal){
 function linkedSourceMealKey(weekIdx, i, meal){
   return state.dayLinks[`${weekIdx}_${i}_${meal}`] || null;
 }
+// Chiave/parsing per un pasto: "weekIdx_i_meal" (es. "0_2_cena"). Centralizza
+// il pattern usato ovunque, evitando .split('_') sparsi che romperebbero
+// silenziosamente su una chiave con più parti del previsto.
+function mealKey(weekIdx, i, meal){ return `${weekIdx}_${i}_${meal}`; }
+function parseMealKey(key){
+  const [w, i, meal] = key.split('_');
+  return { weekIdx: parseInt(w, 10), i, meal };
+}
 // Risolve un pasto (weekIdx, i, meal) fino a {principale, contorni[]}: segue
 // l'eventuale avanzo, poi l'override manuale, poi la generazione automatica,
 // poi — solo per la cena della settimana 0, l'unico caso con un foglio
 // originale alle spalle — il fallback statico di DATA.week1[i].cena.
+// Un pasto "avanzo" eredita sempre il principale dalla fonte (è lo stesso
+// piatto riscaldato), ma se ha un proprio override di contorni (aggiunto a
+// mano su questo pasto, non sulla fonte) mostra quelli invece di ereditare
+// anche i contorni della fonte — così un contorno fresco del giorno si può
+// sempre aggiungere anche a un pranzo che è avanzo della cena di ieri.
 function effectiveMeal(weekIdx, i, meal){
   const link = linkedSourceMealKey(weekIdx, i, meal);
-  if(link){ const [sw,si,sm] = link.split('_'); return effectiveMeal(parseInt(sw,10), si, sm); }
+  if(link){
+    const { weekIdx: sw, i: si, meal: sm } = parseMealKey(link);
+    const source = effectiveMeal(sw, si, sm);
+    const ownOverride = readMealSlot(weekOverridesRef(weekIdx), i, meal);
+    if(ownOverride && ownOverride.contorni && ownOverride.contorni.length) return { principale: source.principale, contorni: ownOverride.contorni };
+    return source;
+  }
   const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
   if(override && override.principale) return override;
   const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
   if(baseline && baseline.principale) return baseline;
   if(weekIdx === 0 && meal === 'cena' && DATA.week1[i].cena) return { principale: DATA.week1[i].cena, contorni: [] };
   return { principale: null, contorni: [] };
+}
+// Aggiunge/toglie un contorno al pasto "meal" del giorno i senza toccare il
+// principale: per un pasto normale blocca l'attuale principale effettivo
+// nell'override (così il contorno non fa "perdere" la ricetta generata); per
+// un pasto avanzo lascia il principale a null nell'override, cosicché
+// effectiveMeal continui a seguire il link per il principale e prenda solo i
+// contorni da qui (vedi sopra).
+function setMealContorni(weekIdx, i, meal, contorni){
+  const map = weekOverridesRef(weekIdx);
+  if(!map[i]) map[i] = emptyDaySlot();
+  const isLinked = !!linkedSourceMealKey(weekIdx, i, meal);
+  map[i][meal] = { principale: isLinked ? null : effectiveMeal(weekIdx, i, meal).principale, contorni };
 }
 function effectiveRecipeName(weekIdx, i, meal='cena'){
   return effectiveMeal(weekIdx, i, meal).principale || '';
@@ -899,7 +940,7 @@ function effectiveRecipeName(weekIdx, i, meal='cena'){
 // catalogo (catalogMatch).
 function effectiveRecipeMeta(weekIdx, i, meal='cena'){
   const link = linkedSourceMealKey(weekIdx, i, meal);
-  if(link){ const [sw,si,sm] = link.split('_'); return effectiveRecipeMeta(parseInt(sw,10), si, sm); }
+  if(link){ const { weekIdx: sw, i: si, meal: sm } = parseMealKey(link); return effectiveRecipeMeta(sw, si, sm); }
   const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
   if(override && override.principale) return getRecipeMeta(override.principale);
   const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
@@ -983,10 +1024,39 @@ function allPlannedDays(){
   state.extraWeeks.forEach((w,wi)=> pushWeek(wi+1));
   return days;
 }
-// Prossimo giorno, a partire da oggi, in cui cucina "user": scorre la settimana
-// corrente (solo dal giorno di oggi in poi) e le settimane extra già pianificate,
-// nello stesso ordine di visualizzazione del Menù. daysFromToday è 0/1 solo per
-// la settimana corrente (usato dal promemoria "oggi/domani cucini tu"), altrimenti null.
+// Tutti i PASTI pianificati (pranzo e cena, settimana corrente + eventuali
+// extra), nell'ordine di visualizzazione: usato dai picker "Avanzata"/"È
+// avanzo di" per elencare i pasti a cui agganciare un avanzo. A differenza di
+// allPlannedDays() (usato da Spesa, ancora sulla sola cena in questo stadio),
+// include entrambi i pasti di ogni giorno e salta solo quelli senza nessuna
+// ricetta scelta (niente da collegare).
+function allPlannedMeals(){
+  const meals = [];
+  const pushWeek = (weekIdx) => {
+    const dates = weekDatesFor(weekIdx);
+    WEEK_DISPLAY_ORDER.forEach((i,pos)=>{
+      ['pranzo','cena'].forEach(meal=>{
+        const name = effectiveRecipeName(weekIdx, i, meal);
+        if(!name) return;
+        meals.push({
+          key: mealKey(weekIdx, i, meal),
+          weekIdx, i, meal,
+          giorno: DATA.week1[i].giorno,
+          dateLabel: formatShortDate(dates[pos]),
+          name
+        });
+      });
+    });
+  };
+  pushWeek(0);
+  state.extraWeeks.forEach((w,wi)=> pushWeek(wi+1));
+  return meals;
+}
+// Prossimo pasto, a partire da oggi, in cui cucina "user": scorre la
+// settimana corrente (solo dal giorno di oggi in poi) e le settimane extra
+// già pianificate, nello stesso ordine di visualizzazione del Menù —
+// pranzo prima di cena nello stesso giorno. daysFromToday è 0/1 solo per la
+// settimana corrente (usato dal promemoria "oggi/domani cucini tu"), altrimenti null.
 function nextCookDayFor(user){
   const startPos = findTodayPos() ?? 0;
   const weeksToCheck = [0, ...state.extraWeeks.map((_,wi)=>wi+1)];
@@ -995,15 +1065,18 @@ function nextCookDayFor(user){
     for(let pos=0; pos<WEEK_DISPLAY_ORDER.length; pos++){
       if(weekIdx===0 && pos<startPos) continue;
       const i = WEEK_DISPLAY_ORDER[pos];
-      const dayKey = `${weekIdx}_${i}`;
-      if(state.cooks[dayKey] === user){
-        return {
-          dayKey,
-          giorno: DATA.week1[i].giorno,
-          dateLabel: formatShortDate(dates[pos]),
-          name: effectiveRecipeName(weekIdx, i),
-          daysFromToday: weekIdx===0 ? (pos - startPos) : null
-        };
+      for(const meal of ['pranzo','cena']){
+        const mk = mealKey(weekIdx, i, meal);
+        if(state.cooks[mk] === user){
+          return {
+            dayKey: mk,
+            meal,
+            giorno: DATA.week1[i].giorno,
+            dateLabel: formatShortDate(dates[pos]),
+            name: effectiveRecipeName(weekIdx, i, meal),
+            daysFromToday: weekIdx===0 ? (pos - startPos) : null
+          };
+        }
       }
     }
   }
@@ -1233,21 +1306,22 @@ function removeWeek(weekIdx){
   render();
 }
 
-// Scambia le cene di due giorni, anche tra settimane diverse (drag&drop nel
-// Menù): entrambe diventano override manuali, coerente con "Cambia ricetta" —
-// il "fatta" non ha più senso dopo lo scambio, quindi si azzera per entrambe.
-// Il pranzo di ciascun giorno non viene toccato.
-function swapDayRecipes(weekIdxA, i, weekIdxB, j){
+// Scambia lo stesso tipo di pasto (entrambi pranzo o entrambi cena) tra due
+// giorni, anche tra settimane diverse (drag&drop nel Menù): entrambi
+// diventano override manuali, coerente con "Cambia ricetta" — il "fatta" non
+// ha più senso dopo lo scambio, quindi si azzera per entrambi. L'altro pasto
+// dello stesso giorno non viene toccato.
+function swapDayRecipes(weekIdxA, i, weekIdxB, j, meal){
   if(weekIdxA === weekIdxB && i === j) return;
-  const nameI = effectiveRecipeName(weekIdxA, i);
-  const nameJ = effectiveRecipeName(weekIdxB, j);
-  const mealKeyA = `${weekIdxA}_${i}_cena`, mealKeyB = `${weekIdxB}_${j}_cena`;
-  writeMealPrincipale(weekOverridesRef(weekIdxA), i, 'cena', nameJ);
-  writeMealPrincipale(weekOverridesRef(weekIdxB), j, 'cena', nameI);
-  clearMealFlag(weekOverridePickedRef(weekIdxA), i, 'cena');
-  clearMealFlag(weekOverridePickedRef(weekIdxB), j, 'cena');
-  clearMealFlag(weekMealsDoneRef(weekIdxA), i, 'cena');
-  clearMealFlag(weekMealsDoneRef(weekIdxB), j, 'cena');
+  const nameI = effectiveRecipeName(weekIdxA, i, meal);
+  const nameJ = effectiveRecipeName(weekIdxB, j, meal);
+  const mealKeyA = mealKey(weekIdxA, i, meal), mealKeyB = mealKey(weekIdxB, j, meal);
+  writeMealPrincipale(weekOverridesRef(weekIdxA), i, meal, nameJ);
+  writeMealPrincipale(weekOverridesRef(weekIdxB), j, meal, nameI);
+  clearMealFlag(weekOverridePickedRef(weekIdxA), i, meal);
+  clearMealFlag(weekOverridePickedRef(weekIdxB), j, meal);
+  clearMealFlag(weekMealsDoneRef(weekIdxA), i, meal);
+  clearMealFlag(weekMealsDoneRef(weekIdxB), j, meal);
   clearDayLink(mealKeyA);
   clearDayLink(mealKeyB);
   unlinkDaysPointingTo(mealKeyA);
@@ -1401,39 +1475,45 @@ function renderRecipeEditModal(){
 // Un giorno di una qualunque settimana (weekIdx 0 = corrente, >=1 = extra).
 // dayKey identifica il giorno in modo univoco tra tutte le settimane mostrate
 // insieme, usato per lo state ephemeral (espanso, swap aperto, modale fatta...).
-function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
-  const dayKey = `${weekIdx}_${i}`;
-  const linkSource = linkedSourceMealKey(weekIdx, i, 'cena');
-  const sourceGiorno = linkSource ? DATA.week1[linkSource.split('_')[1]].giorno : '';
-  const d = DATA.week1[i];
-  const dateLabel = formatShortDate(weekDates[pos]);
-  const isToday = isSameDay(weekDates[pos], new Date());
-  const name = effectiveRecipeName(weekIdx, i);
-  const overrideCena = readMealSlot(weekOverridesRef(weekIdx), i, 'cena');
-  const hasOverride = !!(overrideCena && overrideCena.principale);
-  const baselineCena = readMealSlot(weekBaselineRef(weekIdx), i, 'cena');
-  const isChanged = !!linkSource || weekIdx !== 0 || hasOverride || !!(baselineCena && baselineCena.principale);
-  const rec = effectiveRecipeMeta(weekIdx, i); // dati di catalogo, se disponibili
-  const currentCat = effectiveCategoria(weekIdx, i);
+// Un pasto (pranzo o cena) di un giorno di una qualunque settimana (weekIdx 0
+// = corrente, >=1 = extra). mk (mealKey) identifica il pasto in modo univoco
+// tra tutte le settimane/giorni/pasti mostrati insieme, usato per lo state
+// ephemeral (espanso, swap aperto, modale fatta, chi cucina...). d/dateLabel/
+// isToday sono già calcolati una volta sola dal giorno (renderDayCard) e
+// passati qui, uguali per pranzo e cena dello stesso giorno.
+function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLabel, isToday){
+  const mk = mealKey(weekIdx, i, meal);
+  const linkSource = linkedSourceMealKey(weekIdx, i, meal);
+  const sourceGiorno = linkSource ? DATA.week1[parseMealKey(linkSource).i].giorno : '';
+  const mealData = effectiveMeal(weekIdx, i, meal);
+  const name = mealData.principale || '';
+  const contorni = mealData.contorni || [];
+  const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
+  const hasOverride = !!(override && override.principale);
+  const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
+  const isChanged = !!linkSource || weekIdx !== 0 || hasOverride || !!(baseline && baseline.principale);
+  const rec = name ? effectiveRecipeMeta(weekIdx, i, meal) : null; // dati di catalogo, se disponibili
+  const currentCat = name ? effectiveCategoria(weekIdx, i, meal) : '';
+
   let swapPanelHtml = '';
-  if(state.swapOpenDay === dayKey){
-    const f = state.swapFilters[dayKey] || {search:'', cat: currentCat ? 'same' : 'all'};
-    state.swapFilters[dayKey] = f;
+  if(state.swapOpenDay === mk){
+    const f = state.swapFilters[mk] || {search:'', cat: currentCat ? 'same' : 'all'};
+    state.swapFilters[mk] = f;
     let results = allRecipeMetas();
     if(f.cat === 'same' && currentCat) results = results.filter(r=>r.categoriaNew === currentCat);
     if(f.search) results = results.filter(r=>r.nome.toLowerCase().includes(f.search.toLowerCase()));
     const resultsHtml = results.slice(0, 60).map(r=>`
-      <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${dayKey}">
+      <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${mk}">
         <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
         <span class="swap-result-name">${escapeHtml(r.nome)}</span>
         <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
       </div>`).join('');
-    const suggestions = suggestSwaps(weekIdx, i);
+    const suggestions = meal === 'cena' ? suggestSwaps(weekIdx, i) : [];
     const suggestionsHtml = suggestions.length ? `
       <div class="swap-suggestions">
         <div class="filter-group-label">Suggeriti per questo giorno</div>
         ${suggestions.map(s=>`
-          <button type="button" class="btn swap-suggestion" data-swap-pick="${escapeAttr(s.r.nome)}" data-swap-day="${dayKey}">
+          <button type="button" class="btn swap-suggestion" data-swap-pick="${escapeAttr(s.r.nome)}" data-swap-day="${mk}">
             <span class="swap-suggestion-top"><span class="swap-suggestion-name">${escapeHtml(s.r.nome)}</span><span class="swap-suggestion-time">${escapeHtml(s.r.tempo)}</span></span>
             <span class="swap-suggestion-motivo">${escapeHtml(s.motivo)}</span>
           </button>`).join('')}
@@ -1442,10 +1522,10 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
     <div class="swap-panel">
       ${suggestionsHtml}
       <div class="filter-group-label">Oppure cerca</div>
-      <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${dayKey}" value="${escapeAttr(f.search)}">
+      <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${mk}" value="${escapeAttr(f.search)}">
       <div class="swap-cat-chips">
-        ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${dayKey}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
-        <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${dayKey}">Tutte le categorie</button>
+        ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${mk}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
+        <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${mk}">Tutte le categorie</button>
       </div>
       <div class="swap-results">
         ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
@@ -1454,88 +1534,120 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
     </div>`;
   }
   let linkPanelHtml = '';
-  if(state.linkPickerOpenDay === dayKey){
-    // Solo i giorni successivi a questo hanno senso come "quando la mangerete":
-    // allPlannedDays() è già in ordine cronologico (settimana 0, poi le extra).
-    const allDays = allPlannedDays();
-    const selfPos = allDays.findIndex(o => `${o.weekIdx}_${o.i}` === dayKey);
-    const options = allDays.filter((o, idx) => idx > selfPos);
+  if(state.linkPickerOpenDay === mk){
+    // Solo i pasti successivi a questo hanno senso come "quando lo mangerete":
+    // allPlannedMeals() è già in ordine cronologico (settimana 0, poi le extra).
+    const allMeals = allPlannedMeals();
+    const selfPos = allMeals.findIndex(o => o.key === mk);
+    const options = allMeals.filter((o, idx) => idx > selfPos);
     const optionsHtml = options.map(o=>`
-      <div class="swap-result" data-link-pick="${o.weekIdx}_${o.i}" data-link-day="${dayKey}">
-        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)}</span>
+      <div class="swap-result" data-link-pick="${o.key}" data-link-day="${mk}">
+        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)} · ${escapeHtml(MEAL_LABEL[o.meal])}</span>
         <span class="swap-result-time">${escapeHtml(o.name)}</span>
       </div>`).join('');
     linkPanelHtml = `
     <div class="swap-panel">
-      <p class="section-sub" style="margin:0 0 8px;">Scegli il giorno in cui la mangerete:</p>
+      <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui lo mangerete:</p>
       <div class="swap-results">
-        ${optionsHtml || '<div class="ing-empty">Nessun giorno successivo disponibile.</div>'}
+        ${optionsHtml || '<div class="ing-empty">Nessun pasto successivo disponibile.</div>'}
       </div>
     </div>`;
   }
-  // Direzione opposta di "Avanzata": utile quando il giorno sorgente è ormai
+  // Direzione opposta di "Avanzata": utile quando il pasto sorgente è ormai
   // passato (e quindi la sua card non è più visibile per collegarla da lì) —
-  // si collega da qui, scegliendo tra i giorni precedenti.
+  // si collega da qui, scegliendo tra i pasti precedenti.
   let avanzoDiPanelHtml = '';
-  if(state.avanzoDiPickerOpenDay === dayKey){
-    const allDays = allPlannedDays();
-    const selfPos = allDays.findIndex(o => `${o.weekIdx}_${o.i}` === dayKey);
-    const pastOptions = allDays.filter((o, idx) => idx < selfPos).reverse();
+  if(state.avanzoDiPickerOpenDay === mk){
+    const allMeals = allPlannedMeals();
+    const selfPos = allMeals.findIndex(o => o.key === mk);
+    const pastOptions = allMeals.filter((o, idx) => idx < selfPos).reverse();
     const pastOptionsHtml = pastOptions.map(o=>`
-      <div class="swap-result" data-avanzodi-pick="${o.weekIdx}_${o.i}" data-avanzodi-day="${dayKey}">
-        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)}</span>
+      <div class="swap-result" data-avanzodi-pick="${o.key}" data-avanzodi-day="${mk}">
+        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)} · ${escapeHtml(MEAL_LABEL[o.meal])}</span>
         <span class="swap-result-time">${escapeHtml(o.name)}</span>
       </div>`).join('');
     avanzoDiPanelHtml = `
     <div class="swap-panel">
-      <p class="section-sub" style="margin:0 0 8px;">Scegli il giorno in cui è stata cucinata:</p>
+      <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui è stato cucinato:</p>
       <div class="swap-results">
-        ${pastOptionsHtml || '<div class="ing-empty">Nessun giorno precedente disponibile.</div>'}
+        ${pastOptionsHtml || '<div class="ing-empty">Nessun pasto precedente disponibile.</div>'}
       </div>
     </div>`;
   }
+  // Contorno: sempre modificabile a mano, che sia stato scelto dal generatore
+  // o no — un pasto "avanzo" può comunque avere un contorno tutto suo (vedi
+  // setMealContorni/effectiveMeal).
+  let contornoPanelHtml = '';
+  if(state.contornoPickerOpenMeal === mk){
+    const cf = state.swapFilters[`${mk}_contorno`] || {search:''};
+    state.swapFilters[`${mk}_contorno`] = cf;
+    let cResults = allRecipeMetas().filter(r => r.tipologia === 'contorno' && !contorni.includes(r.nome));
+    if(cf.search) cResults = cResults.filter(r=>r.nome.toLowerCase().includes(cf.search.toLowerCase()));
+    const cResultsHtml = cResults.slice(0, 40).map(r=>`
+      <div class="swap-result" data-contorno-pick="${escapeAttr(r.nome)}" data-contorno-day="${mk}">
+        <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
+        <span class="swap-result-name">${escapeHtml(r.nome)}</span>
+        <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
+      </div>`).join('');
+    contornoPanelHtml = `
+    <div class="swap-panel">
+      <input type="search" class="swap-search" placeholder="Cerca un contorno…" data-contorno-search="${mk}" value="${escapeAttr(cf.search)}">
+      <div class="swap-results">
+        ${cResultsHtml || '<div class="ing-empty">Nessun contorno trovato.</div>'}
+      </div>
+    </div>`;
+  }
+  const contorniHtml = `
+    <div class="contorni-row">
+      ${contorni.map(c=>`<button type="button" class="status-badge" data-contorno-remove="${mk}" data-contorno-name="${escapeAttr(c)}">${escapeHtml(c)} <span class="status-badge-reset">✕</span></button>`).join('')}
+      <button type="button" class="btn is-chip is-dashed" data-open-contorno-picker="${mk}">+ contorno</button>
+    </div>
+    ${contornoPanelHtml}`;
 
-  const isDone = !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i].cena);
+  const isDone = !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i][meal]);
   let swapControls;
   if(linkSource){
     swapControls = `
     <div class="section-footer">
       <div class="section-footer-row">
-        ${state.linkNoteEditingKey === dayKey
-          ? `<input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[`${dayKey}_cena`] || '')}" data-link-note="${dayKey}_cena">`
-          : `<span class="avanzo-note-text" data-link-note-show="${dayKey}">${state.dayLinkNotes[`${dayKey}_cena`] ? escapeHtml(state.dayLinkNotes[`${dayKey}_cena`]) : 'Nessuna variante'}</span>
-             <button type="button" class="btn is-icon" data-link-note-show="${dayKey}" aria-label="Modifica variante"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg></button>`}
+        ${state.linkNoteEditingKey === mk
+          ? `<input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[mk] || '')}" data-link-note="${mk}">`
+          : `<span class="avanzo-note-text" data-link-note-show="${mk}">${state.dayLinkNotes[mk] ? escapeHtml(state.dayLinkNotes[mk]) : 'Nessuna variante'}</span>
+             <button type="button" class="btn is-icon" data-link-note-show="${mk}" aria-label="Modifica variante"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg></button>`}
       </div>
       <div class="section-footer-row">
-      <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
+      <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${mk}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
       </div>
     </div>`;
   } else {
     swapControls = `
     <div class="section-footer">
       <div class="section-footer-row">
-        <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${dayKey}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
-        <button class="btn is-chip is-dashed" data-open-swap="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Cambia</button>
-        <button class="btn is-chip is-dashed" data-open-link-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Avanzata</button>
+        <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${mk}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
+        <button class="btn is-chip is-dashed" data-open-swap="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Cambia</button>
+        <button class="btn is-chip is-dashed" data-open-link-picker="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Avanzata</button>
+        <button class="btn is-chip is-dashed" data-open-avanzodi-picker="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzo di</button>
         </div>
     </div>
     ${swapPanelHtml}
     ${linkPanelHtml}
     ${avanzoDiPanelHtml}`;
   }
-  /* <button class="btn is-chip is-dashed" data-open-avanzodi-picker="${dayKey}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzo di</button>
-       */
 
-  // tempo: se cambiata (a mano o generata) e in catalogo, usa il tempo della nuova ricetta; altrimenti quello originale del giorno
-  const timeDisplay = (isChanged && rec) ? rec.tempo : d.tempo;
+  // tempo: se cambiato (a mano o generato) e in catalogo, usa il tempo della
+  // nuova ricetta; altrimenti quello originale del foglio (solo cena, unica
+  // con un foglio originale alle spalle — vedi effectiveMeal).
+  const timeDisplay = (isChanged && rec) ? rec.tempo : (meal === 'cena' ? d.tempo : '');
 
-  // note: se cambiata, ricostruite dalla ricetta scelta; altrimenti quelle originali del foglio (solo settimana corrente)
+  // note: se cambiato, ricostruite dalla ricetta scelta; altrimenti quelle
+  // originali del foglio (solo cena, settimana corrente — per il pranzo
+  // isChanged è sempre vero quando c'è un nome, vedi effectiveMeal).
   let metaLines = [];
   if(isChanged){
     if(rec){
       if(rec.prep && rec.prep !== 'No') metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
       if(rec.freezer === 'Sì') metaLines.push(`<b>Nota:</b> congela bene — valuta doppia dose per il freezer`);
-    } else {
+    } else if(name) {
       metaLines.push(`<b>Nota:</b> ricetta non presente nel catalogo, dettagli non disponibili`);
     }
   } else {
@@ -1543,34 +1655,38 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
     if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
   }
 
-  // auto reminder: se domani è Legumi, avvisa oggi (il "domani" segue l'ordine
-  // di visualizzazione, non l'indice originale, dato che la settimana parte dal sabato;
-  // non attraversa il confine tra una settimana e la successiva)
+  // auto reminder: se domani è Legumi, avvisa stasera di mettere in ammollo
+  // (solo sul blocco cena: è la cena di oggi il momento buono per l'ammollo
+  // in vista della cena di domani — il "domani" segue l'ordine di
+  // visualizzazione, non l'indice originale, dato che la settimana parte dal
+  // sabato; non attraversa il confine tra una settimana e la successiva)
   let soakChip = '';
-  if(pos < WEEK_DISPLAY_ORDER.length - 1){
-    const nextCat = effectiveCategoria(weekIdx, WEEK_DISPLAY_ORDER[pos+1]);
+  if(meal === 'cena' && pos < WEEK_DISPLAY_ORDER.length - 1){
+    const nextCat = effectiveCategoria(weekIdx, WEEK_DISPLAY_ORDER[pos+1], 'cena');
     if(nextCat === 'legumi'){
       soakChip = `<div class="soak-chip">💧 Domani legumi — valuta l'ammollo stasera</div>`;
     }
   }
 
   let detailHtml = '';
-  if(state.expandedDay === dayKey){
-    const det = getRecipeDetails(name);
-    // Porzioni scelte per questo giorno (default: quelle base della ricetta),
+  if(state.expandedDay === mk){
+    const det = name ? getRecipeDetails(name) : null;
+    // Porzioni scelte per questo pasto (default: 2, o quelle base della
+    // ricetta se non impostate — vedi generateWeek per il default 2/3),
     // usate per scalare le quantità mostrate qui e — se non già spuntate — in Spesa.
     const basePortions = det ? parsePortionsBase(det.porzioni) : null;
-    const currentPortions = basePortions ? (state.dayPortions[dayKey] || basePortions) : null;
+    const currentPortions = basePortions ? (state.dayPortions[mk] || basePortions) : null;
     const portionsRatio = basePortions ? currentPortions / basePortions : 1;
-    const ing = getIngredientsFor(name);
-    const ingHtml = renderIngredientsSection(ing, name, portionsRatio);
+    const ing = name ? getIngredientsFor(name) : [];
+    const contorniIng = contorni.reduce((acc, c) => acc.concat(getIngredientsFor(c)), []);
+    const ingHtml = renderIngredientsSection(ing.concat(contorniIng), portionsRatio);
     const portionsControl = basePortions ? `
       <div class="portions-row">
         <span class="portions-label">Porzioni</span>
         <span class="qty-stepper">
-          <button type="button" class="qty-btn" data-portions-dec="${dayKey}" aria-label="Diminuisci porzioni">−</button>
+          <button type="button" class="qty-btn" data-portions-dec="${mk}" aria-label="Diminuisci porzioni">−</button>
           <span class="qty-num">${currentPortions}</span>
-          <button type="button" class="qty-btn" data-portions-inc="${dayKey}" aria-label="Aumenta porzioni">+</button>
+          <button type="button" class="qty-btn" data-portions-inc="${mk}" aria-label="Aumenta porzioni">+</button>
         </span>
       </div>` : '';
     const tagsHtml = rec ? `
@@ -1582,7 +1698,7 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
         ${(rec.freezerNew && rec.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[rec.freezerNew]}</span>` : ''}
         <span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> ${escapeHtml(AVANZI_LABEL[rec.avanziNew])}</span>
         ${rec.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
-      </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
+      </div>` : `<div class="ing-empty">${name ? 'Ricetta non presente nel catalogo — solo ingredienti disponibili qui.' : 'Nessuna ricetta scelta per questo pasto.'}</div>`;
     const stepsHtml = det && det.procedimento && det.procedimento.length
       ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
       : '';
@@ -1593,12 +1709,12 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
       ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
     const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
     const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
-    const addFormHtml = det ? '' : `
+    const addFormHtml = (name && !det) ? `
       <div class="add-ing-form">
-        <input type="text" placeholder="Ingrediente" data-ning="${dayKey}">
-        <input type="text" placeholder="Quantità" data-nqta="${dayKey}">
-        <button class="btn is-solid" data-add-ing="${dayKey}">+ aggiungi ingrediente</button>
-      </div>`;
+        <input type="text" placeholder="Ingrediente" data-ning="${mk}">
+        <input type="text" placeholder="Quantità" data-nqta="${mk}">
+        <button class="btn is-solid" data-add-ing="${mk}">+ aggiungi ingrediente</button>
+      </div>` : '';
     const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
     const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>` : '';
     const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
@@ -1616,44 +1732,62 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
     </div>`;
   }
 
-  // Badge di stato accanto al tempo, ognuno tocca-per-annullare: "Cucinata"
-  // (ri-tocca Cucinata per segnarla di nuovo da fare), "Cambiata" (torna alla
-  // ricetta originale del giorno) e "Avanzo di GG" (scollega dal giorno
-  // sorgente). Non mutuamente esclusivi: un giorno può essere sia cambiato
-  // sia già segnato mangiato.
+  // Badge di stato accanto al tempo, ognuno tocca-per-annullare: "Cucinato"
+  // (ri-tocca per segnarlo di nuovo da fare), "Cambiato" (torna al pasto
+  // originale) e "Avanzo di GG" (scollega dal pasto sorgente). Non mutuamente
+  // esclusivi: un pasto può essere sia cambiato sia già segnato mangiato.
   const statusBadges = `
-    ${isDone ? `<button type="button" class="status-badge status-done" data-toggle-done="${dayKey}">Cucinata <span class="status-badge-reset">✕</span></button>` : ''}
-    ${hasOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${dayKey}">Cambiata <span class="status-badge-reset">✕</span></button>` : ''}
-    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${dayKey}_cena">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
+    ${isDone ? `<button type="button" class="status-badge status-done" data-toggle-done="${mk}">Cucinat${meal==='cena'?'a':'o'} <span class="status-badge-reset">✕</span></button>` : ''}
+    ${hasOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${mk}">Cambiat${meal==='cena'?'a':'o'} <span class="status-badge-reset">✕</span></button>` : ''}
+    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
   `;
 
-  const cook = state.cooks[dayKey];
-  const isOpen = state.expandedDay === dayKey;
-  // Un'unica fonte per "chi cucina": iniziale sola a card chiusa, nome per
-  // esteso a card aperta — non più duplicata nel .today-badge separato.
+  const cook = state.cooks[mk];
+  const isOpen = state.expandedDay === mk;
+  // Un'unica fonte per "chi cucina": iniziale sola a blocco chiuso, nome per
+  // esteso a blocco aperto.
   const cookLabel = cook ? (isOpen ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '';
-  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${dayKey}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
+  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
 
   return `
-  <div class="day-card${isDone ? ' done' : ''}${isToday ? ' today' : ''}${isOpen ? ' open' : ''}${isPastCard ? ' day-card-past' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
+  <div class="meal-block${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}" data-meal="${meal}">
     <div class="day-row">
-      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
+      <div class="meal-block-label">${escapeHtml(MEAL_LABEL[meal])}</div>
       ${cookPill}
       <div class="day-row-side">
-        <span class="cat-label">Oggi</span>
-        <span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>
+        ${currentCat ? `<span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>` : ''}
       </div>
     </div>
     <div class="day-menu-row">
-      <span class="day-menu" data-toggle-day="${dayKey}">${escapeHtml(name)}</span>
-      <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare la ricetta con un altro giorno">⠿</button>
+      <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(name) || 'Nessuna ricetta scelta'}</span>
+      <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare con un altro giorno">⠿</button>
     </div>
+    ${contorniHtml}
     <div class="recipe-info">
       <span class="day-time">${escapeHtml(timeDisplay)}</span>
       ${statusBadges}
     </div>
     ${detailHtml}
     ${swapControls}
+  </div>`;
+}
+
+// Card di un giorno intero: intestazione (nome/data) + i due blocchi pasto,
+// pranzo e cena. isPastCard non è più usato per lo stile del singolo pasto
+// (era .day-card-past) ma resta sulla card per coerenza col resto del Menù.
+function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
+  const d = DATA.week1[i];
+  const dateLabel = formatShortDate(weekDates[pos]);
+  const isToday = isSameDay(weekDates[pos], new Date());
+  const pranzoOpen = state.expandedDay === mealKey(weekIdx, i, 'pranzo');
+  const cenaOpen = state.expandedDay === mealKey(weekIdx, i, 'cena');
+  return `
+  <div class="day-card${(pranzoOpen||cenaOpen) ? ' open' : ''}${isToday ? ' today' : ''}${isPastCard ? ' day-card-past' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}">
+    <div class="day-row">
+      <div class="day-name">${d.giorno} <span class="day-date">${dateLabel}</span></div>
+    </div>
+    ${renderMealBlock(weekIdx, i, 'pranzo', pos, weekDates, isPastCard, d, dateLabel, isToday)}
+    ${renderMealBlock(weekIdx, i, 'cena', pos, weekDates, isPastCard, d, dateLabel, isToday)}
   </div>`;
 }
 
@@ -1668,7 +1802,7 @@ function renderProfilePanel(){
   if(!user) return '';
   const next = nextCookDayFor(user);
   const nextLine = next
-    ? `Prossimo turno: <b>${escapeHtml(next.giorno)} ${escapeHtml(next.dateLabel)}</b>${next.name ? ' — '+escapeHtml(next.name) : ''}`
+    ? `Prossimo turno: <b>${escapeHtml(next.giorno)} ${escapeHtml(next.dateLabel)} · ${escapeHtml(MEAL_LABEL[next.meal])}</b>${next.name ? ' — '+escapeHtml(next.name) : ''}`
     : 'Nessun turno di cucina in programma.';
   const swatches = USER_COLOR_PRESETS.map(c=>`<button type="button" class="color-swatch${state.userColors[user]===c?' active':''}" style="background:${c}" data-user-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
   return `
@@ -1771,7 +1905,7 @@ function renderMenu(){
       const when = next.daysFromToday === 0 ? 'Oggi' : 'Domani';
       reminderBanner = `
       <div class="cook-reminder-banner">
-        <span>${when} cucini tu${next.name ? ': <b>'+escapeHtml(next.name)+'</b>' : ''}</span>
+        <span>${when} cucini tu (${escapeHtml(MEAL_LABEL[next.meal].toLowerCase())})${next.name ? ': <b>'+escapeHtml(next.name)+'</b>' : ''}</span>
         <button type="button" class="btn is-icon" data-dismiss-reminder="${next.dayKey}" aria-label="Chiudi promemoria">✕</button>
       </div>`;
     }
@@ -1806,10 +1940,10 @@ function renderMenu(){
 
   let doneModal = '';
   if(state.doneModalDay !== null){
-    const [dw, di] = state.doneModalDay.split('_');
-    const doneWeekIdx = parseInt(dw,10);
-    const doneName = effectiveRecipeName(doneWeekIdx, di);
-    const doneIng = getIngredientsFor(doneName);
+    const { weekIdx: doneWeekIdx, i: di, meal: doneMeal } = parseMealKey(state.doneModalDay);
+    const doneMealData = effectiveMeal(doneWeekIdx, di, doneMeal);
+    const doneName = doneMealData.principale || '';
+    const doneIng = (doneName ? getIngredientsFor(doneName) : []).concat(doneMealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
     const qtyMap = state.doneModalQty || {};
     doneModal = `
     <div class="filters-modal-backdrop" data-close-done-modal>
@@ -2275,7 +2409,7 @@ function renderPrep(){
           <span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
           ${r.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
         </div>`;
-      const ingHtml = renderIngredientsSection(ing, r.nome);
+      const ingHtml = renderIngredientsSection(ing);
       const stepsHtml = det && det.procedimento && det.procedimento.length
         ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
         : '';
@@ -2959,6 +3093,7 @@ function attachHandlers(){
       state.swapOpenDay = state.swapOpenDay === key ? null : key;
       state.linkPickerOpenDay = null;
       state.avanzoDiPickerOpenDay = null;
+      state.contornoPickerOpenMeal = null;
       render();
     });
   });
@@ -2968,6 +3103,7 @@ function attachHandlers(){
       state.linkPickerOpenDay = state.linkPickerOpenDay === key ? null : key;
       state.avanzoDiPickerOpenDay = null;
       state.swapOpenDay = null;
+      state.contornoPickerOpenMeal = null;
       render();
     });
   });
@@ -2977,20 +3113,64 @@ function attachHandlers(){
       state.avanzoDiPickerOpenDay = state.avanzoDiPickerOpenDay === key ? null : key;
       state.linkPickerOpenDay = null;
       state.swapOpenDay = null;
+      state.contornoPickerOpenMeal = null;
       render();
+    });
+  });
+  // Contorno: pannello di ricerca uguale a quello di "Cambia", ma filtrato
+  // sui soli tipologia="contorno" e senza toccare il principale.
+  document.querySelectorAll('[data-open-contorno-picker]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.openContornoPicker;
+      state.contornoPickerOpenMeal = state.contornoPickerOpenMeal === key ? null : key;
+      state.swapOpenDay = null;
+      state.linkPickerOpenDay = null;
+      state.avanzoDiPickerOpenDay = null;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-contorno-search]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const key = `${e.target.dataset.contornoSearch}_contorno`;
+      if(!state.swapFilters[key]) state.swapFilters[key] = {search:''};
+      state.swapFilters[key].search = e.target.value;
+      render();
+      const el = document.querySelector(`[data-contorno-search="${e.currentTarget.dataset.contornoSearch}"]`);
+      if(el){ el.focus(); el.selectionStart = el.value.length; }
+    });
+  });
+  document.querySelectorAll('[data-contorno-pick]').forEach(row=>{
+    row.addEventListener('click', e=>{
+      const el = e.currentTarget;
+      const key = el.dataset.contornoDay;
+      const { weekIdx, i, meal } = parseMealKey(key);
+      const current = effectiveMeal(weekIdx, i, meal).contorni;
+      const name = el.dataset.contornoPick;
+      if(!current.includes(name)) setMealContorni(weekIdx, i, meal, current.concat(name));
+      state.contornoPickerOpenMeal = null;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-contorno-remove]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.contornoRemove;
+      const { weekIdx, i, meal } = parseMealKey(key);
+      const name = e.currentTarget.dataset.contornoName;
+      const current = effectiveMeal(weekIdx, i, meal).contorni;
+      setMealContorni(weekIdx, i, meal, current.filter(c => c !== name));
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-avanzodi-pick]').forEach(row=>{
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
-      const sourceKey = el.dataset.avanzodiPick; // giorno passato scelto, in cui è stata cucinata davvero
-      const targetKey = el.dataset.avanzodiDay; // questo giorno, che ne mangia gli avanzi
-      const [w,i] = targetKey.split('_');
-      const weekIdx = parseInt(w,10);
-      state.dayLinks[`${targetKey}_cena`] = `${sourceKey}_cena`;
-      clearMealFlag(weekOverridesRef(weekIdx), i, 'cena');
-      clearMealFlag(weekOverridePickedRef(weekIdx), i, 'cena');
-      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
+      const sourceKey = el.dataset.avanzodiPick; // pasto passato scelto, in cui è stato cucinato davvero
+      const targetKey = el.dataset.avanzodiDay; // questo pasto, che ne mangia gli avanzi
+      const { weekIdx, i, meal } = parseMealKey(targetKey);
+      state.dayLinks[targetKey] = sourceKey;
+      clearMealFlag(weekOverridesRef(weekIdx), i, meal);
+      clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
       state.avanzoDiPickerOpenDay = null;
       persist(); render();
     });
@@ -2998,14 +3178,13 @@ function attachHandlers(){
   document.querySelectorAll('[data-link-pick]').forEach(row=>{
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
-      const sourceKey = el.dataset.linkDay; // giorno in cui è stata cucinata (dove hai cliccato "Avanzata")
-      const targetKey = el.dataset.linkPick; // giorno scelto in cui la mangerete
-      const [w,i] = targetKey.split('_');
-      const weekIdx = parseInt(w,10);
-      state.dayLinks[`${targetKey}_cena`] = `${sourceKey}_cena`;
-      clearMealFlag(weekOverridesRef(weekIdx), i, 'cena');
-      clearMealFlag(weekOverridePickedRef(weekIdx), i, 'cena');
-      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
+      const sourceKey = el.dataset.linkDay; // pasto in cui è stato cucinato (dove hai cliccato "Avanzata")
+      const targetKey = el.dataset.linkPick; // pasto scelto in cui lo mangerete
+      const { weekIdx, i, meal } = parseMealKey(targetKey);
+      state.dayLinks[targetKey] = sourceKey;
+      clearMealFlag(weekOverridesRef(weekIdx), i, meal);
+      clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
       state.linkPickerOpenDay = null;
       persist(); render();
     });
@@ -3044,8 +3223,8 @@ function attachHandlers(){
   document.querySelectorAll('[data-portions-inc]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const dayKey = e.currentTarget.dataset.portionsInc;
-      const [w,i] = dayKey.split('_');
-      const det = getRecipeDetails(effectiveRecipeName(parseInt(w,10), i));
+      const { weekIdx, i, meal } = parseMealKey(dayKey);
+      const det = getRecipeDetails(effectiveRecipeName(weekIdx, i, meal));
       const base = det ? parsePortionsBase(det.porzioni) : null;
       const current = state.dayPortions[dayKey] || base || 1;
       state.dayPortions[dayKey] = current + 1;
@@ -3055,8 +3234,8 @@ function attachHandlers(){
   document.querySelectorAll('[data-portions-dec]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const dayKey = e.currentTarget.dataset.portionsDec;
-      const [w,i] = dayKey.split('_');
-      const det = getRecipeDetails(effectiveRecipeName(parseInt(w,10), i));
+      const { weekIdx, i, meal } = parseMealKey(dayKey);
+      const det = getRecipeDetails(effectiveRecipeName(weekIdx, i, meal));
       const base = det ? parsePortionsBase(det.porzioni) : null;
       const current = state.dayPortions[dayKey] || base || 1;
       state.dayPortions[dayKey] = Math.max(1, current - 1);
@@ -3075,13 +3254,12 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-mancanti-in-spesa]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const recipeName = e.currentTarget.dataset.mancantiInSpesa;
-      const ratio = parseFloat(e.currentTarget.dataset.mancantiRatio) || 1;
-      getIngredientsFor(recipeName).filter(it => pantryStatusFor(it.ingrediente, scaleQtyText(it.qta, ratio)) !== 'in-casa').forEach(it=>{
+      const mancanti = JSON.parse(e.currentTarget.dataset.mancantiInSpesa);
+      mancanti.forEach(it=>{
         const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
         if(already) return;
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-        state.shopExtras[id] = { ingrediente: it.ingrediente, qta: scaleQtyText(it.qta, ratio) || '' };
+        state.shopExtras[id] = { ingrediente: it.ingrediente, qta: it.qta || '' };
       });
       state.tab = 'spesa';
       window.location.hash = 'spesa';
@@ -3138,13 +3316,12 @@ function attachHandlers(){
   document.querySelectorAll('[data-reset-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.resetSwap;
-      const [w,i] = key.split('_');
-      const weekIdx = parseInt(w,10);
-      clearMealFlag(weekOverridesRef(weekIdx), i, 'cena');
-      clearMealFlag(weekOverridePickedRef(weekIdx), i, 'cena');
-      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
-      clearDayLink(`${key}_cena`);
-      unlinkDaysPointingTo(`${key}_cena`);
+      const { weekIdx, i, meal } = parseMealKey(key);
+      clearMealFlag(weekOverridesRef(weekIdx), i, meal);
+      clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
+      clearDayLink(key);
+      unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -3171,15 +3348,14 @@ function attachHandlers(){
     row.addEventListener('click', e=>{
       const el = e.currentTarget;
       const key = el.dataset.swapDay;
-      const [w,i] = key.split('_');
-      const weekIdx = parseInt(w,10);
+      const { weekIdx, i, meal } = parseMealKey(key);
       const recipeName = el.dataset.swapPick;
-      writeMealPrincipale(weekOverridesRef(weekIdx), i, 'cena', recipeName);
+      writeMealPrincipale(weekOverridesRef(weekIdx), i, meal, recipeName);
       if(!weekOverridePickedRef(weekIdx)[i]) weekOverridePickedRef(weekIdx)[i] = {};
-      weekOverridePickedRef(weekIdx)[i].cena = true;
-      clearMealFlag(weekMealsDoneRef(weekIdx), i, 'cena');
-      clearDayLink(`${key}_cena`);
-      unlinkDaysPointingTo(`${key}_cena`);
+      weekOverridePickedRef(weekIdx)[i][meal] = true;
+      clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
+      clearDayLink(key);
+      unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
       persist(); render();
     });
@@ -3188,23 +3364,24 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.toggleDone;
-      const [w,i] = key.split('_');
-      const weekIdx = parseInt(w,10);
+      const { weekIdx, i, meal } = parseMealKey(key);
       const mealsDone = weekMealsDoneRef(weekIdx);
-      if(mealsDone[i] && mealsDone[i].cena){
-        clearMealFlag(mealsDone, i, 'cena');
+      if(mealsDone[i] && mealsDone[i][meal]){
+        clearMealFlag(mealsDone, i, meal);
         persist(); render();
-      } else if(linkedSourceMealKey(weekIdx, i, 'cena')){
-        // giorno "avanzo": nessun nuovo ingrediente consumato (già scalato sul
-        // giorno sorgente), quindi si segna direttamente senza passare dalla
+      } else if(linkedSourceMealKey(weekIdx, i, meal)){
+        // pasto "avanzo": nessun nuovo ingrediente consumato (già scalato sul
+        // pasto sorgente), quindi si segna direttamente senza passare dalla
         // modale di aggiornamento Dispensa.
         if(!mealsDone[i]) mealsDone[i] = {};
-        mealsDone[i].cena = true;
+        mealsDone[i][meal] = true;
         persist(); render();
       } else {
-        const recipeName = effectiveRecipeName(weekIdx, i);
+        const mealData = effectiveMeal(weekIdx, i, meal);
+        const allIng = (mealData.principale ? getIngredientsFor(mealData.principale) : [])
+          .concat(mealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
         const qtyMap = {};
-        getIngredientsFor(recipeName).forEach(it=>{
+        allIng.forEach(it=>{
           const pantryKey = (it.ingrediente||'').trim().toLowerCase();
           const pantryIt = state.pantryItems[pantryKey];
           if(pantryIt && typeof pantryIt.qty === 'number') qtyMap[it.ingrediente] = pantryIt.qty;
@@ -3240,15 +3417,15 @@ function attachHandlers(){
   document.querySelectorAll('[data-confirm-done]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.confirmDone;
-      const [w,i] = key.split('_');
+      const { weekIdx, i, meal } = parseMealKey(key);
       const qtyMap = state.doneModalQty || {};
       Object.keys(qtyMap).forEach(ingrediente=>{
         const pantryKey = ingrediente.trim().toLowerCase();
         if(state.pantryItems[pantryKey]) state.pantryItems[pantryKey].qty = qtyMap[ingrediente];
       });
-      const mealsDone = weekMealsDoneRef(parseInt(w,10));
+      const mealsDone = weekMealsDoneRef(weekIdx);
       if(!mealsDone[i]) mealsDone[i] = {};
-      mealsDone[i].cena = true;
+      mealsDone[i][meal] = true;
       state.doneModalDay = null;
       state.doneModalQty = {};
       persist(); render();
@@ -3297,8 +3474,8 @@ function attachHandlers(){
       const ingrediente = nameInput.value.trim();
       const qta = qtaInput.value.trim();
       if(!ingrediente) return;
-      const [w,i] = key.split('_');
-      const recipeName = effectiveRecipeName(parseInt(w,10), i);
+      const { weekIdx, i, meal } = parseMealKey(key);
+      const recipeName = effectiveRecipeName(weekIdx, i, meal);
       if(!state.recipeIngredients[recipeName]) state.recipeIngredients[recipeName] = [];
       state.recipeIngredients[recipeName].push({ingrediente, qta, dove:'', note:''});
       persist(); render();
@@ -3976,7 +4153,7 @@ function goToTab(delta){
 let dragState = null;
 function startDayDrag(e){
   e.preventDefault();
-  const card = e.currentTarget.closest('.day-card');
+  const card = e.currentTarget.closest('.meal-block');
   if(!card) return;
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
@@ -3985,7 +4162,7 @@ function startDayDrag(e){
   document.body.appendChild(ghost);
   positionGhost(ghost, e.clientX, e.clientY);
   card.classList.add('dragging');
-  dragState = { sourceWeekIdx: card.dataset.weekIdx, sourceIndex: card.dataset.dayIndex, sourceCard: card, ghost, lastTarget: null };
+  dragState = { sourceWeekIdx: card.dataset.weekIdx, sourceIndex: card.dataset.dayIndex, sourceMeal: card.dataset.meal, sourceCard: card, ghost, lastTarget: null };
   e.currentTarget.setPointerCapture(e.pointerId);
   lastPointerY = e.clientY;
   if(!autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
@@ -4015,7 +4192,11 @@ document.addEventListener('pointermove', e=>{
   lastPointerY = e.clientY;
   positionGhost(dragState.ghost, e.clientX, e.clientY);
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  const targetCard = el ? el.closest('.day-card') : null;
+  // Solo lo stesso tipo di pasto è un bersaglio valido (pranzo su pranzo,
+  // cena su cena): scambiare un pranzo con una cena non avrebbe un senso
+  // chiaro, viste le regole di porzioni/avanzo automatico legate al tipo.
+  let targetCard = el ? el.closest('.meal-block') : null;
+  if(targetCard && targetCard.dataset.meal !== dragState.sourceMeal) targetCard = null;
   if(dragState.lastTarget && dragState.lastTarget !== targetCard) dragState.lastTarget.classList.remove('drag-over');
   if(targetCard && targetCard !== dragState.sourceCard){
     targetCard.classList.add('drag-over');
@@ -4026,12 +4207,12 @@ document.addEventListener('pointermove', e=>{
 });
 function endDayDrag(commit){
   if(!dragState) return;
-  const { sourceWeekIdx, sourceIndex, sourceCard, ghost, lastTarget } = dragState;
+  const { sourceWeekIdx, sourceIndex, sourceMeal, sourceCard, ghost, lastTarget } = dragState;
   ghost.remove();
   sourceCard.classList.remove('dragging');
   if(lastTarget) lastTarget.classList.remove('drag-over');
   dragState = null;
-  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), sourceIndex, parseInt(lastTarget.dataset.weekIdx,10), lastTarget.dataset.dayIndex);
+  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), sourceIndex, parseInt(lastTarget.dataset.weekIdx,10), lastTarget.dataset.dayIndex, sourceMeal);
 }
 document.addEventListener('pointerup', ()=> endDayDrag(true));
 document.addEventListener('pointercancel', ()=> endDayDrag(false));
@@ -4232,6 +4413,18 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
       if(typeof val === 'string' && val.split('_').length === 2) state.dayLinks[key] = `${val}_cena`;
     });
     state.mealsModelMigrated = true;
+    persist();
+  }
+  // Una tantum: "chi cucina" diventa per pasto invece che per giorno — le
+  // chiavi esistenti di state.cooks ("weekIdx_i") descrivevano solo la sera.
+  if(!state.mealsModelMigrated2){
+    const renamedCooks = {};
+    Object.keys(state.cooks).forEach(key=>{
+      const newKey = key.split('_').length === 2 ? `${key}_cena` : key;
+      renamedCooks[newKey] = state.cooks[key];
+    });
+    state.cooks = renamedCooks;
+    state.mealsModelMigrated2 = true;
     persist();
   }
   const todayPos = findTodayPos();
