@@ -2345,7 +2345,7 @@ function renderWeekSection(weekIdx){
   // dal bottoncino sul titolo della settimana (vedi genSettingsModal in renderMenu).
   return `
     <section class="week-section">
-      <h2 class="week-title">Settimana del ${weekLabelFor(weekIdx)} ${genSettingsButton(weekIdx)}</h2>
+      <h2 class="week-title is-menu">Settimana del ${weekLabelFor(weekIdx)} ${genSettingsButton(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
       ${days}
     </section>`;
@@ -3129,13 +3129,13 @@ function renderPrep(){
 
   return `
     <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
-    <div class="filters">
-      <input type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
-      <button class="btn" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
+    <div class="view-toggle">
+      <input class="input-search" type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
+      <button class="btn is-filters" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
     </div>
     ${filtersModal}
-    <div class="recipe-count">${list.length} ricette trovate</div>
-    <div class="recipe-list">${cards || '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>'}</div>
+    <div class="shop-checks"><div class="shop-progress">${list.length} ricette trovate</div></div>
+    <div class="accordion-body">${cards || '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>'}</div>
     ${renderRecipeEditModal()}
     ${newRecipeModal}
     <div class="buttons-fixed">
