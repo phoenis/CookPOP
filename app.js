@@ -1352,6 +1352,46 @@ function clearMealToEmpty(weekIdx, i, meal){
   clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
   writeMealPrincipale(weekOverridesRef(weekIdx), i, meal, MEAL_EMPTY);
 }
+// Svuota un pasto e mostra il toast "Annulla" (ripristina ricetta, eventuale
+// collegamento avanzo/nota/porzioni, e i flag fatto/scelto-a-mano) — stessa
+// azione richiamata sia da "Svuota il pasto" nel foglio "⋯" sia dallo swipe
+// sulla card (vedi attachHandlers).
+function performClearMeal(key){
+  const { weekIdx, i, meal } = parseMealKey(key);
+  const overridesMap = weekOverridesRef(weekIdx);
+  const prevOverrideSlot = overridesMap[i] ? overridesMap[i][meal] : undefined;
+  const prevLink = state.dayLinks[key];
+  const prevLinkNote = state.dayLinkNotes[key];
+  const prevPortions = state.dayPortions[key];
+  const mealsDoneMap = weekMealsDoneRef(weekIdx);
+  const prevDone = mealsDoneMap[i] ? mealsDoneMap[i][meal] : undefined;
+  const pickedMap = weekOverridePickedRef(weekIdx);
+  const prevPicked = pickedMap[i] ? pickedMap[i][meal] : undefined;
+  clearMealToEmpty(weekIdx, i, meal);
+  state.mealOverflowOpen = null;
+  persist(); render();
+  showUndoToast('Pasto svuotato', ()=>{
+    if(prevLink !== undefined) state.dayLinks[key] = prevLink;
+    if(prevLinkNote !== undefined) state.dayLinkNotes[key] = prevLinkNote;
+    if(prevPortions !== undefined) state.dayPortions[key] = prevPortions;
+    if(prevOverrideSlot !== undefined){
+      const om = weekOverridesRef(weekIdx);
+      if(!om[i]) om[i] = emptyDaySlot();
+      om[i][meal] = prevOverrideSlot;
+    }
+    if(prevDone !== undefined){
+      const md = weekMealsDoneRef(weekIdx);
+      if(!md[i]) md[i] = {};
+      md[i][meal] = prevDone;
+    }
+    if(prevPicked !== undefined){
+      const pd = weekOverridePickedRef(weekIdx);
+      if(!pd[i]) pd[i] = {};
+      pd[i][meal] = prevPicked;
+    }
+    persist(); render();
+  });
+}
 // Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
 function toggleCook(dayKey){
   const cur = state.cooks[dayKey];
@@ -1812,7 +1852,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   const cookLabel = cook ? (isOpen ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '?';
   const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ' cook-empty'}" data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
 
-  return `
+  const mealBlockHtml = `
   <div class="meal-block${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}" data-meal="${meal}">
     <div class="day-meal">
       <div class="meal-block-label">${escapeHtml(MEAL_LABEL[meal])}</div>
@@ -1833,6 +1873,16 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       ${statusBadges}
     </div>
     ${swapControls}
+  </div>`;
+  // Swipe da sinistra a destra sulla card per svuotare il pasto (come una
+  // lista con "scorri per eliminare"): il cestino sta fermo sotto, la card
+  // scorre sopra e lo rivela — vedi il gestore del gesto in attachHandlers.
+  // Solo quando c'è un principale: un pasto vuoto non ha nulla da svuotare.
+  if(!name) return mealBlockHtml;
+  return `
+  <div class="meal-block-swipe-wrap">
+    <button type="button" class="meal-block-trash" data-clear-meal="${mk}" aria-label="Svuota il pasto"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+    ${mealBlockHtml}
   </div>`;
 }
 
@@ -3693,19 +3743,29 @@ function attachHandlers(){
     inp.addEventListener('blur', commit);
     inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') e.target.blur(); });
   });
-  // Trascinamento a pressione lunga invece della maniglia dedicata (rimossa):
-  // stessa soglia/logica del "tieni premuto per selezionare" di Dispensa
-  // (500ms, annullato se il dito si sposta troppo prima di scattare). Esclude
-  // bottoni/input/link dal punto di partenza, così non ruba il tocco a "Cambia",
-  // al lucchetto, alle chip contorni ecc. — solo il resto della card (nome
-  // ricetta compreso) può avviare un trascinamento.
+  // Tre gesti sulla stessa card, tutti a partire dallo stesso pointerdown:
+  // tap normale (apre il dettaglio), pressione lunga da ferma (500ms senza
+  // spostarsi) per trascinare e scambiare con un altro pasto, e uno swipe
+  // rapido verso destra per rivelare il cestino "svuota il pasto" sotto
+  // (soglia di spostamento minima per distinguerlo da un tap, poi si segue
+  // il dito finché non si supera la soglia di reveal o quella di auto-svuota
+  // rilasciando). Esclude bottoni/input/link dal punto di partenza, così non
+  // ruba il tocco a "Cambia", al lucchetto, alle chip contorni ecc.
+  const TRASH_REVEAL = 80, TRASH_AUTO = 170;
   document.querySelectorAll('.meal-block').forEach(block=>{
+    const blockMk = `${block.dataset.weekIdx}_${block.dataset.dayIndex}_${block.dataset.meal}`;
+    const wrap = block.closest('.meal-block-swipe-wrap');
     let pressTimer = null;
     let longPressed = false;
     let startX = 0, startY = 0;
+    let swiping = false; // una volta capito che è uno swipe verso destra (non tap né pressione lunga)
+    function setTx(px){ block.style.transform = px ? `translateX(${px}px)` : ''; }
+    // Se questa card era rimasta "rivelata" da prima del render, resta aperta.
+    if(wrap && revealedMealKey === blockMk) setTx(TRASH_REVEAL);
     block.addEventListener('pointerdown', e=>{
       if(e.target.closest('button, input, a')) return;
       longPressed = false;
+      swiping = false;
       startX = e.clientX; startY = e.clientY;
       const pointerId = e.pointerId;
       pressTimer = setTimeout(()=>{
@@ -3714,19 +3774,65 @@ function attachHandlers(){
       }, 500);
     });
     const cancelPress = ()=>{ clearTimeout(pressTimer); pressTimer = null; };
-    block.addEventListener('pointerup', cancelPress);
-    block.addEventListener('pointerleave', cancelPress);
-    block.addEventListener('pointercancel', cancelPress);
     block.addEventListener('pointermove', e=>{
-      if(!pressTimer) return;
-      if(Math.hypot(e.clientX - startX, e.clientY - startY) > 10) cancelPress();
+      if(longPressed) return; // il trascinamento ha già preso il controllo del gesto
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if(!swiping){
+        if(Math.hypot(dx, dy) < 10) return;
+        cancelPress();
+        // Solo uno swipe verso destra, prevalentemente orizzontale, e solo
+        // se la card ha un cestino da rivelare (wrap presente): altrimenti
+        // è uno scroll verticale o uno swipe a sinistra, li si lascia
+        // passare così non intralciano lo swipe-cambia-tab del contenuto.
+        if(wrap && dx > 0 && Math.abs(dx) > Math.abs(dy)) swiping = true;
+        else return;
+        block.classList.add('swiping');
+        // Senza cattura, superata la soglia di reveal il dito può finire
+        // fuori dai confini (clippati da overflow:hidden) della card
+        // spostata: pointerup/pointermove andrebbero a un altro elemento
+        // invece che qui. La cattura tiene tutto il gesto su questo blocco
+        // fino al rilascio, indipendentemente da dove finisce il dito.
+        try{ block.setPointerCapture(e.pointerId); }catch(err){}
+      }
+      setTx(Math.max(0, Math.min(dx, TRASH_AUTO + 40)));
+    });
+    function endSwipe(dx){
+      block.classList.remove('swiping');
+      if(dx >= TRASH_AUTO){
+        performClearMeal(blockMk);
+        revealedMealKey = null;
+        return;
+      }
+      if(dx >= TRASH_REVEAL){
+        setTx(TRASH_REVEAL);
+        revealedMealKey = blockMk;
+      } else {
+        setTx(0);
+        if(revealedMealKey === blockMk) revealedMealKey = null;
+      }
+    }
+    block.addEventListener('pointerup', e=>{
+      cancelPress();
+      if(swiping){ swiping = false; endSwipe(e.clientX - startX); }
+    });
+    block.addEventListener('pointerleave', ()=>{ if(!swiping) cancelPress(); });
+    block.addEventListener('pointercancel', ()=>{
+      cancelPress();
+      if(swiping){ swiping = false; endSwipe(0); }
     });
     // Il tap che ha fatto scattare il trascinamento non deve anche aprire il
     // dettaglio a tutto schermo: intercetta il click in fase di cattura,
     // prima che arrivi allo span data-toggle-day (stesso schema del
-    // long-press di Dispensa).
+    // long-press di Dispensa). Un tap mentre il cestino è rivelato lo
+    // richiude invece di aprire il dettaglio sotto, a meno che il tocco non
+    // sia sul cestino stesso (che ha già la sua azione).
     block.addEventListener('click', e=>{
-      if(longPressed){ longPressed = false; e.stopPropagation(); }
+      if(longPressed){ longPressed = false; e.stopPropagation(); return; }
+      if(wrap && revealedMealKey === blockMk){
+        setTx(0);
+        revealedMealKey = null;
+        e.stopPropagation();
+      }
     }, true);
   });
   document.querySelectorAll('[data-toggle-cook]').forEach(btn=>{
@@ -3951,45 +4057,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-clear-meal]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const key = e.currentTarget.dataset.clearMeal;
-      const { weekIdx, i, meal } = parseMealKey(key);
-      // Cattura lo stato precedente per l'Annulla: solo del pasto su cui si
-      // agisce, non degli eventuali altri pasti scollegati a cascata da
-      // unlinkDaysPointingTo (limite noto, coerente con "Torna all'originale"
-      // e con la rigenerazione, che hanno la stessa limitazione).
-      const overridesMap = weekOverridesRef(weekIdx);
-      const prevOverrideSlot = overridesMap[i] ? overridesMap[i][meal] : undefined;
-      const prevLink = state.dayLinks[key];
-      const prevLinkNote = state.dayLinkNotes[key];
-      const prevPortions = state.dayPortions[key];
-      const mealsDoneMap = weekMealsDoneRef(weekIdx);
-      const prevDone = mealsDoneMap[i] ? mealsDoneMap[i][meal] : undefined;
-      const pickedMap = weekOverridePickedRef(weekIdx);
-      const prevPicked = pickedMap[i] ? pickedMap[i][meal] : undefined;
-      clearMealToEmpty(weekIdx, i, meal);
-      state.mealOverflowOpen = null;
-      persist(); render();
-      showUndoToast('Pasto svuotato', ()=>{
-        if(prevLink !== undefined) state.dayLinks[key] = prevLink;
-        if(prevLinkNote !== undefined) state.dayLinkNotes[key] = prevLinkNote;
-        if(prevPortions !== undefined) state.dayPortions[key] = prevPortions;
-        if(prevOverrideSlot !== undefined){
-          const om = weekOverridesRef(weekIdx);
-          if(!om[i]) om[i] = emptyDaySlot();
-          om[i][meal] = prevOverrideSlot;
-        }
-        if(prevDone !== undefined){
-          const md = weekMealsDoneRef(weekIdx);
-          if(!md[i]) md[i] = {};
-          md[i][meal] = prevDone;
-        }
-        if(prevPicked !== undefined){
-          const pd = weekOverridePickedRef(weekIdx);
-          if(!pd[i]) pd[i] = {};
-          pd[i][meal] = prevPicked;
-        }
-        persist(); render();
-      });
+      performClearMeal(e.currentTarget.dataset.clearMeal);
     });
   });
   document.querySelectorAll('[data-open-meal-overflow]').forEach(btn=>{
@@ -4714,7 +4782,10 @@ function goToTab(delta){
   const THRESHOLD = 60, MAX_VERTICAL = 60;
   let startX = 0, startY = 0, tracking = false, startInBottomHalf = false;
   function shouldIgnore(target){
-    return !!target.closest('.balance-strip, input, textarea, select, .filters-modal-backdrop, .settings-backdrop, .luogo-picker, .luogo-picker-backdrop');
+    // .meal-block-swipe-wrap ha il suo swipe-a-destra (svuota il pasto):
+    // senza escluderlo qui, una card nella metà inferiore dello schermo
+    // farebbe scattare ANCHE il cambio tab per lo stesso gesto.
+    return !!target.closest('.balance-strip, input, textarea, select, .filters-modal-backdrop, .settings-backdrop, .luogo-picker, .luogo-picker-backdrop, .meal-block-swipe-wrap');
   }
   panel.addEventListener('touchstart', e=>{
     if(e.touches.length !== 1 || shouldIgnore(e.target)){ tracking = false; return; }
@@ -4778,6 +4849,10 @@ function goToTab(delta){
 // sola volta, mentre il pointerdown sull'handle viene ri-agganciato a ogni render
 // (l'elemento viene ricreato ogni volta) da attachHandlers.
 let dragState = null;
+// mealKey del blocco con il cestino "rivelato" dallo swipe (o null): vive
+// fuori da attachHandlers per sopravvivere ai render, come dragState —
+// altrimenti ogni render (anche per un motivo scollegato) lo dimenticherebbe.
+let revealedMealKey = null;
 // card è già il .meal-block (niente più maniglia dedicata da cui risalire
 // con .closest): chiamata dal timer di pressione lunga in attachHandlers(),
 // non più direttamente da un handler pointerdown, quindi prende le
