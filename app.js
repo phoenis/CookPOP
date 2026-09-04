@@ -561,7 +561,7 @@ const state = {
   shopExtras: {},
   shopQty: {},
   shopQtyEditingKey: null,
-  shopView: 'giorno',
+  shopView: 'reparto', // non persistito (vedi persist()): riparte sempre da qui, non "ricorda" l'ultima vista scelta tra un caricamento e l'altro
   addIngModalOpen: false,
   addIngName: '', // ephemeral, non persistito: testo corrente del campo "Ingrediente" in Aggiungi (Spesa)
   addIngSuggestOpen: false, // ephemeral: se il menu dei suggerimenti è visibile
@@ -588,7 +588,7 @@ const state = {
     'grana-parmigiano': { label:'Grana o parmigiano a scaglie', matchName:'grana o parmigiano a scaglie', cat:'latticini' }
   },
   pantryGroupsModalOpen: false,
-  pantryView: 'categoria',
+  pantryView: 'categoria', // non persistito (vedi persist()): stesso motivo di shopView
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
@@ -779,6 +779,12 @@ async function loadState(){
     const cached = localStorage.getItem('quaderno-state');
     if(cached){
       const saved = JSON.parse(cached);
+      // shopView/pantryView non si caricano più da uno stato salvato prima
+      // che smettessero di essere persistiti (vedi persist()): altrimenti un
+      // valore vecchio rimasto nella cache locale o su Firebase continuerebbe
+      // a sovrascrivere il default "riparti sempre da Per reparto/categoria".
+      delete saved.shopView;
+      delete saved.pantryView;
       Object.assign(state, saved);
       if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
     }
@@ -798,6 +804,8 @@ async function loadState(){
         if(saved.recipeEdits) saved.recipeEdits = decodeKeysFromFirebase(saved.recipeEdits);
         if(saved.customRecipes) saved.customRecipes = decodeKeysFromFirebase(saved.customRecipes);
         if(saved.hiddenRecipes) saved.hiddenRecipes = decodeKeysFromFirebase(saved.hiddenRecipes);
+        delete saved.shopView;
+        delete saved.pantryView;
         Object.assign(state, saved);
         if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
         if(saved.pantryItems) state.pantryItems = saved.pantryItems;
@@ -824,7 +832,9 @@ function persist(){
       shopExtras: state.shopExtras,
       shopQty: state.shopQty,
       pantryChecked: state.pantryChecked,
-      shopView: state.shopView,
+      // shopView/pantryView non persistiti: ogni apertura dell'app riparte da
+      // Per reparto/Per categoria (vedi state init), non "ricorda" l'ultima
+      // vista toccata nella sessione precedente.
       mealsModelMigrated: state.mealsModelMigrated,
       mealsModelMigrated2: state.mealsModelMigrated2,
       weekOverrides: state.weekOverrides,
@@ -859,8 +869,7 @@ function persist(){
       pantryUnitReviewed: state.pantryUnitReviewed,
       pantryGroupMigrated: state.pantryGroupMigrated,
       pantryGroupMigrated2: state.pantryGroupMigrated2,
-      pantryGroups: state.pantryGroups,
-      pantryView: state.pantryView
+      pantryGroups: state.pantryGroups
     };
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
     try{
@@ -3198,8 +3207,8 @@ function renderDispensa(){
           <span class="dept-icon">${LUOGO_ICON[l]}</span>${LUOGO_LABEL[l]}
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        <div class="accordion-body">
-          ${isOpen ? byLuogo[l].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+        <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">
+          ${byLuogo[l].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('')}
         </div>
       </div>`;
     }).join('');
@@ -3215,8 +3224,8 @@ function renderDispensa(){
           <span class="dept-icon">${DEPT_ICON[d]}</span>${DEPT_LABEL[d]}
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        <div class="accordion-body">
-          ${isOpen ? byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+        <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">
+          ${byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('')}
         </div>
       </div>`;
     }).join('');
