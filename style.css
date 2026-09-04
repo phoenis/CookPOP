@@ -241,6 +241,7 @@
   .cook-pill{ min-width:var(--text-large); height:var(--text-large); border:var(--border) solid transparent; background:var(--gold-soft); color:var(--bg); /* font-family:var(--font-family); */line-height: var(--line-height-xsmall); font-weight:var(--weight-medium); font-size:var(--text-xsmall); border-radius: var(--radius-pill); padding: 0px; display: flex; align-items: center; justify-content: center; transition: width .15s ease, padding .15s ease;}
   .cook-pill.cook-mara{ background:var(--user-color-mara);}
   .cook-pill.cook-ste{ background:var(--user-color-ste);}
+  .cook-pill.cook-empty{ background:transparent; border:var(--border) dashed var(--ink-light); color:var(--ink-light); }
   .day-card.open .cook-pill{ padding:0px var(--space-xsmall); }
   .day-menu{ font-size: var(--text-medium); font-weight:var(--weight-medium); line-height: var(--line-height-small); cursor:pointer; border-bottom:1px dotted var(--ink-light); }
   .open .day-menu{ font-size: var(--text-large); cursor:pointer; border-bottom:1px dotted var(--ink-light); }

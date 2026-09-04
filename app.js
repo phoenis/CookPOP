@@ -1925,8 +1925,8 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   const isOpen = state.expandedDay === mk;
   // Un'unica fonte per "chi cucina": iniziale sola a blocco chiuso, nome per
   // esteso a blocco aperto.
-  const cookLabel = cook ? (isOpen ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '';
-  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ''}" data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
+  const cookLabel = cook ? (isOpen ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '?';
+  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ' cook-empty'}" data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
 
   return `
   <div class="meal-block${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}" data-meal="${meal}">
