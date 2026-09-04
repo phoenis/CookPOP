@@ -425,9 +425,11 @@
   .item-detail{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); margin-top:0.0625rem; }
   .shop-progress{ font-family:var(--font-family); font-size:var(--text-xsmall); color:var(--gold-dark); margin-bottom:var(--space-small); }
   .missing-ing-banner{ font-size:var(--text-xsmall); line-height:1.5; background:var(--amber); border:1px solid var(--steel); border-radius:0; padding:var(--space-xsmall) var(--space-small); margin-bottom:0.875rem; }
-  .view-toggle{ display:flex; margin-bottom:var(--space-small); border-bottom: var(--border) solid var(--line-light); }
-  .view-btn{ background-color: transparent; flex:1; border-radius: 0; font-size: var(--text-body); padding: var(--padding-inline) var(--padding-block); border: 0px; border-bottom: var(--border-strong) solid transparent; margin-bottom: -1px;}
-  .view-btn.active{ color:var(--ink); border-color: var(--ink); font-weight: var(--weight-medium);}
+  /* Segmentato: un'unica pillola bordata, non due schede sottolineate — si
+     legge come "sto scegliendo tra due viste", non come cambio pagina. */
+  .view-toggle{ display:flex; margin-bottom:var(--space-small); border:var(--border) solid var(--line-strong); border-radius:var(--radius-pill); padding:0.1875rem; gap:0.1875rem; }
+  .view-btn{ background-color:transparent; flex:1; border-radius:var(--radius-pill); font-size:var(--text-small); font-weight:var(--weight-medium); padding:var(--space-xsmall) var(--padding-block); border:0; color:var(--ink-light); }
+  .view-btn.active{ background-color:var(--ink); color:var(--bg); }
   .reset-btn{ /*font-size:11px; padding:6px 10px;*/ margin-bottom:1rem; }
   .shop-top-actions{ display:flex; gap:var(--gap-btn); flex-direction: column; align-content: center; justify-content: center; margin-top: var(--space-xlarge);}
   .shop-checked-actions{ display:flex; gap:var(--space-xsmall); margin-top:var(--space-medium); }

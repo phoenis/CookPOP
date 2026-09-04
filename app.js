@@ -1484,8 +1484,13 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   render();
 }
 
+// Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
+// tranne nel Menù (resta il nome dell'app — è la schermata principale).
+const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'Dispensa' };
 function render(){
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
+  const topbarTitle = document.getElementById('topbar-title');
+  if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
   const panel = document.getElementById('panel');
   if(state.tab === 'menu') panel.innerHTML = renderMenu();
   if(state.tab === 'spesa') panel.innerHTML = renderSpesa();
