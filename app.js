@@ -1467,11 +1467,22 @@ function generateWeek(weekIdx){
   // baseline appena generata, ed eventuale link avanzo preservato al posto
   // di quello appena assegnato dal loop lun-gio sopra (o rimosso, se non ne
   // aveva uno — es. un pranzo bloccato di ven-dom pianificato a mano).
+  // Se il principale bloccato non esiste più nel catalogo (ricetta creata a
+  // mano e poi eliminata: "Elimina" su una ricetta personalizzata cancella
+  // i dati, non li nasconde soltanto), il blocco non ha più nulla di valido
+  // da preservare: si scarta e si sblocca, restando sulla ricetta appena
+  // generata invece di far "riapparire" una ricetta cancellata a ogni
+  // rigenerazione. Stesso controllo sui contorni, uno per uno.
   if(lockedMeals.length){
     const targetBaseline = weekIdx === 0 ? state.weekBaseline : state.extraWeeks[weekIdx-1].baseline;
     lockedMeals.forEach(({i, meal, data, link})=>{
-      targetBaseline[i][meal] = { principale: data.principale, contorni: data.contorni };
       const lkey = `${weekIdx}_${i}_${meal}`;
+      if(data.principale && !getRecipeMeta(data.principale)){
+        delete state.mealLocked[lkey];
+        return;
+      }
+      const validContorni = (data.contorni || []).filter(c => getRecipeMeta(c));
+      targetBaseline[i][meal] = { principale: data.principale, contorni: validContorni };
       if(link) state.dayLinks[lkey] = link; else delete state.dayLinks[lkey];
     });
   }
@@ -1800,8 +1811,12 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
 
   // tempo: se cambiato (a mano o generato) e in catalogo, usa il tempo della
   // nuova ricetta; altrimenti quello originale del foglio (solo cena, unica
-  // con un foglio originale alle spalle — vedi effectiveMeal).
-  const timeDisplay = (isChanged && rec) ? rec.tempo : (meal === 'cena' ? d.tempo : '');
+  // con un foglio originale alle spalle — vedi effectiveMeal). Niente da
+  // mostrare se il pasto è vuoto: altrimenti una cena senza principale (es.
+  // appena svuotata) restava con il tempo del foglio originale scritto lì
+  // ("Variabile" o un numero di minuti), come se qualcosa fosse ancora
+  // pianificato.
+  const timeDisplay = !name ? '' : (isChanged && rec) ? rec.tempo : (meal === 'cena' ? d.tempo : '');
 
   // note: se cambiato, ricostruite dalla ricetta scelta; altrimenti quelle
   // originali del foglio (solo cena, settimana corrente — per il pranzo
