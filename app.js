@@ -1637,7 +1637,79 @@ function render(){
   if(state.tab === 'dispensa') panel.innerHTML = renderDispensa();
   panel.innerHTML += renderUndoToast();
   attachHandlers();
+  reconcileModalHistory();
 }
+
+// --- Tasto "indietro" del telefono chiude modali/schermate invece di uscire
+// dall'app --------------------------------------------------------------
+// Invece di toccare ogni singolo punto di apertura/chiusura (sono più di
+// 15 tra modali, pannelli e schermate a tutto schermo, ognuna con più modi
+// di chiudersi — ✕, backdrop, Annulla...), il controllo è centralizzato qui:
+// dopo ogni render() contiamo quante ne risultano aperte (isSettingsBackdropOpen
+// più tutti i flag di stato) e la confrontiamo con quante ne avevamo "prenotate"
+// nella cronologia del browser (modalHistoryDepth), aggiungendo o togliendo
+// entry di conseguenza. Il tasto indietro genera un evento popstate: se in
+// quel momento la cronologia aveva entry nostre, chiudiamo solo la più "in
+// cima" (la prima di MODAL_CHECKS che risulta aperta, elencate dalla più
+// annidata/specifica alla più di base) invece di uscire dall'app o saltare
+// tra le tab — che restano gestite come sempre dall'hash (#menu/#spesa/...).
+function isSettingsBackdropOpen(){
+  const el = document.getElementById('settings-backdrop');
+  return !!(el && el.classList.contains('open'));
+}
+function closeSettingsBackdrop(){
+  const el = document.getElementById('settings-backdrop');
+  if(el) el.classList.remove('open');
+}
+const MODAL_CHECKS = [
+  [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
+  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; }],
+  [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
+  [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
+  [()=> !!state.pantryGroupsModalOpen, ()=>{ state.pantryGroupsModalOpen = false; }],
+  [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
+  [()=> !!state.pantryEditKey, ()=>{ state.pantryEditKey = null; }],
+  [()=> !!state.pantryAddModalOpen, ()=>{ state.pantryAddModalOpen = false; }],
+  [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; }],
+  [()=> !!state.newRecipeModalOpen, ()=>{ state.newRecipeModalOpen = false; }],
+  [()=> !!state.filtersOpen, ()=>{ state.filtersOpen = false; }],
+  [()=> !!state.swapOpenDay, ()=>{ state.swapOpenDay = null; }],
+  [()=> !!state.linkPickerOpenDay, ()=>{ state.linkPickerOpenDay = null; }],
+  [()=> !!state.avanzoDiPickerOpenDay, ()=>{ state.avanzoDiPickerOpenDay = null; }],
+  [()=> !!state.contornoPickerOpenMeal, ()=>{ state.contornoPickerOpenMeal = null; }],
+  [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
+  [()=> !!state.expandedDay, ()=>{ state.expandedDay = null; }],
+  [()=> isSettingsBackdropOpen(), ()=> closeSettingsBackdrop()],
+];
+function countOpenModals(){
+  return MODAL_CHECKS.reduce((n, [isOpen])=> n + (isOpen() ? 1 : 0), 0);
+}
+let modalHistoryDepth = 0;
+let suppressPopstateNav = false;
+function reconcileModalHistory(){
+  const openCount = countOpenModals();
+  if(openCount > modalHistoryDepth){
+    for(let i = modalHistoryDepth; i < openCount; i++) history.pushState({ cookpopModalDepth: i + 1 }, '');
+    modalHistoryDepth = openCount;
+  } else if(openCount < modalHistoryDepth){
+    const delta = modalHistoryDepth - openCount;
+    modalHistoryDepth = openCount;
+    suppressPopstateNav = true;
+    history.go(-delta);
+  }
+}
+window.addEventListener('popstate', ()=>{
+  if(suppressPopstateNav){ suppressPopstateNav = false; return; }
+  // Se non avevamo entry nostre in cima, questo indietro riguarda solo la
+  // normale cronologia delle tab (#menu/#spesa/...): niente da chiudere qui,
+  // se ne occupa già il listener hashchange più sopra.
+  if(modalHistoryDepth <= 0) return;
+  for(const [isOpen, close] of MODAL_CHECKS){
+    if(isOpen()){ close(); break; }
+  }
+  modalHistoryDepth = Math.max(0, modalHistoryDepth - 1);
+  render();
+});
 
 // Toast "Annulla" generico e temporaneo (es. dopo lo scollegamento di un
 // avanzo): mostra il messaggio, sparisce da solo dopo TOAST_MS, o subito se
@@ -4963,8 +5035,9 @@ function goToTab(delta){
   const open = ()=>{
     if(profilePanel) profilePanel.innerHTML = renderProfilePanel();
     settingsBackdrop.classList.add('open');
+    reconcileModalHistory();
   };
-  const close = ()=> settingsBackdrop.classList.remove('open');
+  const close = ()=>{ settingsBackdrop.classList.remove('open'); reconcileModalHistory(); };
   settingsBtn.addEventListener('click', open);
   if(settingsClose) settingsClose.addEventListener('click', close);
   settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
