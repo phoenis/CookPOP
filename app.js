@@ -1392,6 +1392,30 @@ function performClearMeal(key){
     persist(); render();
   });
 }
+// Ripulisce ogni riferimento a una ricetta eliminata dalla pianificazione
+// (settimana corrente + tutte le extra): un pasto il cui principale
+// effettivo era quella ricetta torna vuoto (stesso meccanismo di "Svuota il
+// pasto" — scioglie l'eventuale avanzo, sblocca, azzera fatto/scelto-a-mano),
+// un contorno che la usava la perde soltanto, principale invariato.
+// Altrimenti "Elimina" sul Ricettario toglieva la ricetta dalla lista ma
+// non dai pasti già pianificati, che continuavano a mostrarla — e a
+// riproporla rigenerando, se il pasto capitava a essere bloccato.
+function purgeRecipeFromPlanning(name){
+  const weekCount = 1 + state.extraWeeks.length;
+  for(let weekIdx = 0; weekIdx < weekCount; weekIdx++){
+    for(let i = 0; i < 7; i++){
+      ['pranzo','cena'].forEach(meal=>{
+        const mealData = effectiveMeal(weekIdx, i, meal);
+        if(mealData.principale === name){
+          clearMealToEmpty(weekIdx, i, meal);
+          delete state.mealLocked[mealKey(weekIdx, i, meal)];
+        } else if(mealData.contorni && mealData.contorni.includes(name)){
+          setMealContorni(weekIdx, i, meal, mealData.contorni.filter(c => c !== name));
+        }
+      });
+    }
+  }
+}
 // Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
 function toggleCook(dayKey){
   const cur = state.cooks[dayKey];
@@ -4294,6 +4318,11 @@ function attachHandlers(){
   document.querySelectorAll('[data-delete-recipe]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.deleteRecipe;
+      // Toglie ogni riferimento dalla pianificazione PRIMA di cancellare i
+      // dati della ricetta stessa — altrimenti restava scelta (o persino
+      // ripescata rigenerando, se il pasto era bloccato) su qualunque
+      // pasto che la usava già, pur sparendo dal Ricettario.
+      purgeRecipeFromPlanning(name);
       delete state.recipeEdits[name];
       delete state.recipeIngredients[name];
       if(state.customRecipes[name]) delete state.customRecipes[name];
