@@ -77,7 +77,7 @@
     --padding-block: var(--padding-medium);
     --padding-inline: var(--padding-xsmall);
     --padding-page: 1rem;
-    --card-block: var(--padding-large);
+    --card-block: var(--padding-medium);
 
     --gap-icon: 0.3rem;
     --gap-btn: var(--space-xsmall);
@@ -235,7 +235,7 @@
 
   .day-card.open, .recipe-list .day-card.open{ background-color: var(--surface); border: 0px; border-radius: var(--radius-modal); padding: var(--padding-block); margin: var(--space-xlarge) calc(-1 * var(--padding-inline));}
   .week-section{ display:block; margin-bottom:var(--space-xsmall); }
-  .week-section + .week-section{ margin-top:1.625rem; padding-top:3rem; padding-bottom:3rem;/* border-top:1px solid var(--line); */ }
+  .week-section + .week-section{ margin-top:1.625rem; /* padding-top:3rem; */ padding-bottom:3rem;/* border-top:1px solid var(--line); */ }
   .day-time{ display:inline-block; /*margin-top:0.25rem; font-family:var(--font-family); font-weight:var(--weight-medium); */font-size:var(--text-xsmall); opacity:0.75; padding:var(--space-xxsmall) 0px 0px 0px; /*background:var(--surface-2); border-radius:var(--radius-pill); */}
   .day-menu-row{ display:flex; align-items:center; gap:var(--space-xsmall); margin-top:0.375rem; flex-wrap:wrap; position:relative; }
   .cook-pill{ min-width:var(--text-large); height:var(--text-large); border:var(--border) solid transparent; background:var(--gold-soft); color:var(--bg); /* font-family:var(--font-family); */line-height: var(--line-height-xsmall); font-weight:var(--weight-medium); font-size:var(--text-xsmall); border-radius: var(--radius-pill); padding: 0px; display: flex; align-items: center; justify-content: center; transition: width .15s ease, padding .15s ease;}
@@ -246,18 +246,20 @@
   .day-menu{ font-size: var(--text-medium); font-weight:var(--weight-medium); line-height: var(--line-height-small); cursor:pointer; border-bottom:1px dotted var(--ink-light); }
   .open .day-menu{ font-size: var(--text-large); cursor:pointer; border-bottom:1px dotted var(--ink-light); }
   .day-menu:hover{ color:var(--gold-dark); }
-  .day-menu-empty{ width:100%; justify-content:space-between; text-align:left; background:transparent; border:0; padding:0; font-family:var(--font-family); font-size:var(--text-medium); font-weight:var(--weight-medium); color:var(--ink-light); cursor:pointer; }
+  /* .day-menu-empty{ width:100%; justify-content:space-between; text-align:left; background:transparent; border:0; padding:0; font-family:var(--font-family); font-size:var(--text-medium); font-weight:var(--weight-medium); color:var(--ink-light); cursor:pointer; } */
   .day-menu-empty:hover{ color:var(--gold-dark); }
-  .day-menu-empty::after{ content:'+'; font-size:var(--text-large); line-height:1; color:var(--gold); }
+  .day-menu-empty{ font-size:var(--text-large); line-height:var(--line-height-xsmall); color:var(--gold); padding: 0; margin-top: 0; border: none; background-color: transparent;  position: absolute; width: 100%; display: block; text-align: right;}
 /* pan-y (non none): la pressione lunga per trascinare deve convivere con lo
    scroll verticale normale sopra le card — none lo avrebbe bloccato del
    tutto. Non verificabile su device reale in questa sessione. */
 .meal-block{ position:relative; padding: var(--card-block); border-radius: var(--radius-modal); background-color: var(--surface); touch-action: pan-y; transition: transform .2s ease; }
+.meal-block:has(.day-menu-empty){display: flex; padding: 0; background-color: transparent; align-items: center; justify-content: space-between;}
 .meal-block.swiping{ transition: none; }
 /* Swipe-per-svuotare: il cestino sta fermo dietro, la card scorre sopra e
    lo rivela scorrendo verso destra (vedi il gestore in attachHandlers). */
-.meal-block-swipe-wrap{ position:relative; overflow:hidden; border-radius:var(--radius-modal); }
-.meal-block-trash{ position:absolute; left:0; top:0; bottom:0; width:5rem; background:var(--tomato); color:#fff; border:0; padding:0; display:flex; align-items:center; justify-content:center; font-size:1.375rem; }
+.meal-block-swipe-wrap{ position:relative; overflow:hidden; border-radius:var(--radius-modal); background:var(--tomato);}
+.meal-block-trash{ position:absolute; left:0; top:0; bottom:0; width:5rem; background-color: transparent; color:#fff; border:0; padding:0; display:flex; align-items:center; justify-content:center; font-size:1.375rem; }
+.meal-block-trash svg{width: 1.2em; height: 1.2em;}
 /* .meal-block + .meal-block{ margin-top:var(--space-large); padding-top:var(--space-large); border-top:var(--border) dashed var(--line-light); } */
 .meal-block-label{ font-size:var(--text-xsmall); text-transform:uppercase; font-weight:var(--weight-bold); color:var(--ink-light); letter-spacing:0.02em; }
 .contorni-row{ display:flex; flex-wrap:wrap; gap:0.375rem; margin-top:0.25rem; align-items:center; }
@@ -354,6 +356,7 @@
   .day-card.today .day-name, .day-card.today .day-date{color: var(--gold-dark);}
   .detail-tags{ display:flex; flex-wrap:wrap; gap:0.3125rem; margin-bottom:var(--space-xsmall); }
   .recipe-info{ display:flex; flex-wrap:wrap; gap:0.3125rem; margin-bottom:var(--space-xsmall); margin-top:var(--space-xsmall); align-items: center; gap: var(--gap-btn);}
+  .recipe-info:has(.day-time:empty){display: none;}
   .status-badge{ border: none; font-family:var(--font-family); display: flex; gap: var(--gap-icon); align-items: center; font-weight:var(--weight-medium); font-size:var(--text-xsmall); padding:var(--space-xxsmall) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); white-space:nowrap; line-height: var(--line-height-xsmall);}
   .status-badge-reset{font-size: var(--text-xxsmall);}
   .status-badge.status-avanzo{background-color: var(--amber);}
@@ -457,7 +460,8 @@
   .filter-groups{ display:flex; flex-direction:column; gap:var(--space-large); margin-bottom:var(--space-medium); }
   .filter-group-label{ font-family:var(--font-family); font-size:var(--text-xsmall); text-transform:uppercase; color:var(--ink-light); margin-bottom:var(--space-xxsmall); display: flex; gap: var(--gap-icon); }
   .chip-row{ display:flex; flex-wrap:wrap; gap:0.375rem; }
-  .week-rules-link{ font-size:var(--text-xsmall); font-weight:var(--weight-bold); color:var(--gold-dark); text-decoration:underline; text-underline-offset:2px; padding:0; }
+  .week-rules-link{ color:var(--ink); padding:0; }
+  .week-rules-link svg{ width: 1.2em; height: 1.2em }
   .tempo-base-list{ display:flex; flex-direction:column; border-top:1px solid var(--line); }
   .tempo-base-row{ display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; background:transparent; border:0; border-bottom:1px solid var(--line); padding:var(--space-small) var(--space-xxsmall); cursor:pointer; font-family:var(--font-family); font-size:var(--text-body); text-transform:capitalize; }
   .tempo-base-row.active{ font-weight:var(--weight-bold); color:var(--gold-dark); }
