@@ -2969,6 +2969,64 @@ function renderSpesa(){
   `;
 }
 
+// Dettaglio ricetta della tab Ricette, a tutto schermo come nel Menù (stesse
+// classi CSS .meal-detail-*, riusate senza aggiungerne di nuove) invece che
+// ad accordion inline dentro la card.
+function renderRecipeDetailScreen(name){
+  const r = getRecipeMeta(name);
+  if(!r) return '';
+  const det = getRecipeDetails(name);
+  const ing = getIngredientsFor(name);
+  const tagsHtml = `
+    <div class="detail-tags">
+      <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
+      ${(r.freezerNew && r.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[r.freezerNew]}</span>` : ''}
+      <span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
+      ${r.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
+    </div>`;
+  const ingHtml = renderIngredientsSection(ing);
+  const stepsHtml = det && det.procedimento && det.procedimento.length
+    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+    : '';
+  const noteExtra = det ? [
+      det.porzioni ? `<b>Porzioni:</b> ${escapeHtml(det.porzioni)}` : '',
+      det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
+      det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
+      det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
+    ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
+  const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
+  const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
+  const addFormHtml = det ? '' : `
+    <div class="add-ing-form">
+      <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(name)}">
+      <input type="text" placeholder="Quantità" data-rnqta="${escapeAttr(name)}">
+      <button class="btn is-solid" data-add-ing-recipe="${escapeAttr(name)}">+ aggiungi ingrediente</button>
+    </div>`;
+  const editRecipeBtn = `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>`;
+  return `
+  <div class="meal-detail-screen">
+  <div class="filters-modal">
+    <div class="meal-detail-header">
+      <div class="meal-detail-header-text">
+        <div class="meal-detail-kicker">Ricetta</div>
+        <div class="meal-detail-title">${escapeHtml(name)}</div>
+      </div>
+      <button type="button" class="btn is-icon meal-detail-close" data-toggle-recipe="${escapeAttr(name)}" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="meal-detail-body">
+      <div class="detail-box">
+        ${tagsHtml}
+        ${ingHtml}
+        ${stepsHtml}
+        ${noteBox}
+        ${addFormHtml}
+        <div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>
+      </div>
+    </div>
+  </div>
+  </div>`;
+}
+
 function renderPrep(){
   let list = allRecipeMetas().filter(r=>{
     if(state.filters.cat.length && !state.filters.cat.includes(r.categoriaNew)) return false;
@@ -2983,50 +3041,14 @@ function renderPrep(){
     if(state.filters.search && !r.nome.toLowerCase().includes(state.filters.search.toLowerCase())) return false;
     return true;
   });
+  // Il dettaglio non è più un accordion inline (vedi renderRecipeDetailScreen
+  // sopra, a tutto schermo come nel Menù): la card resta sempre nella sua
+  // forma compatta, tap ovunque su di essa (data-toggle-recipe è
+  // sull'intero .recipe-card, non solo sul titolo).
   const cards = list.map(r=>{
-    const isOpen = state.expandedRecipe === r.nome;
     const det = getRecipeDetails(r.nome);
-    const ing = getIngredientsFor(r.nome);
-    let detail = '';
-    if(isOpen){
-      const tagsHtml = `
-        <div class="detail-tags">
-          <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
-          ${(r.freezerNew && r.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[r.freezerNew]}</span>` : ''}
-          <span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> ${escapeHtml(AVANZI_LABEL[r.avanziNew])}</span>
-          ${r.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
-        </div>`;
-      const ingHtml = renderIngredientsSection(ing);
-      const stepsHtml = det && det.procedimento && det.procedimento.length
-        ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
-        : '';
-      const noteExtra = det ? [
-          det.porzioni ? `<b>Porzioni:</b> ${escapeHtml(det.porzioni)}` : '',
-          det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
-          det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
-          det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
-        ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
-      const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-      const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
-      const addFormHtml = det ? '' : `
-        <div class="add-ing-form">
-          <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(r.nome)}">
-          <input type="text" placeholder="Quantità" data-rnqta="${escapeAttr(r.nome)}">
-          <button class="btn is-solid" data-add-ing-recipe="${escapeAttr(r.nome)}">+ aggiungi ingrediente</button>
-        </div>`;
-      const editRecipeBtn = `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(r.nome)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>`;
-      detail = `
-      <div class="detail-box">
-        ${tagsHtml}
-        ${ingHtml}
-        ${stepsHtml}
-        ${noteBox}
-        ${addFormHtml}
-        <div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>
-      </div>`;
-    }
     return `
-    <div class="recipe-card${isOpen ? ' open' : ''}" data-toggle-recipe="${escapeAttr(r.nome)}">
+    <div class="recipe-card" data-toggle-recipe="${escapeAttr(r.nome)}">
       <div class="recipe-row">
         <div>
           <div class="day-menu">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
@@ -3036,7 +3058,6 @@ function renderPrep(){
           <span class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</span>
         </div>
       </div>
-      ${detail}
     </div>`;
   }).join('');
 
@@ -3127,6 +3148,8 @@ function renderPrep(){
       </div>
     </div>` : '';
 
+  const recipeDetailScreen = state.expandedRecipe ? renderRecipeDetailScreen(state.expandedRecipe) : '';
+
   return `
     <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
     <div class="view-toggle">
@@ -3138,6 +3161,7 @@ function renderPrep(){
     <div class="accordion-body">${cards || '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>'}</div>
     ${renderRecipeEditModal()}
     ${newRecipeModal}
+    ${recipeDetailScreen}
     <div class="buttons-fixed">
       <button class="btn is-fixed" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
     </div>
@@ -4228,20 +4252,8 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-recipe]').forEach(el=>{
     el.addEventListener('click', e=>{
       const name = el.dataset.toggleRecipe;
-      const opening = state.expandedRecipe !== name;
-      state.expandedRecipe = opening ? name : null;
+      state.expandedRecipe = state.expandedRecipe !== name ? name : null;
       render();
-      if(opening){
-        const card = document.querySelector(`[data-toggle-recipe="${CSS.escape(name)}"]`);
-        if(card){
-          // la topbar è sticky: scrollIntoView da solo nasconderebbe l'inizio
-          // della card sotto di lei, quindi calcolo l'offset a mano.
-          const topbar = document.querySelector('.topbar');
-          const offset = (topbar ? topbar.offsetHeight : 0) + 8;
-          const top = card.getBoundingClientRect().top + window.scrollY - offset;
-          window.scrollTo({ top, behavior: 'smooth' });
-        }
-      }
     });
   });
 
