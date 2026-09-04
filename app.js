@@ -2835,7 +2835,6 @@ function renderSpesa(){
     </div>` : '';
 
   return `
-    <h2 class="section-title">Spesa</h2>
     <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa parte già spuntato</p>
     ${missingBanner}
     <div class="view-toggle">
@@ -3027,7 +3026,6 @@ function renderPrep(){
     </div>` : '';
 
   return `
-    <h2 class="section-title">Ricettario</h2>
     <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
     <div class="filters">
       <input type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
@@ -3302,7 +3300,6 @@ function renderDispensa(){
     </div>` : '<button class="btn is-fixed" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>';
 
   return `
-    <h2 class="section-title">Dispensa</h2>
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
     <div class="view-toggle">
       <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
