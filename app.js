@@ -3668,7 +3668,9 @@ function attachHandlers(){
   // hanno un fallback sulla scorta) o per ri-applicarlo dopo "Svuota spunte".
   const checkHaveBtn = document.getElementById('check-have-shop');
   if(checkHaveBtn) checkHaveBtn.addEventListener('click', ()=>{
-    buildShopFlat().forEach(it => { if(hasPantryStock(it.ingrediente)) state.shopChecked[it.key] = true; });
+    // Non basta averne un po': se in Dispensa ce n'è meno di quanto serve
+    // (pantryStatusFor === 'poco'), la riga resta da comprare.
+    buildShopFlat().forEach(it => { if(pantryStatusFor(it.ingrediente, it.qta) === 'in-casa') state.shopChecked[it.key] = true; });
     persist(); render();
   });
   const toggleAllSectionsBtn = document.getElementById('shop-toggle-all-sections');
