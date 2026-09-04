@@ -1672,135 +1672,17 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   const rec = name ? effectiveRecipeMeta(weekIdx, i, meal) : null; // dati di catalogo, se disponibili
   const currentCat = name ? effectiveCategoria(weekIdx, i, meal) : '';
 
-  let swapPanelHtml = '';
-  if(state.swapOpenDay === mk){
-    const f = state.swapFilters[mk] || {search:'', cat: currentCat ? 'same' : 'all'};
-    state.swapFilters[mk] = f;
-    let results = allRecipeMetas();
-    if(f.cat === 'same' && currentCat) results = results.filter(r=>r.categoriaNew === currentCat);
-    if(f.search) results = results.filter(r=>r.nome.toLowerCase().includes(f.search.toLowerCase()));
-    const resultsHtml = results.slice(0, 60).map(r=>`
-      <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${mk}">
-        <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
-        <span class="swap-result-name">${escapeHtml(r.nome)}</span>
-        <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
-      </div>`).join('');
-    // "Un'altra proposta" chiede suggerimenti diversi da quelli già mostrati
-    // in questa sessione del pannello (f.suggestSeen, accumulato qui a ogni
-    // render — suggestSwaps stessa è deterministica, senza questo esclude
-    // cliccare "un'altra proposta" richiamerebbe sempre le stesse 3).
-    f.suggestSeen = f.suggestSeen || [];
-    const suggestions = meal === 'cena' ? suggestSwaps(weekIdx, i, new Set(f.suggestSeen)) : [];
-    suggestions.forEach(s => f.suggestSeen.push(s.r.nome));
-    const suggestionsHtml = suggestions.length ? `
-      <div class="swap-suggestions">
-        <div class="filter-group-label">Suggeriti per questo giorno</div>
-        ${suggestions.map(s=>`
-          <button type="button" class="btn swap-suggestion" data-swap-pick="${escapeAttr(s.r.nome)}" data-swap-day="${mk}">
-            <span class="swap-suggestion-top"><span class="swap-suggestion-name">${escapeHtml(s.r.nome)}</span><span class="swap-suggestion-time">${escapeHtml(s.r.tempo)}</span></span>
-            <span class="swap-suggestion-motivo">${escapeHtml(s.motivo)}</span>
-          </button>`).join('')}
-      </div>` : '';
-    const swapDate = formatShortDate(weekDatesFor(weekIdx)[WEEK_DISPLAY_ORDER.indexOf(parseInt(i,10))]);
-    swapPanelHtml = `
-    <div class="swap-panel">
-      <div class="swap-panel-header">
-        <span class="swap-panel-day">${escapeHtml(d.giorno)}</span>
-        <span class="swap-panel-meta">${escapeHtml(swapDate)} · ${escapeHtml(MEAL_LABEL[meal].toLowerCase())} · tetto ${escapeHtml(tempoShortLabel(getTempoCap(i, meal)))}</span>
-      </div>
-      ${suggestionsHtml}
-      <div class="filter-group-label">Oppure cerca</div>
-      <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${mk}" value="${escapeAttr(f.search)}">
-      <div class="swap-cat-chips">
-        ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${mk}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
-        <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${mk}">Tutte le categorie</button>
-      </div>
-      <div class="swap-results">
-        ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
-        ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
-      </div>
-      <div class="swap-panel-footer">
-        ${suggestions.length ? `<button type="button" class="btn is-outline" data-swap-more="${mk}">Un'altra proposta</button>` : ''}
-        <button type="button" class="btn is-ghost" data-open-swap="${mk}">Annulla</button>
-      </div>
-    </div>`;
-  }
-  let linkPanelHtml = '';
-  if(state.linkPickerOpenDay === mk){
-    // Solo i pasti successivi a questo hanno senso come "quando lo mangerete":
-    // allPlannedMeals() è già in ordine cronologico (settimana 0, poi le extra).
-    const allMeals = allPlannedMeals();
-    const selfPos = allMeals.findIndex(o => o.key === mk);
-    const options = allMeals.filter((o, idx) => idx > selfPos);
-    const optionsHtml = options.map(o=>`
-      <div class="swap-result" data-link-pick="${o.key}" data-link-day="${mk}">
-        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)} · ${escapeHtml(MEAL_LABEL[o.meal])}</span>
-        <span class="swap-result-time">${escapeHtml(o.name)}</span>
-      </div>`).join('');
-    linkPanelHtml = `
-    <div class="swap-panel">
-      <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui lo mangerete:</p>
-      <div class="swap-results">
-        ${optionsHtml || '<div class="ing-empty">Nessun pasto successivo disponibile.</div>'}
-      </div>
-    </div>`;
-  }
-  // Direzione opposta di "Avanzata": utile quando il pasto sorgente è ormai
-  // passato (e quindi la sua card non è più visibile per collegarla da lì) —
-  // si collega da qui, scegliendo tra i pasti precedenti.
-  let avanzoDiPanelHtml = '';
-  if(state.avanzoDiPickerOpenDay === mk){
-    const allMeals = allPlannedMeals();
-    const selfPos = allMeals.findIndex(o => o.key === mk);
-    const pastOptions = allMeals.filter((o, idx) => idx < selfPos).reverse();
-    const pastOptionsHtml = pastOptions.map(o=>`
-      <div class="swap-result" data-avanzodi-pick="${o.key}" data-avanzodi-day="${mk}">
-        <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)} · ${escapeHtml(MEAL_LABEL[o.meal])}</span>
-        <span class="swap-result-time">${escapeHtml(o.name)}</span>
-      </div>`).join('');
-    avanzoDiPanelHtml = `
-    <div class="swap-panel">
-      <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui è stato cucinato:</p>
-      <div class="swap-results">
-        ${pastOptionsHtml || '<div class="ing-empty">Nessun pasto precedente disponibile.</div>'}
-      </div>
-    </div>`;
-  }
-  // Ricette aggiuntive del pasto (di solito un contorno, ma qualsiasi
-  // ricetta va bene): sempre modificabili a mano, che siano state scelte dal
-  // generatore o no — un pasto "avanzo" può comunque averne una tutta sua
-  // (vedi setMealContorni/effectiveMeal). Niente filtro di tipologia: la
-  // ricerca elenca tutto il catalogo, come "Cambia".
-  let contornoPanelHtml = '';
-  if(state.contornoPickerOpenMeal === mk){
-    const cf = state.swapFilters[`${mk}_contorno`] || {search:''};
-    state.swapFilters[`${mk}_contorno`] = cf;
-    let cResults = allRecipeMetas().filter(r => !contorni.includes(r.nome));
-    if(cf.search) cResults = cResults.filter(r=>r.nome.toLowerCase().includes(cf.search.toLowerCase()));
-    const cResultsHtml = cResults.slice(0, 40).map(r=>`
-      <div class="swap-result" data-contorno-pick="${escapeAttr(r.nome)}" data-contorno-day="${mk}">
-        <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
-        <span class="swap-result-name">${escapeHtml(r.nome)}</span>
-        <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
-      </div>`).join('');
-    contornoPanelHtml = `
-    <div class="swap-panel">
-      <input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-contorno-search="${mk}" value="${escapeAttr(cf.search)}">
-      <div class="swap-results">
-        ${cResultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
-        ${cResults.length > 40 ? `<div class="ing-empty">Altri ${cResults.length-40} risultati — affina la ricerca.</div>` : ''}
-      </div>
-    </div>`;
-  }
   // "+ ricetta" non ha senso finché il pasto non ha almeno un principale:
   // sparisce insieme al resto (chi cucina, riga bottoni) quando è vuoto —
   // vedi anche il bottone dedicato "Scegli una ricetta" al posto del titolo.
+  // Il pannello di ricerca ("+ ricetta" come "Cambia"/"È avanzata"/"È avanzo
+  // di") non è più qui: è a tutto schermo, vedi render*Screen() più sotto,
+  // invocate una sola volta da renderMenu() in base agli stessi state flag.
   const contorniHtml = name ? `
     <div class="contorni-row">
       ${contorni.map(c=>`<button type="button" class="status-badge" data-contorno-remove="${mk}" data-contorno-name="${escapeAttr(c)}">${escapeHtml(c)} <span class="status-badge-reset">✕</span></button>`).join('')}
       <button type="button" class="btn is-chip is-dashed" data-open-contorno-picker="${mk}">+ ricetta</button>
-    </div>
-    ${contornoPanelHtml}` : '';
+    </div>` : '';
 
   const isDone = !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i][meal]);
   // Un pasto bloccato non viene toccato da "Rigenera settimana" (vedi
@@ -1868,10 +1750,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       </div>`;
     }
     swapControls = `${footerButtons}
-    ${overflowModalHtml}
-    ${swapPanelHtml}
-    ${linkPanelHtml}
-    ${avanzoDiPanelHtml}`;
+    ${overflowModalHtml}`;
   }
 
   // tempo: se cambiato (a mano o generato) e in catalogo, usa il tempo della
@@ -2077,6 +1956,179 @@ function renderMealDetailScreen(weekIdx, i, meal){
         ${sourceEditBox}
       </div>
       ${contorniDetailHtml}
+    </div>
+  </div>`;
+}
+
+// Le 4 schermate di scelta ricetta ("Cambia", "È avanzata", "È avanzo di",
+// "+ ricetta" per i contorni) — come renderMealDetailScreen, a tutto
+// schermo invece che pannelli inline nella card, invocate una sola volta da
+// renderMenu() in base agli stessi state flag di sempre (stato/handler
+// invariati: solo dove il markup finisce nella pagina è cambiato).
+function renderSwapScreen(weekIdx, i, meal){
+  const mk = mealKey(weekIdx, i, meal);
+  const d = DATA.week1[i];
+  const dateLabel = formatShortDate(weekDatesFor(weekIdx)[WEEK_DISPLAY_ORDER.indexOf(parseInt(i,10))]);
+  const currentName = effectiveRecipeName(weekIdx, i, meal);
+  const currentCat = currentName ? effectiveCategoria(weekIdx, i, meal) : '';
+  const contorni = effectiveMeal(weekIdx, i, meal).contorni || [];
+  const f = state.swapFilters[mk] || {search:'', cat: currentCat ? 'same' : 'all'};
+  state.swapFilters[mk] = f;
+  let results = allRecipeMetas();
+  if(f.cat === 'same' && currentCat) results = results.filter(r=>r.categoriaNew === currentCat);
+  if(f.search) results = results.filter(r=>r.nome.toLowerCase().includes(f.search.toLowerCase()));
+  const resultsHtml = results.slice(0, 60).map(r=>`
+    <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${mk}">
+      <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
+      <span class="swap-result-name">${escapeHtml(r.nome)}</span>
+      <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
+    </div>`).join('');
+  // "Un'altra proposta" chiede suggerimenti diversi da quelli già mostrati in
+  // questa sessione del pannello (f.suggestSeen, accumulato qui a ogni
+  // render — suggestSwaps è deterministica, senza questo richiamerebbe
+  // sempre le stesse 3).
+  f.suggestSeen = f.suggestSeen || [];
+  const suggestions = meal === 'cena' ? suggestSwaps(weekIdx, i, new Set(f.suggestSeen)) : [];
+  suggestions.forEach(s => f.suggestSeen.push(s.r.nome));
+  const suggestionsHtml = suggestions.length ? `
+    <div class="swap-suggestions">
+      <div class="filter-group-label">Suggeriti per questo giorno</div>
+      ${suggestions.map(s=>`
+        <button type="button" class="btn swap-suggestion" data-swap-pick="${escapeAttr(s.r.nome)}" data-swap-day="${mk}">
+          <span class="swap-suggestion-top"><span class="swap-suggestion-name">${escapeHtml(s.r.nome)}</span><span class="swap-suggestion-time">${escapeHtml(s.r.tempo)}</span></span>
+          <span class="swap-suggestion-motivo">${escapeHtml(s.motivo)}</span>
+        </button>`).join('')}
+    </div>` : '';
+  return `
+  <div class="meal-detail-screen">
+    <div class="meal-detail-header">
+      <div class="meal-detail-header-text">
+        <div class="meal-detail-kicker">${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)} · ${escapeHtml(MEAL_LABEL[meal].toLowerCase())} · tetto ${escapeHtml(tempoShortLabel(getTempoCap(i, meal)))}</div>
+        <div class="meal-detail-title">${escapeHtml(currentName) || 'Scegli una ricetta'}</div>
+      </div>
+      <button type="button" class="btn is-icon meal-detail-close" data-open-swap="${mk}" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="meal-detail-body">
+      <div class="swap-panel">
+        ${suggestionsHtml}
+        <div class="filter-group-label">Oppure cerca</div>
+        <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${mk}" value="${escapeAttr(f.search)}">
+        <div class="swap-cat-chips">
+          ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${mk}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
+          <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${mk}">Tutte le categorie</button>
+        </div>
+        <div class="swap-results">
+          ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+          ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
+        </div>
+        <div class="swap-panel-footer">
+          ${suggestions.length ? `<button type="button" class="btn is-outline" data-swap-more="${mk}">Un'altra proposta</button>` : ''}
+          <button type="button" class="btn is-ghost" data-open-swap="${mk}">Annulla</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+// "È avanzata": scegli un pasto FUTURO che mangerà l'avanzo di questo.
+function renderLinkPickerScreen(weekIdx, i, meal){
+  const mk = mealKey(weekIdx, i, meal);
+  const currentName = effectiveRecipeName(weekIdx, i, meal);
+  const allMeals = allPlannedMeals();
+  const selfPos = allMeals.findIndex(o => o.key === mk);
+  const options = allMeals.filter((o, idx) => idx > selfPos);
+  const optionsHtml = options.map(o=>`
+    <div class="swap-result" data-link-pick="${o.key}" data-link-day="${mk}">
+      <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)} · ${escapeHtml(MEAL_LABEL[o.meal])}</span>
+      <span class="swap-result-time">${escapeHtml(o.name)}</span>
+    </div>`).join('');
+  return `
+  <div class="meal-detail-screen">
+    <div class="meal-detail-header">
+      <div class="meal-detail-header-text">
+        <div class="meal-detail-kicker">Segna come avanzata</div>
+        <div class="meal-detail-title">${escapeHtml(currentName)}</div>
+      </div>
+      <button type="button" class="btn is-icon meal-detail-close" data-open-link-picker="${mk}" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="meal-detail-body">
+      <div class="swap-panel">
+        <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui lo mangerete:</p>
+        <div class="swap-results">
+          ${optionsHtml || '<div class="ing-empty">Nessun pasto successivo disponibile.</div>'}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+// Direzione opposta di "Avanzata": utile quando il pasto sorgente è ormai
+// passato (e quindi la sua card non è più raggiungibile per collegarla da
+// lì) — si collega da qui, scegliendo tra i pasti precedenti.
+function renderAvanzoDiPickerScreen(weekIdx, i, meal){
+  const mk = mealKey(weekIdx, i, meal);
+  const currentName = effectiveRecipeName(weekIdx, i, meal);
+  const allMeals = allPlannedMeals();
+  const selfPos = allMeals.findIndex(o => o.key === mk);
+  const pastOptions = allMeals.filter((o, idx) => idx < selfPos).reverse();
+  const pastOptionsHtml = pastOptions.map(o=>`
+    <div class="swap-result" data-avanzodi-pick="${o.key}" data-avanzodi-day="${mk}">
+      <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)} · ${escapeHtml(MEAL_LABEL[o.meal])}</span>
+      <span class="swap-result-time">${escapeHtml(o.name)}</span>
+    </div>`).join('');
+  return `
+  <div class="meal-detail-screen">
+    <div class="meal-detail-header">
+      <div class="meal-detail-header-text">
+        <div class="meal-detail-kicker">È avanzo di…</div>
+        <div class="meal-detail-title">${escapeHtml(currentName) || 'Scegli una ricetta'}</div>
+      </div>
+      <button type="button" class="btn is-icon meal-detail-close" data-open-avanzodi-picker="${mk}" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="meal-detail-body">
+      <div class="swap-panel">
+        <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui è stato cucinato:</p>
+        <div class="swap-results">
+          ${pastOptionsHtml || '<div class="ing-empty">Nessun pasto precedente disponibile.</div>'}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+// "+ ricetta" per i contorni: sempre modificabile a mano, che sia stata
+// scelta dal generatore o no — un pasto "avanzo" può comunque averne una
+// tutta sua (vedi setMealContorni/effectiveMeal). Niente filtro di
+// tipologia: la ricerca elenca tutto il catalogo, come "Cambia".
+function renderContornoPickerScreen(weekIdx, i, meal){
+  const mk = mealKey(weekIdx, i, meal);
+  const mealData = effectiveMeal(weekIdx, i, meal);
+  const currentName = mealData.principale || '';
+  const contorni = mealData.contorni || [];
+  const cf = state.swapFilters[`${mk}_contorno`] || {search:''};
+  state.swapFilters[`${mk}_contorno`] = cf;
+  let cResults = allRecipeMetas().filter(r => !contorni.includes(r.nome));
+  if(cf.search) cResults = cResults.filter(r=>r.nome.toLowerCase().includes(cf.search.toLowerCase()));
+  const cResultsHtml = cResults.slice(0, 40).map(r=>`
+    <div class="swap-result" data-contorno-pick="${escapeAttr(r.nome)}" data-contorno-day="${mk}">
+      <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
+      <span class="swap-result-name">${escapeHtml(r.nome)}</span>
+      <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
+    </div>`).join('');
+  return `
+  <div class="meal-detail-screen">
+    <div class="meal-detail-header">
+      <div class="meal-detail-header-text">
+        <div class="meal-detail-kicker">+ ricetta</div>
+        <div class="meal-detail-title">${escapeHtml(currentName)}</div>
+      </div>
+      <button type="button" class="btn is-icon meal-detail-close" data-open-contorno-picker="${mk}" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="meal-detail-body">
+      <div class="swap-panel">
+        <input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-contorno-search="${mk}" value="${escapeAttr(cf.search)}">
+        <div class="swap-results">
+          ${cResultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+          ${cResults.length > 40 ? `<div class="ing-empty">Altri ${cResults.length-40} risultati — affina la ricerca.</div>` : ''}
+        </div>
+      </div>
     </div>
   </div>`;
 }
@@ -2397,6 +2449,19 @@ function renderMenu(){
     if(meal !== 'pranzo' && meal !== 'cena') return '';
     return renderMealDetailScreen(weekIdx, i, meal);
   })() : '';
+  // Le 4 schermate di scelta ricetta: al più una alla volta, gli stessi
+  // handler di apertura si escludono già a vicenda (vedi attachHandlers).
+  function pickerScreenFor(stateKey, renderFn){
+    const key = state[stateKey];
+    if(!key) return '';
+    const { weekIdx, i, meal } = parseMealKey(key);
+    if(meal !== 'pranzo' && meal !== 'cena') return '';
+    return renderFn(weekIdx, i, meal);
+  }
+  const swapScreen = pickerScreenFor('swapOpenDay', renderSwapScreen);
+  const linkPickerScreen = pickerScreenFor('linkPickerOpenDay', renderLinkPickerScreen);
+  const avanzoDiPickerScreen = pickerScreenFor('avanzoDiPickerOpenDay', renderAvanzoDiPickerScreen);
+  const contornoPickerScreen = pickerScreenFor('contornoPickerOpenMeal', renderContornoPickerScreen);
   return `
     ${eatenReminderBanner}
     ${reminderBanner}
@@ -2405,6 +2470,10 @@ function renderMenu(){
     ${renderRecipeEditModal()}
     ${genSettingsModal}
     ${mealDetailScreen}
+    ${swapScreen}
+    ${linkPickerScreen}
+    ${avanzoDiPickerScreen}
+    ${contornoPickerScreen}
     <div class="generate-week-block">
       <div class="generate-week-row">
         <button class="btn is-double is-left is-accent" id="add-week">+ Aggiungi settimana</button>
@@ -3799,7 +3868,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-swap-more]').forEach(btn=>{
     // f.suggestSeen è già stato aggiornato con i 3 suggerimenti appena
-    // mostrati durante QUESTO render (vedi swapPanelHtml): basta un nuovo
+    // mostrati durante QUESTO render (vedi renderSwapScreen): basta un nuovo
     // render, i prossimi suggeriti li esclude da soli.
     btn.addEventListener('click', ()=>{ render(); });
   });
