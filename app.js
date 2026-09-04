@@ -825,7 +825,24 @@ async function loadState(){
 let saveTimeout=null;
 function persist(){
   clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(async ()=>{
+  saveTimeout = setTimeout(runPersist, 350);
+}
+// Il browser su telefono può sospendere/scaricare la pagina in background
+// pochi istanti dopo che la tocchi (cambio app, blocco schermo): se il
+// salvataggio con debounce (350ms) non ha ancora avuto il tempo di partire,
+// la modifica non arriva né a Firebase né alla cache locale e si perde per
+// sempre. flushPendingPersist forza subito il salvataggio in sospeso appena
+// la pagina sta per finire in background, invece di fidarsi del timer.
+function flushPendingPersist(){
+  if(saveTimeout){ clearTimeout(saveTimeout); saveTimeout = null; runPersist(); }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'hidden') flushPendingPersist();
+});
+window.addEventListener('pagehide', flushPendingPersist);
+async function runPersist(){
+  saveTimeout = null;
+  {
     const payload = {
       shopChecked: state.shopChecked,
       shopDismissed: state.shopDismissed,
@@ -892,7 +909,7 @@ function persist(){
       const hint = document.querySelector('.save-hint');
       if(hint){ hint.textContent = 'salvato ✓'; setTimeout(()=>{ if(hint) hint.textContent=''; }, 1500); }
     }catch(e){ console.error('Errore salvataggio', e); }
-  }, 350);
+  }
 }
 
 // Settimana 0 = quella "corrente" (DATA.week1 + weekOverrides/weekBaseline/mealsDone
@@ -3212,7 +3229,8 @@ function renderDispensa(){
           ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}"><span class="qty-unit">${escapeHtml(it.unit || 'pz')}</span>`
           : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty} ${escapeHtml(it.unit || 'pz')}</span>`}
       </span>
-    </div>`;
+    </div>
+    `;
   }
 /*       <button class="btn-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
  */
@@ -3409,12 +3427,13 @@ function renderDispensa(){
     .filter(it => typeof it.qty === 'number' && it.qty <= 0)
     .sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   const finishedSection = finishedItems.length ? `
-    <div class="dept-block">
+    <div class="shop-day-group">
       <div class="dept-title finished-toggle${state.pantryFinishedOpen ? ' open' : ''}" data-toggle-finished>
         <span class="dept-icon">${DEPT_ICON.finiti}</span>${DEPT_LABEL.finiti} (${finishedItems.length})
         <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
       </div>
-      ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}
+    <div class="accordion-body">
+      ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}</div>
     </div>` : '';
 
   // Barra di selezione globale (pressione lunga su una riga per attivarla):
