@@ -603,6 +603,7 @@ const state = {
   mealsModelMigrated: false, // una tantum: passaggio da "una ricetta al giorno" a due pasti (pranzo/cena), ognuno {principale, contorni[]} — vedi il blocco di migrazione più sotto
   mealsModelMigrated2: false, // una tantum: "chi cucina" da per giorno a per pasto
   tempoRulesMigrated: false, // una tantum: dayTempoCap (per giorno 0-6) -> weekTempoBase/weekTempoExceptions (base + eccezioni, pranzo/cena separati ven-dom)
+  staleRecipesPurged: false, // una tantum: pulisce i pasti già pianificati che puntano a una ricetta cancellata PRIMA che "Elimina" imparasse a farlo da solo (vedi purgeRecipeFromPlanning)
   weekOverrides: {}, // {i: {pranzo:{principale,contorni[]}, cena:{principale,contorni[]}}}
   weekOverridePicked: {}, // {i: {pranzo:bool, cena:bool}}
   weekBaseline: null, // stessa forma di weekOverrides, riempita dal generatore
@@ -837,6 +838,7 @@ function persist(){
       weekTempoBase: state.weekTempoBase,
       weekTempoExceptions: state.weekTempoExceptions,
       tempoRulesMigrated: state.tempoRulesMigrated,
+      staleRecipesPurged: state.staleRecipesPurged,
       userColors: state.userColors,
       notifDismissed: state.notifDismissed,
       mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
@@ -5223,6 +5225,33 @@ document.addEventListener('click', e=>{
       if(state.weekTempoExceptions[`${d}_cena`]) state.weekTempoExceptions[`${d}_pranzo`] = state.weekTempoExceptions[`${d}_cena`];
     });
     state.tempoRulesMigrated = true;
+    persist();
+  }
+  // Una tantum: ripulisce i pasti già pianificati (settimana corrente + tutte
+  // le extra) che puntano a una ricetta ormai cancellata da PRIMA che
+  // "Elimina" imparasse a farlo da solo (purgeRecipeFromPlanning) — quei
+  // riferimenti restavano orfani per sempre, e senza un vero "Modifica
+  // ricetta" da aprire (la ricetta non esiste più: effectiveRecipeMeta torna
+  // null) non c'era nemmeno un modo per raggiungere il bottone Elimina e
+  // farli ripulire da lì. Stessa identica logica del purge, generalizzata a
+  // "qualunque nome che non risolve più" invece di un nome specifico.
+  if(!state.staleRecipesPurged){
+    const weekCount = 1 + state.extraWeeks.length;
+    for(let weekIdx = 0; weekIdx < weekCount; weekIdx++){
+      for(let i = 0; i < 7; i++){
+        ['pranzo','cena'].forEach(meal=>{
+          const mealData = effectiveMeal(weekIdx, i, meal);
+          if(mealData.principale && !getRecipeMeta(mealData.principale)){
+            clearMealToEmpty(weekIdx, i, meal);
+            delete state.mealLocked[mealKey(weekIdx, i, meal)];
+          } else if(mealData.contorni && mealData.contorni.length){
+            const validContorni = mealData.contorni.filter(c => getRecipeMeta(c));
+            if(validContorni.length !== mealData.contorni.length) setMealContorni(weekIdx, i, meal, validContorni);
+          }
+        });
+      }
+    }
+    state.staleRecipesPurged = true;
     persist();
   }
   // Apriva in automatico la cena di oggi al caricamento, ma con una chiave
