@@ -972,6 +972,13 @@ function parseMealKey(key){
   const [w, i, meal] = key.split('_');
   return { weekIdx: parseInt(w, 10), i, meal };
 }
+// Sentinella per "Svuota il pasto": un override.principale normalmente
+// falsy (null) significa "nessun override, guarda la baseline" — ma svuotare
+// deve fermarsi qui e NON ricadere sulla baseline generata. MEAL_EMPTY è un
+// principale esplicito e verosimile (truthy) che effectiveMeal/
+// effectiveRecipeMeta riconoscono e traducono in "vuoto per davvero" prima
+// di guardare oltre. Vedi clearMealToEmpty().
+const MEAL_EMPTY = ' meal-empty';
 // Risolve un pasto (weekIdx, i, meal) fino a {principale, contorni[]}: segue
 // l'eventuale avanzo, poi l'override manuale, poi la generazione automatica,
 // poi — solo per la cena della settimana 0, l'unico caso con un foglio
@@ -991,6 +998,7 @@ function effectiveMeal(weekIdx, i, meal){
     return source;
   }
   const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
+  if(override && override.principale === MEAL_EMPTY) return { principale: null, contorni: [] };
   if(override && override.principale) return override;
   const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
   if(baseline && baseline.principale) return baseline;
@@ -1020,6 +1028,7 @@ function effectiveRecipeMeta(weekIdx, i, meal='cena'){
   const link = linkedSourceMealKey(weekIdx, i, meal);
   if(link){ const { weekIdx: sw, i: si, meal: sm } = parseMealKey(link); return effectiveRecipeMeta(sw, si, sm); }
   const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
+  if(override && override.principale === MEAL_EMPTY) return null;
   if(override && override.principale) return getRecipeMeta(override.principale);
   const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
   if(baseline && baseline.principale) return getRecipeMeta(baseline.principale);
@@ -1330,6 +1339,19 @@ function clearDayLink(mealKey){
   delete state.dayLinkNotes[mealKey];
   delete state.dayPortions[mealKey];
 }
+// "Svuota il pasto": scioglie un eventuale collegamento avanzo (proprio o di
+// chi dipendeva da questo pasto — vuoto non ha più nulla da cui avanzare),
+// azzera fatto/scelto-a-mano, e scrive la sentinella MEAL_EMPTY come
+// principale — così effectiveMeal si ferma qui invece di ricadere sulla
+// baseline generata (vedi effectiveMeal/effectiveRecipeMeta).
+function clearMealToEmpty(weekIdx, i, meal){
+  const key = mealKey(weekIdx, i, meal);
+  clearDayLink(key);
+  unlinkDaysPointingTo(key);
+  clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
+  clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
+  writeMealPrincipale(weekOverridesRef(weekIdx), i, meal, MEAL_EMPTY);
+}
 // Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
 function toggleCook(dayKey){
   const cur = state.cooks[dayKey];
@@ -1435,22 +1457,24 @@ function removeWeek(weekIdx){
   render();
 }
 
-// Scambia lo stesso tipo di pasto (entrambi pranzo o entrambi cena) tra due
-// giorni, anche tra settimane diverse (drag&drop nel Menù): entrambi
-// diventano override manuali, coerente con "Cambia ricetta" — il "fatta" non
-// ha più senso dopo lo scambio, quindi si azzera per entrambi. L'altro pasto
-// dello stesso giorno non viene toccato.
-function swapDayRecipes(weekIdxA, i, weekIdxB, j, meal){
-  if(weekIdxA === weekIdxB && i === j) return;
-  const nameI = effectiveRecipeName(weekIdxA, i, meal);
-  const nameJ = effectiveRecipeName(weekIdxB, j, meal);
-  const mealKeyA = mealKey(weekIdxA, i, meal), mealKeyB = mealKey(weekIdxB, j, meal);
-  writeMealPrincipale(weekOverridesRef(weekIdxA), i, meal, nameJ);
-  writeMealPrincipale(weekOverridesRef(weekIdxB), j, meal, nameI);
-  clearMealFlag(weekOverridePickedRef(weekIdxA), i, meal);
-  clearMealFlag(weekOverridePickedRef(weekIdxB), j, meal);
-  clearMealFlag(weekMealsDoneRef(weekIdxA), i, meal);
-  clearMealFlag(weekMealsDoneRef(weekIdxB), j, meal);
+// Scambia due pasti qualsiasi (anche pranzo con cena, anche tra settimane
+// diverse — drag&drop nel Menù): entrambi diventano override manuali,
+// coerente con "Cambia ricetta" — il "fatta" non ha più senso dopo lo
+// scambio, quindi si azzera per entrambi. Le porzioni/l'eventuale
+// collegamento avanzo restano legati alla posizione (giorno+pasto), non
+// seguono la ricetta: scambiare una cena da 3 porzioni con un pranzo da 2
+// lascia 3 e 2 dove stavano, si scambia solo cosa cucinare.
+function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
+  if(weekIdxA === weekIdxB && i === j && mealA === mealB) return;
+  const nameI = effectiveRecipeName(weekIdxA, i, mealA);
+  const nameJ = effectiveRecipeName(weekIdxB, j, mealB);
+  const mealKeyA = mealKey(weekIdxA, i, mealA), mealKeyB = mealKey(weekIdxB, j, mealB);
+  writeMealPrincipale(weekOverridesRef(weekIdxA), i, mealA, nameJ);
+  writeMealPrincipale(weekOverridesRef(weekIdxB), j, mealB, nameI);
+  clearMealFlag(weekOverridePickedRef(weekIdxA), i, mealA);
+  clearMealFlag(weekOverridePickedRef(weekIdxB), j, mealB);
+  clearMealFlag(weekMealsDoneRef(weekIdxA), i, mealA);
+  clearMealFlag(weekMealsDoneRef(weekIdxB), j, mealB);
   clearDayLink(mealKeyA);
   clearDayLink(mealKeyB);
   unlinkDaysPointingTo(mealKeyA);
@@ -1819,11 +1843,16 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     // data-stop-close) e non si chiuderebbe da solo col bubbling.
     let overflowModalHtml = '';
     if(name && state.mealOverflowOpen === mk){
+      // Nome a cui torna davvero "Torna alla ricetta originale": la baseline
+      // (proposta del generatore), o — solo cena, settimana 0 — il piatto
+      // del foglio originale se non c'è mai stata una baseline generata.
+      const originalName = (baseline && baseline.principale) || (weekIdx === 0 && meal === 'cena' ? DATA.week1[i].cena : '') || '';
       const overflowItems = [
         { label:'È avanzo di…', note:'Collega questo pasto a una cena passata: gli ingredienti non tornano in spesa.', attr:`data-open-avanzodi-picker="${mk}"` },
-        hasOverride ? { label:'Torna alla ricetta originale', note:'Rimette la proposta di partenza del generatore.', attr:`data-reset-swap="${mk}"` } : null,
+        hasOverride ? { label: originalName ? `Torna a «${originalName}»` : 'Torna alla ricetta originale', note:'Rimette la proposta di partenza del generatore.', attr:`data-reset-swap="${mk}"` } : null,
         { label:'Segna come avanzata', note:'Scegli quale pasto futuro mangerà quello che resta.', attr:`data-open-link-picker="${mk}"` },
-        { label: isLocked ? 'Sblocca il pasto' : 'Blocca il pasto', note: isLocked ? 'Torna a essere toccato dalla rigenerazione della settimana.' : 'La rigenerazione della settimana non lo tocca più.', attr:`data-toggle-lock="${mk}"` }
+        { label: isLocked ? 'Sblocca il pasto' : 'Blocca il pasto', note: isLocked ? 'Torna a essere toccato dalla rigenerazione della settimana.' : 'La rigenerazione della settimana non lo tocca più.', attr:`data-toggle-lock="${mk}"` },
+        { label:'Svuota il pasto', note:'Torna "nessuna ricetta scelta". Toglie gli ingredienti dalla lista della spesa.', attr:`data-clear-meal="${mk}"`, danger: true }
       ].filter(Boolean);
       overflowModalHtml = `
       <div class="filters-modal-backdrop" data-close-meal-overflow>
@@ -1833,7 +1862,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
             <button class="btn is-icon filters-close-btn" data-close-meal-overflow>✕</button>
           </div>
           <div class="overflow-actions">
-            ${overflowItems.map(it=>`<button type="button" class="overflow-action" ${it.attr}><span class="overflow-action-label">${escapeHtml(it.label)}</span><span class="overflow-action-note">${escapeHtml(it.note)}</span></button>`).join('')}
+            ${overflowItems.map(it=>`<button type="button" class="overflow-action${it.danger ? ' overflow-action-danger' : ''}" ${it.attr}><span class="overflow-action-label">${escapeHtml(it.label)}</span><span class="overflow-action-note">${escapeHtml(it.note)}</span></button>`).join('')}
           </div>
         </div>
       </div>`;
@@ -3849,6 +3878,49 @@ function attachHandlers(){
       persist(); render();
     });
   });
+  document.querySelectorAll('[data-clear-meal]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const key = e.currentTarget.dataset.clearMeal;
+      const { weekIdx, i, meal } = parseMealKey(key);
+      // Cattura lo stato precedente per l'Annulla: solo del pasto su cui si
+      // agisce, non degli eventuali altri pasti scollegati a cascata da
+      // unlinkDaysPointingTo (limite noto, coerente con "Torna all'originale"
+      // e con la rigenerazione, che hanno la stessa limitazione).
+      const overridesMap = weekOverridesRef(weekIdx);
+      const prevOverrideSlot = overridesMap[i] ? overridesMap[i][meal] : undefined;
+      const prevLink = state.dayLinks[key];
+      const prevLinkNote = state.dayLinkNotes[key];
+      const prevPortions = state.dayPortions[key];
+      const mealsDoneMap = weekMealsDoneRef(weekIdx);
+      const prevDone = mealsDoneMap[i] ? mealsDoneMap[i][meal] : undefined;
+      const pickedMap = weekOverridePickedRef(weekIdx);
+      const prevPicked = pickedMap[i] ? pickedMap[i][meal] : undefined;
+      clearMealToEmpty(weekIdx, i, meal);
+      state.mealOverflowOpen = null;
+      persist(); render();
+      showUndoToast('Pasto svuotato', ()=>{
+        if(prevLink !== undefined) state.dayLinks[key] = prevLink;
+        if(prevLinkNote !== undefined) state.dayLinkNotes[key] = prevLinkNote;
+        if(prevPortions !== undefined) state.dayPortions[key] = prevPortions;
+        if(prevOverrideSlot !== undefined){
+          const om = weekOverridesRef(weekIdx);
+          if(!om[i]) om[i] = emptyDaySlot();
+          om[i][meal] = prevOverrideSlot;
+        }
+        if(prevDone !== undefined){
+          const md = weekMealsDoneRef(weekIdx);
+          if(!md[i]) md[i] = {};
+          md[i][meal] = prevDone;
+        }
+        if(prevPicked !== undefined){
+          const pd = weekOverridePickedRef(weekIdx);
+          if(!pd[i]) pd[i] = {};
+          pd[i][meal] = prevPicked;
+        }
+        persist(); render();
+      });
+    });
+  });
   document.querySelectorAll('[data-open-meal-overflow]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.mealOverflowOpen = e.currentTarget.dataset.openMealOverflow;
@@ -4668,11 +4740,10 @@ document.addEventListener('pointermove', e=>{
   lastPointerY = e.clientY;
   positionGhost(dragState.ghost, e.clientX, e.clientY);
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  // Solo lo stesso tipo di pasto è un bersaglio valido (pranzo su pranzo,
-  // cena su cena): scambiare un pranzo con una cena non avrebbe un senso
-  // chiaro, viste le regole di porzioni/avanzo automatico legate al tipo.
+  // Qualsiasi pasto è un bersaglio valido, anche di tipo diverso (pranzo su
+  // cena): le porzioni/l'eventuale collegamento avanzo restano legati alla
+  // posizione, non alla ricetta — vedi swapDayRecipes.
   let targetCard = el ? el.closest('.meal-block') : null;
-  if(targetCard && targetCard.dataset.meal !== dragState.sourceMeal) targetCard = null;
   if(dragState.lastTarget && dragState.lastTarget !== targetCard) dragState.lastTarget.classList.remove('drag-over');
   if(targetCard && targetCard !== dragState.sourceCard){
     targetCard.classList.add('drag-over');
@@ -4688,7 +4759,7 @@ function endDayDrag(commit){
   sourceCard.classList.remove('dragging');
   if(lastTarget) lastTarget.classList.remove('drag-over');
   dragState = null;
-  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), sourceIndex, parseInt(lastTarget.dataset.weekIdx,10), lastTarget.dataset.dayIndex, sourceMeal);
+  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), sourceIndex, sourceMeal, parseInt(lastTarget.dataset.weekIdx,10), lastTarget.dataset.dayIndex, lastTarget.dataset.meal);
 }
 document.addEventListener('pointerup', ()=> endDayDrag(true));
 document.addEventListener('pointercancel', ()=> endDayDrag(false));

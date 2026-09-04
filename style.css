@@ -313,6 +313,8 @@
   .overflow-action:hover{ background:var(--surface-2); }
   .overflow-action-label{ font-size:var(--text-body); font-weight:var(--weight-medium); }
   .overflow-action-note{ font-size:var(--text-xsmall); color:var(--ink-light); line-height:1.4; }
+  .overflow-action-danger{ border-top:2px solid var(--line-strong); margin-top:var(--space-xsmall); padding-top:var(--space-medium); }
+  .overflow-action-danger .overflow-action-label{ color:var(--tomato); }
   .meal-overflow-btn{ font-size:1.25rem; line-height:1; color:var(--ink-light); width:2.25rem; height:2.25rem; margin-left:auto; }
 
 .section-footer{display: flex; flex-direction: column; gap: var(--gap-btn); margin-top: var(--space-medium);}
