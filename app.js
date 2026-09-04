@@ -2032,6 +2032,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
 
   return `
   <div class="meal-detail-screen">
+  <div class="filters-modal">
     <div class="meal-detail-header">
       <div class="meal-detail-header-text">
         <div class="meal-detail-kicker">${escapeHtml(MEAL_LABEL[meal])} · ${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)}</div>
@@ -2053,6 +2054,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
       </div>
       ${contorniDetailHtml}
     </div>
+     </div>
   </div>`;
 }
 
@@ -2773,7 +2775,7 @@ function renderSpesa(){
       const sectionId = `reparto_${dept}`;
       const isOpen = !state.shopSectionCollapsed[sectionId];
       return `
-      <div class="dept-block">
+      <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
           <span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
@@ -2815,7 +2817,7 @@ function renderSpesa(){
       return `
       <div class="shop-day-group">
         <div class="shop-day-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
-          <span class="font-weight-bold">${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel)} · ${escapeHtml(MEAL_LABEL[meal])}</span><span class="spesa-recipe">&nbsp;- ${escapeHtml(dishLabel)}</span>
+          <span class="font-weight-bold">${escapeHtml(giorno.slice(0,3))} ${escapeHtml(dateLabel.split(' ')[0])} · ${escapeHtml(MEAL_LABEL[meal])}</span> <span class="spesa-recipe">${escapeHtml(dishLabel)}</span>
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
         <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">${rows}</div>
@@ -3191,12 +3193,14 @@ function renderDispensa(){
       const sectionId = `luogo_${l}`;
       const isOpen = !state.pantrySectionCollapsed[sectionId];
       return `
-      <div class="dept-block">
-        <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
+      <div class="shop-day-group">
+        <div class="shop-day-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
           <span class="dept-icon">${LUOGO_ICON[l]}</span>${LUOGO_LABEL[l]}
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${isOpen ? byLuogo[l].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+        <div class="accordion-body">
+          ${isOpen ? byLuogo[l].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+        </div>
       </div>`;
     }).join('');
   } else {
@@ -3206,12 +3210,14 @@ function renderDispensa(){
       const sectionId = `cat_${d}`;
       const isOpen = !state.pantrySectionCollapsed[sectionId];
       return `
-      <div class="dept-block">
+      <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
           <span class="dept-icon">${DEPT_ICON[d]}</span>${DEPT_LABEL[d]}
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
-        ${isOpen ? byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+        <div class="accordion-body">
+          ${isOpen ? byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('') : ''}
+        </div>
       </div>`;
     }).join('');
   }
