@@ -2487,7 +2487,7 @@ function renderMenu(){
     if(state.tempoExceptionAdding === 'pickingDay'){
       excPickerHtml = `
       <div class="tempo-exception-picker">
-        ${excOptions.length ? excOptions.map(o=>`<button type="button" class="btn is-chip" data-pick-tempo-exception-day="${o.day}" data-pick-tempo-exception-meal="${o.meal}">${escapeHtml(o.label)}</button>`).join('') : '<div class="ing-empty">Nessun altro giorno disponibile.</div>'}
+        ${excOptions.length ? excOptions.map(o=>`<button type="button" class="btn is-filter" data-pick-tempo-exception-day="${o.day}" data-pick-tempo-exception-meal="${o.meal}">${escapeHtml(o.label)}</button>`).join('') : '<div class="ing-empty">Nessun altro giorno disponibile.</div>'}
       </div>`;
     } else if(state.tempoExceptionAdding && typeof state.tempoExceptionAdding === 'object'){
       const { day: exDay, meal: exMealPicking } = state.tempoExceptionAdding;
@@ -2524,7 +2524,7 @@ function renderMenu(){
           <div class="filter-group">
             <div class="filter-group-label">Tempo massimo, tutti i giorni</div>
             <div class="tempo-base-list">
-              ${TEMPO_ORDER.map(t=>`<button type="button" class="tempo-base-row${state.weekTempoBase===t?' active':''}" data-set-tempo-base="${t}"><span>${escapeHtml(tempoShortLabel(t))}</span>${state.weekTempoBase===t?'<span class="tempo-base-check">✓</span>':''}</button>`).join('')}
+              ${TEMPO_ORDER.map(t=>`<button type="button" class="tempo-base-row${state.weekTempoBase===t?' active':''}" data-set-tempo-base="${t}"><span>${escapeHtml(TEMPO_LABEL[t])}</span>${state.weekTempoBase===t?'<span class="tempo-base-check">✓</span>':''}</button>`).join('')}
             </div>
           </div>
           <div class="filter-group">
@@ -2930,12 +2930,12 @@ function renderSpesa(){
           </div>
         </div>
         <div class="filters-modal-footer">
-          <button class="btn is-ghost reset-btn" data-close-add-ing-modal>Annulla</button>
           <button class="btn is-solid mini-add-btn" id="shop-add-btn" type="button">Aggiungi</button>
         </div>
       </div>
     </div>` : '';
-
+/*           <button class="btn is-ghost reset-btn" data-close-add-ing-modal>Annulla</button>
+ */
   return `
     <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa parte già spuntato</p>
     ${missingBanner}
@@ -3029,7 +3029,7 @@ function renderPrep(){
     <div class="recipe-card${isOpen ? ' open' : ''}" data-toggle-recipe="${escapeAttr(r.nome)}">
       <div class="recipe-row">
         <div>
-          <div class="day-menu">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
+          <div class="recipe-title">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
           <span class="day-time">${escapeHtml(r.tempo)}</span>
         </div>
         <div class="day-row-side">
@@ -3121,12 +3121,12 @@ function renderPrep(){
         </div>
         ${state.newRecipeError ? `<p class="section-sub" style="color:var(--tomato); margin-top:-8px;">${escapeHtml(state.newRecipeError)}</p>` : ''}
         <div class="filters-modal-footer">
-          <button class="btn is-ghost reset-btn" data-close-new-recipe-modal>Annulla</button>
           <button class="btn is-solid mini-add-btn" id="new-recipe-create-btn" type="button">Crea</button>
         </div>
       </div>
     </div>` : '';
-
+/*           <button class="btn is-ghost reset-btn" data-close-new-recipe-modal>Annulla</button>
+ */
   return `
     <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
     <div class="view-toggle">
@@ -3328,12 +3328,12 @@ function renderDispensa(){
           </div>
         </div>
         <div class="filters-modal-footer">
-          <button class="btn is-ghost reset-btn" data-close-pantry-add-modal>Annulla</button>
           <button class="btn is-solid mini-add-btn" id="pantry-add-btn" type="button">Aggiungi</button>
         </div>
       </div>
     </div>` : '';
-
+/*           <button class="btn is-ghost reset-btn" data-close-pantry-add-modal>Annulla</button>
+ */
   // Gestione gruppi (Pasta corta/lunga e quelli che l'utente crea): "matchName"
   // è il testo esatto usato nelle ricette per il generico — un gruppo senza
   // corrispondenza in nessuna ricetta è comunque salvabile, semplicemente non
