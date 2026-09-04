@@ -235,6 +235,42 @@ function toComparableUnit(value, unit){
   return null;
 }
 
+// Somma le quantità testuali di più occorrenze dello stesso ingrediente (es.
+// due ricette che chiedono entrambe "farina", "200 g" e "150 g") invece di
+// tenerle su righe separate in Spesa — prima si univano solo se il testo
+// combaciava esattamente, quindi "200 g" e "150 g" restavano due righe
+// distinte anche se in realtà andavano sommate. Se le unità sono la stessa
+// unità di peso/volume riconosciuta (anche miste, es. g + kg) somma nella
+// base comune e riformatta; se sono la stessa unità testuale non convertibile
+// (es. "spicchio") somma comunque i numeri; altrimenti (q.b., unità diverse
+// non comparabili) non inventa un totale e le accosta con "+".
+function combineQtyTexts(qtaTexts){
+  const texts = [...new Set(qtaTexts.filter(Boolean).map(t=>t.trim()))];
+  if(texts.length <= 1) return texts[0] || '';
+  const parsed = texts.map(t => ({ text: t, val: parseQtyValue(t) }));
+  if(parsed.every(p => p.val)){
+    const sameUnit = parsed.every(p => (p.val.unit||'') === (parsed[0].val.unit||''));
+    if(sameUnit){
+      const total = parsed.reduce((s,p)=> s + p.val.value, 0);
+      const unit = parsed[0].val.unit;
+      const totalStr = Number.isInteger(total) ? String(total) : total.toFixed(1).replace('.', ',');
+      return unit ? `${totalStr} ${unit}` : totalStr;
+    }
+    const comparable = parsed.map(p => toComparableUnit(p.val.value, p.val.unit));
+    if(comparable.every(Boolean) && comparable.every(c => c.base === comparable[0].base)){
+      const totalBase = comparable.reduce((s,c)=> s + c.value, 0);
+      const isWeight = comparable[0].base === 'g';
+      if(totalBase >= 1000){
+        const kilos = totalBase / 1000;
+        const kiloStr = Number.isInteger(kilos) ? String(kilos) : kilos.toFixed(1).replace('.', ',');
+        return `${kiloStr} ${isWeight ? 'kg' : 'l'}`;
+      }
+      return `${Math.round(totalBase)} ${isWeight ? 'g' : 'ml'}`;
+    }
+  }
+  return texts.join(' + ');
+}
+
 // Stato di un ingrediente rispetto alla Dispensa: 'manca' se assente o a
 // quantità zero; 'poco' se in Dispensa ce n'è di meno di quanto richiesto
 // (solo quando entrambe le quantità sono in un'unità di peso/volume
@@ -2747,18 +2783,20 @@ function renderSpesa(){
       const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : classifyDept(it.ingrediente);
       return {...it, dept};
     });
-    // unisco articoli identici (stesso ingrediente + stessa quantità) comparsi in più ricette
+    // unisco articoli identici (stesso ingrediente) comparsi in più ricette,
+    // sommando le quantità invece di tenerne una sola (vedi combineQtyTexts)
     const merged = {};
     classified.forEach(it=>{
-      const mergeKey = (it.ingrediente||'').trim().toLowerCase() + '|' + (it.qta||'').trim().toLowerCase();
+      const mergeKey = (it.ingrediente||'').trim().toLowerCase();
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [it.contextShort] : [] };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [it.contextShort] : [] };
       } else {
+        merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
         if(it.isRecipe && !merged[mergeKey].contexts.includes(it.contextShort)) merged[mergeKey].contexts.push(it.contextShort);
       }
     });
-    const mergedList = Object.values(merged);
+    const mergedList = Object.values(merged).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
     displayTotal = mergedList.length;
     displayDone = mergedList.filter(it=>isItemChecked(it.keys, it.ingrediente)).length;
     displayDoneShoppable = mergedList.filter(it=> it.dept !== 'finiti' && isItemChecked(it.keys, it.ingrediente)).length;
@@ -2829,11 +2867,11 @@ function renderSpesa(){
       const dayItems = mainFlat.filter(it => it.context === context);
       const mergedDay = {};
       dayItems.forEach(it=>{
-        const mergeKey = (it.ingrediente||'').trim().toLowerCase() + '|' + (it.qta||'').trim().toLowerCase();
-        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qta: it.qta, note: it.note, dove: it.dove, keys: [it.key] };
-        else mergedDay[mergeKey].keys.push(it.key);
+        const mergeKey = (it.ingrediente||'').trim().toLowerCase();
+        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key] };
+        else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); }
       });
-      const mergedDayItems = Object.values(mergedDay);
+      const mergedDayItems = Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
       giornoMergedAll.push(...mergedDayItems);
       const rows = mergedDayItems.length
         ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.dove)).join('')
