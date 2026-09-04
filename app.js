@@ -2161,29 +2161,31 @@ function renderSwapScreen(weekIdx, i, meal){
     </div>` : '';
   return `
   <div class="meal-detail-screen">
-    <div class="meal-detail-header">
-      <div class="meal-detail-header-text">
-        <div class="meal-detail-kicker">${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)} · ${escapeHtml(MEAL_LABEL[meal].toLowerCase())} · tetto ${escapeHtml(tempoShortLabel(getTempoCap(i, meal)))}</div>
-        <div class="meal-detail-title">${escapeHtml(currentName) || 'Scegli una ricetta'}</div>
+    <div class="filters-modal">
+      <div class="meal-detail-header">
+        <div class="meal-detail-header-text">
+          <div class="meal-detail-kicker">${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)} · ${escapeHtml(MEAL_LABEL[meal].toLowerCase())} · tetto ${escapeHtml(tempoShortLabel(getTempoCap(i, meal)))}</div>
+          <div class="meal-detail-title">${escapeHtml(currentName) || 'Scegli una ricetta'}</div>
+        </div>
+        <button type="button" class="btn is-icon meal-detail-close" data-open-swap="${mk}" aria-label="Chiudi">✕</button>
       </div>
-      <button type="button" class="btn is-icon meal-detail-close" data-open-swap="${mk}" aria-label="Chiudi">✕</button>
-    </div>
-    <div class="meal-detail-body">
-      <div class="swap-panel">
-        ${suggestionsHtml}
-        <div class="filter-group-label">Oppure cerca</div>
-        <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${mk}" value="${escapeAttr(f.search)}">
-        <div class="swap-cat-chips">
-          ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${mk}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
-          <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${mk}">Tutte le categorie</button>
-        </div>
-        <div class="swap-results">
-          ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
-          ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
-        </div>
-        <div class="swap-panel-footer">
-          ${suggestions.length ? `<button type="button" class="btn is-outline" data-swap-more="${mk}">Un'altra proposta</button>` : ''}
-          <button type="button" class="btn is-ghost" data-open-swap="${mk}">Annulla</button>
+      <div class="meal-detail-body">
+        <div class="swap-panel">
+          ${suggestionsHtml}
+          <div class="filter-group-label">Oppure cerca</div>
+          <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${mk}" value="${escapeAttr(f.search)}">
+          <div class="swap-cat-chips">
+            ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${mk}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
+            <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${mk}">Tutte le categorie</button>
+          </div>
+          <div class="swap-results">
+            ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+            ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
+          </div>
+          <div class="swap-panel-footer">
+            ${suggestions.length ? `<button type="button" class="btn is-outline" data-swap-more="${mk}">Un'altra proposta</button>` : ''}
+            <button type="button" class="btn is-ghost" data-open-swap="${mk}">Annulla</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2203,18 +2205,20 @@ function renderLinkPickerScreen(weekIdx, i, meal){
     </div>`).join('');
   return `
   <div class="meal-detail-screen">
-    <div class="meal-detail-header">
-      <div class="meal-detail-header-text">
-        <div class="meal-detail-kicker">Segna come avanzata</div>
-        <div class="meal-detail-title">${escapeHtml(currentName)}</div>
+    <div class="filters-modal">
+      <div class="meal-detail-header">
+        <div class="meal-detail-header-text">
+          <div class="meal-detail-kicker">Segna come avanzata</div>
+          <div class="meal-detail-title">${escapeHtml(currentName)}</div>
+        </div>
+        <button type="button" class="btn is-icon meal-detail-close" data-open-link-picker="${mk}" aria-label="Chiudi">✕</button>
       </div>
-      <button type="button" class="btn is-icon meal-detail-close" data-open-link-picker="${mk}" aria-label="Chiudi">✕</button>
-    </div>
-    <div class="meal-detail-body">
-      <div class="swap-panel">
-        <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui lo mangerete:</p>
-        <div class="swap-results">
-          ${optionsHtml || '<div class="ing-empty">Nessun pasto successivo disponibile.</div>'}
+      <div class="meal-detail-body">
+        <div class="swap-panel">
+          <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui lo mangerete:</p>
+          <div class="swap-results">
+            ${optionsHtml || '<div class="ing-empty">Nessun pasto successivo disponibile.</div>'}
+          </div>
         </div>
       </div>
     </div>
@@ -2236,18 +2240,20 @@ function renderAvanzoDiPickerScreen(weekIdx, i, meal){
     </div>`).join('');
   return `
   <div class="meal-detail-screen">
-    <div class="meal-detail-header">
-      <div class="meal-detail-header-text">
-        <div class="meal-detail-kicker">È avanzo di…</div>
-        <div class="meal-detail-title">${escapeHtml(currentName) || 'Scegli una ricetta'}</div>
+    <div class="filters-modal">
+      <div class="meal-detail-header">
+        <div class="meal-detail-header-text">
+          <div class="meal-detail-kicker">È avanzo di…</div>
+          <div class="meal-detail-title">${escapeHtml(currentName) || 'Scegli una ricetta'}</div>
+        </div>
+        <button type="button" class="btn is-icon meal-detail-close" data-open-avanzodi-picker="${mk}" aria-label="Chiudi">✕</button>
       </div>
-      <button type="button" class="btn is-icon meal-detail-close" data-open-avanzodi-picker="${mk}" aria-label="Chiudi">✕</button>
-    </div>
-    <div class="meal-detail-body">
-      <div class="swap-panel">
-        <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui è stato cucinato:</p>
-        <div class="swap-results">
-          ${pastOptionsHtml || '<div class="ing-empty">Nessun pasto precedente disponibile.</div>'}
+      <div class="meal-detail-body">
+        <div class="swap-panel">
+          <p class="section-sub" style="margin:0 0 8px;">Scegli il pasto in cui è stato cucinato:</p>
+          <div class="swap-results">
+            ${pastOptionsHtml || '<div class="ing-empty">Nessun pasto precedente disponibile.</div>'}
+          </div>
         </div>
       </div>
     </div>
@@ -2274,19 +2280,21 @@ function renderContornoPickerScreen(weekIdx, i, meal){
     </div>`).join('');
   return `
   <div class="meal-detail-screen">
-    <div class="meal-detail-header">
-      <div class="meal-detail-header-text">
-        <div class="meal-detail-kicker">+ ricetta</div>
-        <div class="meal-detail-title">${escapeHtml(currentName)}</div>
+    <div class="filters-modal">
+      <div class="meal-detail-header">
+        <div class="meal-detail-header-text">
+          <div class="meal-detail-kicker">+ ricetta</div>
+          <div class="meal-detail-title">${escapeHtml(currentName)}</div>
+        </div>
+        <button type="button" class="btn is-icon meal-detail-close" data-open-contorno-picker="${mk}" aria-label="Chiudi">✕</button>
       </div>
-      <button type="button" class="btn is-icon meal-detail-close" data-open-contorno-picker="${mk}" aria-label="Chiudi">✕</button>
-    </div>
-    <div class="meal-detail-body">
-      <div class="swap-panel">
-        <input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-contorno-search="${mk}" value="${escapeAttr(cf.search)}">
-        <div class="swap-results">
-          ${cResultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
-          ${cResults.length > 40 ? `<div class="ing-empty">Altri ${cResults.length-40} risultati — affina la ricerca.</div>` : ''}
+      <div class="meal-detail-body">
+        <div class="swap-panel">
+          <input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-contorno-search="${mk}" value="${escapeAttr(cf.search)}">
+          <div class="swap-results">
+            ${cResultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+            ${cResults.length > 40 ? `<div class="ing-empty">Altri ${cResults.length-40} risultati — affina la ricerca.</div>` : ''}
+          </div>
         </div>
       </div>
     </div>
