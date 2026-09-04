@@ -28,7 +28,14 @@ const TIPO_ORDER = ['antipasto','primo','secondo','contorno','unico'];
 
 const MEAL_LABEL = { pranzo:'Pranzo', cena:'Cena' };
 
-const TEMPO_LABEL = { 'express':'⚡ Express — fino a 20 min', 'veloce':'🟢 Veloce — 20–30 min', 'normale':'🟡 Normale — 30–45 min', 'lunga':'🟠 Lunga — 45–90 min', 'progetto':'🔴 Progetto — oltre 90 min' };
+// Nomi delle 5 fasce di durata: usati ovunque (regole della settimana,
+// editor ricetta, filtri) per coerenza — vedi anche tempoShortLabel() più
+// sotto, che ne deriva la versione breve senza emoji per i punti dove non
+// c'è spazio (etichetta accanto al titolo settimana, righe eccezioni...).
+const TEMPO_LABEL = { 'express':'⚡ Sotto 20 min', 'veloce':'🟢 Circa 30 min', 'normale':'🟡 30–45 min', 'lunga':'🟠 1 h', 'progetto':'🔴 Oltre 1 h' };
+function tempoShortLabel(key){
+  return (TEMPO_LABEL[key] || '').replace(/^\S+\s*/, '').toLowerCase();
+}
 const TEMPO_ORDER = ['express','veloce','normale','lunga','progetto'];
 
 const PIAN_LABEL = { 'nessuna':'Nessuna', 'ammollo':'Ammollo', 'scongelamento':'Scongelamento', 'marinatura':'Marinatura', 'impasto-lievitazione':'Impasto / lievitazione', 'prep-anticipata':'Preparazione anticipata' };
@@ -595,10 +602,17 @@ const state = {
   pantryEditKey: null,
   mealsModelMigrated: false, // una tantum: passaggio da "una ricetta al giorno" a due pasti (pranzo/cena), ognuno {principale, contorni[]} — vedi il blocco di migrazione più sotto
   mealsModelMigrated2: false, // una tantum: "chi cucina" da per giorno a per pasto
+  tempoRulesMigrated: false, // una tantum: dayTempoCap (per giorno 0-6) -> weekTempoBase/weekTempoExceptions (base + eccezioni, pranzo/cena separati ven-dom)
   weekOverrides: {}, // {i: {pranzo:{principale,contorni[]}, cena:{principale,contorni[]}}}
   weekOverridePicked: {}, // {i: {pranzo:bool, cena:bool}}
   weekBaseline: null, // stessa forma di weekOverrides, riempita dal generatore
-  dayTempoCap: {0:'normale',1:'normale',2:'normale',3:'normale',4:'normale',5:'progetto',6:'progetto'}, // giorno (0=Lun..6=Dom) -> tempoBucket massimo consentito in pickWeekRecipes ('progetto' = nessun limite)
+  // Tetto di durata per la generazione: un solo valore di base per tutta la
+  // settimana (cena tutti i giorni, pranzo dove si genera — ven/sab/dom).
+  // "weekTempoExceptions" contiene solo i giorni/pasti che si scostano dalla
+  // base, chiave "i_meal" (es. "5_cena", "5_pranzo" — così ven/sab/dom
+  // possono avere un tetto diverso tra pranzo e cena dello stesso giorno).
+  weekTempoBase: 'normale',
+  weekTempoExceptions: {},
   userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "tocca a te cucinare" già chiuso per quel pasto
   mealsDoneReminderDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel pasto (senza segnarlo mangiato)
@@ -612,6 +626,9 @@ const state = {
   cooks: {}, // chiave "weekIdx_i" -> 'mara' | 'ste', chi cucina quel giorno (diventerà per pasto in uno stadio successivo, vedi piano)
   shopAssignees: {}, // reparto -> 'mara' | 'ste' | null, chi se ne occupa alla spesa
   linkPickerOpenDay: null,
+  undoToast: null, // { message, undoFn } | null — toast "Annulla" temporaneo, solo di sessione: undoFn è una funzione, quindi va tenuto FUORI dal payload di persist() (mai serializzato)
+  mealOverflowOpen: null, // mealKey del pasto per cui è aperto il foglio "⋯" (azioni rare)
+  tempoExceptionAdding: null, // null | 'pickingDay' | {day, meal} — stadio del flusso "+ aggiungi un'eccezione" nelle regole della settimana
   avanzoDiPickerOpenDay: null,
   contornoPickerOpenMeal: null, // ephemeral: mealKey del pasto per cui è aperto il pannello "+ contorno"
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
@@ -817,7 +834,9 @@ function persist(){
       dayLinkNotes: state.dayLinkNotes,
       dayPortions: state.dayPortions,
       mealLocked: state.mealLocked,
-      dayTempoCap: state.dayTempoCap,
+      weekTempoBase: state.weekTempoBase,
+      weekTempoExceptions: state.weekTempoExceptions,
+      tempoRulesMigrated: state.tempoRulesMigrated,
       userColors: state.userColors,
       notifDismissed: state.notifDismissed,
       mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
@@ -1179,13 +1198,17 @@ function currentSeasonKey(){
 // esplicita: sotto i 30 minuti nei feriali, progetto/congelabile nel weekend,
 // altrimenti una categoria diversa da quella di oggi. i è l'indice originale
 // del giorno (0=Lun...6=Dom): 5 e 6 (Sab/Dom) contano come weekend.
-function suggestSwaps(weekIdx, i){
+// exclude: nomi già proposti in questa sessione del pannello (vedi
+// f.suggestSeen in renderMealBlock) — "Un'altra proposta" li passa qui
+// invece di richiamare sempre le stesse 3, dato che l'ordinamento per
+// punteggio è deterministico.
+function suggestSwaps(weekIdx, i, exclude){
   const currentCat = effectiveCategoria(weekIdx, i);
   const inPlan = new Set();
   WEEK_DISPLAY_ORDER.forEach(di => { const n = effectiveRecipeName(weekIdx, di); if(n) inPlan.add(n); });
   const isWeekend = i === 5 || i === 6;
   const WEEKDAY_TEMPO = ['express','veloce','normale'];
-  const scored = allRecipeMetas().filter(r => !inPlan.has(r.nome)).map(r=>{
+  const scored = allRecipeMetas().filter(r => !inPlan.has(r.nome) && !(exclude && exclude.has(r.nome))).map(r=>{
     const isLong = r.tempoBucket === 'progetto' || r.tempoBucket === 'lunga';
     const isFreezable = r.freezerNew === 'congelabile' || r.freezerNew === 'base';
     let motivo;
@@ -1210,6 +1233,11 @@ function suggestSwaps(weekIdx, i){
 // bilanciamento categoria, che riguarda solo la varietà dei principali.
 // Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
 // (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
+// Tetto di durata effettivo per un giorno+pasto: l'eccezione se c'è,
+// altrimenti la base (cena per ogni giorno, pranzo solo ven/sab/dom).
+function getTempoCap(day, meal){
+  return state.weekTempoExceptions[`${day}_${meal}`] || state.weekTempoBase || 'progetto';
+}
 function pickWeekRecipes(){
   const season = currentSeasonKey();
   let pool = allRecipeMetas().filter(r => r.stagioni.includes(season) || r.stagioni.includes('tutto'));
@@ -1226,8 +1254,8 @@ function pickWeekRecipes(){
   const catCount = {};
   let prevCat = null;
 
-  function pickPrincipale(day){
-    const cap = state.dayTempoCap[day] || 'progetto';
+  function pickPrincipale(day, meal){
+    const cap = getTempoCap(day, meal);
     const capIdx = TEMPO_ORDER.indexOf(cap);
     // candidati non ancora usati, ordinati per preferenza: categoria diversa dal giorno prima
     // e categoria meno usata finora nella settimana
@@ -1254,8 +1282,8 @@ function pickWeekRecipes(){
     prevCat = chosen.categoriaNew;
     return chosen;
   }
-  function pickContorno(day){
-    const cap = state.dayTempoCap[day] || 'progetto';
+  function pickContorno(day, meal){
+    const cap = getTempoCap(day, meal);
     const capIdx = TEMPO_ORDER.indexOf(cap);
     let candidates = shuffled.filter(r => r.tipologia === 'contorno' && !usedNames.has(r.nome));
     if(capIdx < TEMPO_ORDER.length - 1){
@@ -1268,17 +1296,17 @@ function pickWeekRecipes(){
     usedNames.add(chosen.nome);
     return chosen;
   }
-  function pickMeal(day){
-    const principale = pickPrincipale(day);
-    const contorno = principale.tipologia === 'secondo' ? pickContorno(day) : null;
+  function pickMeal(day, meal){
+    const principale = pickPrincipale(day, meal);
+    const contorno = principale.tipologia === 'secondo' ? pickContorno(day, meal) : null;
     return { principale, contorni: contorno ? [contorno] : [] };
   }
 
   const days = [];
   for(let day = 0; day < 7; day++){
     days.push({
-      cena: pickMeal(day),
-      pranzo: (day === 4 || day === 5 || day === 6) ? pickMeal(day) : null
+      cena: pickMeal(day, 'cena'),
+      pranzo: (day === 4 || day === 5 || day === 6) ? pickMeal(day, 'pranzo') : null
     });
   }
   return days;
@@ -1439,7 +1467,31 @@ function render(){
   if(state.tab === 'spesa') panel.innerHTML = renderSpesa();
   if(state.tab === 'prep') panel.innerHTML = renderPrep();
   if(state.tab === 'dispensa') panel.innerHTML = renderDispensa();
+  panel.innerHTML += renderUndoToast();
   attachHandlers();
+}
+
+// Toast "Annulla" generico e temporaneo (es. dopo lo scollegamento di un
+// avanzo): mostra il messaggio, sparisce da solo dopo TOAST_MS, o subito se
+// si tocca "Annulla" (che richiama undoFn). Non è legato a una tab
+// specifica, quindi vive nel render() di livello pagina invece che dentro
+// renderMenu()/renderSpesa()/ecc — funziona indipendentemente da dove ti
+// trovi quando scatta.
+const TOAST_MS = 5000;
+let undoToastTimer = null;
+function showUndoToast(message, undoFn){
+  clearTimeout(undoToastTimer);
+  state.undoToast = { message, undoFn };
+  render();
+  undoToastTimer = setTimeout(()=>{ state.undoToast = null; render(); }, TOAST_MS);
+}
+function renderUndoToast(){
+  if(!state.undoToast) return '';
+  return `
+  <div class="undo-toast">
+    <span class="undo-toast-message">${escapeHtml(state.undoToast.message)}</span>
+    <button type="button" class="btn is-text undo-toast-btn" data-undo-toast>Annulla</button>
+  </div>`;
 }
 
 function editIngRowHtml(ingrediente, qta){
@@ -1609,7 +1661,13 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         <span class="swap-result-name">${escapeHtml(r.nome)}</span>
         <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
       </div>`).join('');
-    const suggestions = meal === 'cena' ? suggestSwaps(weekIdx, i) : [];
+    // "Un'altra proposta" chiede suggerimenti diversi da quelli già mostrati
+    // in questa sessione del pannello (f.suggestSeen, accumulato qui a ogni
+    // render — suggestSwaps stessa è deterministica, senza questo esclude
+    // cliccare "un'altra proposta" richiamerebbe sempre le stesse 3).
+    f.suggestSeen = f.suggestSeen || [];
+    const suggestions = meal === 'cena' ? suggestSwaps(weekIdx, i, new Set(f.suggestSeen)) : [];
+    suggestions.forEach(s => f.suggestSeen.push(s.r.nome));
     const suggestionsHtml = suggestions.length ? `
       <div class="swap-suggestions">
         <div class="filter-group-label">Suggeriti per questo giorno</div>
@@ -1619,8 +1677,13 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
             <span class="swap-suggestion-motivo">${escapeHtml(s.motivo)}</span>
           </button>`).join('')}
       </div>` : '';
+    const swapDate = formatShortDate(weekDatesFor(weekIdx)[WEEK_DISPLAY_ORDER.indexOf(parseInt(i,10))]);
     swapPanelHtml = `
     <div class="swap-panel">
+      <div class="swap-panel-header">
+        <span class="swap-panel-day">${escapeHtml(d.giorno)}</span>
+        <span class="swap-panel-meta">${escapeHtml(swapDate)} · ${escapeHtml(MEAL_LABEL[meal].toLowerCase())} · tetto ${escapeHtml(tempoShortLabel(getTempoCap(i, meal)))}</span>
+      </div>
       ${suggestionsHtml}
       <div class="filter-group-label">Oppure cerca</div>
       <input type="search" class="swap-search" placeholder="Cerca ricetta…" data-swap-search="${mk}" value="${escapeAttr(f.search)}">
@@ -1631,6 +1694,10 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       <div class="swap-results">
         ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
         ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
+      </div>
+      <div class="swap-panel-footer">
+        ${suggestions.length ? `<button type="button" class="btn is-outline" data-swap-more="${mk}">Un'altra proposta</button>` : ''}
+        <button type="button" class="btn is-ghost" data-open-swap="${mk}">Annulla</button>
       </div>
     </div>`;
   }
@@ -1741,14 +1808,38 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       <div class="section-footer-row">
         <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${mk}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
         <button class="btn is-chip is-dashed" data-open-swap="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> Cambia</button>
-        <button class="btn is-chip is-dashed" data-open-link-picker="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Avanzata</button>
-        <button class="btn is-chip is-dashed" data-open-avanzodi-picker="${mk}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> È avanzo di</button>
-        <button type="button" class="btn is-icon meal-lock-btn${isLocked ? ' active' : ''}" data-toggle-lock="${mk}" aria-label="${isLocked ? 'Sblocca questo pasto' : 'Blocca questo pasto'}" title="${isLocked ? 'Bloccato: la rigenerazione della settimana non lo tocca' : 'Blocca: la rigenerazione della settimana non lo toccherà'}">${isLocked
-          ? '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" width="1.125em" height="1.125em"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></g></svg>'
-          : '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" width="1.125em" height="1.125em"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="18" height="11" x="3" y="11"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></g></svg>'}</button>
+        <button type="button" class="btn is-icon meal-overflow-btn" data-open-meal-overflow="${mk}" aria-label="Altre azioni">⋯</button>
         </div>
     </div>` : '';
+    // Le azioni rare (È avanzo di, Torna all'originale, Segna come avanzata,
+    // Blocca) vivono nel foglio "⋯" invece che come bottoni sempre visibili
+    // in riga: stesso stato/handler di sempre (data-open-link-picker ecc. già
+    // agganciati altrove), qui li chiudo esplicitamente dopo l'azione perché
+    // il foglio ha il suo stopPropagation come gli altri modali (vedi
+    // data-stop-close) e non si chiuderebbe da solo col bubbling.
+    let overflowModalHtml = '';
+    if(name && state.mealOverflowOpen === mk){
+      const overflowItems = [
+        { label:'È avanzo di…', note:'Collega questo pasto a una cena passata: gli ingredienti non tornano in spesa.', attr:`data-open-avanzodi-picker="${mk}"` },
+        hasOverride ? { label:'Torna alla ricetta originale', note:'Rimette la proposta di partenza del generatore.', attr:`data-reset-swap="${mk}"` } : null,
+        { label:'Segna come avanzata', note:'Scegli quale pasto futuro mangerà quello che resta.', attr:`data-open-link-picker="${mk}"` },
+        { label: isLocked ? 'Sblocca il pasto' : 'Blocca il pasto', note: isLocked ? 'Torna a essere toccato dalla rigenerazione della settimana.' : 'La rigenerazione della settimana non lo tocca più.', attr:`data-toggle-lock="${mk}"` }
+      ].filter(Boolean);
+      overflowModalHtml = `
+      <div class="filters-modal-backdrop" data-close-meal-overflow>
+        <div class="filters-modal" data-stop-close>
+          <div class="filters-modal-header">
+            <h3>${escapeHtml(name)}</h3>
+            <button class="btn is-icon filters-close-btn" data-close-meal-overflow>✕</button>
+          </div>
+          <div class="overflow-actions">
+            ${overflowItems.map(it=>`<button type="button" class="overflow-action" ${it.attr}><span class="overflow-action-label">${escapeHtml(it.label)}</span><span class="overflow-action-note">${escapeHtml(it.note)}</span></button>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    }
     swapControls = `${footerButtons}
+    ${overflowModalHtml}
     ${swapPanelHtml}
     ${linkPanelHtml}
     ${avanzoDiPanelHtml}`;
@@ -1788,15 +1879,15 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     }
   }
 
-  // Badge di stato accanto al tempo, ognuno tocca-per-annullare: "Cucinato"
-  // (ri-tocca per segnarlo di nuovo da fare), "Cambiato" (torna al pasto
-  // originale) e "Avanzo di GG" (scollega dal pasto sorgente). Non mutuamente
-  // esclusivi: un pasto può essere sia cambiato sia già segnato mangiato.
-  // "Bloccato" è sola lettura: l'annullo sta nel lucchetto nella riga
-  // bottoni, non si ripete il controllo qui.
+  // Badge di stato accanto al tempo. "Cucinato" non è più un badge
+  // chiudibile: si dice una volta sola nel titolo barrato (vedi .done .day-menu
+  // in CSS) più questa etichettina di conferma — l'annullo sta nel bottone
+  // "Cucinata"/"Da cucinare" della riga sotto, non si ripete qui. Lo stesso
+  // vale per "Cambiato": l'annullo ("Torna alla ricetta originale") si è
+  // spostato nel foglio "⋯". "Avanzo di GG" resta badge-con-✕ (scollega),
+  // e "Bloccato" è sola lettura (l'annullo sta nel lucchetto/nel foglio "⋯").
+  const doneTag = isDone ? `<span class="done-tag">✓ Cucinat${meal==='cena'?'a':'o'}</span>` : '';
   const statusBadges = `
-    ${isDone ? `<button type="button" class="status-badge status-done" data-toggle-done="${mk}">Cucinat${meal==='cena'?'a':'o'} <span class="status-badge-reset">✕</span></button>` : ''}
-    ${hasOverride ? `<button type="button" class="status-badge status-changed" data-reset-swap="${mk}">Cambiat${meal==='cena'?'a':'o'} <span class="status-badge-reset">✕</span></button>` : ''}
     ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
     ${isLocked ? `<span class="status-badge status-locked">Bloccat${meal==='cena'?'a':'o'}</span>` : ''}
   `;
@@ -1820,12 +1911,12 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     ${name ? `
     <div class="day-menu-row">
       <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(name)}</span>
-      <button type="button" class="drag-handle" data-drag-handle aria-label="Trascina per scambiare con un altro giorno">⠿</button>
     </div>` : `
     <button type="button" class="day-menu-row day-menu-empty" data-open-swap="${mk}">Scegli una ricetta</button>`}
     ${contorniHtml}
     <div class="recipe-info">
       <span class="day-time">${escapeHtml(timeDisplay)}</span>
+      ${doneTag}
       ${statusBadges}
     </div>
     ${swapControls}
@@ -2009,8 +2100,11 @@ function renderProfilePanel(){
     </div>`;
 }
 
+// Etichetta leggibile invece dell'ingranaggio: "regole: circa 30 min",
+// stesso trigger di sempre (apre genSettingsModal) ma si legge da sola
+// invece di essere un'icona senza testo.
 function genSettingsButton(target){
-  return `<button class="btn is-icon" type="button" data-open-gen-settings="${target}" aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
+  return `<button class="btn is-text week-rules-link" type="button" data-open-gen-settings="${target}">regole: ${escapeHtml(tempoShortLabel(state.weekTempoBase))}</button>`;
 }
 function genSettingsButtonAccent(target){
   return `<button class="btn is-double is-right is-accent" type="button" data-open-gen-settings="${target}" aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
@@ -2176,43 +2270,93 @@ function renderMenu(){
   }
 
   const genSettingsTargetWeek = typeof state.genSettingsOpen === 'number' ? state.genSettingsOpen : null;
-  const genSettingsModal = state.genSettingsOpen !== null ? `
+  const genSettingsModal = state.genSettingsOpen !== null ? (()=>{
+    // Righe eccezione esistenti, ordinate per giorno poi pranzo/cena.
+    const excKeys = Object.keys(state.weekTempoExceptions).sort((a,b)=>{
+      const [da, ma] = a.split('_'), [db, mb] = b.split('_');
+      return (parseInt(da,10) - parseInt(db,10)) || ma.localeCompare(mb);
+    });
+    const excRowsHtml = excKeys.map(key=>{
+      const [dayStr, exMeal] = key.split('_');
+      const day = parseInt(dayStr, 10);
+      const dayLabel = DATA.week1[day].giorno.slice(0,3).toUpperCase() + (exMeal === 'pranzo' ? ' pranzo' : '');
+      return `
+      <div class="tempo-exception-row">
+        <span class="tempo-exception-day">${escapeHtml(dayLabel)}</span>
+        <span class="tempo-exception-value">${escapeHtml(tempoShortLabel(state.weekTempoExceptions[key]))}</span>
+        <button type="button" class="btn is-icon" data-remove-tempo-exception="${key}" aria-label="Togli eccezione">✕</button>
+      </div>`;
+    }).join('');
+    // Giorni/pasti ancora disponibili per una nuova eccezione: cena per ogni
+    // giorno che non ne ha già una, pranzo solo ven/sab/dom (indici 4,5,6 —
+    // gli unici pranzi generati, lun-gio è avanzo automatico).
+    const excOptions = [];
+    for(let d = 0; d < 7; d++){
+      if(!state.weekTempoExceptions[`${d}_cena`]) excOptions.push({ day:d, meal:'cena', label: DATA.week1[d].giorno.slice(0,3).toUpperCase() });
+      if((d===4||d===5||d===6) && !state.weekTempoExceptions[`${d}_pranzo`]) excOptions.push({ day:d, meal:'pranzo', label: DATA.week1[d].giorno.slice(0,3).toUpperCase()+' pranzo' });
+    }
+    let excPickerHtml = '';
+    if(state.tempoExceptionAdding === 'pickingDay'){
+      excPickerHtml = `
+      <div class="tempo-exception-picker">
+        ${excOptions.length ? excOptions.map(o=>`<button type="button" class="btn is-chip" data-pick-tempo-exception-day="${o.day}" data-pick-tempo-exception-meal="${o.meal}">${escapeHtml(o.label)}</button>`).join('') : '<div class="ing-empty">Nessun altro giorno disponibile.</div>'}
+      </div>`;
+    } else if(state.tempoExceptionAdding && typeof state.tempoExceptionAdding === 'object'){
+      const { day: exDay, meal: exMealPicking } = state.tempoExceptionAdding;
+      excPickerHtml = `
+      <div class="tempo-exception-picker">
+        ${TEMPO_ORDER.map(t=>`<button type="button" class="btn is-chip" data-set-tempo-exception-value="${t}">${escapeHtml(tempoShortLabel(t))}</button>`).join('')}
+      </div>`;
+    }
+    // Solo indicativo per la settimana bersaglio: quanti pasti la
+    // rigenerazione toccherebbe davvero e quanti bloccati vengono conservati
+    // (vedi generateWeek). Lun-gio pranzo non è mai generato (è avanzo).
+    let regenNote = '';
+    let regenCount = 0;
+    if(genSettingsTargetWeek !== null){
+      let lockedCount = 0, totalMeals = 0;
+      for(let d = 0; d < 7; d++){
+        ['pranzo','cena'].forEach(m=>{
+          if(m === 'pranzo' && !(d===4||d===5||d===6)) return;
+          totalMeals++;
+          if(state.mealLocked[`${genSettingsTargetWeek}_${d}_${m}`]) lockedCount++;
+        });
+      }
+      regenCount = totalMeals - lockedCount;
+      regenNote = lockedCount > 0 ? `Rigenerare sostituisce <b>${regenCount} pasti</b> e conserva i <b>${lockedCount} bloccati</b>.` : '';
+    }
+    return `
     <div class="filters-modal-backdrop" data-close-gen-settings>
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
-          <h3>Impostazioni generazione</h3>
+          <h3>Regole di generazione</h3>
           <button class="btn is-icon filters-close-btn" data-close-gen-settings>✕</button>
         </div>
         <div class="filter-groups">
           <div class="filter-group">
-            <div class="filter-group-label">Durata massima ricette per giorno</div>
-            <div class="tempo-cap-list">
-              ${DATA.week1.map((d,idx)=>{
-                const cap = state.dayTempoCap[idx] || 'progetto';
-                const capIdx = TEMPO_ORDER.indexOf(cap);
-                const dots = TEMPO_ORDER.map((t,i)=>`<button type="button" class="tempo-cap-dot${i<=capIdx?' active':''}" data-tempo-cap-day="${idx}" data-tempo-cap-level="${t}" aria-label="${escapeAttr(TEMPO_LABEL[t])}">${TEMPO_LABEL[t].split(' ')[0]}</button>`).join('');
-                return `<div class="tempo-cap-row">
-                  <span class="tempo-cap-day-label">${escapeHtml(d.giorno.slice(0,3))}</span>
-                  <span class="tempo-cap-dots">${dots}</span>
-                </div>`;
-              }).join('')}
+            <div class="filter-group-label">Tempo massimo, tutti i giorni</div>
+            <div class="tempo-base-list">
+              ${TEMPO_ORDER.map(t=>`<button type="button" class="tempo-base-row${state.weekTempoBase===t?' active':''}" data-set-tempo-base="${t}"><span>${escapeHtml(tempoShortLabel(t))}</span>${state.weekTempoBase===t?'<span class="tempo-base-check">✓</span>':''}</button>`).join('')}
             </div>
-            <p class="section-sub" style="margin:0.5rem 0 0;">Tocca fino a dove vuoi arrivare: quel giorno la generazione sceglierà solo ricette entro quella durata.</p>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Eccezioni</div>
+            ${excRowsHtml || '<p class="section-sub" style="margin:0;">Nessuna: tutti i giorni seguono il valore di base.</p>'}
+            <button type="button" class="btn is-text" data-toggle-tempo-exception-picker style="margin-top:0.5rem;">+ aggiungi un'eccezione</button>
+            ${excPickerHtml}
           </div>
         </div>
         ${genSettingsTargetWeek !== null ? `
         <p class="generate-week-hint">${genSettingsTargetWeek === 0 ? "Sceglie 7 ricette di stagione, variando le categorie giorno per giorno." : ''}</p>
-        
+        ${regenNote ? `<p class="section-sub" style="margin:0 0 0.75rem;">${regenNote}</p>` : ''}
         <div class="filters-modal-footer">
-          <button class="btn is-outline" data-generate-week="${genSettingsTargetWeek}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg> ${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : 'Rigenera settimana'}</button>
-        
-        ${genSettingsTargetWeek > 0 ? `
-          <button class="btn is-outline color-delete" data-remove-week="${genSettingsTargetWeek}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina settimana</button>
-        ` : ''}` : ''}
-         </div>
+          <button class="btn is-solid mini-add-btn" data-generate-week="${genSettingsTargetWeek}">${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : (regenCount ? `Rigenera ${regenCount} pasti` : 'Rigenera settimana')}</button>
+        </div>
+        ${genSettingsTargetWeek > 0 ? `<div style="text-align:center;margin-top:0.75rem;"><button type="button" class="btn is-text color-delete" data-remove-week="${genSettingsTargetWeek}">Elimina questa settimana</button></div>` : ''}` : ''}
       </div>
-    </div>` : '';
-/* 
+    </div>`;
+  })() : '';
+/*
         <div class="filters-modal-footer">
           <button class="btn is-solid mini-add-btn" data-close-gen-settings>Fatto</button>
         </div> */
@@ -3347,6 +3491,7 @@ function attachHandlers(){
       state.avanzoDiPickerOpenDay = null;
       state.swapOpenDay = null;
       state.contornoPickerOpenMeal = null;
+      state.mealOverflowOpen = null;
       render();
     });
   });
@@ -3357,6 +3502,7 @@ function attachHandlers(){
       state.linkPickerOpenDay = null;
       state.swapOpenDay = null;
       state.contornoPickerOpenMeal = null;
+      state.mealOverflowOpen = null;
       render();
     });
   });
@@ -3414,8 +3560,18 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-unlink-day]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      clearDayLink(e.currentTarget.dataset.unlinkDay);
+      const key = e.currentTarget.dataset.unlinkDay;
+      const prevLink = state.dayLinks[key];
+      const prevNote = state.dayLinkNotes[key];
+      const prevPortions = state.dayPortions[key];
+      clearDayLink(key);
       persist(); render();
+      showUndoToast('Pasto scollegato dall\'avanzo', ()=>{
+        if(prevLink !== undefined) state.dayLinks[key] = prevLink;
+        if(prevNote !== undefined) state.dayLinkNotes[key] = prevNote;
+        if(prevPortions !== undefined) state.dayPortions[key] = prevPortions;
+        persist(); render();
+      });
     });
   });
   document.querySelectorAll('[data-link-note-show]').forEach(el=>{
@@ -3437,8 +3593,41 @@ function attachHandlers(){
     inp.addEventListener('blur', commit);
     inp.addEventListener('keydown', e=>{ if(e.key === 'Enter') e.target.blur(); });
   });
-  document.querySelectorAll('[data-drag-handle]').forEach(handle=>{
-    handle.addEventListener('pointerdown', startDayDrag);
+  // Trascinamento a pressione lunga invece della maniglia dedicata (rimossa):
+  // stessa soglia/logica del "tieni premuto per selezionare" di Dispensa
+  // (500ms, annullato se il dito si sposta troppo prima di scattare). Esclude
+  // bottoni/input/link dal punto di partenza, così non ruba il tocco a "Cambia",
+  // al lucchetto, alle chip contorni ecc. — solo il resto della card (nome
+  // ricetta compreso) può avviare un trascinamento.
+  document.querySelectorAll('.meal-block').forEach(block=>{
+    let pressTimer = null;
+    let longPressed = false;
+    let startX = 0, startY = 0;
+    block.addEventListener('pointerdown', e=>{
+      if(e.target.closest('button, input, a')) return;
+      longPressed = false;
+      startX = e.clientX; startY = e.clientY;
+      const pointerId = e.pointerId;
+      pressTimer = setTimeout(()=>{
+        longPressed = true;
+        startDayDrag(block, e.clientX, e.clientY, pointerId);
+      }, 500);
+    });
+    const cancelPress = ()=>{ clearTimeout(pressTimer); pressTimer = null; };
+    block.addEventListener('pointerup', cancelPress);
+    block.addEventListener('pointerleave', cancelPress);
+    block.addEventListener('pointercancel', cancelPress);
+    block.addEventListener('pointermove', e=>{
+      if(!pressTimer) return;
+      if(Math.hypot(e.clientX - startX, e.clientY - startY) > 10) cancelPress();
+    });
+    // Il tap che ha fatto scattare il trascinamento non deve anche aprire il
+    // dettaglio a tutto schermo: intercetta il click in fase di cattura,
+    // prima che arrivi allo span data-toggle-day (stesso schema del
+    // long-press di Dispensa).
+    block.addEventListener('click', e=>{
+      if(longPressed){ longPressed = false; e.stopPropagation(); }
+    }, true);
   });
   document.querySelectorAll('[data-toggle-cook]').forEach(btn=>{
     btn.addEventListener('click', e=>{ toggleCook(e.currentTarget.dataset.toggleCook); });
@@ -3512,6 +3701,7 @@ function attachHandlers(){
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
       state.genSettingsOpen = null;
+      state.tempoExceptionAdding = null;
       render();
     });
   });
@@ -3527,11 +3717,39 @@ function attachHandlers(){
       persist(); render();
     });
   });
-  document.querySelectorAll('[data-tempo-cap-day]').forEach(btn=>{
+  document.querySelectorAll('[data-set-tempo-base]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const day = parseInt(e.currentTarget.dataset.tempoCapDay, 10);
-      const level = e.currentTarget.dataset.tempoCapLevel;
-      state.dayTempoCap[day] = level;
+      state.weekTempoBase = e.currentTarget.dataset.setTempoBase;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-toggle-tempo-exception-picker]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.tempoExceptionAdding = state.tempoExceptionAdding ? null : 'pickingDay';
+      render();
+    });
+  });
+  document.querySelectorAll('[data-pick-tempo-exception-day]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const day = parseInt(e.currentTarget.dataset.pickTempoExceptionDay, 10);
+      const meal = e.currentTarget.dataset.pickTempoExceptionMeal;
+      state.tempoExceptionAdding = { day, meal };
+      render();
+    });
+  });
+  document.querySelectorAll('[data-set-tempo-exception-value]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const adding = state.tempoExceptionAdding;
+      if(adding && typeof adding === 'object'){
+        state.weekTempoExceptions[`${adding.day}_${adding.meal}`] = e.currentTarget.dataset.setTempoExceptionValue;
+      }
+      state.tempoExceptionAdding = null;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-remove-tempo-exception]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      delete state.weekTempoExceptions[e.currentTarget.dataset.removeTempoException];
       persist(); render();
     });
   });
@@ -3546,8 +3764,15 @@ function attachHandlers(){
       clearDayLink(key);
       unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
+      state.mealOverflowOpen = null;
       persist(); render();
     });
+  });
+  document.querySelectorAll('[data-swap-more]').forEach(btn=>{
+    // f.suggestSeen è già stato aggiornato con i 3 suggerimenti appena
+    // mostrati durante QUESTO render (vedi swapPanelHtml): basta un nuovo
+    // render, i prossimi suggeriti li esclude da soli.
+    btn.addEventListener('click', ()=>{ render(); });
   });
   document.querySelectorAll('[data-swap-cat]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -3620,7 +3845,29 @@ function attachHandlers(){
       const key = e.currentTarget.dataset.toggleLock;
       if(state.mealLocked[key]) delete state.mealLocked[key];
       else state.mealLocked[key] = true;
+      state.mealOverflowOpen = null;
       persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-open-meal-overflow]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.mealOverflowOpen = e.currentTarget.dataset.openMealOverflow;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-close-meal-overflow]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.mealOverflowOpen = null;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-undo-toast]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      clearTimeout(undoToastTimer);
+      const fn = state.undoToast && state.undoToast.undoFn;
+      state.undoToast = null;
+      if(fn) fn();
     });
   });
   document.querySelectorAll('[data-close-done-modal]').forEach(el=>{
@@ -4379,20 +4626,21 @@ function goToTab(delta){
 // sola volta, mentre il pointerdown sull'handle viene ri-agganciato a ogni render
 // (l'elemento viene ricreato ogni volta) da attachHandlers.
 let dragState = null;
-function startDayDrag(e){
-  e.preventDefault();
-  const card = e.currentTarget.closest('.meal-block');
-  if(!card) return;
+// card è già il .meal-block (niente più maniglia dedicata da cui risalire
+// con .closest): chiamata dal timer di pressione lunga in attachHandlers(),
+// non più direttamente da un handler pointerdown, quindi prende le
+// coordinate/il pointerId espliciti invece di leggerli da un evento.
+function startDayDrag(card, clientX, clientY, pointerId){
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
   const recipeEl = card.querySelector('.day-menu');
   ghost.textContent = recipeEl ? recipeEl.textContent : '';
   document.body.appendChild(ghost);
-  positionGhost(ghost, e.clientX, e.clientY);
+  positionGhost(ghost, clientX, clientY);
   card.classList.add('dragging');
   dragState = { sourceWeekIdx: card.dataset.weekIdx, sourceIndex: card.dataset.dayIndex, sourceMeal: card.dataset.meal, sourceCard: card, ghost, lastTarget: null };
-  e.currentTarget.setPointerCapture(e.pointerId);
-  lastPointerY = e.clientY;
+  try{ card.setPointerCapture(pointerId); }catch(err){ /* pointer già rilasciato: il drag prosegue comunque via i listener su document */ }
+  lastPointerY = clientY;
   if(!autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
 }
 function positionGhost(ghost, x, y){
@@ -4678,6 +4926,33 @@ document.addEventListener('click', e=>{
     });
     state.cooks = renamedCooks;
     state.mealsModelMigrated2 = true;
+    persist();
+  }
+  // Una tantum: il vecchio dayTempoCap (un valore per giorno 0-6, condiviso
+  // da cena e — per ven/sab/dom — anche dal pranzo) diventa una base sola
+  // per tutta la settimana, con eccezioni solo dove un giorno si scostava
+  // dal valore più comune. Il pranzo ven-sab-dom condivideva lo stesso
+  // valore della cena dello stesso giorno: se quel giorno aveva
+  // un'eccezione sulla cena, la eredita identica anche sul pranzo.
+  if(!state.tempoRulesMigrated){
+    const old = state.dayTempoCap || {};
+    function mostCommon(vals){
+      const counts = {};
+      vals.forEach(v=>{ if(v) counts[v] = (counts[v]||0) + 1; });
+      let best = 'normale', bestCount = -1;
+      Object.entries(counts).forEach(([k,c])=>{ if(c > bestCount){ best = k; bestCount = c; } });
+      return best;
+    }
+    const base = mostCommon([0,1,2,3,4,5,6].map(d=>old[d]));
+    state.weekTempoBase = base;
+    state.weekTempoExceptions = {};
+    [0,1,2,3,4,5,6].forEach(d=>{
+      if(old[d] && old[d] !== base) state.weekTempoExceptions[`${d}_cena`] = old[d];
+    });
+    [4,5,6].forEach(d=>{
+      if(state.weekTempoExceptions[`${d}_cena`]) state.weekTempoExceptions[`${d}_pranzo`] = state.weekTempoExceptions[`${d}_cena`];
+    });
+    state.tempoRulesMigrated = true;
     persist();
   }
   // Apriva in automatico la cena di oggi al caricamento, ma con una chiave
