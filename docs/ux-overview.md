@@ -138,9 +138,12 @@ propria sezione.
 - Contatore "N / M presi", bottone "Espandi tutto"/"Comprimi tutto" (agisce
   su tutte le sezioni della vista corrente in un colpo) e "Svuota spunte"
   (deseleziona tutto, non fa ricomparire ciò che avevi eliminato).
-- **Riga ingrediente**: checkbox "preso", nome + quantità/nota, stepper
-  quantità (tap sul numero per editarlo a mano), cestino per eliminarlo
-  dalla lista.
+- **Riga ingrediente**: checkbox "preso", nome + quantità/nota della
+  ricetta, stepper quantità (tap sul numero per editarlo a mano), cestino
+  per eliminarlo dalla lista. Sotto, una **nota personale legata al nome
+  dell'ingrediente** ("+ nota" se assente, testo tocca-per-modificare se
+  presente): la stessa nota compare su ogni occorrenza di quell'ingrediente,
+  in qualunque pasto o settimana, e resta salvata finché non la cambi.
 - Sezione **Finiti**: ingredienti a scorta 0 in Dispensa, popolata da sola.
   Selezionando una o più righe compaiono "Elimina" e "Segna da comprare"
   (quest'ultimo li fa uscire da qui e li mescola nel loro reparto vero,

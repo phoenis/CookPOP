@@ -441,6 +441,10 @@
   .item-name{ font-weight:var(--weight-medium); font-size:var(--text-small); }
   .partial-mark{ color:var(--steel); font-size:0.7em; margin-left:0.3em; vertical-align:middle; }
   .item-detail{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); margin-top:0.0625rem; }
+  .ing-note-row{ display:block; margin-top:0.0625rem; }
+  .ing-note-text{ font-size:var(--text-xsmall); color:var(--gold-dark); font-style:italic; cursor:pointer; }
+  .ing-note-add{ font-size:var(--text-xsmall); color:var(--ink-light); opacity:0.7; padding:0; }
+  .ing-note-input{ width:100%; max-width:16rem; font-family:var(--font-family); font-size:var(--text-xsmall); padding:0.125rem 0.25rem; border-radius:0; border:1px solid var(--gold); background:var(--surface); }
   .shop-progress{ font-family:var(--font-family); font-size:var(--text-xsmall); color:var(--gold-dark); margin-bottom:var(--space-small); }
   .missing-ing-banner{ font-size:var(--text-xsmall); line-height:1.5; background:var(--amber); border:1px solid var(--steel); border-radius:0; padding:var(--space-xsmall) var(--space-small); margin-bottom:0.875rem; }
   /* Segmentato: un'unica pillola bordata, non due schede sottolineate — si

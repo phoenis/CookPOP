@@ -676,6 +676,8 @@ const state = {
   contornoPickerOpenMeal: null, // ephemeral: mealKey del pasto per cui è aperto il pannello "+ contorno"
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
+  ingredientNotes: {}, // nome ingrediente (minuscolo) -> nota libera, mostrata su ogni occorrenza in Spesa qualunque sia il pasto/settimana
+  ingNoteEditingKey: null, // ephemeral: nome ingrediente la cui nota è in modifica
   recipeEdits: {},
   recipeEditName: null,
   customRecipes: {}, // nome -> {nome}: ricette create a mano, non presenti nel catalogo DATA.recipes
@@ -843,6 +845,7 @@ async function loadState(){
         if(saved.pantryItems) saved.pantryItems = decodeKeysFromFirebase(saved.pantryItems);
         if(saved.freezerItems) saved.freezerItems = decodeKeysFromFirebase(saved.freezerItems);
         if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
+        if(saved.ingredientNotes) saved.ingredientNotes = decodeKeysFromFirebase(saved.ingredientNotes);
         if(saved.recipeEdits) saved.recipeEdits = decodeKeysFromFirebase(saved.recipeEdits);
         if(saved.customRecipes) saved.customRecipes = decodeKeysFromFirebase(saved.customRecipes);
         if(saved.hiddenRecipes) saved.hiddenRecipes = decodeKeysFromFirebase(saved.hiddenRecipes);
@@ -853,6 +856,7 @@ async function loadState(){
         if(saved.pantryItems) state.pantryItems = saved.pantryItems;
         if(saved.freezerItems) state.freezerItems = saved.freezerItems;
         if(saved.ingredientRenames) state.ingredientRenames = saved.ingredientRenames;
+        if(saved.ingredientNotes) state.ingredientNotes = saved.ingredientNotes;
         if(saved.recipeEdits) state.recipeEdits = saved.recipeEdits;
         if(saved.customRecipes) state.customRecipes = saved.customRecipes;
         if(saved.hiddenRecipes) state.hiddenRecipes = saved.hiddenRecipes;
@@ -918,6 +922,7 @@ async function runPersist(){
       mealsDone: state.mealsDone,
       recipeIngredients: state.recipeIngredients,
       ingredientRenames: state.ingredientRenames,
+      ingredientNotes: state.ingredientNotes,
       recipeEdits: state.recipeEdits,
       customRecipes: state.customRecipes,
       hiddenRecipes: state.hiddenRecipes,
@@ -944,6 +949,7 @@ async function runPersist(){
           recipeIngredients: encodeKeysForFirebase(payload.recipeIngredients),
           pantryItems: encodeKeysForFirebase(payload.pantryItems),
           ingredientRenames: encodeKeysForFirebase(payload.ingredientRenames),
+          ingredientNotes: encodeKeysForFirebase(payload.ingredientNotes),
           recipeEdits: encodeKeysForFirebase(payload.recipeEdits),
           customRecipes: encodeKeysForFirebase(payload.customRecipes),
           hiddenRecipes: encodeKeysForFirebase(payload.hiddenRecipes)
@@ -2846,6 +2852,15 @@ function renderSpesa(){
     // mentre in realtà è parziale (es. il sale servito solo per alcune ricette).
     const checkedCount = keys.filter(k=>state.shopChecked[k]===true).length;
     const isPartial = keys.length > 1 && checkedCount > 0 && checkedCount < keys.length;
+    // Nota personale legata al nome dell'ingrediente (non al pasto/occorrenza):
+    // stessa nota su ogni riga in cui compare, persiste da una settimana
+    // all'altra — stesso schema tocca-per-modificare della "Variante" avanzo.
+    const ingNoteKey = (ingrediente||'').trim().toLowerCase();
+    const ingNote = state.ingredientNotes[ingNoteKey] || '';
+    const editingIngNote = state.ingNoteEditingKey === ingNoteKey;
+    const ingNoteHtml = editingIngNote
+      ? `<span class="ing-note-row"><input type="text" class="ing-note-input" placeholder="Nota per questo ingrediente…" value="${escapeAttr(ingNote)}" data-ing-note="${escapeAttr(ingNoteKey)}"></span>`
+      : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">📝 ${escapeHtml(ingNote)}</span>` : `<button type="button" class="btn is-text ing-note-add" data-ing-note-show="${escapeAttr(ingNoteKey)}">+ nota</button>`}</span>`;
     return `
     <div class="shop-item-row">
       <label class="shop-item ${checked?'checked':''}">
@@ -2853,6 +2868,7 @@ function renderSpesa(){
         <span>
           <span class="item-name">${escapeHtml(ingrediente)}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}</span>
           ${(subtitle || note) ? `<span class="item-detail">${escapeHtml(subtitle||'')}${subtitle && note ? ' · ' : ''}${escapeHtml(note||'')}</span>` : ''}
+          ${ingNoteHtml}
         </span>
       </label>
       <span class="qty-stepper" title="Quantità da prendere">
@@ -3668,10 +3684,35 @@ function attachHandlers(){
     shopQtyEditInput.addEventListener('blur', commitShopQtyEdit);
     shopQtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') shopQtyEditInput.blur(); });
   }
+  // Nota persistente per ingrediente (vedi ingredientNotes): il tasto/testo
+  // vive dentro il <label> della riga, quindi senza preventDefault il click
+  // spunterebbe anche la checkbox (comportamento nativo di label+input).
+  document.querySelectorAll('[data-ing-note-show]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.preventDefault();
+      state.ingNoteEditingKey = e.currentTarget.dataset.ingNoteShow;
+      render();
+    });
+  });
+  const ingNoteInput = document.querySelector('[data-ing-note]');
+  if(ingNoteInput){
+    ingNoteInput.addEventListener('click', e=> e.preventDefault());
+    ingNoteInput.focus();
+    ingNoteInput.select();
+    const commitIngNote = ()=>{
+      const key = ingNoteInput.dataset.ingNote;
+      const val = ingNoteInput.value.trim();
+      if(val) state.ingredientNotes[key] = val; else delete state.ingredientNotes[key];
+      state.ingNoteEditingKey = null;
+      persist(); render();
+    };
+    ingNoteInput.addEventListener('blur', commitIngNote);
+    ingNoteInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') ingNoteInput.blur(); });
+  }
   const deleteCheckedBtn = document.getElementById('delete-checked-shop');
   if(deleteCheckedBtn){
-    // Per quello che era già spuntato perché ce l'hai già (basilare o
-    // aggiornato a mano): esce dalla lista senza toccare la Dispensa.
+    // Per quello che era già spuntato perché ce l'hai già (in automatico
+    // dalla scorta, o a mano): esce dalla lista senza toccare la Dispensa.
     deleteCheckedBtn.addEventListener('click', ()=>{
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
         if(cb.closest('.finished-shop-group')) return;
