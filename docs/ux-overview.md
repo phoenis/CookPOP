@@ -109,10 +109,12 @@ propria sezione.
   pasto è un "avanzo", niente da scalare due volte); "Cambia" (apre un
   pannello inline con ricerca ricette + suggerimenti contestuali, per
   sostituire il principale di quel pasto); "È avanzata" (apre un pannello
-  con l'elenco dei pasti successivi, per collegare questo pasto come
-  sorgente di avanzi di un pasto futuro); "È avanzo di" (stesso pannello ma
-  con i pasti *precedenti*, per collegare un pasto già passato come
-  sorgente — utile quando il suo blocco non è più visibile).
+  con l'elenco dei pasti successivi — inclusi quelli ancora vuoti, mostrati
+  come "Vuoto", non solo quelli con una ricetta già scelta — per collegare
+  questo pasto come sorgente di avanzi di un pasto futuro); "È avanzo di"
+  (stesso pannello ma con i pasti *precedenti* già assegnati, per collegare
+  un pasto già passato come sorgente — utile quando il suo blocco non è più
+  visibile).
 - **Trascinare per scambiare**: ogni blocco pasto ha una maniglia (⠿) per
   trascinarlo su un altro blocco e scambiare le due ricette — solo tra pasti
   dello stesso tipo (pranzo con pranzo, cena con cena).

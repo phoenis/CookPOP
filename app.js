@@ -1195,25 +1195,27 @@ function allPlannedShoppingMeals(){
   state.extraWeeks.forEach((w,wi)=> pushWeek(wi+1));
   return meals;
 }
-// Tutti i PASTI pianificati (pranzo e cena, settimana corrente + eventuali
-// extra), nell'ordine di visualizzazione: usato dai picker "Avanzata"/"È
-// avanzo di" per elencare i pasti a cui agganciare un avanzo. A differenza di
-// allPlannedShoppingMeals() (usato da Spesa) NON salta i pasti già linkati
-// (restano scegliebili come sorgente/bersaglio) e non include i contorni.
-function allPlannedMeals(){
+// Tutti gli SLOT pasto (pranzo e cena, settimana corrente + eventuali extra),
+// nell'ordine di visualizzazione, inclusi quelli ancora vuoti (name: '') —
+// usato dal picker "Segna come avanzata" per poter scegliere come bersaglio
+// anche un pasto non ancora deciso, non solo sostituire una scelta già fatta.
+// A differenza di allPlannedShoppingMeals() (usato da Spesa) NON salta i
+// pasti già linkati (restano scegliebili come sorgente/bersaglio) e non
+// include i contorni. allPlannedMeals() sotto filtra via gli slot vuoti, per
+// tutto il resto (es. "È avanzo di", dove la sorgente deve per forza essere
+// un piatto vero già cucinato).
+function allMealSlots(){
   const meals = [];
   const pushWeek = (weekIdx) => {
     const dates = weekDatesFor(weekIdx);
     WEEK_DISPLAY_ORDER.forEach((i,pos)=>{
       ['pranzo','cena'].forEach(meal=>{
-        const name = effectiveRecipeName(weekIdx, i, meal);
-        if(!name) return;
         meals.push({
           key: mealKey(weekIdx, i, meal),
           weekIdx, i, meal,
           giorno: DATA.week1[i].giorno,
           dateLabel: formatShortDate(dates[pos]),
-          name
+          name: effectiveRecipeName(weekIdx, i, meal) || ''
         });
       });
     });
@@ -1221,6 +1223,9 @@ function allPlannedMeals(){
   pushWeek(0);
   state.extraWeeks.forEach((w,wi)=> pushWeek(wi+1));
   return meals;
+}
+function allPlannedMeals(){
+  return allMealSlots().filter(m => m.name);
 }
 // Prossimo pasto, a partire da oggi, in cui cucina "user": scorre la
 // settimana corrente (solo dal giorno di oggi in poi) e le settimane extra
@@ -2275,13 +2280,15 @@ function renderSwapScreen(weekIdx, i, meal){
 function renderLinkPickerScreen(weekIdx, i, meal){
   const mk = mealKey(weekIdx, i, meal);
   const currentName = effectiveRecipeName(weekIdx, i, meal);
-  const allMeals = allPlannedMeals();
+  // Include anche gli slot ancora vuoti: un avanzo si può assegnare a un
+  // pasto non ancora deciso, non solo sostituire una scelta già fatta.
+  const allMeals = allMealSlots();
   const selfPos = allMeals.findIndex(o => o.key === mk);
   const options = allMeals.filter((o, idx) => idx > selfPos);
   const optionsHtml = options.map(o=>`
     <div class="swap-result" data-link-pick="${o.key}" data-link-day="${mk}">
       <span class="swap-result-name">${escapeHtml(o.giorno)} ${escapeHtml(o.dateLabel)} · ${escapeHtml(MEAL_LABEL[o.meal])}</span>
-      <span class="swap-result-time">${escapeHtml(o.name)}</span>
+      <span class="swap-result-time">${o.name ? escapeHtml(o.name) : 'Vuoto'}</span>
     </div>`).join('');
   return `
   <div class="meal-detail-screen">
