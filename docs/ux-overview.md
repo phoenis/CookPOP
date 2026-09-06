@@ -185,9 +185,10 @@ propria sezione.
   ingredienti a scorta 0, mai cancellati automaticamente — restano lì
   pronti a essere riattivati quando li ricompri.
 - **Bottone "+" flottante**: apre la **modale "Aggiungi ingrediente"** di
-  Dispensa — nome, luogo, quantità/unità, flag "basilare" (se attivo,
-  l'ingrediente parte spuntato in Spesa quando ne hai scorta, senza dover
-  spuntarlo ogni settimana a mano).
+  Dispensa — nome, luogo, quantità/unità (niente selettore unità per gli
+  ingredienti "a spanne" come sale/pepe/spezie: per quelli conta solo se
+  ce n'è o no). Un ingrediente con scorta reale parte già spuntato in Spesa
+  in automatico, senza flag manuali da impostare.
 - Tap su un ingrediente esistente apre la **modale Modifica ingrediente**
   (nome, categoria, luogo, quantità, unità).
 

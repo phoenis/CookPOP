@@ -69,13 +69,24 @@ const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Fri
 const UNIT_ORDER = ['', 'g', 'kg', 'ml', 'l'];
 const UNIT_LABEL = { '':'pezzi/generico', g:'grammi (g)', kg:'chili (kg)', ml:'millilitri (ml)', l:'litri (l)' };
 
+// Ingredienti "a spanne": sale, pepe e spezie/erbe secche in genere — si sa se
+// ci sono o no, ma pesarli per confrontarli con quanto serve in ricetta non ha
+// senso pratico (non si mette la bilancia sotto il sale). Per questi niente
+// selettore unità in Dispensa: restano sempre a '' (pezzi/generico, solo
+// presenza/assenza). Non include olio/zucchero/aceto, che si comprano e
+// tracciano davvero a volume/peso.
+const SPANNE_KEYWORDS = ['sale','pepe','peperoncino','origano','rosmarino','timo','alloro','cannella','paprika','noce moscata'];
+function isSpanneIngredient(nome){
+  const s = (nome||'').trim().toLowerCase();
+  return SPANNE_KEYWORDS.some(kw => new RegExp(`\\b${kw}\\b`).test(s));
+}
+
 // Revisione unità di misura per gli ingredienti da dispensa veri (non i
 // freschi, comprati a vista) — solo quelli con un'unità in cui ha senso
 // confrontare la scorta con quanto serve in ricetta (vedi pantryStatusFor).
 // Concordata con l'utente; usata dalla migrazione "pantryUnitReviewed" più
 // sotto, che la applica solo dove l'unità non è già stata impostata a mano.
 const PANTRY_UNIT_BY_NAME = {
-  'sale':'kg', 'sale grosso':'kg',
   'farina':'g', 'farina 0':'g', 'farina 00':'g', 'farina di ceci':'g', 'farina di mais':'g', 'farina di mais per polenta':'g',
   'zucchero':'g',
   'pasta':'g', 'pasta corta':'g', 'pasta piccola':'g', 'pasta mista':'g', 'spaghetti':'g', 'rigatoni':'g',
@@ -121,15 +132,12 @@ const DEPT_RULES = [
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
 ];
-// "Di solito li hai già" = flag manuale sulla voce di Dispensa (impostato
-// all'aggiunta o dalla modifica), indipendente dalla categoria/reparto: prima
-// era dedotto dalla categoria "Utility", ma così un ingrediente restava legato
-// a un solo reparto anche quando l'abitudine di averlo in casa non c'entrava
-// nulla con dove si compra. Un ingrediente mai aggiunto a Dispensa non è
-// considerato basilare finché non lo si spunta la prima volta.
+// "Di solito li hai già" non è più un flag manuale: un ingrediente parte già
+// spuntato in Spesa quando in Dispensa ce n'è davvero scorta (vedi
+// hasPantryStock/isStapleConfirmed) — niente più bandierina indipendente da
+// aggiornare a mano, la quantità reale è l'unica fonte di verità.
 function isStaple(ingrediente){
-  const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
-  return !!(it && it.staple);
+  return hasPantryStock(ingrediente);
 }
 
 // Un nome ingrediente tipo "Scalogno o cipolla" o "Pasta corta (ditalini o
@@ -406,14 +414,13 @@ function renderContornoDetailBox(name, ratio){
 // automatico quando si spunta un articolo in Spesa. Quantità = un contatore
 // numerico (stepper +/- in UI); finché non è impostata (o è 0) la voce non
 // compare nell'elenco.
-function upsertPantryItem(nome, luogo, amount, staple, unit, cat, group){
+function upsertPantryItem(nome, luogo, amount, unit, cat, group){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
   const key = trimmedName.toLowerCase();
   const existing = state.pantryItems[key];
   const currentQty = (existing && typeof existing.qty === 'number') ? existing.qty : 0;
   const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
-  const isStapleFlag = staple !== undefined ? !!staple : !!(existing && existing.staple);
   const finalUnit = unit !== undefined ? unit : (existing && existing.unit) || '';
   const finalCat = cat !== undefined ? cat : (existing && existing.cat) || '';
   const finalGroup = group !== undefined ? group : (existing && existing.group) || '';
@@ -423,7 +430,6 @@ function upsertPantryItem(nome, luogo, amount, staple, unit, cat, group){
     qty: newQty,
     luogo: (existing && existing.luogo) || luogo || 'dispensa',
     ...(finalCat ? { cat: finalCat } : {}),
-    ...(isStapleFlag ? { staple: true } : {}),
     ...(finalUnit ? { unit: finalUnit } : {}),
     ...(finalGroup ? { group: finalGroup } : {})
   };
@@ -920,6 +926,8 @@ async function runPersist(){
       pantryQtyMigrated: state.pantryQtyMigrated,
       pantryUtilityLuogoMigrated: state.pantryUtilityLuogoMigrated,
       pantryUnitReviewed: state.pantryUnitReviewed,
+      pantryStapleMigrated: state.pantryStapleMigrated,
+      pantrySpanneUnitCleared: state.pantrySpanneUnitCleared,
       pantryGroupMigrated: state.pantryGroupMigrated,
       pantryGroupMigrated2: state.pantryGroupMigrated2,
       pantryGroups: state.pantryGroups
@@ -3308,14 +3316,6 @@ function renderPrep(){
   `;
 }
 
-// Stesso schema icona+testo del bottone "Cucinata/Da cucinare" in Menù,
-// riusato per il flag staple così i due toggle si comportano allo stesso modo.
-function stapleToggleInner(active){
-  return active
-    ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Di solito c\'è'
-    : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2"></path></svg> Non sempre in casa';
-}
-
 function renderDispensa(){
   // Un'unica lista per dispensa/ripostiglio/frigo/freezer, distinti solo
   // dall'icona del luogo (si cambia toccandola). Si riempie da sola quando
@@ -3433,15 +3433,13 @@ function renderDispensa(){
             <div class="filter-group-label">Quantità</div>
             <input type="number" min="0" step="${qtyStepFor(editItem.unit)}" id="pantry-edit-qty" value="${editItem.qty}">
           </div>
+          ${isSpanneIngredient(editItem.nome) ? '' : `
           <div class="filter-group">
             <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
             <select id="pantry-edit-unit">
               ${UNIT_ORDER.map(u=>`<option value="${u}" ${(editItem.unit||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
             </select>
-          </div>
-          <div class="filter-group">
-            <button type="button" class="btn is-filter ${editItem.staple ? 'active' : ''}" id="pantry-edit-staple-toggle">${stapleToggleInner(!!editItem.staple)}</button>
-          </div>
+          </div>`}
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-outline color-delete" id="pantry-edit-delete"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina</button>
@@ -3482,14 +3480,11 @@ function renderDispensa(){
               ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
             </select>
           </div>
-          <div class="filter-group">
+          <div class="filter-group" id="pantry-add-unit-group">
             <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
             <select id="pantry-add-unit">
               ${UNIT_ORDER.map(u=>`<option value="${u}">${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
             </select>
-          </div>
-          <div class="filter-group">
-            <button type="button" class="btn is-chip" id="pantry-add-staple-toggle">${stapleToggleInner(false)}</button>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -3588,14 +3583,11 @@ function renderDispensa(){
     ${editModal}
     ${addModal}
     ${groupsModal}
-    <div class="buttons-fixed">      ${items.length ? `<button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
     <div class="buttons-fixed">
+    <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
     <button class="btn is-fixed" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
-
     </div>
     ${selectionBar}
-
-    </div>
   `;
 }
 
@@ -3693,7 +3685,7 @@ function attachHandlers(){
         const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
         const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 1 : fallback);
         const unit = cb.dataset.shopUnit || undefined;
-        upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, undefined, unit);
+        upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
         rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
       });
       persist(); render();
@@ -4771,21 +4763,23 @@ function attachHandlers(){
     const catSelect = document.getElementById('pantry-add-cat');
     const groupSelect = document.getElementById('pantry-add-group');
     const luogoSelect = document.getElementById('pantry-add-luogo');
-    const stapleToggle = document.getElementById('pantry-add-staple-toggle');
     const unitSelect = document.getElementById('pantry-add-unit');
+    const unitGroup = document.getElementById('pantry-add-unit-group');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
-      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, stapleToggle && stapleToggle.classList.contains('active'), unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
+      const unitVal = (unitSelect && unitGroup && unitGroup.style.display !== 'none') ? unitSelect.value : '';
+      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, unitVal, catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
       state.pantryAddModalOpen = false;
       persist(); render();
     };
     pantryAddBtn.addEventListener('click', doAdd);
     nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
-    // Non chiama render(): altrimenti il testo già digitato nel campo nome andrebbe perso.
-    if(stapleToggle) stapleToggle.addEventListener('click', ()=>{
-      const nowActive = !stapleToggle.classList.contains('active');
-      stapleToggle.classList.toggle('active', nowActive);
-      stapleToggle.innerHTML = stapleToggleInner(nowActive);
+    // Niente render() sull'input: perderebbe il testo già digitato (uguale al
+    // motivo per cui i suggerimenti in tempo reale manipolano il DOM a mano).
+    // Ingredienti "a spanne" (sale, pepe, spezie...) non hanno un'unità da
+    // scegliere: il gruppo si nasconde mentre scrivi il nome.
+    if(unitGroup) nameInput.addEventListener('input', ()=>{
+      unitGroup.style.display = isSpanneIngredient(nameInput.value) ? 'none' : '';
     });
   }
   const dispensaFab = document.getElementById('dispensa-fab');
@@ -4930,16 +4924,6 @@ function attachHandlers(){
       const it = state.pantryItems[state.pantryEditKey];
       if(it){
         if(e.target.value) it.unit = e.target.value; else delete it.unit;
-        persist(); render();
-      }
-    });
-  }
-  const editStapleToggle = document.getElementById('pantry-edit-staple-toggle');
-  if(editStapleToggle){
-    editStapleToggle.addEventListener('click', ()=>{
-      const it = state.pantryItems[state.pantryEditKey];
-      if(it){
-        it.staple = !it.staple;
         persist(); render();
       }
     });
@@ -5245,19 +5229,14 @@ document.addEventListener('click', e=>{
     state.pantryUtilityLuogoMigrated = true;
     persist();
   }
-  // Una tantum: anche il reparto "Utility" come categoria viene rimosso, sostituito
-  // dal flag manuale "staple" (vedi isStaple) impostabile all'aggiunta/modifica in
-  // Dispensa. Le voci già categorizzate a mano come Utility, o il cui nome
-  // corrispondeva alle vecchie parole chiave utility, ricevono staple:true per non
-  // perdere il comportamento "di solito ce l'ho già" nella lista della spesa.
+  // Una tantum: il reparto "Utility" come categoria viene rimosso (ripulisce
+  // le voci categorizzate a mano come Utility) — "di solito ce l'ho già" non
+  // è più un flag a parte, vedi isStaple/hasPantryStock più sotto.
   if(!state.pantryStapleMigrated){
-    const OLD_UTILITY_KEYWORDS = ['peperoncino','sale','olio','pepe','aceto','zucchero','spezie','origano','rosmarino','timo','alloro','cannella','paprika','noce moscata'];
     Object.keys(state.pantryItems).forEach(key=>{
       const it = state.pantryItems[key];
       if(!it) return;
-      const wasUtilityCat = it.cat === 'utility';
-      if(wasUtilityCat || OLD_UTILITY_KEYWORDS.some(kw => key.includes(kw))) it.staple = true;
-      if(wasUtilityCat) delete it.cat;
+      if(it.cat === 'utility') delete it.cat;
     });
     state.pantryStapleMigrated = true;
     persist();
@@ -5271,6 +5250,19 @@ document.addEventListener('click', e=>{
       if(it && !it.unit && PANTRY_UNIT_BY_NAME[key]) it.unit = PANTRY_UNIT_BY_NAME[key];
     });
     state.pantryUnitReviewed = true;
+    persist();
+  }
+  // Una tantum: gli ingredienti "a spanne" (sale, pepe, spezie/erbe secche —
+  // vedi SPANNE_KEYWORDS) non devono avere un'unità tracciabile, ma una
+  // revisione precedente ne aveva assegnata una (es. "Sale" → kg): la toglie.
+  // Anche i vecchi flag "staple" non servono più (vedi isStaple), li ripulisce.
+  if(!state.pantrySpanneUnitCleared){
+    Object.values(state.pantryItems).forEach(it=>{
+      if(!it) return;
+      if(it.staple !== undefined) delete it.staple;
+      if(it.unit && isSpanneIngredient(it.nome)) delete it.unit;
+    });
+    state.pantrySpanneUnitCleared = true;
     persist();
   }
   // Una tantum: assegna il gruppo "Pasta corta"/"Pasta lunga" ai formati di
