@@ -103,10 +103,14 @@ propria sezione.
   dopo) — le ricette aggiunte si scalano di conseguenza, ciascuna rispetto
   alle proprie porzioni base.
 - **Riga bottoni sotto il blocco pasto**: "Mangiata"/"Da mangiare" (tocco =
-  apre la **modale "Ricetta fatta!"** con lo stepper delle quantità rimaste
-  in Dispensa per ogni ingrediente tracciato del pasto — principale e
-  ricette aggiunte insieme — da confermare, oppure segna diretto se il
-  pasto è un "avanzo", niente da scalare due volte); "Cambia" (apre un
+  apre la **modale "Ricetta fatta!"** con lo stepper — precompilato con
+  quanto la ricetta ne richiede, scalato sulle porzioni del pasto — di
+  quanto hai usato di ogni ingrediente tracciato del pasto (principale e
+  ricette aggiunte insieme): alla conferma quella quantità si toglie dalla
+  scorta in Dispensa, non serve calcolare a mano cosa resta. Step e unità
+  seguono quelli impostati in Dispensa per l'ingrediente, tap sul numero
+  per digitarlo a mano; oppure segna diretto se il pasto è un "avanzo",
+  niente da scalare due volte); "Cambia" (apre un
   pannello inline con ricerca ricette + suggerimenti contestuali, per
   sostituire il principale di quel pasto); "È avanzata" (apre un pannello
   con l'elenco dei pasti successivi — inclusi quelli ancora vuoti, mostrati

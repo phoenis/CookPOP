@@ -232,6 +232,26 @@ function toComparableUnit(value, unit){
   return null;
 }
 
+// Quantità usata di un ingrediente, nell'unità con cui è tracciato in
+// Dispensa (per poterla poi sottrarre dalla scorta) — es. ricetta "500 g" su
+// una voce di Dispensa tracciata in kg diventa 0.5. Se l'unità di Dispensa è
+// generica (pezzi) il numero della ricetta si usa così com'è (es. "2 uova" =
+// 2), a prescindere dalla parola usata in ricetta. Se non si riesce a
+// interpretare un numero, o le unità non sono comparabili, torna 0 — meglio
+// non sottrarre nulla che sottrarre un valore inventato.
+function usedQtyForPantry(pantryUnit, qtaText, ratio){
+  const parsed = parseQtyValue(scaleQtyText(qtaText, ratio));
+  if(!parsed) return 0;
+  if(!pantryUnit) return Math.round(parsed.value);
+  const have = toComparableUnit(parsed.value, parsed.unit);
+  if(!have) return 0;
+  if(pantryUnit === 'g') return have.base === 'g' ? Math.round(have.value) : 0;
+  if(pantryUnit === 'kg') return have.base === 'g' ? Math.round((have.value/1000)*100)/100 : 0;
+  if(pantryUnit === 'ml') return have.base === 'ml' ? Math.round(have.value) : 0;
+  if(pantryUnit === 'l') return have.base === 'ml' ? Math.round((have.value/1000)*100)/100 : 0;
+  return 0;
+}
+
 // Somma le quantità testuali di più occorrenze dello stesso ingrediente (es.
 // due ricette che chiedono entrambe "farina", "200 g" e "150 g") invece di
 // tenerle su righe separate in Spesa — prima si univano solo se il testo
@@ -680,6 +700,7 @@ const state = {
   mealsDone: {}, // {i: {pranzo:bool, cena:bool}}
   doneModalDay: null, // chiave "weekIdx_i" del giorno per cui è aperta la modale "Ricetta fatta!" (sempre riferita alla cena, come il resto della UI in questo stadio)
   doneModalQty: {},
+  doneQtyEditingKey: null, // ephemeral: nome ingrediente il cui campo "quanto ne hai usato" è in modifica diretta (modale "Ricetta fatta!")
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
   filters: { cat:[], tipo:[], tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' } // cat e tipo sono multi-selezione (array), gli altri restano a valore singolo
 };
@@ -1671,7 +1692,7 @@ function closeSettingsBackdrop(){
 }
 const MODAL_CHECKS = [
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
-  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; }],
+  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; }],
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen, ()=>{ state.pantryGroupsModalOpen = false; }],
@@ -2572,7 +2593,7 @@ function renderMenu(){
           <h3>Ricetta fatta! 🎉</h3>
           <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
         </div>
-        <p class="section-sub" style="margin-top:-8px;">Quanto ti resta in Dispensa di ogni ingrediente? Aggiusta solo quello che hai usato — il resto non cambia.</p>
+        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa — il resto degli ingredienti non cambia.</p>
         ${doneIng.length ? `
         <div class="done-ing-list">
           ${doneIng.map(it=>{
@@ -2581,12 +2602,18 @@ function renderMenu(){
             if(!tracked){
               return `<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`;
             }
+            const pantryIt = resolvePantryItem(name);
+            const unit = pantryIt.unit || '';
+            const step = qtyStepFor(unit);
+            const editingThis = state.doneQtyEditingKey === name;
             return `
             <div class="done-ing-row">
               <span>${escapeHtml(name)}</span>
               <span class="qty-stepper">
                 <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
-                <span class="qty-num">${qtyMap[name]}</span>
+                ${editingThis
+                  ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qtyMap[name]}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
+                  : `<span class="qty-num" data-done-qty-show="${escapeAttr(name)}">${qtyMap[name]}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
                 <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
               </span>
             </div>`;
@@ -4305,16 +4332,27 @@ function attachHandlers(){
         persist(); render();
       } else {
         const mealData = effectiveMeal(weekIdx, i, meal);
+        // Stessa scala porzioni usata ovunque (Spesa, dettaglio ricetta): la
+        // quantità precompilata è quella davvero usata per QUESTO pasto, non
+        // quella "di base" della ricetta.
+        const det = mealData.principale ? getRecipeDetails(mealData.principale) : null;
+        const basePortions = det ? parsePortionsBase(det.porzioni) : null;
+        const ratio = basePortions ? (state.dayPortions[key] || basePortions) / basePortions : 1;
         const allIng = (mealData.principale ? getIngredientsFor(mealData.principale) : [])
           .concat(mealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
         const qtyMap = {};
         allIng.forEach(it=>{
-          const pantryKey = (it.ingrediente||'').trim().toLowerCase();
-          const pantryIt = state.pantryItems[pantryKey];
-          if(pantryIt && typeof pantryIt.qty === 'number') qtyMap[it.ingrediente] = pantryIt.qty;
+          // resolvePantryItem (non un lookup diretto per nome): un ingrediente
+          // con alternative tra parentesi ("Farina 00 (o mix con Manitoba)")
+          // o parte di un gruppo va risolto come ovunque in Dispensa/Spesa.
+          const pantryIt = resolvePantryItem(it.ingrediente);
+          if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.unit !== 'none'){
+            qtyMap[it.ingrediente] = usedQtyForPantry(pantryIt.unit, it.qta, ratio);
+          }
         });
         state.doneModalDay = key;
         state.doneModalQty = qtyMap;
+        state.doneQtyEditingKey = null;
         render();
       }
     });
@@ -4359,37 +4397,66 @@ function attachHandlers(){
       if(e.target.hasAttribute('data-stop-close')) return;
       state.doneModalDay = null;
       state.doneModalQty = {};
+      state.doneQtyEditingKey = null;
       render();
     });
   });
   document.querySelectorAll('[data-done-qty-dec]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.doneQtyDec;
-      state.doneModalQty[name] = Math.max(0, (state.doneModalQty[name]||0) - 1);
+      const pantryIt = resolvePantryItem(name);
+      const step = qtyStepFor(pantryIt && pantryIt.unit);
+      state.doneModalQty[name] = Math.max(0, Math.round(((state.doneModalQty[name]||0) - step) * 100) / 100);
       render();
     });
   });
   document.querySelectorAll('[data-done-qty-inc]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.doneQtyInc;
-      state.doneModalQty[name] = (state.doneModalQty[name]||0) + 1;
+      const pantryIt = resolvePantryItem(name);
+      const step = qtyStepFor(pantryIt && pantryIt.unit);
+      state.doneModalQty[name] = Math.round(((state.doneModalQty[name]||0) + step) * 100) / 100;
       render();
     });
   });
+  document.querySelectorAll('[data-done-qty-show]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      state.doneQtyEditingKey = e.currentTarget.dataset.doneQtyShow;
+      render();
+    });
+  });
+  const doneQtyEditInput = document.querySelector('[data-done-qty-edit]');
+  if(doneQtyEditInput){
+    doneQtyEditInput.focus();
+    doneQtyEditInput.select();
+    const commitDoneQtyEdit = ()=>{
+      const name = doneQtyEditInput.dataset.doneQtyEdit;
+      const n = parseFloat(doneQtyEditInput.value);
+      state.doneModalQty[name] = Number.isNaN(n) ? 0 : Math.max(0, n);
+      state.doneQtyEditingKey = null;
+      render();
+    };
+    doneQtyEditInput.addEventListener('blur', commitDoneQtyEdit);
+    doneQtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doneQtyEditInput.blur(); });
+  }
   document.querySelectorAll('[data-confirm-done]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.confirmDone;
       const { weekIdx, i, meal } = parseMealKey(key);
       const qtyMap = state.doneModalQty || {};
+      // Le quantità qui sono "quanto ne hai usato": si sottraggono dalla
+      // scorta attuale invece di sovrascriverla (prima il campo era "quanto
+      // ti resta", da calcolare a mano — vedi commit).
       Object.keys(qtyMap).forEach(ingrediente=>{
-        const pantryKey = ingrediente.trim().toLowerCase();
-        if(state.pantryItems[pantryKey]) state.pantryItems[pantryKey].qty = qtyMap[ingrediente];
+        const pantryIt = resolvePantryItem(ingrediente);
+        if(pantryIt) pantryIt.qty = Math.max(0, Math.round(((pantryIt.qty||0) - qtyMap[ingrediente]) * 100) / 100);
       });
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(!mealsDone[i]) mealsDone[i] = {};
       mealsDone[i][meal] = true;
       state.doneModalDay = null;
       state.doneModalQty = {};
+      state.doneQtyEditingKey = null;
       persist(); render();
     });
   });
