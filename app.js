@@ -198,13 +198,10 @@ function resolvePantryItem(ingrediente){
   return fallback;
 }
 
-// Basilari ("di solito li hai già") raccolti dal menù corrente, uniti per solo
-// nome (non nome+quantità: altrimenti lo stesso ingrediente con una qta scritta
-// in modo leggermente diverso da una ricetta all'altra compariva due volte).
-
-// Un basilare (staple) parte "confermato" - quindi già spuntato in Spesa, al
-// suo posto nella lista normale - se lo si ha già in dispensa; se l'utente ha
-// toccato la spunta a mano, quella scelta vince sempre.
+// Ha scorta reale in Dispensa (qty > 0)? Usata da buildShopFlat per escludere
+// del tutto da Spesa gli ingredienti che non servono comprare, e come
+// fallback di isItemChecked per il raro caso in cui una riga con scorta resti
+// comunque visibile (l'utente l'aveva de-spuntata esplicitamente in passato).
 function hasPantryStock(ingrediente){
   const it = resolvePantryItem(ingrediente);
   return !!(it && typeof it.qty === 'number' && it.qty > 0);
@@ -2764,18 +2761,23 @@ function buildShopFlat(){
         // Le quantità scalate valgono solo finché non è già stato spuntato:
         // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
         const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio);
-        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context, contextShort, staple: isStaple(it.ingrediente), isRecipe: true });
+        // Se in Dispensa ce n'è già abbastanza, non compare proprio in Spesa
+        // (niente riga da vedere/spuntare) — a meno che non l'avessi già
+        // esplicitamente de-spuntato in passato per dire "mi serve comunque".
+        if(pantryStatusFor(it.ingrediente, qta) === 'in-casa' && state.shopChecked[key] !== false) return;
+        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context, contextShort, isRecipe: true });
       });
     });
   });
   DATA.generalShopping.forEach((it,idx)=>{
     const key = `gen_${idx}`;
     if(state.shopDismissed[key]) return;
-    flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:'Ogni settimana', contextShort:'Ogni settimana', staple: isStaple(it.ingrediente) });
+    if(pantryStatusFor(it.ingrediente, it.qta) === 'in-casa' && state.shopChecked[key] !== false) return;
+    flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:'Ogni settimana', contextShort:'Ogni settimana' });
   });
   Object.entries(state.shopExtras).forEach(([id, it])=>{
     if(state.shopDismissed[id]) return;
-    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', contextShort:'Aggiunti a mano', staple: isStaple(it.ingrediente) });
+    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', contextShort:'Aggiunti a mano' });
   });
   // Ingredienti finiti in Dispensa (qty scesa a 0): la voce di Dispensa non
   // viene mai cancellata quando arriva a 0, resta lì con la sua unità/luogo/
@@ -2785,15 +2787,17 @@ function buildShopFlat(){
     if(typeof it.qty !== 'number' || it.qty > 0) return;
     const key = `oos_${pantryKey}`;
     if(state.shopDismissed[key]) return;
-    flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', staple: isStaple(it.nome), confirmed: !!state.pantryConfirmedShop[pantryKey] });
+    flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
   return flat;
 }
 
 function renderSpesa(){
-  // I basilari già confermati - a mano o perché presenti in Dispensa - non
-  // finiscono più in una sezione a parte: restano nella lista normale (per
-  // giorno/per reparto) ma già spuntati, coerente con isStapleConfirmed.
+  // Chi ha già scorta sufficiente in Dispensa non compare proprio qui (vedi
+  // buildShopFlat) — se serve comunque, si riaggiunge a mano con "+ ingrediente
+  // extra". isStaple/isStapleConfirmed restano solo per il raro caso di una
+  // riga con scorta che l'utente aveva già de-spuntato esplicitamente prima
+  // di questo comportamento: quella resta visibile, coerente con la scelta fatta allora.
   const mainFlat = buildShopFlat();
 
   // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
@@ -3095,7 +3099,7 @@ function renderSpesa(){
 /*           <button class="btn is-ghost reset-btn" data-close-add-ing-modal>Annulla</button>
  */
   return `
-    <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa parte già spuntato</p>
+    <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa non compare qui</p>
     ${missingBanner}
     <div class="view-toggle">
       <button class="view-btn ${state.shopView==='reparto'?'active':''}" data-shop-view="reparto">Per reparto</button>

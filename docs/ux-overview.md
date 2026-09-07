@@ -126,6 +126,10 @@ propria sezione.
 
 - Banner d'avviso se qualche ricetta pianificata non ha ancora ingredienti
   salvati (rimanda al Menù per completarla).
+- Un ingrediente con scorta sufficiente in Dispensa **non compare proprio in
+  lista** (né qui né in "Per reparto"): niente righe da vedere/spuntare per
+  quello che hai già. Se in realtà ti serve comunque, si aggiunge a mano con
+  "+ ingrediente extra" (vedi sotto).
 - **Selettore vista**: "Per reparto" (Carne, Frutta e verdura, ecc. in
   ordine alfabetico, poi Altro, poi Finiti — tutti accordion apri/chiudi,
   aperti di default) oppure "Per giorno" (una sezione per ogni pasto
@@ -196,8 +200,8 @@ propria sezione.
   senso una quantità precisa, la riga mostra una semplice spunta
   presente/assente al posto dello stepper numerico — scelta manuale
   dell'utente, niente rilevamento automatico). Un ingrediente con scorta
-  reale parte già spuntato in Spesa in automatico, senza flag manuali da
-  impostare.
+  reale non compare proprio in Spesa quando serve per una ricetta — se poi
+  serve comunque, si riaggiunge a mano da lì con "+ ingrediente extra".
 - Tap su un ingrediente esistente apre la **modale Modifica ingrediente**
   (nome, categoria, luogo, quantità, unità).
 
