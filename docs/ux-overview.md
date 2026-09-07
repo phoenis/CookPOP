@@ -177,8 +177,9 @@ propria sezione.
   Frigo, Freezer, Giardino) — sezioni ad accordion come in Spesa, con
   "Espandi tutto"/"Comprimi tutto".
 - **Riga ingrediente**: icona del luogo (tap = apre un piccolo selettore a
-  icone per cambiarlo), nome (tap = rinomina in linea), stepper quantità,
-  cestino.
+  icone per cambiarlo), nome (tap = rinomina in linea), stepper quantità —
+  o, se l'unità è impostata su "Non mostrare", una semplice spunta
+  presente/assente al suo posto — cestino.
 - **Selezione multipla**: pressione lunga su una riga (non sullo stepper
   +/-, che resta sempre libero) entra in modalità selezione — l'icona del
   luogo di quella riga diventa un segno di spunta. Da lì, un tap semplice
@@ -190,10 +191,13 @@ propria sezione.
   ingredienti a scorta 0, mai cancellati automaticamente — restano lì
   pronti a essere riattivati quando li ricompri.
 - **Bottone "+" flottante**: apre la **modale "Aggiungi ingrediente"** di
-  Dispensa — nome, luogo, quantità/unità (niente selettore unità per gli
-  ingredienti "a spanne" come sale/pepe/spezie: per quelli conta solo se
-  ce n'è o no). Un ingrediente con scorta reale parte già spuntato in Spesa
-  in automatico, senza flag manuali da impostare.
+  Dispensa — nome, luogo, quantità, unità (una delle opzioni è "Non
+  mostrare": per ingredienti "a spanne" come sale/pepe/spezie, dove non ha
+  senso una quantità precisa, la riga mostra una semplice spunta
+  presente/assente al posto dello stepper numerico — scelta manuale
+  dell'utente, niente rilevamento automatico). Un ingrediente con scorta
+  reale parte già spuntato in Spesa in automatico, senza flag manuali da
+  impostare.
 - Tap su un ingrediente esistente apre la **modale Modifica ingrediente**
   (nome, categoria, luogo, quantità, unità).
 

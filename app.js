@@ -64,22 +64,14 @@ const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
 
 // Unità di misura tracciabili per una voce di Dispensa: '' = pezzi/generico
-// (comportamento originale, solo presenza/assenza), le altre abilitano il
-// confronto quantitativo con quanto richiesto dalla ricetta (vedi pantryStatusFor).
-const UNIT_ORDER = ['', 'g', 'kg', 'ml', 'l'];
-const UNIT_LABEL = { '':'pezzi/generico', g:'grammi (g)', kg:'chili (kg)', ml:'millilitri (ml)', l:'litri (l)' };
-
-// Ingredienti "a spanne": sale, pepe e spezie/erbe secche in genere — si sa se
-// ci sono o no, ma pesarli per confrontarli con quanto serve in ricetta non ha
-// senso pratico (non si mette la bilancia sotto il sale). Per questi niente
-// selettore unità in Dispensa: restano sempre a '' (pezzi/generico, solo
-// presenza/assenza). Non include olio/zucchero/aceto, che si comprano e
-// tracciano davvero a volume/peso.
-const SPANNE_KEYWORDS = ['sale','pepe','peperoncino','origano','rosmarino','timo','alloro','cannella','paprika','noce moscata'];
-function isSpanneIngredient(nome){
-  const s = (nome||'').trim().toLowerCase();
-  return SPANNE_KEYWORDS.some(kw => new RegExp(`\\b${kw}\\b`).test(s));
-}
+// (contatore numerico senza unità), le altre abilitano il confronto
+// quantitativo con quanto richiesto dalla ricetta (vedi pantryStatusFor).
+// 'none' = "Non mostrare": per ingredienti "a spanne" (sale, pepe, spezie...)
+// dove non ha senso una quantità precisa — in Dispensa il contatore sparisce
+// a favore di una semplice spunta presente/assente (vedi renderDispensa).
+// Scelta manuale dell'utente riga per riga, niente rilevamento automatico.
+const UNIT_ORDER = ['', 'g', 'kg', 'ml', 'l', 'none'];
+const UNIT_LABEL = { '':'pezzi/generico', g:'grammi (g)', kg:'chili (kg)', ml:'millilitri (ml)', l:'litri (l)', none:'Non mostrare (solo presenza/assenza)' };
 
 // Revisione unità di misura per gli ingredienti da dispensa veri (non i
 // freschi, comprati a vista) — solo quelli con un'unità in cui ha senso
@@ -3089,10 +3081,9 @@ function renderSpesa(){
             <div class="filter-group-label">Quantità</div>
             <div class="pantry-group-row">
               <input type="text" id="shop-add-qta" placeholder="Es. 1 o 1 rotolo" value="${escapeAttr(matchedPantryUnit ? '1' : '')}">
-              ${isSpanneIngredient(addIngQuery) ? '' : `
               <select id="shop-add-unit" title="Unità (si aggiunge da sola al numero, non serve scriverla)">
-                ${UNIT_ORDER.map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
-              </select>`}
+                ${UNIT_ORDER.filter(u=>u!=='none').map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
+              </select>
             </div>
           </div>
         </div>
@@ -3370,12 +3361,14 @@ function renderDispensa(){
         ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===it.luogo?' active':''}" data-luogo-set="${escapeAttr(it.key)}" data-luogo-value="${l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
       </div>` : ''}
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
-      <span class="qty-stepper">
+      ${it.unit === 'none'
+        ? `<label class="presence-toggle"><input type="checkbox" ${it.qty > 0 ? 'checked' : ''} data-presence-toggle="${escapeAttr(it.key)}"></label>`
+        : `<span class="qty-stepper">
         <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
           ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}"><span class="qty-unit">${escapeHtml(it.unit || 'pz')}</span>`
           : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty} ${escapeHtml(it.unit || 'pz')}</span>`}
-      </span>
+      </span>`}
     </div>
     `;
   }
@@ -3457,13 +3450,12 @@ function renderDispensa(){
             <div class="filter-group-label">Quantità</div>
             <input type="number" min="0" step="${qtyStepFor(editItem.unit)}" id="pantry-edit-qty" value="${editItem.qty}">
           </div>
-          ${isSpanneIngredient(editItem.nome) ? '' : `
           <div class="filter-group">
             <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
             <select id="pantry-edit-unit">
               ${UNIT_ORDER.map(u=>`<option value="${u}" ${(editItem.unit||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
             </select>
-          </div>`}
+          </div>
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-outline color-delete" id="pantry-edit-delete"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina</button>
@@ -3504,7 +3496,7 @@ function renderDispensa(){
               ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
             </select>
           </div>
-          <div class="filter-group" id="pantry-add-unit-group">
+          <div class="filter-group">
             <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
             <select id="pantry-add-unit">
               ${UNIT_ORDER.map(u=>`<option value="${u}">${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
@@ -3733,10 +3725,11 @@ function attachHandlers(){
         const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
         const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
         const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 1 : fallback);
-        // Gli ingredienti "a spanne" non devono avere un'unità nemmeno quando
-        // arriva da qui: la quantità della ricetta ("12 g" di sale, es.) può
-        // contenere un'unità parsabile che altrimenti la riassegnerebbe.
-        const unit = isSpanneIngredient(cb.dataset.shopName) ? '' : (cb.dataset.shopUnit || undefined);
+        // Se in Dispensa è già impostata "Non mostrare" per questo ingrediente,
+        // quella scelta manuale vince sempre: la quantità della ricetta ("12 g"
+        // di sale, es.) non deve poterla resettare a un'unità tracciabile.
+        const existingUnit = (state.pantryItems[(cb.dataset.shopName||'').trim().toLowerCase()] || {}).unit;
+        const unit = existingUnit === 'none' ? 'none' : (cb.dataset.shopUnit || undefined);
         upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
         rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
       });
@@ -4785,6 +4778,19 @@ function attachHandlers(){
       render();
     });
   });
+  // Unità "Non mostrare": una spunta al posto dello stepper. Spuntata = 1
+  // (presente), tolta = 0 (finita, va in Finiti — stesso stato di qty=0
+  // ovunque nell'app, solo la UI cambia).
+  document.querySelectorAll('[data-presence-toggle]').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      const key = e.currentTarget.dataset.presenceToggle;
+      const it = state.pantryItems[key];
+      if(!it) return;
+      it.qty = e.currentTarget.checked ? 1 : 0;
+      if(it.qty > 0) delete state.pantryConfirmedShop[key];
+      persist(); render();
+    });
+  });
   const qtyEditInput = document.querySelector('[data-qty-edit]');
   if(qtyEditInput){
     qtyEditInput.focus();
@@ -4816,23 +4822,14 @@ function attachHandlers(){
     const groupSelect = document.getElementById('pantry-add-group');
     const luogoSelect = document.getElementById('pantry-add-luogo');
     const unitSelect = document.getElementById('pantry-add-unit');
-    const unitGroup = document.getElementById('pantry-add-unit-group');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
-      const unitVal = (unitSelect && unitGroup && unitGroup.style.display !== 'none') ? unitSelect.value : '';
-      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, unitVal, catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
+      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
       state.pantryAddModalOpen = false;
       persist(); render();
     };
     pantryAddBtn.addEventListener('click', doAdd);
     nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
-    // Niente render() sull'input: perderebbe il testo già digitato (uguale al
-    // motivo per cui i suggerimenti in tempo reale manipolano il DOM a mano).
-    // Ingredienti "a spanne" (sale, pepe, spezie...) non hanno un'unità da
-    // scegliere: il gruppo si nasconde mentre scrivi il nome.
-    if(unitGroup) nameInput.addEventListener('input', ()=>{
-      unitGroup.style.display = isSpanneIngredient(nameInput.value) ? 'none' : '';
-    });
   }
   const dispensaFab = document.getElementById('dispensa-fab');
   if(dispensaFab) dispensaFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
@@ -5304,15 +5301,10 @@ document.addEventListener('click', e=>{
     state.pantryUnitReviewed = true;
     persist();
   }
-  // Una tantum: gli ingredienti "a spanne" (sale, pepe, spezie/erbe secche —
-  // vedi SPANNE_KEYWORDS) non devono avere un'unità tracciabile, ma una
-  // revisione precedente ne aveva assegnata una (es. "Sale" → kg): la toglie.
-  // Anche i vecchi flag "staple" non servono più (vedi isStaple), li ripulisce.
+  // Una tantum: i vecchi flag "staple" non servono più (vedi isStaple), li ripulisce.
   if(!state.pantrySpanneUnitCleared){
     Object.values(state.pantryItems).forEach(it=>{
-      if(!it) return;
-      if(it.staple !== undefined) delete it.staple;
-      if(it.unit && isSpanneIngredient(it.nome)) delete it.unit;
+      if(it && it.staple !== undefined) delete it.staple;
     });
     state.pantrySpanneUnitCleared = true;
     persist();
