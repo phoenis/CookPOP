@@ -2863,9 +2863,11 @@ function renderSpesa(){
     // "1 spicchio"...) invece di un generico "1" scollegato — allineato a come
     // Dispensa mostra numero+unità nello stepper. Se il testo non è
     // interpretabile (es. "q.b.", "circa 80 ml") resta il vecchio fallback:
-    // un contatore da 1 senza unità, comunque modificabile con +/-.
+    // un contatore da 1 senza unità, comunque modificabile con +/-. Unità
+    // vuota (non "pz") per i conteggi generici, coerente con come Dispensa
+    // tratta "pezzi/generico".
     const parsedQta = parseQtyValue(qta);
-    const unit = parsedQta ? (parsedQta.unit || 'pz') : '';
+    const unit = parsedQta ? (parsedQta.unit || '') : '';
     const step = parsedQta ? qtyStepFor(parsedQta.unit) : 1;
     const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (parsedQta ? parsedQta.value : 1);
     const editingQty = state.shopQtyEditingKey === rowKey;
