@@ -3089,9 +3089,10 @@ function renderSpesa(){
             <div class="filter-group-label">Quantità</div>
             <div class="pantry-group-row">
               <input type="text" id="shop-add-qta" placeholder="Es. 1 o 1 rotolo" value="${escapeAttr(matchedPantryUnit ? '1' : '')}">
+              ${isSpanneIngredient(addIngQuery) ? '' : `
               <select id="shop-add-unit" title="Unità (si aggiunge da sola al numero, non serve scriverla)">
                 ${UNIT_ORDER.map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
-              </select>
+              </select>`}
             </div>
           </div>
         </div>
@@ -3732,7 +3733,10 @@ function attachHandlers(){
         const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
         const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
         const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 1 : fallback);
-        const unit = cb.dataset.shopUnit || undefined;
+        // Gli ingredienti "a spanne" non devono avere un'unità nemmeno quando
+        // arriva da qui: la quantità della ricetta ("12 g" di sale, es.) può
+        // contenere un'unità parsabile che altrimenti la riassegnerebbe.
+        const unit = isSpanneIngredient(cb.dataset.shopName) ? '' : (cb.dataset.shopUnit || undefined);
         upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
         rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
       });
