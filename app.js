@@ -701,6 +701,7 @@ const state = {
   doneModalDay: null, // chiave "weekIdx_i" del giorno per cui è aperta la modale "Ricetta fatta!" (sempre riferita alla cena, come il resto della UI in questo stadio)
   doneModalQty: {},
   doneQtyEditingKey: null, // ephemeral: nome ingrediente il cui campo "quanto ne hai usato" è in modifica diretta (modale "Ricetta fatta!")
+  doneModalFinished: {}, // ephemeral: nome ingrediente "a spanne" (unit 'none') -> true se spuntato "L'hai finito?" nella modale "Ricetta fatta!"; non presente = non spuntato
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
   filters: { cat:[], tipo:[], tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' } // cat e tipo sono multi-selezione (array), gli altri restano a valore singolo
 };
@@ -1692,7 +1693,7 @@ function closeSettingsBackdrop(){
 }
 const MODAL_CHECKS = [
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
-  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; }],
+  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; }],
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen, ()=>{ state.pantryGroupsModalOpen = false; }],
@@ -1799,7 +1800,7 @@ function renderRecipeEditModal(){
     .map(s => editStepRowHtml(s)).join('');
 
   return `
-    <div class="filters-modal-backdrop" data-close-recipe-edit>
+    <div class="filters-modal-backdrop is-second" data-close-recipe-edit>
       <div class="filters-modal recipe-edit-modal" data-stop-close>
         <div class="filters-modal-header">
           <h3>Modifica ricetta</h3>
@@ -2586,6 +2587,56 @@ function renderMenu(){
     const doneName = doneMealData.principale || '';
     const doneIng = (doneName ? getIngredientsFor(doneName) : []).concat(doneMealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
     const qtyMap = state.doneModalQty || {};
+    const finishedMap = state.doneModalFinished || {};
+    // Stesso ingrediente può ripetersi tra principale e contorni: una riga sola.
+    const seenNames = new Set();
+    const uniqueIng = doneIng.filter(it=>{
+      const key = (it.ingrediente||'').trim().toLowerCase();
+      if(seenNames.has(key)) return false;
+      seenNames.add(key);
+      return true;
+    });
+    // Gli ingredienti "a spanne" (unit 'none' in Dispensa, es. sale/pepe) non
+    // hanno una quantità da tracciare: non vanno confusi con "non in
+    // dispensa" (ci sono, semplicemente non si conta quanto). Finiscono in
+    // una sezione a parte più sotto, "L'hai finito?" — di default non
+    // spuntata, perché usarne un po' non vuol dire averla esaurita.
+    const finishableNames = [];
+    const normalRowsHtml = uniqueIng.map(it=>{
+      const name = it.ingrediente;
+      const pantryIt = resolvePantryItem(name);
+      if(pantryIt && pantryIt.unit === 'none'){
+        if(typeof pantryIt.qty === 'number' && pantryIt.qty > 0) finishableNames.push(name);
+        return '';
+      }
+      const tracked = Object.prototype.hasOwnProperty.call(qtyMap, name);
+      if(!tracked){
+        return `<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`;
+      }
+      const unit = pantryIt.unit || '';
+      const step = qtyStepFor(unit);
+      const editingThis = state.doneQtyEditingKey === name;
+      return `
+      <div class="done-ing-row">
+        <span>${escapeHtml(name)}</span>
+        <span class="qty-stepper">
+          <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
+          ${editingThis
+            ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qtyMap[name]}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
+            : `<span class="qty-num" data-done-qty-show="${escapeAttr(name)}">${qtyMap[name]}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
+          <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
+        </span>
+      </div>`;
+    }).join('');
+    const finishedSectionHtml = finishableNames.length ? `
+      <div class="filter-group-label done-finished-title">L'hai finito? Se sì, lo aggiungo alla lista della spesa.</div>
+      <div class="done-ing-list">
+        ${finishableNames.map(name=>`
+        <label class="done-ing-row presence-toggle done-finished-row">
+          <span>${escapeHtml(name)}</span>
+          <input type="checkbox" ${finishedMap[name] ? 'checked' : ''} data-done-finished-toggle="${escapeAttr(name)}">
+        </label>`).join('')}
+      </div>` : '';
     doneModal = `
     <div class="filters-modal-backdrop" data-close-done-modal>
       <div class="filters-modal" data-stop-close>
@@ -2594,31 +2645,10 @@ function renderMenu(){
           <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
         </div>
         <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa — il resto degli ingredienti non cambia.</p>
-        ${doneIng.length ? `
-        <div class="done-ing-list">
-          ${doneIng.map(it=>{
-            const name = it.ingrediente;
-            const tracked = Object.prototype.hasOwnProperty.call(qtyMap, name);
-            if(!tracked){
-              return `<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`;
-            }
-            const pantryIt = resolvePantryItem(name);
-            const unit = pantryIt.unit || '';
-            const step = qtyStepFor(unit);
-            const editingThis = state.doneQtyEditingKey === name;
-            return `
-            <div class="done-ing-row">
-              <span>${escapeHtml(name)}</span>
-              <span class="qty-stepper">
-                <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
-                ${editingThis
-                  ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qtyMap[name]}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
-                  : `<span class="qty-num" data-done-qty-show="${escapeAttr(name)}">${qtyMap[name]}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
-                <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
-              </span>
-            </div>`;
-          }).join('')}
-        </div>` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
+        ${uniqueIng.length ? `
+        ${normalRowsHtml ? `<div class="done-ing-list">${normalRowsHtml}</div>` : ''}
+        ${finishedSectionHtml}
+        ` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
         <div class="filters-modal-footer">
           <button class="btn is-ghost reset-btn" data-close-done-modal>Annulla</button>
           <button class="btn is-solid mini-add-btn" data-confirm-done="${state.doneModalDay}">Conferma</button>
@@ -4355,6 +4385,7 @@ function attachHandlers(){
         state.doneModalDay = key;
         state.doneModalQty = qtyMap;
         state.doneQtyEditingKey = null;
+        state.doneModalFinished = {};
         render();
       }
     });
@@ -4400,6 +4431,14 @@ function attachHandlers(){
       state.doneModalDay = null;
       state.doneModalQty = {};
       state.doneQtyEditingKey = null;
+      state.doneModalFinished = {};
+      render();
+    });
+  });
+  document.querySelectorAll('[data-done-finished-toggle]').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      const name = e.currentTarget.dataset.doneFinishedToggle;
+      state.doneModalFinished[name] = e.currentTarget.checked;
       render();
     });
   });
@@ -4453,12 +4492,27 @@ function attachHandlers(){
         const pantryIt = resolvePantryItem(ingrediente);
         if(pantryIt) pantryIt.qty = Math.max(0, Math.round(((pantryIt.qty||0) - qtyMap[ingrediente]) * 100) / 100);
       });
+      // Ingredienti "a spanne" spuntati "L'hai finito?": segnati assenti in
+      // Dispensa (stesso stato della spunta tolta a mano, vedi presence-toggle)
+      // e aggiunti direttamente in Spesa, senza quantità — sono quelli che
+      // "si ricomprano e basta", non si scrive mai quanto prenderne.
+      Object.entries(state.doneModalFinished || {}).forEach(([ingrediente, checked])=>{
+        if(!checked) return;
+        const pantryIt = resolvePantryItem(ingrediente);
+        if(pantryIt) pantryIt.qty = 0;
+        const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === ingrediente.trim().toLowerCase());
+        if(!already){
+          const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+          state.shopExtras[id] = { ingrediente, qta: '' };
+        }
+      });
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(!mealsDone[i]) mealsDone[i] = {};
       mealsDone[i][meal] = true;
       state.doneModalDay = null;
       state.doneModalQty = {};
       state.doneQtyEditingKey = null;
+      state.doneModalFinished = {};
       persist(); render();
     });
   });

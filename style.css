@@ -355,6 +355,7 @@
   .done-ing-row:last-child{ border-bottom:none; }
   .done-ing-row.untracked{ color:var(--ink-light); }
   .done-ing-row .done-ing-hint{ font-size:var(--text-xsmall); color:var(--ink-light); font-style:italic; }
+  .done-finished-title{ margin-top:0.75rem; }
 
   .detail-box{ /* margin-top:calc(-1 * var(--radius-modal)); padding:var(--padding-inline); */ margin:var(--space-large) 0px; background:var(--surface); border-radius:var(--radius-modal); font-size: var(--text-small);}
   .contorno-detail-box{ margin-top:0; border-top:1px dashed var(--line); padding-top:var(--space-medium); }
@@ -465,6 +466,7 @@
   .filters select/* , .filters input[type=search] */{ font-family:var(--font-family); font-size:var(--text-small); padding:var(--space-xsmall) var(--space-xsmall); border-radius:0; border:1px solid var(--line); background:var(--surface); }
   /* .filters input[type=search]{ flex:1; min-width:8.75rem; } */
   .filters-modal-backdrop, .meal-detail-screen{ position:fixed; inset:0; background:var(--overlay); overflow-y:auto; z-index:200; display:flex; align-items:top; justify-content:flex-start; padding:var(--padding-block);  backdrop-filter: blur(var(--blur-modal)); flex-direction: column;}
+  .filters-modal-backdrop.is-second{z-index: 220;}
   .filters-modal{ background:var(--surface); width:100%; max-width:32.5rem; border-radius:var(--radius-modal); margin: auto; padding:var(--space-medium); border:0px solid var(--line-strong); box-shadow:var(--shadow-modal); }
   .filters-modal-header, .meal-detail-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:var(--space-medium); }
   .filters-modal-header h3{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-medium); margin:0; }

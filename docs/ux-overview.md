@@ -109,8 +109,14 @@ propria sezione.
   ricette aggiunte insieme): alla conferma quella quantità si toglie dalla
   scorta in Dispensa, non serve calcolare a mano cosa resta. Step e unità
   seguono quelli impostati in Dispensa per l'ingrediente, tap sul numero
-  per digitarlo a mano; oppure segna diretto se il pasto è un "avanzo",
-  niente da scalare due volte); "Cambia" (apre un
+  per digitarlo a mano. Gli ingredienti "a spanne" (unità "Non mostrare" in
+  Dispensa, es. sale/pepe) non hanno una quantità da scalare: finiscono
+  invece in una sezione separata sotto, "L'hai finito?", con una casella
+  vuota per ciascuno — spuntala solo se l'hai davvero esaurito, e alla
+  conferma quell'ingrediente si segna assente in Dispensa e si aggiunge da
+  solo in Spesa, senza quantità (si ricompra e basta, non si misura) —
+  oppure segna diretto se il pasto è un "avanzo", niente da scalare due
+  volte); "Cambia" (apre un
   pannello inline con ricerca ricette + suggerimenti contestuali, per
   sostituire il principale di quel pasto); "È avanzata" (apre un pannello
   con l'elenco dei pasti successivi — inclusi quelli ancora vuoti, mostrati
