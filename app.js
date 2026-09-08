@@ -5105,7 +5105,13 @@ function attachHandlers(){
       state.filtersOpen = false; render();
     });
   });
-  const stopClose = document.querySelector('[data-stop-close]');
+  // Scoperto a #panel: senza, document.querySelector prendeva il PRIMO
+  // [data-stop-close] di tutto il documento, che essendo il topbar-menu
+  // (nell'header, prima di #panel nel markup) si beccava lui lo
+  // stopPropagation a ogni render — bloccando ogni click al suo interno
+  // prima che potesse risalire fino al listener sul backdrop del menu.
+  const panelEl = document.getElementById('panel');
+  const stopClose = panelEl && panelEl.querySelector('[data-stop-close]');
   if(stopClose) stopClose.addEventListener('click', e=>{ e.stopPropagation(); });
   const clearFilters = document.getElementById('clear-filters');
   if(clearFilters) clearFilters.addEventListener('click', ()=>{
