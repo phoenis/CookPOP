@@ -188,7 +188,7 @@
      richiuderlo, come .luogo-picker-backdrop. */
   .topbar-menu-backdrop{ display:none; position:fixed; inset:0; z-index:150; background:transparent; }
   .topbar-menu-backdrop.open{ display:block; }
-  .topbar-menu{ position:absolute; top:100%; right:var(--space-medium); margin-top:var(--space-xxsmall); z-index:151; display:flex; flex-direction:column; min-width:12rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-modal); padding:var(--space-xxsmall); box-shadow:var(--shadow-dropdown); }
+  .topbar-menu{ position:absolute; top:50px; right:var(--space-medium); margin-top:var(--space-xxsmall); z-index:151; display:flex; flex-direction:column; min-width:12rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-modal); padding:var(--space-xxsmall); box-shadow:var(--shadow-dropdown); }
   .topbar-menu-item{ display:flex; align-items:center; gap:var(--gap-icon); width:100%; text-align:left; padding:var(--space-xsmall) var(--space-small); border:none; background:none; border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-small); color:var(--ink); cursor:pointer; }
   .topbar-menu-item:hover{ background:var(--surface-2); }
   .topbar-menu-sep{ height:1px; background:var(--line); margin:var(--space-xxsmall) 0; }
