@@ -1479,6 +1479,26 @@ function clearDayLink(mealKey){
   delete state.dayLinkNotes[mealKey];
   delete state.dayPortions[mealKey];
 }
+// Cattura link/nota/porzioni di un pasto E di ogni altro pasto che lo aveva
+// come "avanzo di" (sciolto da clearDayLink/unlinkDaysPointingTo quando la
+// ricetta di "mealKey" cambia — es. dopo uno swap), per poterli ripristinare
+// tutti insieme con "Annulla".
+function snapshotMealLinks(mealKey){
+  const affectedKeys = [mealKey, ...Object.keys(state.dayLinks).filter(k => state.dayLinks[k] === mealKey)];
+  return affectedKeys.map(key => ({
+    key,
+    link: state.dayLinks[key],
+    note: state.dayLinkNotes[key],
+    portions: state.dayPortions[key]
+  }));
+}
+function restoreMealLinks(snap){
+  snap.forEach(({key, link, note, portions})=>{
+    if(link !== undefined) state.dayLinks[key] = link; else delete state.dayLinks[key];
+    if(note !== undefined) state.dayLinkNotes[key] = note; else delete state.dayLinkNotes[key];
+    if(portions !== undefined) state.dayPortions[key] = portions; else delete state.dayPortions[key];
+  });
+}
 // "Svuota il pasto": scioglie un eventuale collegamento avanzo (proprio o di
 // chi dipendeva da questo pasto — vuoto non ha più nulla da cui avanzare),
 // azzera fatto/scelto-a-mano, e scrive la sentinella MEAL_EMPTY come
@@ -1695,12 +1715,18 @@ function addWeek(){
 // fisso salvato altrove) non serve nessuna migrazione.
 function removeWeek(weekIdx){
   if(weekIdx === 0) return;
-  state.extraWeeks.splice(weekIdx-1, 1);
+  const removedIndex = weekIdx - 1;
+  const removedWeek = state.extraWeeks[removedIndex];
+  state.extraWeeks.splice(removedIndex, 1);
   state.expandedDay = null;
   state.swapOpenDay = null;
   state.genSettingsOpen = null;
   persist();
   render();
+  showUndoToast('Settimana eliminata', ()=>{
+    state.extraWeeks.splice(removedIndex, 0, removedWeek);
+    persist(); render();
+  });
 }
 
 // Scambia due pasti qualsiasi (anche pranzo con cena, anche tra settimane
@@ -4470,14 +4496,44 @@ function attachHandlers(){
       const key = el.dataset.swapDay;
       const { weekIdx, i, meal } = parseMealKey(key);
       const recipeName = el.dataset.swapPick;
-      writeMealPrincipale(weekOverridesRef(weekIdx), i, meal, recipeName);
-      if(!weekOverridePickedRef(weekIdx)[i]) weekOverridePickedRef(weekIdx)[i] = {};
-      weekOverridePickedRef(weekIdx)[i][meal] = true;
-      clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
+      const overridesMap = weekOverridesRef(weekIdx);
+      const prevOverrideSlot = overridesMap[i] ? overridesMap[i][meal] : undefined;
+      const pickedMap = weekOverridePickedRef(weekIdx);
+      const prevPicked = pickedMap[i] ? pickedMap[i][meal] : undefined;
+      const mealsDoneMap = weekMealsDoneRef(weekIdx);
+      const prevDone = mealsDoneMap[i] ? mealsDoneMap[i][meal] : undefined;
+      const linksSnap = snapshotMealLinks(key);
+      writeMealPrincipale(overridesMap, i, meal, recipeName);
+      if(!pickedMap[i]) pickedMap[i] = {};
+      pickedMap[i][meal] = true;
+      clearMealFlag(mealsDoneMap, i, meal);
       clearDayLink(key);
       unlinkDaysPointingTo(key);
       state.swapOpenDay = null;
       persist(); render();
+      showUndoToast('Ricetta sostituita', ()=>{
+        restoreMealLinks(linksSnap);
+        const om = weekOverridesRef(weekIdx);
+        if(prevOverrideSlot !== undefined){
+          if(!om[i]) om[i] = emptyDaySlot();
+          om[i][meal] = prevOverrideSlot;
+        } else if(om[i]){
+          delete om[i][meal];
+        }
+        const pd = weekOverridePickedRef(weekIdx);
+        if(prevPicked !== undefined){
+          if(!pd[i]) pd[i] = {};
+          pd[i][meal] = prevPicked;
+        } else if(pd[i]){
+          delete pd[i][meal];
+        }
+        if(prevDone !== undefined){
+          const md = weekMealsDoneRef(weekIdx);
+          if(!md[i]) md[i] = {};
+          md[i][meal] = prevDone;
+        }
+        persist(); render();
+      });
     });
   });
 
