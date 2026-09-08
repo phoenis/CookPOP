@@ -1777,18 +1777,16 @@ const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'
 // state.whatsNewSeen, poi resta chiusa finché non si cambia di nuovo
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
-const WHATS_NEW = null;
-/* Esempio:
 const WHATS_NEW = {
   version: '2026-09-08',
   title: 'Novità',
   items: [
-    'Ora puoi annullare anche lo swap tra ricette e l\'eliminazione di una settimana.',
+    'Il tasto "Annulla" ora compare anche spuntando in Modalità spesa, con Elimina/Svuota/Sposta in dispensa, generando o rigenerando il menù, eliminando una ricetta o una settimana, e cambiando la ricetta di un pasto.',
     'Nuovo campo di ricerca in Dispensa.',
-    '48 ricette nuove in catalogo, incluse le prime ricette dolci.'
+    '48 ricette nuove nel catalogo, con procedimento e fonte — comprese le prime ricette dolci (Tiramisù, panna cotta, torta di mele).',
+    'Sistemata la tipologia di piatto (primo/secondo/contorno/ecc.) su tutte le ricette esistenti.'
   ]
 };
-*/
 function renderWhatsNewModal(){
   if(!WHATS_NEW || state.whatsNewSeen === WHATS_NEW.version) return '';
   return `
