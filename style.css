@@ -551,6 +551,11 @@
   .inv-name{ flex:1; min-width:0; text-align:left; font-weight:var(--weight-medium); font-size:var(--text-small); justify-content: left; }
   .is-text.inv-name{ padding:0.25rem 0; }
   .inv-name:hover{ text-decoration:underline; }
+  .ingredient-manager-list{ display:flex; flex-direction:column; gap:0.125rem; margin-top:var(--space-small); }
+  .ingredient-manager-row{ display:flex; align-items:center; gap:var(--gap-icon); width:100%; text-align:left; padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:none; background:none; cursor:pointer; font-family:var(--font-family); color:var(--ink); border-bottom:1px dashed var(--line); }
+  .ingredient-manager-row:hover{ background:var(--surface-2); }
+  .ingredient-manager-name{ flex:1; min-width:0; font-size:var(--text-small); }
+  .ingredient-manager-status{ font-size:var(--text-xsmall); color:var(--ink-light); white-space:nowrap; }
   .luogo-picker-backdrop{ position:fixed; inset:0; z-index:150; background:transparent; }
   .luogo-picker{ position:absolute; top:100%; left:0; margin-top:var(--space-xxsmall); z-index:151; display:flex; gap:0.125rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-pill); padding:var(--space-xxsmall); box-shadow:var(--shadow-dropdown); }
   .luogo-picker-opt{ width:1.875rem; height:1.875rem; font-size:var(--text-small); line-height:1; padding: var(--space-xxsmall);}

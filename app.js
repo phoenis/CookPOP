@@ -117,7 +117,7 @@ const LUOGO_ICON = {
 const DEPT_RULES = [
   ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
   ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['pesce','pesce'],
-  ['manzo','carne'], ['pollo','carne'], ['maiale','carne'], ['salsiccia','carne'], ['tacchino','carne'], ['vitello','carne'], ['agnello','carne'], ['straccetti','carne'], ['macinato','carne'],
+  ['manzo','carne'], ['pollo','carne'], ['maiale','carne'], ['salsiccia','carne'], ['tacchino','carne'], ['vitello','carne'], ['agnello','carne'], ['straccetti','carne'], ['macinato','carne'], ['prosciutto','carne'], ['pancetta','carne'], ['guanciale','carne'], ['coniglio','carne'],
   ['mozzarella','latticini'], ['ricotta','latticini'], ['parmigiano','latticini'], ['formaggio','latticini'], ['grana','latticini'], ['latte','latticini'], ['burro','latticini'], ['yogurt','latticini'], ['stracchino','latticini'], ['provola','latticini'],
   ['uova','uova'], ['uovo','uova'],
   ['pane','pane'], ['farina','pane'], ['pasta','pane'], ['riso','pane'], ['lievito','pane'],
@@ -129,6 +129,7 @@ const DEPT_RULES = [
   ['senape','dispensa'], ['miele','dispensa'], ['pangrattato','dispensa'],
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
+  ['melone','verdura'], ['anguria','verdura'], ['mela','verdura'], ['pera','verdura'], ['limone','verdura'], ['arancia','verdura'], ['banana','verdura'], ['fragol','verdura'], ['uva','verdura'],
 ];
 // "Di solito li hai già" non è più un flag manuale: un ingrediente parte già
 // spuntato in Spesa quando in Dispensa ce n'è davvero scorta (vedi
@@ -628,6 +629,17 @@ function allKnownIngredientNamesWithGroups(){
   return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
 }
 
+// Come allKnownIngredientNames, ma include anche gli extra aggiunti a mano
+// in Spesa e la lista "Ogni settimana": per la vista "Gestisci ingredienti"
+// in Dispensa serve davvero OGNI nome noto al sistema, non solo quello utile
+// al suggeritore dell'autocomplete.
+function allIngredientNamesForManager(){
+  const names = new Set(allKnownIngredientNames());
+  Object.values(state.shopExtras).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
+  DATA.generalShopping.forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
+  return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
+}
+
 // Combobox "leggera" per un campo nome-ingrediente creato fuori dal normale
 // ciclo render() (righe aggiunte a mano nella modale Modifica ricetta): pura
 // manipolazione DOM, non tocca state/render per non perdere quanto già
@@ -705,6 +717,8 @@ const state = {
   pantryGroupsModalOpen: false,
   pantryView: 'categoria', // non persistito (vedi persist()): stesso motivo di shopView
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
+  ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
+  ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   whatsNewSeen: null, // ultima WHATS_NEW.version già chiusa dall'utente (vedi renderWhatsNewModal)
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
@@ -1906,6 +1920,7 @@ const MODAL_CHECKS = [
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen, ()=>{ state.pantryGroupsModalOpen = false; }],
+  [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
   [()=> !!state.pantryEditKey, ()=>{ state.pantryEditKey = null; }],
   [()=> !!state.pantryAddModalOpen, ()=>{ state.pantryAddModalOpen = false; }],
@@ -3850,6 +3865,47 @@ function renderDispensa(){
       </div>
     </div>` : '';
 
+  // "Gestisci ingredienti": anagrafica di OGNI ingrediente noto al sistema
+  // (Dispensa, ricette, Spesa aggiunta a mano, "Ogni settimana"), non solo
+  // quelli con scorta > 0 — tocca una riga per modificarne categoria/luogo/
+  // unità anche se non l'hai mai avuto in Dispensa (riusa l'edit modale
+  // esistente: se l'ingrediente non ha ancora una voce in pantryItems, gliene
+  // crea una a quantità 0 al primo tocco — resta invisibile nelle viste
+  // normali finché non imposti una quantità reale, esattamente come i
+  // "Finiti", vedi sotto).
+  const ingredientManagerModal = state.ingredientManagerOpen ? (()=>{
+    const search = (state.ingredientManagerSearch||'').trim().toLowerCase();
+    const names = allIngredientNamesForManager().filter(n => !search || n.toLowerCase().includes(search));
+    const rows = names.map(name=>{
+      const key = name.trim().toLowerCase();
+      const it = state.pantryItems[key];
+      const cat = (it && it.cat) || classifyDept(name);
+      const statusText = (it && typeof it.qty === 'number' && it.qty > 0)
+        ? `${it.qty}${it.unit ? ' ' + it.unit : ''} · ${LUOGO_LABEL[it.luogo || 'dispensa']}`
+        : 'Non in dispensa';
+      return `
+      <button type="button" class="ingredient-manager-row" data-manage-ingredient="${escapeAttr(name)}">
+        <span class="dept-icon">${DEPT_ICON[cat]}</span>
+        <span class="ingredient-manager-name">${escapeHtml(name)}</span>
+        <span class="ingredient-manager-status">${escapeHtml(statusText)}</span>
+      </button>`;
+    }).join('');
+    return `
+    <div class="filters-modal-backdrop" data-close-ingredient-manager>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Gestisci ingredienti</h3>
+          <button class="btn is-icon filters-close-btn" data-close-ingredient-manager>✕</button>
+        </div>
+        <p class="section-sub">Tutti gli ingredienti noti al sistema — in Dispensa, nelle ricette o aggiunti a mano in Spesa. Tocca per modificarne categoria, luogo o quantità.</p>
+        <input class="input-search" type="search" id="ingredient-manager-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.ingredientManagerSearch||'')}">
+        <div class="ingredient-manager-list">
+          ${rows || `<p class="ing-empty">Nessun ingrediente trovato.</p>`}
+        </div>
+      </div>
+    </div>`;
+  })() : '';
+
   // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
   // qui restano fuori dalle viste normali per luogo/categoria e finiscono in un
   // accordion a parte, chiuso di default — non è un luogo assegnabile, solo
@@ -3892,12 +3948,14 @@ function renderDispensa(){
       <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
     </div>
+    <button type="button" class="btn is-text" id="open-ingredient-manager">🗂️ Gestisci tutti gli ingredienti</button>
     ${body}
     ${finishedSection}
     <div class="save-hint"></div>
     ${editModal}
     ${addModal}
     ${groupsModal}
+    ${ingredientManagerModal}
     <div class="buttons-fixed">
     <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
     <button class="btn is-fixed" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
@@ -5331,6 +5389,39 @@ function attachHandlers(){
       if(e.target.hasAttribute('data-stop-close')) return;
       state.pantryGroupsModalOpen = false;
       render();
+    });
+  });
+  const openIngredientManagerBtn = document.getElementById('open-ingredient-manager');
+  if(openIngredientManagerBtn) openIngredientManagerBtn.addEventListener('click', ()=>{
+    state.ingredientManagerOpen = true;
+    render();
+  });
+  document.querySelectorAll('[data-close-ingredient-manager]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.ingredientManagerOpen = false;
+      render();
+    });
+  });
+  const ingredientManagerSearch = document.getElementById('ingredient-manager-search');
+  if(ingredientManagerSearch) ingredientManagerSearch.addEventListener('input', e=>{
+    state.ingredientManagerSearch = e.target.value;
+    render();
+    const el = document.getElementById('ingredient-manager-search');
+    el.focus(); el.selectionStart = el.value.length;
+  });
+  // Riusa l'edit modale già esistente di Dispensa: se l'ingrediente non ha
+  // ancora una voce in pantryItems gliene crea una a quantità 0 (invisibile
+  // nelle viste normali finché non imposti una scorta reale, come i
+  // "Finiti"), poi apre lo stesso modale di modifica di sempre.
+  document.querySelectorAll('[data-manage-ingredient]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const name = e.currentTarget.dataset.manageIngredient;
+      const key = name.trim().toLowerCase();
+      if(!state.pantryItems[key]) upsertPantryItem(name, 'dispensa', 0);
+      state.ingredientManagerOpen = false;
+      state.pantryEditKey = key;
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-group-label]').forEach(inp=>{
