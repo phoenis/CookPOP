@@ -684,6 +684,7 @@ const state = {
   },
   pantryGroupsModalOpen: false,
   pantryView: 'categoria', // non persistito (vedi persist()): stesso motivo di shopView
+  pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
@@ -1572,6 +1573,37 @@ function toggleShopAssignee(store){
 }
 // Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
 // state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
+// Cattura l'intera pianificazione (tutte le settimane) prima di un'azione che
+// la tocca in profondità — generateWeek e l'eliminazione di una ricetta dal
+// Ricettario: entrambe possono scrivere non solo sulla settimana bersaglio ma
+// anche su dayLinks/dayPortions/mealLocked di altre settimane (un avanzo
+// sciolto altrove, un blocco invalidato), quindi il ripristino via "Annulla"
+// deve coprire tutti questi campi insieme, non solo quelli della settimana
+// diretta interessata.
+function snapshotPlanningState(){
+  return {
+    weekBaseline: JSON.parse(JSON.stringify(state.weekBaseline)),
+    weekOverrides: JSON.parse(JSON.stringify(state.weekOverrides)),
+    weekOverridePicked: JSON.parse(JSON.stringify(state.weekOverridePicked)),
+    mealsDone: JSON.parse(JSON.stringify(state.mealsDone)),
+    extraWeeks: JSON.parse(JSON.stringify(state.extraWeeks)),
+    dayLinks: JSON.parse(JSON.stringify(state.dayLinks)),
+    dayLinkNotes: JSON.parse(JSON.stringify(state.dayLinkNotes)),
+    dayPortions: JSON.parse(JSON.stringify(state.dayPortions)),
+    mealLocked: JSON.parse(JSON.stringify(state.mealLocked))
+  };
+}
+function restorePlanningState(snap){
+  state.weekBaseline = snap.weekBaseline;
+  state.weekOverrides = snap.weekOverrides;
+  state.weekOverridePicked = snap.weekOverridePicked;
+  state.mealsDone = snap.mealsDone;
+  state.extraWeeks = snap.extraWeeks;
+  state.dayLinks = snap.dayLinks;
+  state.dayLinkNotes = snap.dayLinkNotes;
+  state.dayPortions = snap.dayPortions;
+  state.mealLocked = snap.mealLocked;
+}
 function generateWeek(weekIdx){
   // Pasti bloccati (state.mealLocked) di questa settimana: catturo la loro
   // ricetta effettiva ATTUALE (principale+contorni) e l'eventuale link avanzo
@@ -3458,9 +3490,11 @@ function renderDispensa(){
   // si spunta un articolo in Spesa, e si modifica liberamente a mano. Una
   // voce senza quantità (0) non compare: la quantità è un contatore che si
   // vede solo una volta impostato.
+  const searchTerm = state.pantrySearch.trim().toLowerCase();
   const items = Object.entries(state.pantryItems)
     .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
-    .filter(it => typeof it.qty === 'number' && it.qty > 0);
+    .filter(it => typeof it.qty === 'number' && it.qty > 0)
+    .filter(it => !searchTerm || it.nome.toLowerCase().includes(searchTerm));
 
   function itemRow(it){
     const editing = state.pantryEditingKey === it.key;
@@ -3497,7 +3531,9 @@ function renderDispensa(){
  */
   let body;
   if(!items.length){
-    body = `<p class="ing-empty">Vuota per ora — spunta qualcosa in Spesa o tocca il + per aggiungere un ingrediente.</p>`;
+    body = searchTerm
+      ? `<p class="ing-empty">Nessun ingrediente trovato per "${escapeHtml(state.pantrySearch.trim())}".</p>`
+      : `<p class="ing-empty">Vuota per ora — spunta qualcosa in Spesa o tocca il + per aggiungere un ingrediente.</p>`;
   } else if(state.pantryView === 'luogo'){
     const byLuogo = {};
     items.forEach(it=>{ (byLuogo[it.luogo] = byLuogo[it.luogo] || []).push(it); });
@@ -3710,6 +3746,7 @@ function renderDispensa(){
 
   return `
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
+    <input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}">
     <div class="view-toggle">
       <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
@@ -4306,7 +4343,15 @@ function attachHandlers(){
     });
   });
   document.querySelectorAll('[data-generate-week]').forEach(btn=>{
-    btn.addEventListener('click', e=>{ generateWeek(parseInt(e.currentTarget.dataset.generateWeek,10)); });
+    btn.addEventListener('click', e=>{
+      const weekIdx = parseInt(e.currentTarget.dataset.generateWeek,10);
+      const snap = snapshotPlanningState();
+      generateWeek(weekIdx);
+      showUndoToast('Menù rigenerato', ()=>{
+        restorePlanningState(snap);
+        persist(); render();
+      });
+    });
   });
   document.querySelectorAll('[data-remove-week]').forEach(btn=>{
     btn.addEventListener('click', e=>{ removeWeek(parseInt(e.currentTarget.dataset.removeWeek,10)); });
@@ -4752,6 +4797,11 @@ function attachHandlers(){
   document.querySelectorAll('[data-delete-recipe]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.deleteRecipe;
+      const planningSnap = snapshotPlanningState();
+      const prevRecipeEdit = state.recipeEdits[name];
+      const prevRecipeIngredients = state.recipeIngredients[name];
+      const prevCustomRecipe = state.customRecipes[name];
+      const hadHidden = Object.prototype.hasOwnProperty.call(state.hiddenRecipes, name);
       // Toglie ogni riferimento dalla pianificazione PRIMA di cancellare i
       // dati della ricetta stessa — altrimenti restava scelta (o persino
       // ripescata rigenerando, se il pasto era bloccato) su qualunque
@@ -4764,6 +4814,14 @@ function attachHandlers(){
       if(state.expandedRecipe === name) state.expandedRecipe = null;
       state.recipeEditName = null;
       persist(); render();
+      showUndoToast('Ricetta eliminata', ()=>{
+        restorePlanningState(planningSnap);
+        if(prevRecipeEdit !== undefined) state.recipeEdits[name] = prevRecipeEdit;
+        if(prevRecipeIngredients !== undefined) state.recipeIngredients[name] = prevRecipeIngredients;
+        if(prevCustomRecipe !== undefined) state.customRecipes[name] = prevCustomRecipe;
+        if(hadHidden) state.hiddenRecipes[name] = true; else delete state.hiddenRecipes[name];
+        persist(); render();
+      });
     });
   });
 
@@ -4816,6 +4874,8 @@ function attachHandlers(){
 
   const fSearch = document.getElementById('f-search');
   if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); const el=document.getElementById('f-search'); el.focus(); el.selectionStart = el.value.length; });
+  const pantrySearch = document.getElementById('pantry-search');
+  if(pantrySearch) pantrySearch.addEventListener('input', e=>{ state.pantrySearch = e.target.value; render(); const el=document.getElementById('pantry-search'); el.focus(); el.selectionStart = el.value.length; });
 
   document.querySelectorAll('.chip-row [data-f]').forEach(btn=>{
     btn.addEventListener('click', e=>{
