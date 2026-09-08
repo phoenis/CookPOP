@@ -352,7 +352,14 @@ function scaleQtyText(text, ratio){
 // ovunque si apra il dettaglio di una ricetta.
 // ratio scala le quantità visualizzate (e quelle mandate in Spesa) per un
 // eventuale numero di porzioni diverso da quello base — vedi renderDayCard.
-function renderIngredientsSection(ing, ratio){
+// ctx (opzionale) collega la lista a un pasto pianificato specifico
+// ({weekIdx, i, meal, role}, role: 'p' principale o 'c0'/'c1'/... contorni —
+// vedi dayIngKey): quando presente, "Aggiungi N ingredienti" riporta quelle
+// righe in Spesa nella sezione del pasto invece che tra "Aggiunti a mano" —
+// coerente con l'aggregazione automatica di buildShopFlat, che le include già
+// di suo a meno che non risultino scartate. Senza ctx (es. ricetta aperta dal
+// Ricettario, senza un giorno/pasto a cui è associata) resta "Aggiunti a mano".
+function renderIngredientsSection(ing, ratio, ctx){
   ratio = ratio || 1;
   if(!ing.length) return `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta ancora.</div>`;
   const STATUS_LABEL = { 'in-casa':'In casa', 'poco':'Scorta bassa', 'manca':'Manca' };
@@ -365,8 +372,15 @@ function renderIngredientsSection(ing, ratio){
   // ri-derivare al click gli ingredienti dal solo nome ricetta): necessario
   // da quando questa lista può unire più ricette (principale + contorni di
   // uno stesso pasto), che il vecchio "solo nome" non saprebbe più ricostruire.
-  const mancanti = ing.filter(it => pantryStatusFor(it.ingrediente, scaleQtyText(it.qta, ratio)) !== 'in-casa')
-    .map(it => ({ ingrediente: it.ingrediente, qta: scaleQtyText(it.qta, ratio) || '' }));
+  // idx = posizione nell'array ing, la stessa che usa buildShopFlat per
+  // costruire la chiave dayIngKey di questo stesso ingrediente/ricetta/pasto.
+  const mancanti = ing.map((it, idx) => ({ it, idx }))
+    .filter(({it}) => pantryStatusFor(it.ingrediente, scaleQtyText(it.qta, ratio)) !== 'in-casa')
+    .map(({it, idx}) => ({
+      ingrediente: it.ingrediente,
+      qta: scaleQtyText(it.qta, ratio) || '',
+      key: ctx ? dayIngKey(ctx.weekIdx, ctx.i, ctx.meal, ctx.role, idx) : null
+    }));
   const mancantiBtn = mancanti.length
     ? `<div class="button-wrapper"><button class="btn is-small" data-mancanti-in-spesa="${escapeAttr(JSON.stringify(mancanti))}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button></div>`
     : '';
@@ -380,11 +394,11 @@ function renderIngredientsSection(ing, ratio){
 // solo mescolata nella lista ingredienti comune del pasto. ratio scala le
 // quantità sulle stesse porzioni-obiettivo impostate per il pasto (vedi
 // renderMealBlock), calcolato rispetto alle porzioni base di QUESTA ricetta.
-function renderContornoDetailBox(name, ratio){
+function renderContornoDetailBox(name, ratio, ctx){
   const rec = getRecipeMeta(name);
   const det = getRecipeDetails(name);
   const ing = getIngredientsFor(name);
-  const ingHtml = renderIngredientsSection(ing, ratio);
+  const ingHtml = renderIngredientsSection(ing, ratio, ctx);
   const tagsHtml = rec ? `
     <div class="detail-tags">
       <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
@@ -2340,16 +2354,16 @@ function renderMealDetailScreen(weekIdx, i, meal){
   const currentPortions = basePortions ? (state.dayPortions[mk] || basePortions) : null;
   const portionsRatio = basePortions ? currentPortions / basePortions : 1;
   const ing = name ? getIngredientsFor(name) : [];
-  const ingHtml = renderIngredientsSection(ing, portionsRatio);
+  const ingHtml = renderIngredientsSection(ing, portionsRatio, { weekIdx, i, meal, role: 'p' });
   // Ogni contorno ha il proprio dettaglio completo (tag/ingredienti/
   // procedimento/note), scalato sulle stesse porzioni-obiettivo del pasto
   // ma rispetto alle porzioni BASE di quella ricetta (può differire da
   // quella del principale) — non più solo mescolato nella lista sopra.
-  const contorniDetailHtml = contorni.map(c=>{
+  const contorniDetailHtml = contorni.map((c,ci)=>{
     const cDet = getRecipeDetails(c);
     const cBase = cDet ? parsePortionsBase(cDet.porzioni) : null;
     const cRatio = (cBase && currentPortions) ? currentPortions / cBase : 1;
-    return renderContornoDetailBox(c, cRatio);
+    return renderContornoDetailBox(c, cRatio, { weekIdx, i, meal, role: `c${ci}` });
   }).join('');
   const portionsControl = basePortions ? `
     <div class="portions-row">
@@ -3236,7 +3250,7 @@ function renderSpesa(){
     const giornoMergedAll = [];
     body = allPlannedShoppingMeals()
       .filter(({weekIdx, i}) => weekIdx !== 0 || WEEK_DISPLAY_ORDER.indexOf(i) >= todayPos)
-      .map(({weekIdx,i,meal,giorno,dateLabel,dishLabel})=>{
+      .map(({weekIdx,i,meal,giorno,dateLabel,dishLabel,principale,contorni})=>{
       const context = `${giorno} ${dateLabel} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
       const dayItems = mainFlat.filter(it => it.context === context);
       const mergedDay = {};
@@ -3247,9 +3261,17 @@ function renderSpesa(){
       });
       const mergedDayItems = Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
       giornoMergedAll.push(...mergedDayItems);
+      // Vuota per due motivi ben diversi: la ricetta non ha ingredienti
+      // salvati (va aperta dal Menù per aggiungerli) oppure ce li ha tutti,
+      // sono solo già "in casa" e quindi filtrati altrove da buildShopFlat —
+      // in quel caso è una buona notizia, non un dato mancante.
+      const totalIngCount = getIngredientsFor(principale).length
+        + contorni.reduce((n,c)=> n + getIngredientsFor(c).length, 0);
       const rows = mergedDayItems.length
         ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.dove)).join('')
-        : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`;
+        : (totalIngCount > 0
+          ? `<div class="ing-empty">✅ Hai tutti gli ingredienti, puoi cucinare!</div>`
+          : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`);
       const sectionId = `giorno_${weekIdx}_${i}_${meal}`;
       const isOpen = !state.shopSectionCollapsed[sectionId];
       return `
@@ -4458,6 +4480,15 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const mancanti = JSON.parse(e.currentTarget.dataset.mancantiInSpesa);
       mancanti.forEach(it=>{
+        if(it.key){
+          // Collegato a un pasto pianificato: buildShopFlat lo aggrega già
+          // da solo nella sezione di quel pasto, a meno che la riga non
+          // risulti scartata (o già spuntata) — qui basta assicurarsi che
+          // sia visibile, senza duplicarla come voce "Aggiunti a mano".
+          delete state.shopDismissed[it.key];
+          state.shopChecked[it.key] = false;
+          return;
+        }
         const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
         if(already) return;
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
