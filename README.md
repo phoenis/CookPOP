@@ -8,8 +8,11 @@ Nessuna build: si apre e basta. Online su https://phoenis.github.io/CookPOP/
 Dati e logica vivono in `app.js` (un oggetto `DATA` incorporato come JSON
 compatto in cima al file, più tutta la logica dell'app), lo stile in
 `style.css`, `index.html` li carica entrambi:
-- Un oggetto `DATA` con **188 ricette**, tutte "curate" con ingredienti reali,
-  procedimento, tempi e (dove trovato) link alla fonte (vedi `DATA.recipeDetails`).
+- Un oggetto `DATA` con **237 ricette** (vedi `DATA.recipeDetails`): la
+  maggior parte "curate" con ingredienti reali, procedimento, tempi e (dove
+  trovato) link alla fonte; 48 importate più di recente hanno ingredienti e
+  metadati completi ma `procedimento: []` ancora da scrivere (vedi Curatela
+  delle ricette più sotto).
 - Persistenza condivisa su Firebase Realtime Database (menù della settimana,
   spesa spuntata, inventario freezer, ecc.): chi apre la pagina legge/scrive lo
   stesso stato, con aggiornamenti in tempo reale su tutti i dispositivi. La
@@ -47,8 +50,12 @@ resto dell'app (non viene incorporato in `index.html`).
 
 ## Curatela delle ricette
 
-Tutte le 188 ricette hanno ormai `recipeDetails` (ingredienti precisi,
-procedimento, tempo esatto, e link alla fonte dove trovato).
+La maggior parte delle ricette ha ormai `recipeDetails` completo (ingredienti
+precisi, procedimento, tempo esatto, e link alla fonte dove trovato). Fanno
+eccezione 48 ricette importate da un CSV categorizzato dall'utente (settembre
+2026): hanno ingredienti e metadati (categoria, tempo, stagioni, tipologia,
+ecc.) ma `procedimento: []` vuoto — vanno curate una per una seguendo il
+processo qui sotto prima di considerarle complete.
 
 Per curare o correggere una ricetta: cerca fonti italiane affidabili (2-3),
 scrivi ingredienti/procedimento con parole proprie (mai copiare testo, per
@@ -76,8 +83,14 @@ descrive davvero un prodotto diverso da comprare (es. `"Ricotta"` vs
 ## Tassonomia dei filtri
 
 Ogni ricetta ha, oltre ai campi originali del foglio:
-- `categoriaNew`: una delle 8 — pasta, riso, carne, pesce, legumi, uova,
-  verdure, forno
+- `categoriaNew`: una delle 9 — pasta, riso, carne, pesce, legumi, uova,
+  verdure, forno, dolci
+- `tipologia`: portata del pasto, indipendente da `categoriaNew` (una
+  bistecca è "carne" come categoria ma "secondo" come tipologia) — antipasto,
+  primo, secondo, contorno, unico (piatto unico), dolce. Il generatore
+  automatico (`pickWeekRecipes`) sceglie il principale da tutto il catalogo
+  tranne i dolci, e abbina un contorno solo quando il principale scelto è un
+  "secondo"
 - `tempoBucket`: express (≤20min), veloce (20-30), normale (30-45),
   lunga (45-90), progetto (>90)
 - `pianificazione`: nessuna, ammollo, scongelamento, marinatura,
@@ -100,4 +113,4 @@ lo stesso schema per coerenza con i filtri esistenti.
   accento primario, tonalità acciaio per il freezer, grigio neutro per i tag
   tempo
 - Icone categoria: 🍝 pasta, 🍚 riso, 🥩 carne, 🐟 pesce, 🫘 legumi, 🥚 uova,
-  🥦 verdure, 🥧 forno
+  🥦 verdure, 🥧 forno, 🍰 dolci
