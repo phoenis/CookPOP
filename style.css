@@ -132,7 +132,7 @@
 
   /* topbar: nome app + ingranaggio impostazioni, sticky in cima come una vera app */
   .topbar{ position:sticky; top:0; z-index:90; background:var(--bg); border-bottom:1px solid var(--line); }
-  .topbar-inner{ max-width:60rem; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:var(--space-small) var(--space-medium); padding-top:calc(0.75rem + env(safe-area-inset-top)); }
+  .topbar-inner{ max-width:60rem; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:var(--space-small) var(--space-medium); padding-top:calc(0.75rem + env(safe-area-inset-top)); position:relative; }
   .topbar-title{ font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-medium); }
 
   /* ==== pulsanti: base condivisa (.btn) + comboclass per le varianti ====
@@ -182,6 +182,16 @@
 
   .btn-settings{ width:2.25rem; height:2.25rem; border:none; background:transparent; }
   .btn-settings:hover{ background:var(--surface); }
+  /* Menu "tre puntini" della topbar (stile WhatsApp): un piccolo pannello
+     ancorato sotto l'icona, non una modale a tutto schermo — sfondo
+     trasparente a schermo intero solo per intercettare il tap fuori e
+     richiuderlo, come .luogo-picker-backdrop. */
+  .topbar-menu-backdrop{ display:none; position:fixed; inset:0; z-index:150; background:transparent; }
+  .topbar-menu-backdrop.open{ display:block; }
+  .topbar-menu{ position:absolute; top:100%; right:var(--space-medium); margin-top:var(--space-xxsmall); z-index:151; display:flex; flex-direction:column; min-width:12rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-modal); padding:var(--space-xxsmall); box-shadow:var(--shadow-dropdown); }
+  .topbar-menu-item{ display:flex; align-items:center; gap:var(--gap-icon); width:100%; text-align:left; padding:var(--space-xsmall) var(--space-small); border:none; background:none; border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-small); color:var(--ink); cursor:pointer; }
+  .topbar-menu-item:hover{ background:var(--surface-2); }
+  .topbar-menu-sep{ height:1px; background:var(--line); margin:var(--space-xxsmall) 0; }
 
   /* pulsante flottante "+" (stile WhatsApp) per aggiungere un ingrediente in Spesa */
   .buttons-fixed, .input_wrapper{position:fixed; right:1rem; bottom:calc(4.5rem + env(safe-area-inset-bottom)); z-index:80; display: flex; flex-direction: column; gap: var(--gap-btn); align-items: end;}

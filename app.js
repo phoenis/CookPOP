@@ -1921,6 +1921,14 @@ function closeSettingsBackdrop(){
   const el = document.getElementById('settings-backdrop');
   if(el) el.classList.remove('open');
 }
+function isTopbarMenuOpen(){
+  const el = document.getElementById('topbar-menu-backdrop');
+  return !!(el && el.classList.contains('open'));
+}
+function closeTopbarMenu(){
+  const el = document.getElementById('topbar-menu-backdrop');
+  if(el) el.classList.remove('open');
+}
 const MODAL_CHECKS = [
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; }],
@@ -1941,6 +1949,7 @@ const MODAL_CHECKS = [
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
   [()=> !!state.expandedDay, ()=>{ state.expandedDay = null; }],
   [()=> isSettingsBackdropOpen(), ()=> closeSettingsBackdrop()],
+  [()=> isTopbarMenuOpen(), ()=> closeTopbarMenu()],
   [()=> !!(WHATS_NEW && state.whatsNewSeen !== WHATS_NEW.version), ()=>{ if(WHATS_NEW) state.whatsNewSeen = WHATS_NEW.version; persist(); }],
 ];
 function countOpenModals(){
@@ -3640,18 +3649,15 @@ function renderPrep(){
     ${newRecipeModal}
     ${recipeDetailScreen}
     <div class="buttons-fixed">
-     <button class="btn is-fixed" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
-            ${state.prepSearchOpen ? `
-                    <div class="search_wrapper">
-                    <div class="input_wrapper">
-                      <input class="input-search" type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
-                      <button class="btn is-filters" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
-                    </div>
+      ${state.prepSearchOpen ? `
+              <div class="search_wrapper">
+              <div class="input_wrapper">
+                <input class="input-search" type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
+                <button class="btn is-filters" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
+              </div>
       <button type="button" class="btn is-fixed" id="prep-search-close" aria-label="Chiudi ricerca">✕</button>
       </div>
       ` : `<button type="button" class="btn is-fixed${state.filters.search ? ' active' : ''}" id="prep-search-toggle" aria-label="Cerca ricetta">${SEARCH_ICON_SVG}${state.filters.search ? ' Cerca' : ''}</button>`}
-      
-
     </div>
   `;
 }
@@ -3964,7 +3970,6 @@ function renderDispensa(){
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
       
     </div>
-    <button type="button" class="btn is-text" id="open-ingredient-manager">🗂️ Gestisci tutti gli ingredienti</button>
     ${body}
     ${finishedSection}
     <div class="save-hint"></div>
@@ -3974,7 +3979,6 @@ function renderDispensa(){
     ${ingredientManagerModal}
     <div class="buttons-fixed">
       <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
-      <button class="btn is-fixed" id="dispensa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
       <div class="search_wrapper">
         ${state.pantrySearchOpen ? `<div class="input_wrapper"><input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}"></div>` : ''}
         ${state.pantrySearchOpen
@@ -5109,8 +5113,6 @@ function attachHandlers(){
     render();
   });
 
-  const prepFab = document.getElementById('prep-fab');
-  if(prepFab) prepFab.addEventListener('click', ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; render(); });
   document.querySelectorAll('[data-close-new-recipe-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
@@ -5407,8 +5409,6 @@ function attachHandlers(){
     pantryAddBtn.addEventListener('click', doAdd);
     nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
   }
-  const dispensaFab = document.getElementById('dispensa-fab');
-  if(dispensaFab) dispensaFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
   document.querySelectorAll('[data-close-pantry-add-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
@@ -5436,11 +5436,6 @@ function attachHandlers(){
       state.pantryGroupsModalOpen = false;
       render();
     });
-  });
-  const openIngredientManagerBtn = document.getElementById('open-ingredient-manager');
-  if(openIngredientManagerBtn) openIngredientManagerBtn.addEventListener('click', ()=>{
-    state.ingredientManagerOpen = true;
-    render();
   });
   document.querySelectorAll('[data-close-ingredient-manager]').forEach(el=>{
     el.addEventListener('click', e=>{
@@ -5688,14 +5683,29 @@ function goToTab(delta){
   }, { passive: true });
 })();
 
+// Voci aggiuntive del menu "tre puntini" specifiche della tab aperta in quel
+// momento — vedi TAB_MENU_ITEMS più sotto. "Impostazioni" c'è sempre, in
+// testa, indipendentemente dalla tab.
+const TAB_MENU_ITEMS = {
+  dispensa: [
+    { label: '🗂️ Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
+    { label: '+ Aggiungi ingrediente', action: ()=>{ state.pantryAddModalOpen = true; } }
+  ],
+  prep: [
+    { label: '+ Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; } }
+  ]
+};
+
 (function(){
-  const settingsBtn = document.getElementById('settings-btn');
+  const topbarMenuBtn = document.getElementById('topbar-menu-btn');
+  const topbarMenuBackdrop = document.getElementById('topbar-menu-backdrop');
+  const topbarMenu = document.getElementById('topbar-menu');
   const settingsBackdrop = document.getElementById('settings-backdrop');
   const settingsClose = document.getElementById('settings-close');
   const profilePanel = document.getElementById('profile-panel');
   const themeRow = document.getElementById('theme-toggle-row');
   const accentRow = document.getElementById('accent-swatch-row');
-  if(!settingsBtn || !settingsBackdrop) return;
+  if(!topbarMenuBtn || !settingsBackdrop) return;
   const refreshThemeRow = ()=>{
     if(!themeRow) return;
     const active = currentTheme();
@@ -5716,9 +5726,45 @@ function goToTab(delta){
     reconcileModalHistory();
   };
   const close = ()=>{ settingsBackdrop.classList.remove('open'); reconcileModalHistory(); };
-  settingsBtn.addEventListener('click', open);
   if(settingsClose) settingsClose.addEventListener('click', close);
   settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
+
+  // Menu "tre puntini" della topbar: Impostazioni + le voci di TAB_MENU_ITEMS
+  // per la tab corrente, ricalcolate a ogni apertura così restano coerenti
+  // anche se nel frattempo si è cambiata tab.
+  let currentExtraItems = [];
+  const renderTopbarMenuContent = ()=>{
+    currentExtraItems = TAB_MENU_ITEMS[state.tab] || [];
+    const extraHtml = currentExtraItems.length
+      ? `<div class="topbar-menu-sep"></div>` + currentExtraItems.map((it,idx)=>`<button type="button" class="topbar-menu-item" data-topbar-menu-action="${idx}">${it.label}</button>`).join('')
+      : '';
+    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>⚙️ Impostazioni</button>${extraHtml}`;
+  };
+  const openTopbarMenu = ()=>{
+    renderTopbarMenuContent();
+    if(topbarMenuBackdrop) topbarMenuBackdrop.classList.add('open');
+    reconcileModalHistory();
+  };
+  topbarMenuBtn.addEventListener('click', ()=>{
+    if(isTopbarMenuOpen()) closeTopbarMenu(); else openTopbarMenu();
+    reconcileModalHistory();
+  });
+  if(topbarMenuBackdrop){
+    topbarMenuBackdrop.addEventListener('click', e=>{
+      const settingsItem = e.target.closest('[data-topbar-menu-settings]');
+      if(settingsItem){ closeTopbarMenu(); open(); return; }
+      const actionBtn = e.target.closest('[data-topbar-menu-action]');
+      if(actionBtn){
+        const item = currentExtraItems[parseInt(actionBtn.dataset.topbarMenuAction, 10)];
+        closeTopbarMenu();
+        if(item){ item.action(); persist(); render(); }
+        return;
+      }
+      if(e.target.closest('[data-stop-close]')) return;
+      closeTopbarMenu();
+      reconcileModalHistory();
+    });
+  }
   if(profilePanel){
     profilePanel.addEventListener('click', e=>{
       const swatch = e.target.closest('[data-user-color]');
