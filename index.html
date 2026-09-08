@@ -7,15 +7,39 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CookPOP">
-<meta name="theme-color" content="#f3f2f2" media="(prefers-color-scheme: light)">
-<!--<meta name="theme-color" content="#18191b" media="(prefers-color-scheme: dark)">-->
+<meta name="theme-color" content="#f3f2f2" id="meta-theme-color">
 <title>CookPOP</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=27">
+<script>
+// Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
+// in localStorage — non sincronizzate via Firebase) prima del primo paint,
+// per evitare un lampo con i colori sbagliati. Duplica un po' di logica di
+// applyTheme/applyAccent in app.js (che gira più tardi, a script caricato,
+// e tiene i due allineati quando l'utente cambia scelta dalle Impostazioni)
+// perché deve poter girare qui, sincrona, senza aspettare nulla.
+(function(){
+  try{
+    var theme = localStorage.getItem('cookpop-theme');
+    if(theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    var accent = localStorage.getItem('cookpop-accent');
+    if(accent){
+      document.documentElement.style.setProperty('--gold', accent);
+      var m = accent.replace('#','');
+      var r = parseInt(m.substring(0,2),16), g = parseInt(m.substring(2,4),16), b = parseInt(m.substring(4,6),16);
+      var d = function(c){ return Math.max(0, Math.round(c*0.82)).toString(16).padStart(2,'0'); };
+      document.documentElement.style.setProperty('--gold-dark', '#'+d(r)+d(g)+d(b));
+      document.documentElement.style.setProperty('--gold-rgb', r+','+g+','+b);
+    }
+    var dark = theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.getElementById('meta-theme-color').setAttribute('content', dark ? '#18191b' : '#f3f2f2');
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 <div id="login-gate">
@@ -53,6 +77,14 @@
       <button class="btn is-icon filters-close-btn" id="settings-close">✕</button>
     </div>
     <div id="profile-panel"></div>
+    <div class="filter-group-label">Tema (solo su questo dispositivo)</div>
+    <div class="theme-toggle-row" id="theme-toggle-row">
+      <button type="button" class="btn is-outline theme-btn" data-theme-choice="system">Sistema</button>
+      <button type="button" class="btn is-outline theme-btn" data-theme-choice="light">Chiaro</button>
+      <button type="button" class="btn is-outline theme-btn" data-theme-choice="dark">Scuro</button>
+    </div>
+    <div class="filter-group-label">Colore d'accento (solo su questo dispositivo)</div>
+    <div class="color-swatch-row settings-accent-row" id="accent-swatch-row"></div>
     <button class="btn is-outline settings-item" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
     <button class="btn is-outline settings-item settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>
     <p class="settings-credit">AGGIORNATO A MANO, CUCINATO CON CURA</p>
@@ -64,6 +96,6 @@
   el.textContent = new Date().getDate();
 });
 </script>
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>

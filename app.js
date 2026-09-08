@@ -881,6 +881,49 @@ function applyUserColors(){
   document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#87282b');
 }
 
+// Tema e colore d'accento: preferenze di QUESTO dispositivo (localStorage,
+// non passano da persist()/Firebase) — cambiarle sul proprio telefono non
+// cambia nulla sull'altro. Il tema viene già applicato prima del primo
+// paint da uno script inline in index.html (per evitare il lampo con i
+// colori sbagliati); queste funzioni servono a riapplicarlo quando l'utente
+// cambia scelta dalle Impostazioni, e a tenere sincronizzato il meta
+// theme-color della barra del browser.
+const THEME_KEY = 'cookpop-theme';
+const ACCENT_KEY = 'cookpop-accent';
+function currentTheme(){
+  const t = localStorage.getItem(THEME_KEY);
+  return (t === 'light' || t === 'dark') ? t : 'system';
+}
+function applyTheme(theme){
+  if(theme === 'system') localStorage.removeItem(THEME_KEY);
+  else localStorage.setItem(THEME_KEY, theme);
+  if(theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+  else delete document.documentElement.dataset.theme;
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const meta = document.getElementById('meta-theme-color');
+  if(meta) meta.setAttribute('content', isDark ? '#18191b' : '#f3f2f2');
+}
+function hexToRgbTriplet(hex){
+  const m = hex.replace('#','');
+  return [parseInt(m.substring(0,2),16), parseInt(m.substring(2,4),16), parseInt(m.substring(4,6),16)];
+}
+function darkenHex(hex, amount){
+  const [r,g,b] = hexToRgbTriplet(hex);
+  const d = c => Math.max(0, Math.round(c * (1 - amount))).toString(16).padStart(2,'0');
+  return '#' + d(r) + d(g) + d(b);
+}
+function applyAccent(hex){
+  if(hex) localStorage.setItem(ACCENT_KEY, hex); else localStorage.removeItem(ACCENT_KEY);
+  const root = document.documentElement.style;
+  if(!hex){
+    root.removeProperty('--gold'); root.removeProperty('--gold-dark'); root.removeProperty('--gold-rgb');
+    return;
+  }
+  root.setProperty('--gold', hex);
+  root.setProperty('--gold-dark', darkenHex(hex, 0.18));
+  root.setProperty('--gold-rgb', hexToRgbTriplet(hex).join(','));
+}
+
 async function loadState(){
   // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
   try{
@@ -5482,9 +5525,25 @@ function goToTab(delta){
   const settingsBackdrop = document.getElementById('settings-backdrop');
   const settingsClose = document.getElementById('settings-close');
   const profilePanel = document.getElementById('profile-panel');
+  const themeRow = document.getElementById('theme-toggle-row');
+  const accentRow = document.getElementById('accent-swatch-row');
   if(!settingsBtn || !settingsBackdrop) return;
+  const refreshThemeRow = ()=>{
+    if(!themeRow) return;
+    const active = currentTheme();
+    themeRow.querySelectorAll('[data-theme-choice]').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.themeChoice === active);
+    });
+  };
+  const refreshAccentRow = ()=>{
+    if(!accentRow) return;
+    const active = localStorage.getItem(ACCENT_KEY) || USER_COLOR_PRESETS[0];
+    accentRow.innerHTML = USER_COLOR_PRESETS.map(c=>`<button type="button" class="color-swatch${active===c?' active':''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
+  };
   const open = ()=>{
     if(profilePanel) profilePanel.innerHTML = renderProfilePanel();
+    refreshThemeRow();
+    refreshAccentRow();
     settingsBackdrop.classList.add('open');
     reconcileModalHistory();
   };
@@ -5502,6 +5561,22 @@ function goToTab(delta){
       applyUserColors();
       persist();
       profilePanel.innerHTML = renderProfilePanel();
+    });
+  }
+  if(themeRow){
+    themeRow.addEventListener('click', e=>{
+      const btn = e.target.closest('[data-theme-choice]');
+      if(!btn) return;
+      applyTheme(btn.dataset.themeChoice);
+      refreshThemeRow();
+    });
+  }
+  if(accentRow){
+    accentRow.addEventListener('click', e=>{
+      const swatch = e.target.closest('[data-accent-color]');
+      if(!swatch) return;
+      applyAccent(swatch.dataset.accentColor);
+      refreshAccentRow();
     });
   }
 })();
