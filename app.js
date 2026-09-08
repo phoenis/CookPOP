@@ -3947,7 +3947,9 @@ function renderDispensa(){
 
   return `
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
-    <input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}">
+    <div class="view-toggle">
+      <input class="input-search" type="search" id="pantry-search" placeholder="Cerca in dispensa…" value="${escapeAttr(state.pantrySearch)}">
+    </div>
     <div class="view-toggle">
       <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
