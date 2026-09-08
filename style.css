@@ -120,6 +120,12 @@
   body{
     background:var(--bg); color:var(--ink); font-family:var(--font-family); font-weight: var(--weight-normal); line-height: var(--line-height); min-height:100vh; -webkit-font-smoothing:antialiased;
   }
+  /* Gli input/select/textarea non ereditano font/colore dal body per
+     default (stile utente-agente a parte, indipendente dal resto della
+     pagina) — senza questo reset restano scritti in nero fisso anche
+     quando lo sfondo dietro (--surface) diventa scuro in dark mode,
+     illeggibili. */
+  input, select, textarea, button{ color:inherit; font:inherit; }
   b {font-weight: var(--weight-bold);}
   ::selection{ background:var(--gold); color:var(--bg); }
   .app{ max-width:60rem; margin:0 auto; padding:0 0 calc(4.5rem + env(safe-area-inset-bottom) + 3rem); }
