@@ -216,10 +216,14 @@ function hasPantryStock(ingrediente){
 
 // Estrae {value, unit} dal primo numero trovato in un testo tipo "300 g",
 // "1,5 kg", "1 spicchio" — null se non c'è un numero. unit è tutto ciò che
-// segue, minuscolo (può essere vuoto, es. "3").
+// segue, minuscolo (può essere vuoto, es. "3"). Un intervallo tipo "150–180 g"
+// o "6-12 foglie" (trattino o "–") si salta fino all'unità dopo il secondo
+// numero — altrimenti l'unità restava incollata al "180"/"12" e il "\s*[a-zà-
+// ù]*" dopo il primo numero non trovava nulla, tornando un'unità vuota anche
+// quando c'era eccome (bug reale: la Spesa mostrava "150" senza "g").
 function parseQtyValue(text){
   if(!text) return null;
-  const m = (''+text).trim().match(/^(\d+(?:[.,]\d+)?)\s*([a-zà-ù]*)/i);
+  const m = (''+text).trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:[-–]\s*\d+(?:[.,]\d+)?\s*)?([a-zà-ù]*)/i);
   if(!m) return null;
   const value = parseFloat(m[1].replace(',', '.'));
   if(Number.isNaN(value)) return null;
