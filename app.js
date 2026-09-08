@@ -463,6 +463,33 @@ function moveShopRowToPantry(cb){
   rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
 }
 
+// Cattura lo stato di Dispensa/Spesa toccato da moveShopRowToPantry prima di
+// eseguirla, per poter offrire "Annulla" sia sulla spunta singola in
+// Modalità spesa sia sullo spostamento multiplo dal foglio di selezione.
+function snapshotShopRowForUndo(cb){
+  const rowKeys = cb.dataset.shopKeys.split(',');
+  const pantryKey = (cb.dataset.shopName||'').trim().toLowerCase();
+  return {
+    pantryKey,
+    hadPantryItem: Object.prototype.hasOwnProperty.call(state.pantryItems, pantryKey),
+    prevPantryItem: state.pantryItems[pantryKey] ? {...state.pantryItems[pantryKey]} : undefined,
+    hadConfirmedShop: Object.prototype.hasOwnProperty.call(state.pantryConfirmedShop, pantryKey),
+    prevConfirmedShop: state.pantryConfirmedShop[pantryKey],
+    rowKeys,
+    prevDismissed: rowKeys.map(k=>state.shopDismissed[k])
+  };
+}
+function restoreShopRowSnapshot(snap){
+  if(snap.hadPantryItem) state.pantryItems[snap.pantryKey] = snap.prevPantryItem;
+  else delete state.pantryItems[snap.pantryKey];
+  if(snap.hadConfirmedShop) state.pantryConfirmedShop[snap.pantryKey] = snap.prevConfirmedShop;
+  else delete state.pantryConfirmedShop[snap.pantryKey];
+  snap.rowKeys.forEach((k,idx)=>{
+    const prev = snap.prevDismissed[idx];
+    if(prev !== undefined) state.shopDismissed[k] = prev; else delete state.shopDismissed[k];
+  });
+}
+
 // Rinominare cambia anche la chiave (derivata dal nome): se il nuovo nome
 // coincide con un'altra voce già esistente, le quantità si sommano invece
 // di perdersi. Ritorna la chiave da usare dopo la modifica.
@@ -3729,11 +3756,17 @@ function attachHandlers(){
       // spuntato. In "Modalità spesa" invece ogni spunta sposta subito quella
       // riga in Dispensa, una alla volta, comoda mentre si è al supermercato.
       if(state.shopMode && e.target.checked && !e.target.closest('.finished-shop-group')){
+        const snap = snapshotShopRowForUndo(e.target);
         moveShopRowToPantry(e.target);
+        persist(); render();
+        showUndoToast('Spostato in Dispensa', ()=>{
+          restoreShopRowSnapshot(snap);
+          persist(); render();
+        });
       } else {
         e.target.dataset.shopKeys.split(',').forEach(k=>{ state.shopChecked[k] = e.target.checked; });
+        persist(); render();
       }
-      persist(); render();
     });
   });
   const shopModeToggle = document.getElementById('shop-mode-toggle');
@@ -3811,11 +3844,21 @@ function attachHandlers(){
     // Per quello che era già spuntato perché ce l'hai già (in automatico
     // dalla scorta, o a mano): esce dalla lista senza toccare la Dispensa.
     deleteCheckedBtn.addEventListener('click', ()=>{
+      const keys = [];
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
         if(cb.closest('.finished-shop-group')) return;
-        cb.dataset.shopKeys.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+        cb.dataset.shopKeys.split(',').forEach(k=>keys.push(k));
       });
+      const prevDismissed = keys.map(k=>state.shopDismissed[k]);
+      keys.forEach(k=>{ state.shopDismissed[k] = true; });
       persist(); render();
+      if(keys.length) showUndoToast(keys.length === 1 ? 'Rimosso dalla lista' : `${keys.length} articoli rimossi dalla lista`, ()=>{
+        keys.forEach((k,idx)=>{
+          const prev = prevDismissed[idx];
+          if(prev !== undefined) state.shopDismissed[k] = prev; else delete state.shopDismissed[k];
+        });
+        persist(); render();
+      });
     });
   }
   const moveToPantryBtn = document.getElementById('move-checked-to-pantry');
@@ -3823,11 +3866,17 @@ function attachHandlers(){
     // Per quello che hai appena comprato: aggiunge alla Dispensa (con la
     // quantità impostata nello stepper) e poi esce dalla lista.
     moveToPantryBtn.addEventListener('click', ()=>{
+      const snaps = [];
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
         if(cb.closest('.finished-shop-group')) return;
+        snaps.push(snapshotShopRowForUndo(cb));
         moveShopRowToPantry(cb);
       });
       persist(); render();
+      if(snaps.length) showUndoToast(snaps.length === 1 ? 'Spostato in Dispensa' : `${snaps.length} articoli spostati in Dispensa`, ()=>{
+        snaps.forEach(restoreShopRowSnapshot);
+        persist(); render();
+      });
     });
   }
   // Selezionati nella sezione "Finiti" (checkbox spuntata = presa in carico):
@@ -3941,8 +3990,17 @@ function attachHandlers(){
   // isStapleConfirmed) — "Svuota spunte" deve fare una cosa sola e precisa,
   // niente eccezioni per i basilari.
   if(resetBtn) resetBtn.addEventListener('click', ()=>{
-    buildShopFlat().forEach(it => { state.shopChecked[it.key] = false; });
+    const items = buildShopFlat();
+    const prevChecked = items.map(it => state.shopChecked[it.key]);
+    items.forEach(it => { state.shopChecked[it.key] = false; });
     persist(); render();
+    showUndoToast('Spunte azzerate', ()=>{
+      items.forEach((it, idx)=>{
+        const prev = prevChecked[idx];
+        if(prev !== undefined) state.shopChecked[it.key] = prev; else delete state.shopChecked[it.key];
+      });
+      persist(); render();
+    });
   });
   // Comando manuale per spuntare quello che hai già, oltre al comportamento
   // automatico dei basilari: utile per gli ingredienti normali (che non
@@ -4829,10 +4887,19 @@ function attachHandlers(){
   });
   const pantrySelectionDeleteBtn = document.getElementById('pantry-selection-delete');
   if(pantrySelectionDeleteBtn) pantrySelectionDeleteBtn.addEventListener('click', ()=>{
-    Object.keys(state.pantrySelected).forEach(key=>{ delete state.pantryItems[key]; });
+    const removed = {};
+    Object.keys(state.pantrySelected).forEach(key=>{
+      if(state.pantryItems[key]) removed[key] = state.pantryItems[key];
+      delete state.pantryItems[key];
+    });
     state.pantrySelectMode = false;
     state.pantrySelected = {};
     persist(); render();
+    const removedKeys = Object.keys(removed);
+    if(removedKeys.length) showUndoToast(removedKeys.length === 1 ? 'Ingrediente eliminato' : `${removedKeys.length} ingredienti eliminati`, ()=>{
+      removedKeys.forEach(key=>{ state.pantryItems[key] = removed[key]; });
+      persist(); render();
+    });
   });
   const pantrySelectionCancelBtn = document.getElementById('pantry-selection-cancel');
   if(pantrySelectionCancelBtn) pantrySelectionCancelBtn.addEventListener('click', ()=>{
