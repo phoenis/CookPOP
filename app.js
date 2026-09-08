@@ -723,6 +723,8 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  prepSearchOpen: false, // non persistito: campo di ricerca ricette (Prep) visibile o ridotto a icona
+  pantrySearchOpen: false, // non persistito: campo di ricerca Dispensa visibile o ridotto a icona
   whatsNewSeen: null, // ultima WHATS_NEW.version già chiusa dall'utente (vedi renderWhatsNewModal)
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
@@ -1846,6 +1848,7 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
 // Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
 // tranne nel Menù (resta il nome dell'app — è la schermata principale).
 const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'Dispensa' };
+const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></g></svg>';
 
 // Modale "Novità": compare una volta sola al prossimo caricamento (su tutti i
 // dispositivi, lo stato è condiviso) quando `version` è diversa da
@@ -3629,7 +3632,10 @@ function renderPrep(){
   return `
     <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
     <div class="view-toggle">
+      ${state.prepSearchOpen ? `
       <input class="input-search" type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
+      <button type="button" class="btn is-icon" id="prep-search-close" aria-label="Chiudi ricerca">✕</button>
+      ` : `<button type="button" class="btn is-filters search-toggle-btn${state.filters.search ? ' active' : ''}" id="prep-search-toggle" aria-label="Cerca ricetta">${SEARCH_ICON_SVG}${state.filters.search ? ' Cerca' : ''}</button>`}
       <button class="btn is-filters" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
     </div>
     ${filtersModal}
@@ -3948,12 +3954,13 @@ function renderDispensa(){
   return `
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
     <div class="view-toggle">
-      <input class="input-search" type="search" id="pantry-search" placeholder="Cerca in dispensa…" value="${escapeAttr(state.pantrySearch)}">
-    </div>
-    <div class="view-toggle">
       <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
       <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
+      ${state.pantrySearchOpen
+        ? `<button type="button" class="view-btn" id="pantry-search-close" aria-label="Chiudi ricerca">✕</button>`
+        : `<button type="button" class="view-btn${state.pantrySearch ? ' active' : ''}" id="pantry-search-toggle" aria-label="Cerca in Dispensa">${SEARCH_ICON_SVG}</button>`}
     </div>
+    ${state.pantrySearchOpen ? `<input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}">` : ''}
     <button type="button" class="btn is-text" id="open-ingredient-manager">🗂️ Gestisci tutti gli ingredienti</button>
     ${body}
     ${finishedSection}
@@ -5127,6 +5134,30 @@ function attachHandlers(){
   if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); const el=document.getElementById('f-search'); el.focus(); el.selectionStart = el.value.length; });
   const pantrySearch = document.getElementById('pantry-search');
   if(pantrySearch) pantrySearch.addEventListener('input', e=>{ state.pantrySearch = e.target.value; render(); const el=document.getElementById('pantry-search'); el.focus(); el.selectionStart = el.value.length; });
+  const prepSearchToggle = document.getElementById('prep-search-toggle');
+  if(prepSearchToggle) prepSearchToggle.addEventListener('click', ()=>{
+    state.prepSearchOpen = true;
+    render();
+    const el = document.getElementById('f-search');
+    if(el) el.focus();
+  });
+  const prepSearchClose = document.getElementById('prep-search-close');
+  if(prepSearchClose) prepSearchClose.addEventListener('click', ()=>{
+    state.prepSearchOpen = false;
+    render();
+  });
+  const pantrySearchToggle = document.getElementById('pantry-search-toggle');
+  if(pantrySearchToggle) pantrySearchToggle.addEventListener('click', ()=>{
+    state.pantrySearchOpen = true;
+    render();
+    const el = document.getElementById('pantry-search');
+    if(el) el.focus();
+  });
+  const pantrySearchClose = document.getElementById('pantry-search-close');
+  if(pantrySearchClose) pantrySearchClose.addEventListener('click', ()=>{
+    state.pantrySearchOpen = false;
+    render();
+  });
 
   document.querySelectorAll('.chip-row [data-f]').forEach(btn=>{
     btn.addEventListener('click', e=>{

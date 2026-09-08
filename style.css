@@ -499,6 +499,8 @@
  */
   .input-search{flex: 1; background-color: transparent; border: none; padding-left: var(--padding-small);}
   .input-search:focus{border: 0; outline: 0;}
+  .search-toggle-btn{ flex:1; }
+  .search-toggle-btn.active{ background-color:var(--gold); }
   .filters{ display:flex; flex-wrap:wrap; gap:var(--space-xsmall); margin-bottom:var(--space-medium); }
   .filters select/* , .filters input[type=search] */{ font-family:var(--font-family); font-size:var(--text-small); padding:var(--space-xsmall) var(--space-xsmall); border-radius:0; border:1px solid var(--line); background:var(--surface); }
   /* .filters input[type=search]{ flex:1; min-width:8.75rem; } */
