@@ -691,6 +691,7 @@ const state = {
   pantryGroupsModalOpen: false,
   pantryView: 'categoria', // non persistito (vedi persist()): stesso motivo di shopView
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
+  whatsNewSeen: null, // ultima WHATS_NEW.version già chiusa dall'utente (vedi renderWhatsNewModal)
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
@@ -998,7 +999,8 @@ async function runPersist(){
       pantrySpanneUnitCleared: state.pantrySpanneUnitCleared,
       pantryGroupMigrated: state.pantryGroupMigrated,
       pantryGroupMigrated2: state.pantryGroupMigrated2,
-      pantryGroups: state.pantryGroups
+      pantryGroups: state.pantryGroups,
+      whatsNewSeen: state.whatsNewSeen
     };
     try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
     try{
@@ -1769,6 +1771,44 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
 // Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
 // tranne nel Menù (resta il nome dell'app — è la schermata principale).
 const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'Dispensa' };
+
+// Modale "Novità": compare una volta sola al prossimo caricamento (su tutti i
+// dispositivi, lo stato è condiviso) quando `version` è diversa da
+// state.whatsNewSeen, poi resta chiusa finché non si cambia di nuovo
+// `version`. NON è automatica a ogni deploy — resta `null` di default, e va
+// valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
+const WHATS_NEW = null;
+/* Esempio:
+const WHATS_NEW = {
+  version: '2026-09-08',
+  title: 'Novità',
+  items: [
+    'Ora puoi annullare anche lo swap tra ricette e l\'eliminazione di una settimana.',
+    'Nuovo campo di ricerca in Dispensa.',
+    '48 ricette nuove in catalogo, incluse le prime ricette dolci.'
+  ]
+};
+*/
+function renderWhatsNewModal(){
+  if(!WHATS_NEW || state.whatsNewSeen === WHATS_NEW.version) return '';
+  return `
+  <div class="filters-modal-backdrop" data-close-whats-new>
+    <div class="filters-modal" data-stop-close>
+      <div class="filters-modal-header">
+        <h3>${escapeHtml(WHATS_NEW.title || 'Novità')}</h3>
+        <button class="btn is-icon filters-close-btn" data-close-whats-new>✕</button>
+      </div>
+      <div class="filter-groups">
+        <ul class="steps-list">
+          ${WHATS_NEW.items.map(i=>`<li>${escapeHtml(i)}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="filters-modal-footer">
+        <button class="btn is-solid mini-add-btn" data-close-whats-new>Ho capito</button>
+      </div>
+    </div>
+  </div>`;
+}
 function render(){
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
@@ -1779,6 +1819,7 @@ function render(){
   if(state.tab === 'prep') panel.innerHTML = renderPrep();
   if(state.tab === 'dispensa') panel.innerHTML = renderDispensa();
   panel.innerHTML += renderUndoToast();
+  panel.innerHTML += renderWhatsNewModal();
   attachHandlers();
   reconcileModalHistory();
 }
@@ -1823,6 +1864,7 @@ const MODAL_CHECKS = [
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
   [()=> !!state.expandedDay, ()=>{ state.expandedDay = null; }],
   [()=> isSettingsBackdropOpen(), ()=> closeSettingsBackdrop()],
+  [()=> !!(WHATS_NEW && state.whatsNewSeen !== WHATS_NEW.version), ()=>{ if(WHATS_NEW) state.whatsNewSeen = WHATS_NEW.version; persist(); }],
 ];
 function countOpenModals(){
   return MODAL_CHECKS.reduce((n, [isOpen])=> n + (isOpen() ? 1 : 0), 0);
@@ -4052,6 +4094,13 @@ function attachHandlers(){
       state.addIngSuggestOpen = false;
       state.addIngCursorPos = null;
       render();
+    });
+  });
+  document.querySelectorAll('[data-close-whats-new]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      if(WHATS_NEW) state.whatsNewSeen = WHATS_NEW.version;
+      persist(); render();
     });
   });
   const resetBtn = document.getElementById('reset-shop');
