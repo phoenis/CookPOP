@@ -446,6 +446,23 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
   if(newQty > 0) delete state.pantryConfirmedShop[key];
 }
 
+// Sposta in Dispensa la riga di Spesa di una checkbox (upsert + dismiss):
+// stessa logica di "Sposta in dispensa" per la spunta multipla, riusata
+// anche dalla spunta singola quando "Modalità spesa" è attiva.
+function moveShopRowToPantry(cb){
+  const rowKey = cb.dataset.shopKeys;
+  const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
+  const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
+  const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 1 : fallback);
+  // Se in Dispensa è già impostata "Non mostrare" per questo ingrediente,
+  // quella scelta manuale vince sempre: la quantità della ricetta ("12 g"
+  // di sale, es.) non deve poterla resettare a un'unità tracciabile.
+  const existingUnit = (state.pantryItems[(cb.dataset.shopName||'').trim().toLowerCase()] || {}).unit;
+  const unit = existingUnit === 'none' ? 'none' : (cb.dataset.shopUnit || undefined);
+  upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
+  rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+}
+
 // Rinominare cambia anche la chiave (derivata dal nome): se il nuovo nome
 // coincide con un'altra voce già esistente, le quantità si sommano invece
 // di perdersi. Ritorna la chiave da usare dopo la modifica.
@@ -670,6 +687,7 @@ const state = {
   mealsDoneReminderDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel pasto (senza segnarlo mangiato)
   genSettingsOpen: null, // null = chiuso; 'plain' = solo impostazioni (da "Aggiungi settimana"); un numero = impostazioni + genera/rigenera per quella settimana (dal titolo settimana)
   showPastDays: false, // mostra le card degli ultimi 3 giorni passati (nascoste di default) nella settimana corrente
+  shopMode: false, // "Modalità spesa" in Spesa: se attiva, spuntare una riga la sposta subito in Dispensa invece di limitarsi a segnarla presa
   extraWeeks: [], // settimane pianificate oltre la prima: [{ baseline:{0..6:{pranzo,cena}}, overrides:{}, overridePicked:{}, mealsDone:{} }, ...]
   dayLinks: {}, // pasto "avanzo" -> pasto sorgente, entrambi come chiave "weekIdx_i_meal" (es. "0_1_pranzo" -> "0_0_cena")
   dayLinkNotes: {}, // pasto "avanzo" -> nota libera (es. "fatta a frittata"), stessa chiave di dayLinks
@@ -3183,7 +3201,8 @@ function renderSpesa(){
           
     <div class="shop-top-actions">
       <button class="btn is-outline" id="check-have-shop"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Spunta quello che ho già</button>
-    
+      <button class="btn is-outline ${state.shopMode ? 'active' : ''}" id="shop-mode-toggle" type="button" title="Se attiva, spuntare una riga la sposta subito in Dispensa"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Modalità spesa${state.shopMode ? ': ON' : ''}</button>
+
  ${displayDoneShoppable ? `
   <div class="buttons-fixed is-checked">
       <button class="btn is-outline color-delete" id="delete-checked-shop"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina</button>
@@ -3705,12 +3724,22 @@ function attachHandlers(){
 
   document.querySelectorAll('.shop-item input[type=checkbox]').forEach(cb=>{
     cb.addEventListener('change', e=>{
-      // La spunta segna solo "preso/da tenere d'occhio": non tocca la Dispensa.
-      // È "Elimina spuntati" (per quello che avevi già) o "Sposta in dispensa"
-      // (per quello appena comprato) a decidere cosa succede a quello spuntato.
-      e.target.dataset.shopKeys.split(',').forEach(k=>{ state.shopChecked[k] = e.target.checked; });
+      // Normalmente la spunta segna solo "preso/da tenere d'occhio": non
+      // tocca la Dispensa, ci pensa poi "Sposta in dispensa" per il gruppo
+      // spuntato. In "Modalità spesa" invece ogni spunta sposta subito quella
+      // riga in Dispensa, una alla volta, comoda mentre si è al supermercato.
+      if(state.shopMode && e.target.checked && !e.target.closest('.finished-shop-group')){
+        moveShopRowToPantry(e.target);
+      } else {
+        e.target.dataset.shopKeys.split(',').forEach(k=>{ state.shopChecked[k] = e.target.checked; });
+      }
       persist(); render();
     });
+  });
+  const shopModeToggle = document.getElementById('shop-mode-toggle');
+  if(shopModeToggle) shopModeToggle.addEventListener('click', ()=>{
+    state.shopMode = !state.shopMode;
+    persist(); render();
   });
   document.querySelectorAll('[data-shop-qty-inc]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -3796,17 +3825,7 @@ function attachHandlers(){
     moveToPantryBtn.addEventListener('click', ()=>{
       document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
         if(cb.closest('.finished-shop-group')) return;
-        const rowKey = cb.dataset.shopKeys;
-        const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
-        const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
-        const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 1 : fallback);
-        // Se in Dispensa è già impostata "Non mostrare" per questo ingrediente,
-        // quella scelta manuale vince sempre: la quantità della ricetta ("12 g"
-        // di sale, es.) non deve poterla resettare a un'unità tracciabile.
-        const existingUnit = (state.pantryItems[(cb.dataset.shopName||'').trim().toLowerCase()] || {}).unit;
-        const unit = existingUnit === 'none' ? 'none' : (cb.dataset.shopUnit || undefined);
-        upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
-        rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+        moveShopRowToPantry(cb);
       });
       persist(); render();
     });
