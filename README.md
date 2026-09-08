@@ -13,14 +13,67 @@ compatto in cima al file, più tutta la logica dell'app), lo stile in
   trovato) link alla fonte; 48 importate più di recente hanno ingredienti e
   metadati completi ma `procedimento: []` ancora da scrivere (vedi Curatela
   delle ricette più sotto).
-- Persistenza condivisa su Firebase Realtime Database (menù della settimana,
-  spesa spuntata, inventario freezer, ecc.): chi apre la pagina legge/scrive lo
-  stesso stato, con aggiornamenti in tempo reale su tutti i dispositivi. La
-  configurazione Firebase (progetto `cookpop-c91d6`) è incorporata in
-  `app.js`; le regole del Realtime Database consentono lettura/scrittura
-  solo sul path `quaderno-state`, tutto il resto è bloccato. Se Firebase non è
-  raggiungibile (rete assente), l'app resta funzionante in locale su
+- Persistenza su Firebase Realtime Database, divisa su **due livelli** (vedi
+  "Spazi multipli" più sotto): un percorso **condiviso** con la curatela del
+  catalogo ricette/ingredienti, e un percorso **personale per spazio**
+  (nucleo familiare) con dispensa/menù/spesa — chi apre la pagina con un
+  account dello stesso spazio legge/scrive lo stesso stato personale, con
+  aggiornamenti in tempo reale su tutti i dispositivi. La configurazione
+  Firebase (progetto `cookpop-c91d6`) è incorporata in `app.js`. Se Firebase
+  non è raggiungibile (rete assente), l'app resta funzionante in locale su
   `localStorage` come cache/fallback.
+
+### Spazi multipli
+
+Più nuclei familiari possono usare lo stesso CookPOP senza vedere i dati
+personali gli uni degli altri, ma condividendo la stessa curatela di
+ricette/ingredienti. Login sempre email/password Firebase Auth "finti" (email
+che contiene solo un nome, password a scelta — non servono account reali):
+l'email determina lo **spazio** (vedi `SPACE_ROUTES` in `app.js`), che a sua
+volta determina il percorso Firebase per i dati personali:
+
+- `mara`/`ste` → spazio `default` → percorso `quaderno-state` (quello di
+  sempre, mai rinominato/spostato)
+- `cugina` → spazio `cugina` → percorso `spaces/cugina/state`
+- `mamma` → spazio `mamma` → percorso `spaces/mamma/state`
+
+Condiviso da **tutti** gli spazi, su un percorso a sé (`catalog-state`,
+`CATALOG_STATE_PATH` in app.js): ricette aggiunte/modificate/nascoste,
+ingredienti delle ricette, sinonimi ingredienti (`ingredientRenames`), gruppi
+Dispensa (`pantryGroups`, es. "Pasta corta") — vedi `CATALOG_FIELDS`. Tutto il
+resto (dispensa reale, menù della settimana, spesa, chi cucina, colori
+profilo, note personali su un ingrediente) resta nel percorso personale dello
+spazio, isolato dagli altri.
+
+**Aggiungere un nuovo spazio**: (1) in Firebase Console → Authentication,
+crea un nuovo utente email/password con un'email che contiene il nome dello
+spazio (es. `zia@qualcosa.it`); (2) aggiungi una riga a `SPACE_ROUTES` in
+`app.js` (`{ id: 'zia', match: ['zia'], path: 'spaces/zia/state' }`); (3)
+aggiorna le regole del Realtime Database (vedi sotto) se non coprono già
+`spaces/*` in generale.
+
+**Regole del Realtime Database**: devono permettere lettura/scrittura (a
+qualunque utente autenticato, stesso livello di sicurezza "finto" del login)
+sia sul percorso storico `quaderno-state`, sia su `catalog-state`, sia su
+tutto l'albero `spaces` — tre blocchi allo stesso livello, con le stesse
+regole che ha oggi `quaderno-state`, es.:
+```json
+{
+  "rules": {
+    "quaderno-state": { ".read": "auth != null", ".write": "auth != null" },
+    "catalog-state":  { ".read": "auth != null", ".write": "auth != null" },
+    "spaces":         { ".read": "auth != null", ".write": "auth != null" }
+  }
+}
+```
+(adatta la condizione `auth != null` a quella che le regole attuali usano già
+per `quaderno-state`, se diversa — l'importante è che `catalog-state` e
+`spaces` abbiano la stessa).
+
+Il primo avvio in assoluto con `catalog-state` ancora vuoto copia lì dentro
+la curatela già presente nello spazio `default` (se c'è), una volta sola —
+vedi il commento nel blocco `if(route.id === 'default')` di `loadState()` in
+app.js. Gli spazi nuovi la trovano quindi già pronta, senza doverla rifare.
 
 Le 4 tab dell'app: **Menù** (settimana corrente + generatore automatico),
 **Spesa** (lista aggiornata in automatico in base al menù, per giorno o per

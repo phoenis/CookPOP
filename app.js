@@ -826,10 +826,13 @@ const firebaseReady = (async ()=>{
     };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const stateRef = ref(db, 'quaderno-state');
+    // Parametrizzato per percorso (non più un ref fisso) perché ora ci sono
+    // più percorsi in gioco: uno personale per spazio (dispensa/menù/spesa,
+    // isolato) e uno condiviso per il catalogo ricette/ingredienti — vedi
+    // SPACE_ROUTES/CATALOG_STATE_PATH più sotto.
     window.cookpopSync = {
-      save(data){ return fbSet(stateRef, data); },
-      onChange(cb){ onValue(stateRef, (snap)=>cb(snap.val())); }
+      save(path, data){ return fbSet(ref(db, path), data); },
+      onChange(path, cb){ onValue(ref(db, path), (snap)=>cb(snap.val())); }
     };
     const auth = getAuth(app);
     window.cookpopAuth = {
@@ -905,6 +908,54 @@ function getCurrentUser(){
   if(email.includes('ste')) return 'ste';
   return null;
 }
+
+// Spazi diversi (nuclei familiari) che condividono lo stesso account
+// Firebase/progetto ma NON i dati personali: stesso schema di sempre per
+// riconoscere chi sei (l'email "finta" contiene solo un nome), che qui
+// determina anche QUALE percorso Firebase legge/scrive dispensa/menù/spesa
+// — ognuno il suo, isolato dagli altri spazi. Aggiungerne uno nuovo (es. un
+// altro parente) è solo una riga qui + un nuovo account nella Firebase
+// Console con un'email che contiene quel nome, nessun'altra modifica.
+// Il catalogo ricette/ingredienti (vedi CATALOG_STATE_PATH) resta invece
+// condiviso da tutti gli spazi, non è qui.
+const CATALOG_STATE_PATH = 'catalog-state';
+const SPACE_ROUTES = [
+  { id: 'default', match: ['mara','ste'], path: 'quaderno-state' },
+  { id: 'cugina', match: ['cugina'], path: 'spaces/cugina/state' },
+  { id: 'mamma', match: ['mamma'], path: 'spaces/mamma/state' }
+];
+function getSpaceRoute(){
+  const email = (loggedInEmail || '').toLowerCase();
+  return SPACE_ROUTES.find(r => r.match.some(m => email.includes(m))) || SPACE_ROUTES[0];
+}
+// Campi del catalogo condiviso: curatela ricette (aggiunte/modificate/
+// nascoste), ingredienti delle ricette, sinonimi e definizioni dei gruppi —
+// uguali per tutti gli spazi. Le note personali su un ingrediente
+// (state.ingredientNotes) restano invece per spazio, apposta. Anche
+// pantryGroupMigrated/2 restano fuori da qui pur riguardando i gruppi:
+// assegnano il campo "gruppo" alle voci di state.pantryItems, che è
+// personale — un flag condiviso farebbe girare quella migrazione una sola
+// volta in assoluto (dal primo spazio ad aprire l'app) invece che una volta
+// per spazio, lasciando gli altri spazi senza gruppi assegnati alla loro Dispensa.
+const CATALOG_FIELDS = ['recipeIngredients','ingredientRenames','recipeEdits','customRecipes','hiddenRecipes','pantryGroups'];
+function decodeCatalogSaved(saved){
+  if(saved.recipeIngredients) saved.recipeIngredients = decodeKeysFromFirebase(saved.recipeIngredients);
+  if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
+  if(saved.recipeEdits) saved.recipeEdits = decodeKeysFromFirebase(saved.recipeEdits);
+  if(saved.customRecipes) saved.customRecipes = decodeKeysFromFirebase(saved.customRecipes);
+  if(saved.hiddenRecipes) saved.hiddenRecipes = decodeKeysFromFirebase(saved.hiddenRecipes);
+  return saved;
+}
+function encodeCatalogForFirebase(payload){
+  return JSON.parse(JSON.stringify({
+    ...payload,
+    recipeIngredients: encodeKeysForFirebase(payload.recipeIngredients),
+    ingredientRenames: encodeKeysForFirebase(payload.ingredientRenames),
+    recipeEdits: encodeKeysForFirebase(payload.recipeEdits),
+    customRecipes: encodeKeysForFirebase(payload.customRecipes),
+    hiddenRecipes: encodeKeysForFirebase(payload.hiddenRecipes)
+  }));
+}
 const COOK_LABEL = { mara:'Mara', ste:'Ste' };
 // Tavolozza di colori preimpostati tra cui scegliere il proprio "colore identità"
 // (profilo in Impostazioni): solo toni abbastanza scuri/saturi da restare leggibili
@@ -959,9 +1010,11 @@ function applyAccent(hex){
 }
 
 async function loadState(){
+  const route = getSpaceRoute();
+  const personalKey = 'quaderno-state-' + route.id;
   // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
   try{
-    const cached = localStorage.getItem('quaderno-state');
+    const cached = localStorage.getItem(personalKey);
     if(cached){
       const saved = JSON.parse(cached);
       // shopView/pantryView non si caricano più da uno stato salvato prima
@@ -971,37 +1024,62 @@ async function loadState(){
       delete saved.shopView;
       delete saved.pantryView;
       Object.assign(state, saved);
-      if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
     }
   }catch(e){ /* nessuno stato salvato ancora */ }
+  try{
+    const catalogCached = localStorage.getItem('catalog-state-cache');
+    if(catalogCached) Object.assign(state, JSON.parse(catalogCached));
+  }catch(e){ /* nessun catalogo in cache ancora */ }
 
   await firebaseReady;
   if(!window.cookpopSync) return;
 
+  // Dati personali (dispensa, menù, spesa, chi cucina...): percorso per
+  // spazio (vedi SPACE_ROUTES), isolato dagli altri.
   await new Promise((resolve)=>{
     let done = false;
-    window.cookpopSync.onChange((saved)=>{
+    window.cookpopSync.onChange(route.path, (saved)=>{
       if(saved){
-        if(saved.recipeIngredients) saved.recipeIngredients = decodeKeysFromFirebase(saved.recipeIngredients);
         if(saved.pantryItems) saved.pantryItems = decodeKeysFromFirebase(saved.pantryItems);
         if(saved.freezerItems) saved.freezerItems = decodeKeysFromFirebase(saved.freezerItems);
-        if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
         if(saved.ingredientNotes) saved.ingredientNotes = decodeKeysFromFirebase(saved.ingredientNotes);
-        if(saved.recipeEdits) saved.recipeEdits = decodeKeysFromFirebase(saved.recipeEdits);
-        if(saved.customRecipes) saved.customRecipes = decodeKeysFromFirebase(saved.customRecipes);
-        if(saved.hiddenRecipes) saved.hiddenRecipes = decodeKeysFromFirebase(saved.hiddenRecipes);
         delete saved.shopView;
         delete saved.pantryView;
         Object.assign(state, saved);
-        if(saved.recipeIngredients) state.recipeIngredients = saved.recipeIngredients;
-        if(saved.pantryItems) state.pantryItems = saved.pantryItems;
-        if(saved.freezerItems) state.freezerItems = saved.freezerItems;
-        if(saved.ingredientRenames) state.ingredientRenames = saved.ingredientRenames;
-        if(saved.ingredientNotes) state.ingredientNotes = saved.ingredientNotes;
-        if(saved.recipeEdits) state.recipeEdits = saved.recipeEdits;
-        if(saved.customRecipes) state.customRecipes = saved.customRecipes;
-        if(saved.hiddenRecipes) state.hiddenRecipes = saved.hiddenRecipes;
-        try{ localStorage.setItem('quaderno-state', JSON.stringify(saved)); }catch(e){}
+        try{ localStorage.setItem(personalKey, JSON.stringify(saved)); }catch(e){}
+      }
+      render();
+      if(!done){ done = true; resolve(); }
+    });
+    setTimeout(()=>{ if(!done){ done = true; resolve(); } }, 2500);
+  });
+
+  // Catalogo ricette/ingredienti: un solo percorso condiviso da tutti gli
+  // spazi (vedi CATALOG_STATE_PATH) — chi cura una ricetta o rinomina un
+  // ingrediente lo fa per tutti, non solo per il proprio spazio.
+  await new Promise((resolve)=>{
+    let done = false;
+    window.cookpopSync.onChange(CATALOG_STATE_PATH, (saved)=>{
+      if(saved){
+        decodeCatalogSaved(saved);
+        Object.assign(state, saved);
+        try{ localStorage.setItem('catalog-state-cache', JSON.stringify(saved)); }catch(e){}
+      } else if(route.id === 'default'){
+        // Primissimo avvio in assoluto del catalogo condiviso: se questo è
+        // lo spazio originale e ha già curatela fatta (ricette aggiunte/
+        // modificate/nascoste, sinonimi, gruppi — arrivata qui dal vecchio
+        // formato, un'unica voce quaderno-state che li conteneva tutti),
+        // gliela copiamo dentro una volta sola: gli altri spazi la trovano
+        // già pronta invece di ripartire da un catalogo vuoto.
+        const hasContent = Object.keys(state.customRecipes||{}).length || Object.keys(state.recipeEdits||{}).length
+          || Object.keys(state.hiddenRecipes||{}).length || Object.keys(state.ingredientRenames||{}).length
+          || Object.keys(state.recipeIngredients||{}).length;
+        if(hasContent){
+          const seed = {};
+          CATALOG_FIELDS.forEach(f=>{ seed[f] = state[f]; });
+          window.cookpopSync.save(CATALOG_STATE_PATH, encodeCatalogForFirebase(seed))
+            .catch(e=>console.error('Seed catalogo condiviso fallito', e));
+        }
       }
       render();
       if(!done){ done = true; resolve(); }
@@ -1030,7 +1108,8 @@ window.addEventListener('pagehide', flushPendingPersist);
 async function runPersist(){
   saveTimeout = null;
   {
-    const payload = {
+    const route = getSpaceRoute();
+    const personalPayload = {
       shopChecked: state.shopChecked,
       shopDismissed: state.shopDismissed,
       shopExtras: state.shopExtras,
@@ -1061,12 +1140,7 @@ async function runPersist(){
       shopAssignees: state.shopAssignees,
       appliedForcedWeekVersion: state.appliedForcedWeekVersion,
       mealsDone: state.mealsDone,
-      recipeIngredients: state.recipeIngredients,
-      ingredientRenames: state.ingredientRenames,
       ingredientNotes: state.ingredientNotes,
-      recipeEdits: state.recipeEdits,
-      customRecipes: state.customRecipes,
-      hiddenRecipes: state.hiddenRecipes,
       pantryItems: state.pantryItems,
       pantrySeeded: state.pantrySeeded,
       pantryQtyMigrated: state.pantryQtyMigrated,
@@ -1076,27 +1150,29 @@ async function runPersist(){
       pantrySpanneUnitCleared: state.pantrySpanneUnitCleared,
       pantryGroupMigrated: state.pantryGroupMigrated,
       pantryGroupMigrated2: state.pantryGroupMigrated2,
-      pantryGroups: state.pantryGroups,
       whatsNewSeen: state.whatsNewSeen
     };
-    try{ localStorage.setItem('quaderno-state', JSON.stringify(payload)); }catch(e){}
+    // Catalogo condiviso (CATALOG_FIELDS): stessa scrittura per tutti gli
+    // spazi, su un percorso Firebase a sé — vedi CATALOG_STATE_PATH.
+    const catalogPayload = {};
+    CATALOG_FIELDS.forEach(f=>{ catalogPayload[f] = state[f]; });
+    try{ localStorage.setItem('quaderno-state-' + route.id, JSON.stringify(personalPayload)); }catch(e){}
+    try{ localStorage.setItem('catalog-state-cache', JSON.stringify(catalogPayload)); }catch(e){}
     try{
       await firebaseReady;
       if(window.cookpopSync){
         // Firebase rifiuta l'intero salvataggio se un solo campo è undefined
         // (es. appliedForcedWeekVersion prima che venga mai impostato): il
         // giro JSON lo elimina, coerente con come viene già trattato in locale.
-        const fbPayload = JSON.parse(JSON.stringify({
-          ...payload,
-          recipeIngredients: encodeKeysForFirebase(payload.recipeIngredients),
-          pantryItems: encodeKeysForFirebase(payload.pantryItems),
-          ingredientRenames: encodeKeysForFirebase(payload.ingredientRenames),
-          ingredientNotes: encodeKeysForFirebase(payload.ingredientNotes),
-          recipeEdits: encodeKeysForFirebase(payload.recipeEdits),
-          customRecipes: encodeKeysForFirebase(payload.customRecipes),
-          hiddenRecipes: encodeKeysForFirebase(payload.hiddenRecipes)
+        const fbPersonal = JSON.parse(JSON.stringify({
+          ...personalPayload,
+          pantryItems: encodeKeysForFirebase(personalPayload.pantryItems),
+          ingredientNotes: encodeKeysForFirebase(personalPayload.ingredientNotes)
         }));
-        await window.cookpopSync.save(fbPayload);
+        await Promise.all([
+          window.cookpopSync.save(route.path, fbPersonal),
+          window.cookpopSync.save(CATALOG_STATE_PATH, encodeCatalogForFirebase(catalogPayload))
+        ]);
       }
       const hint = document.querySelector('.save-hint');
       if(hint){ hint.textContent = 'salvato ✓'; setTimeout(()=>{ if(hint) hint.textContent=''; }, 1500); }
