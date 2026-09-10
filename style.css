@@ -559,6 +559,7 @@
   .day-card.today .cat-label{visibility: visible;}
 
   .inv-item, .recipe-card{ display:flex; align-items:center; gap:var(--space-xsmall); padding:var(--space-xsmall) var(--space-xxsmall); border-bottom:1px dashed var(--line); position:relative; }
+  .inv-item.is-avanzi{padding-left: 0; padding-right: 0;}
   .recipe-card{padding-right: 3rem;}
   .full-badge{display: none;}
   .recipe-title{font-weight: var(--weight-medium);}
@@ -573,7 +574,8 @@
   .picker-anchor{ position:relative; }
   .luogo-picker-backdrop{ position:fixed; inset:0; z-index:150; background:transparent; }
   .luogo-picker{ position:absolute; top:100%; left:0; margin-top:var(--space-xxsmall); z-index:151; display:flex; gap:0.125rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-pill); padding:var(--space-xxsmall); box-shadow:var(--shadow-dropdown); }
-  .luogo-picker.cat-picker{ flex-wrap:wrap; max-width:13rem; border-radius:var(--form-border-radius); }
+  /* .luogo-picker.cat-picker{ flex-wrap:wrap; max-width:13rem; border-radius:var(--form-border-radius); } */
+  .luogo-picker.is-category{left: calc((-2 * var(--space-xsmall)) - 30px); max-width: calc(100vw - (2 * var(--padding-block)) - (2 *var(--space-medium))); overflow: auto;}
   .luogo-picker-opt,.data-done-leftover-cat-toggle{ width:1.875rem; height:1.875rem; font-size:var(--text-small); line-height:1; padding: var(--space-xxsmall); background-color: var(--bg);}
   .luogo-picker-opt:hover,.data-done-leftover-cat-toggle:hover{ background:var(--surface-2); }
   .luogo-picker-opt.picking{ background:var(--gold); color:var(--bg); border-radius:var(--radius-pill); }

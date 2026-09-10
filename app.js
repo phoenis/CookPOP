@@ -3039,7 +3039,7 @@ function renderMenu(){
         ` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
         <div class="filter-group done-finished-title">
           <div class="filter-group-label">È avanzato qualcosa?</div>
-          <div class="inv-item">
+          <div class="inv-item is-avanzi">
             <div class="picker-anchor">
               <button type="button" class="btn is-icon luogo-picker-opt" data-luogo-value="${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])}" data-done-leftover-luogo-toggle title="Luogo: ${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])} — tocca per scegliere">${LUOGO_ICON[state.doneModalLeftoverLuogo]}</button>
               ${state.doneModalLeftoverPickerOpen ? `
@@ -3052,7 +3052,7 @@ function renderMenu(){
               <button type="button" class="btn is-icon luogo-picker-opt" data-done-leftover-cat-toggle title="Reparto: ${escapeAttr(DEPT_LABEL[state.doneModalLeftoverCat])} — tocca per scegliere">${DEPT_ICON[state.doneModalLeftoverCat]}</button>
               ${state.doneModalLeftoverCatPickerOpen ? `
               <div class="luogo-picker-backdrop" data-done-leftover-cat-close></div>
-              <div class="luogo-picker">
+              <div class="luogo-picker is-category">
                 ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===state.doneModalLeftoverCat?' active':''}" data-done-leftover-cat-set="${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
               </div>` : ''}
             </div>
