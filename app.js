@@ -3052,7 +3052,7 @@ function renderMenu(){
               <button type="button" class="btn is-icon luogo-picker-opt" data-done-leftover-cat-toggle title="Reparto: ${escapeAttr(DEPT_LABEL[state.doneModalLeftoverCat])} — tocca per scegliere">${DEPT_ICON[state.doneModalLeftoverCat]}</button>
               ${state.doneModalLeftoverCatPickerOpen ? `
               <div class="luogo-picker-backdrop" data-done-leftover-cat-close></div>
-              <div class="luogo-picker cat-picker">
+              <div class="luogo-picker">
                 ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===state.doneModalLeftoverCat?' active':''}" data-done-leftover-cat-set="${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
               </div>` : ''}
             </div>
