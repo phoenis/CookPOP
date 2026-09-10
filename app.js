@@ -845,6 +845,7 @@ const state = {
   doneModalLeftoverCat: 'avanzi', // ephemeral: reparto scelto per l'avanzo; di default "Avanzi", ma modificabile (es. un sugo che ricongeli va in "Legumi e conserve")
   doneModalLeftoverChecked: false, // ephemeral: se spuntato, l'avanzo va in Dispensa alla conferma; sempre deselezionato al caricamento
   doneModalLeftoverPickerOpen: false, // ephemeral: luogo-picker dell'avanzo aperto/chiuso
+  doneModalLeftoverCatPickerOpen: false, // ephemeral: cat-picker (reparto) dell'avanzo aperto/chiuso
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
   filters: { cat:[], tipo:[], tempo:'', pian:'', stagione:'', avanzi:'', freezer:'', grad:'', attrezz:'', search:'' } // cat e tipo sono multi-selezione (array), gli altri restano a valore singolo
 };
@@ -2064,7 +2065,8 @@ function closeTopbarMenu(){
 const MODAL_CHECKS = [
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> !!state.doneModalLeftoverPickerOpen, ()=>{ state.doneModalLeftoverPickerOpen = false; }],
-  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalLeftover = ''; state.doneModalLeftoverLuogo = 'frigo'; state.doneModalLeftoverCat = 'avanzi'; state.doneModalLeftoverChecked = false; state.doneModalLeftoverPickerOpen = false; }],
+  [()=> !!state.doneModalLeftoverCatPickerOpen, ()=>{ state.doneModalLeftoverCatPickerOpen = false; }],
+  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalLeftover = ''; state.doneModalLeftoverLuogo = 'frigo'; state.doneModalLeftoverCat = 'avanzi'; state.doneModalLeftoverChecked = false; state.doneModalLeftoverPickerOpen = false; state.doneModalLeftoverCatPickerOpen = false; }],
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen, ()=>{ state.pantryGroupsModalOpen = false; }],
@@ -3038,18 +3040,25 @@ function renderMenu(){
         <div class="filter-group done-finished-title">
           <div class="filter-group-label">È avanzato qualcosa?</div>
           <div class="inv-item">
-            <button type="button" class="btn is-icon luogo-picker-opt" data-luogo-value="${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])}" data-done-leftover-luogo-toggle title="Luogo: ${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])} — tocca per scegliere">${LUOGO_ICON[state.doneModalLeftoverLuogo]}</button>
-            ${state.doneModalLeftoverPickerOpen ? `
-            <div class="luogo-picker-backdrop" data-done-leftover-luogo-close></div>
-            <div class="luogo-picker">
-              ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===state.doneModalLeftoverLuogo?' active':''}" data-done-leftover-luogo-set="${l}" data-luogo-value="${escapeAttr(LUOGO_LABEL[l])}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
-            </div>` : ''}
+            <div class="picker-anchor">
+              <button type="button" class="btn is-icon luogo-picker-opt" data-luogo-value="${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])}" data-done-leftover-luogo-toggle title="Luogo: ${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])} — tocca per scegliere">${LUOGO_ICON[state.doneModalLeftoverLuogo]}</button>
+              ${state.doneModalLeftoverPickerOpen ? `
+              <div class="luogo-picker-backdrop" data-done-leftover-luogo-close></div>
+              <div class="luogo-picker">
+                ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===state.doneModalLeftoverLuogo?' active':''}" data-done-leftover-luogo-set="${l}" data-luogo-value="${escapeAttr(LUOGO_LABEL[l])}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
+              </div>` : ''}
+            </div>
+            <div class="picker-anchor">
+              <button type="button" class="btn is-icon luogo-picker-opt" data-done-leftover-cat-toggle title="Reparto: ${escapeAttr(DEPT_LABEL[state.doneModalLeftoverCat])} — tocca per scegliere">${DEPT_ICON[state.doneModalLeftoverCat]}</button>
+              ${state.doneModalLeftoverCatPickerOpen ? `
+              <div class="luogo-picker-backdrop" data-done-leftover-cat-close></div>
+              <div class="luogo-picker cat-picker">
+                ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===state.doneModalLeftoverCat?' active':''}" data-done-leftover-cat-set="${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
+              </div>` : ''}
+            </div>
             <input type="text" placeholder="es. ${escapeAttr(doneName || 'Avanzo')}" value="${escapeAttr(state.doneModalLeftover || '')}" data-done-leftover-input>
             <label class="presence-toggle"><input type="checkbox" ${state.doneModalLeftoverChecked ? 'checked' : ''} data-done-leftover-toggle></label>
           </div>
-          <select data-done-leftover-cat-select>
-            ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${state.doneModalLeftoverCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
-          </select>
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-ghost reset-btn" data-close-done-modal>Annulla</button>
@@ -4945,6 +4954,7 @@ function attachHandlers(){
         state.doneModalLeftoverCat = 'avanzi';
         state.doneModalLeftoverChecked = false;
         state.doneModalLeftoverPickerOpen = false;
+        state.doneModalLeftoverCatPickerOpen = false;
         render();
       }
     });
@@ -4996,6 +5006,7 @@ function attachHandlers(){
       state.doneModalLeftoverCat = 'avanzi';
       state.doneModalLeftoverChecked = false;
       state.doneModalLeftoverPickerOpen = false;
+      state.doneModalLeftoverCatPickerOpen = false;
       render();
     });
   });
@@ -5061,6 +5072,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-done-leftover-luogo-toggle]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       state.doneModalLeftoverPickerOpen = !state.doneModalLeftoverPickerOpen;
+      state.doneModalLeftoverCatPickerOpen = false;
       render();
     });
   });
@@ -5074,9 +5086,20 @@ function attachHandlers(){
       render();
     });
   });
-  document.querySelectorAll('[data-done-leftover-cat-select]').forEach(sel=>{
-    sel.addEventListener('change', e=>{
-      state.doneModalLeftoverCat = e.currentTarget.value;
+  document.querySelectorAll('[data-done-leftover-cat-toggle]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.doneModalLeftoverCatPickerOpen = !state.doneModalLeftoverCatPickerOpen;
+      state.doneModalLeftoverPickerOpen = false;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-done-leftover-cat-close]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.doneModalLeftoverCatPickerOpen = false; render(); });
+  });
+  document.querySelectorAll('[data-done-leftover-cat-set]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      state.doneModalLeftoverCat = e.currentTarget.dataset.doneLeftoverCatSet;
+      state.doneModalLeftoverCatPickerOpen = false;
       render();
     });
   });
@@ -5128,6 +5151,7 @@ function attachHandlers(){
       state.doneModalLeftoverCat = 'avanzi';
       state.doneModalLeftoverChecked = false;
       state.doneModalLeftoverPickerOpen = false;
+      state.doneModalLeftoverCatPickerOpen = false;
       persist(); render();
     });
   });
