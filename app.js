@@ -3036,13 +3036,13 @@ function renderMenu(){
         ${finishedSectionHtml}
         ` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
         <div class="filter-group done-finished-title">
-          <div class="filter-group-label">È avanzato qualcosa? Spuntalo per metterlo in Dispensa.</div>
+          <div class="filter-group-label">È avanzato qualcosa?</div>
           <div class="inv-item">
-            <button type="button" class="btn is-icon luogo-picker-opt" data-done-leftover-luogo-toggle title="Luogo: ${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])} — tocca per scegliere">${LUOGO_ICON[state.doneModalLeftoverLuogo]}</button>
+            <button type="button" class="btn is-icon luogo-picker-opt" data-luogo-value="${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])}" data-done-leftover-luogo-toggle title="Luogo: ${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])} — tocca per scegliere">${LUOGO_ICON[state.doneModalLeftoverLuogo]}</button>
             ${state.doneModalLeftoverPickerOpen ? `
             <div class="luogo-picker-backdrop" data-done-leftover-luogo-close></div>
             <div class="luogo-picker">
-              ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===state.doneModalLeftoverLuogo?' active':''}" data-done-leftover-luogo-set="${l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
+              ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===state.doneModalLeftoverLuogo?' active':''}" data-done-leftover-luogo-set="${l}" data-luogo-value="${escapeAttr(LUOGO_LABEL[l])}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
             </div>` : ''}
             <input type="text" placeholder="es. ${escapeAttr(doneName || 'Avanzo')}" value="${escapeAttr(state.doneModalLeftover || '')}" data-done-leftover-input>
             <label class="presence-toggle"><input type="checkbox" ${state.doneModalLeftoverChecked ? 'checked' : ''} data-done-leftover-toggle></label>
