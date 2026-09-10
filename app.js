@@ -62,9 +62,15 @@ const GRAD_ORDER = ['preferita','ci-piace','ogni-tanto','da-provare'];
 const ATTREZZ_LABEL = { 'Padella':'Padella', 'Pentola':'Pentola', 'Forno':'Forno', 'Piastra':'Piastra', 'Moulinex':'Moulinex', 'Frullatore':'Frullatore', 'Fritto':'Fritto' };
 const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullatore','Fritto'];
 
-const DEPT_ORDER = ['verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro','finiti'];
-const DEPT_LABEL = { verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', finiti:'Finiti', altro:'Altro' };
-const DEPT_ICON = { verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', finiti:'🗑️', altro:'🛒' };
+// 'avanzi' è sempre il primo reparto (vedi ordine sotto): non è mai
+// indovinato da classifyDept (nessun ingrediente "è" avanzo per nome), lo
+// assegna solo l'utente — dalla modale "Ricetta fatta!" o a mano da
+// "Gestisci ingredienti". Come ogni reparto, la sezione compare in Dispensa/
+// Spesa solo quando contiene almeno una voce (stesso filtro presenza già
+// usato per tutti gli altri, vedi DEPT_ORDER.filter più sotto).
+const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro','finiti'];
+const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', finiti:'Finiti', altro:'Altro' };
+const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', finiti:'🗑️', altro:'🛒' };
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
@@ -836,6 +842,7 @@ const state = {
   doneModalFinished: {}, // ephemeral: nome ingrediente "a spanne" (unit 'none') -> true se spuntato "L'hai finito?" nella modale "Ricetta fatta!"; non presente = non spuntato
   doneModalLeftover: '', // ephemeral: testo libero "cosa è avanzato" nella modale "Ricetta fatta!", precompilato col nome della ricetta
   doneModalLeftoverLuogo: 'frigo', // ephemeral: luogo scelto per l'avanzo (icona con luogo-picker, come in Dispensa)
+  doneModalLeftoverCat: 'avanzi', // ephemeral: reparto scelto per l'avanzo; di default "Avanzi", ma modificabile (es. un sugo che ricongeli va in "Legumi e conserve")
   doneModalLeftoverChecked: false, // ephemeral: se spuntato, l'avanzo va in Dispensa alla conferma; sempre deselezionato al caricamento
   doneModalLeftoverPickerOpen: false, // ephemeral: luogo-picker dell'avanzo aperto/chiuso
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
@@ -2057,7 +2064,7 @@ function closeTopbarMenu(){
 const MODAL_CHECKS = [
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> !!state.doneModalLeftoverPickerOpen, ()=>{ state.doneModalLeftoverPickerOpen = false; }],
-  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalLeftover = ''; state.doneModalLeftoverLuogo = 'frigo'; state.doneModalLeftoverChecked = false; state.doneModalLeftoverPickerOpen = false; }],
+  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalLeftover = ''; state.doneModalLeftoverLuogo = 'frigo'; state.doneModalLeftoverCat = 'avanzi'; state.doneModalLeftoverChecked = false; state.doneModalLeftoverPickerOpen = false; }],
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen, ()=>{ state.pantryGroupsModalOpen = false; }],
@@ -3040,6 +3047,9 @@ function renderMenu(){
             <input type="text" placeholder="es. ${escapeAttr(doneName || 'Avanzo')}" value="${escapeAttr(state.doneModalLeftover || '')}" data-done-leftover-input>
             <label class="presence-toggle"><input type="checkbox" ${state.doneModalLeftoverChecked ? 'checked' : ''} data-done-leftover-toggle></label>
           </div>
+          <select data-done-leftover-cat-select>
+            ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${state.doneModalLeftoverCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+          </select>
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-ghost reset-btn" data-close-done-modal>Annulla</button>
@@ -4932,6 +4942,7 @@ function attachHandlers(){
         state.doneModalFinished = {};
         state.doneModalLeftover = mealData.principale || '';
         state.doneModalLeftoverLuogo = 'frigo';
+        state.doneModalLeftoverCat = 'avanzi';
         state.doneModalLeftoverChecked = false;
         state.doneModalLeftoverPickerOpen = false;
         render();
@@ -4982,6 +4993,7 @@ function attachHandlers(){
       state.doneModalFinished = {};
       state.doneModalLeftover = '';
       state.doneModalLeftoverLuogo = 'frigo';
+      state.doneModalLeftoverCat = 'avanzi';
       state.doneModalLeftoverChecked = false;
       state.doneModalLeftoverPickerOpen = false;
       render();
@@ -5062,6 +5074,12 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-done-leftover-cat-select]').forEach(sel=>{
+    sel.addEventListener('change', e=>{
+      state.doneModalLeftoverCat = e.currentTarget.value;
+      render();
+    });
+  });
   document.querySelectorAll('[data-confirm-done]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.confirmDone;
@@ -5096,7 +5114,7 @@ function attachHandlers(){
       // testo da solo non basta, va spuntato esplicitamente.
       const leftover = (state.doneModalLeftover || '').trim();
       if(state.doneModalLeftoverChecked && leftover){
-        upsertPantryItem(leftover, state.doneModalLeftoverLuogo, 1, 'none');
+        upsertPantryItem(leftover, state.doneModalLeftoverLuogo, 1, 'none', state.doneModalLeftoverCat);
       }
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(!mealsDone[i]) mealsDone[i] = {};
@@ -5107,6 +5125,7 @@ function attachHandlers(){
       state.doneModalFinished = {};
       state.doneModalLeftover = '';
       state.doneModalLeftoverLuogo = 'frigo';
+      state.doneModalLeftoverCat = 'avanzi';
       state.doneModalLeftoverChecked = false;
       state.doneModalLeftoverPickerOpen = false;
       persist(); render();
