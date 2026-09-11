@@ -870,7 +870,7 @@ window.addEventListener('hashchange', ()=>{
 const firebaseReady = (async ()=>{
   try{
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js");
-    const { getDatabase, ref, set: fbSet, onValue } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js");
+    const { getDatabase, ref, set: fbSet, update: fbUpdate, onValue } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js");
     const { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js");
     const firebaseConfig = {
       apiKey: "AIzaSyDVlyYgyJ1rTtyitMc3xoNhvBm3HPpC0g8",
@@ -889,6 +889,9 @@ const firebaseReady = (async ()=>{
     // SPACE_ROUTES/CATALOG_STATE_PATH più sotto.
     window.cookpopSync = {
       save(path, data){ return fbSet(ref(db, path), data); },
+      // Multi-path update: scrive solo le chiavi passate (es. "pantryItems/farina"),
+      // lasciando intatto tutto il resto del percorso — vedi buildFirebasePatch/runPersist.
+      patch(path, data){ return Object.keys(data).length ? fbUpdate(ref(db, path), data) : Promise.resolve(); },
       onChange(path, cb){ onValue(ref(db, path), (snap)=>cb(snap.val())); }
     };
     const auth = getAuth(app);
@@ -1104,6 +1107,9 @@ async function loadState(){
         delete saved.pantryView;
         Object.assign(state, saved);
         try{ localStorage.setItem(personalKey, JSON.stringify(saved)); }catch(e){}
+        lastSyncedPersonal = JSON.parse(JSON.stringify(saved));
+      } else {
+        lastSyncedPersonal = {};
       }
       personalSynced = true;
       render();
@@ -1123,6 +1129,7 @@ async function loadState(){
         decodeCatalogSaved(saved);
         Object.assign(state, saved);
         try{ localStorage.setItem('catalog-state-cache', JSON.stringify(saved)); }catch(e){}
+        lastSyncedCatalog = JSON.parse(JSON.stringify(saved));
       } else if(route.id === 'default'){
         // Primissimo avvio in assoluto del catalogo condiviso: se questo è
         // lo spazio originale e ha già curatela fatta (ricette aggiunte/
@@ -1138,6 +1145,9 @@ async function loadState(){
           CATALOG_FIELDS.forEach(f=>{ seed[f] = state[f]; });
           window.cookpopSync.save(CATALOG_STATE_PATH, encodeCatalogForFirebase(seed))
             .catch(e=>console.error('Seed catalogo condiviso fallito', e));
+          lastSyncedCatalog = JSON.parse(JSON.stringify(seed));
+        } else {
+          lastSyncedCatalog = {};
         }
       }
       catalogSynced = true;
@@ -1161,6 +1171,59 @@ let catalogSynced = false;
 // ritentiamo (vedi loadState), invece di perdere quella modifica per sempre.
 let personalSaveDeferred = false;
 let catalogSaveDeferred = false;
+// Ultimo payload noto per certo uguale a quello su Firebase: aggiornato sia
+// quando arriva un onChange reale (vedi loadState) sia dopo ogni scrittura
+// riuscita (vedi runPersist). Sempre un clone indipendente (mai le stesse
+// referenze di state.*), altrimenti una mutazione in-place su state
+// "sporcherebbe" anche la baseline e il confronto smetterebbe di vedere la
+// differenza. Confrontato contro il payload attuale per capire quali chiavi
+// scrivere — vedi buildFirebasePatch.
+let lastSyncedPersonal = null;
+let lastSyncedCatalog = null;
+// Campi di personalPayload/catalogPayload che sono dizionari a chiave
+// dinamica (ingrediente, mealKey, giorno, id riga di spesa...): li
+// confrontiamo chiave per chiave invece che come blocco unico, così due
+// dispositivi che toccano chiavi DIVERSE dello stesso campo (es. due
+// ingredienti diversi in Dispensa, o un ingrediente in Dispensa e un pasto in
+// Menù) non si sovrascrivono più a vicenda in un solo colpo — vince l'ultimo
+// arrivato solo sulla singola chiave che entrambi hanno toccato, non su tutto
+// il blocco. Tutti gli altri campi di personalPayload (flag di migrazione,
+// weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
+// scalari o strutture che non hanno una vera "chiave dinamica" di primo
+// livello su cui vale la pena scendere.
+const PERSONAL_DICT_FIELDS = ['shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors'];
+// Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
+// (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
+const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
+// Confronta newPayload con oldPayload (l'ultimo stato noto su Firebase) e
+// produce una mappa "percorso relativo -> valore", pronta per un multi-path
+// update(): solo le chiavi davvero cambiate finiscono nel risultato, una
+// chiave sparita da un campo-dizionario diventa null (Firebase la cancella),
+// il resto del percorso non viene toccato. dictFields elenca i campi da
+// confrontare chiave per chiave invece che come blocco unico (vedi sopra).
+function buildFirebasePatch(newPayload, oldPayload, dictFields){
+  oldPayload = oldPayload || {};
+  const patch = {};
+  for(const field in newPayload){
+    const newVal = newPayload[field];
+    if(dictFields.includes(field)){
+      const newDict = newVal || {};
+      const oldDict = oldPayload[field] || {};
+      for(const key in newDict){
+        if(JSON.stringify(newDict[key]) !== JSON.stringify(oldDict[key])){
+          patch[field + '/' + fbKeyEncode(key)] = newDict[key];
+        }
+      }
+      for(const key in oldDict){
+        if(!(key in newDict)) patch[field + '/' + fbKeyEncode(key)] = null;
+      }
+    } else {
+      if(newVal === undefined) continue; // come prima: un campo undefined si omette, non si scrive
+      if(JSON.stringify(newVal) !== JSON.stringify(oldPayload[field])) patch[field] = newVal;
+    }
+  }
+  return patch;
+}
 let saveTimeout=null;
 function persist(){
   clearTimeout(saveTimeout);
@@ -1235,27 +1298,38 @@ async function runPersist(){
     try{
       await firebaseReady;
       if(window.cookpopSync){
-        // Firebase rifiuta l'intero salvataggio se un solo campo è undefined
-        // (es. appliedForcedWeekVersion prima che venga mai impostato): il
-        // giro JSON lo elimina, coerente con come viene già trattato in locale.
-        const fbPersonal = JSON.parse(JSON.stringify({
-          ...personalPayload,
-          pantryItems: encodeKeysForFirebase(personalPayload.pantryItems),
-          ingredientNotes: encodeKeysForFirebase(personalPayload.ingredientNotes)
-        }));
         // Prima della prima sincronizzazione reale (personalSynced/catalogSynced,
         // vedi loadState) non scriviamo affatto su Firebase: quello che abbiamo
-        // in "state" a quel punto è solo cache locale o default, e un set()
-        // (sovrascrive l'intero percorso) scritto alla cieca rischierebbe di
-        // cancellare una modifica più recente fatta nel frattempo da un altro
-        // dispositivo. Restiamo comunque salvati in locale (sopra) e ritentiamo
-        // il salvataggio su Firebase non appena arriva quella sincronizzazione.
+        // in "state" a quel punto è solo cache locale o default, e scriverlo
+        // alla cieca rischierebbe di cancellare una modifica più recente fatta
+        // nel frattempo da un altro dispositivo. Restiamo comunque salvati in
+        // locale (sopra) e ritentiamo il salvataggio su Firebase non appena
+        // arriva quella sincronizzazione.
+        //
+        // Da lì in poi, invece di un set() che sovrascrive l'intero percorso,
+        // calcoliamo un patch (buildFirebasePatch) con solo le chiavi
+        // davvero cambiate rispetto all'ultimo stato noto (lastSyncedPersonal/
+        // lastSyncedCatalog) e lo scriviamo con un multi-path update(): due
+        // dispositivi che toccano chiavi diverse (due ingredienti diversi in
+        // Dispensa, un ingrediente e un pasto...) non si sovrascrivono più a
+        // vicenda — vince l'ultimo arrivato solo sulla singola chiave che
+        // entrambi hanno toccato, non su tutto il blocco.
         let savePersonal = Promise.resolve();
-        if(personalSynced) savePersonal = window.cookpopSync.save(route.path, fbPersonal);
-        else personalSaveDeferred = true;
+        if(personalSynced){
+          const personalPatch = JSON.parse(JSON.stringify(
+            buildFirebasePatch(personalPayload, lastSyncedPersonal, PERSONAL_DICT_FIELDS)
+          ));
+          savePersonal = window.cookpopSync.patch(route.path, personalPatch)
+            .then(()=>{ lastSyncedPersonal = JSON.parse(JSON.stringify(personalPayload)); });
+        } else personalSaveDeferred = true;
         let saveCatalog = Promise.resolve();
-        if(catalogSynced) saveCatalog = window.cookpopSync.save(CATALOG_STATE_PATH, encodeCatalogForFirebase(catalogPayload));
-        else catalogSaveDeferred = true;
+        if(catalogSynced){
+          const catalogPatch = JSON.parse(JSON.stringify(
+            buildFirebasePatch(catalogPayload, lastSyncedCatalog, CATALOG_DICT_FIELDS)
+          ));
+          saveCatalog = window.cookpopSync.patch(CATALOG_STATE_PATH, catalogPatch)
+            .then(()=>{ lastSyncedCatalog = JSON.parse(JSON.stringify(catalogPayload)); });
+        } else catalogSaveDeferred = true;
         await Promise.all([savePersonal, saveCatalog]);
       }
       const hint = document.querySelector('.save-hint');
