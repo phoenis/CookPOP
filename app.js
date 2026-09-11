@@ -1105,7 +1105,9 @@ async function loadState(){
         Object.assign(state, saved);
         try{ localStorage.setItem(personalKey, JSON.stringify(saved)); }catch(e){}
       }
+      personalSynced = true;
       render();
+      if(personalSaveDeferred){ personalSaveDeferred = false; persist(); }
       if(!done){ done = true; resolve(); }
     });
     setTimeout(()=>{ if(!done){ done = true; resolve(); } }, 2500);
@@ -1138,12 +1140,27 @@ async function loadState(){
             .catch(e=>console.error('Seed catalogo condiviso fallito', e));
         }
       }
+      catalogSynced = true;
       render();
+      if(catalogSaveDeferred){ catalogSaveDeferred = false; persist(); }
       if(!done){ done = true; resolve(); }
     });
     setTimeout(()=>{ if(!done){ done = true; resolve(); } }, 2500);
   });
 }
+// Vero solo dopo il primo onChange REALE di Firebase per quel percorso (non
+// il timeout di ripiego in loadState, che serve solo a non tenere l'app
+// bloccata offline): finché è false non sappiamo ancora se c'è già uno stato
+// più recente sul server (scritto da un altro dispositivo) di quello che
+// abbiamo in locale/cache — scrivere prima d'allora rischierebbe di
+// sovrascriverlo alla cieca con dati vecchi. Vedi runPersist.
+let personalSynced = false;
+let catalogSynced = false;
+// Vero se un salvataggio ha dovuto saltare la scrittura su Firebase perché
+// non ancora sincronizzati: appena arriva la prima sincronizzazione reale lo
+// ritentiamo (vedi loadState), invece di perdere quella modifica per sempre.
+let personalSaveDeferred = false;
+let catalogSaveDeferred = false;
 let saveTimeout=null;
 function persist(){
   clearTimeout(saveTimeout);
@@ -1226,13 +1243,26 @@ async function runPersist(){
           pantryItems: encodeKeysForFirebase(personalPayload.pantryItems),
           ingredientNotes: encodeKeysForFirebase(personalPayload.ingredientNotes)
         }));
-        await Promise.all([
-          window.cookpopSync.save(route.path, fbPersonal),
-          window.cookpopSync.save(CATALOG_STATE_PATH, encodeCatalogForFirebase(catalogPayload))
-        ]);
+        // Prima della prima sincronizzazione reale (personalSynced/catalogSynced,
+        // vedi loadState) non scriviamo affatto su Firebase: quello che abbiamo
+        // in "state" a quel punto è solo cache locale o default, e un set()
+        // (sovrascrive l'intero percorso) scritto alla cieca rischierebbe di
+        // cancellare una modifica più recente fatta nel frattempo da un altro
+        // dispositivo. Restiamo comunque salvati in locale (sopra) e ritentiamo
+        // il salvataggio su Firebase non appena arriva quella sincronizzazione.
+        let savePersonal = Promise.resolve();
+        if(personalSynced) savePersonal = window.cookpopSync.save(route.path, fbPersonal);
+        else personalSaveDeferred = true;
+        let saveCatalog = Promise.resolve();
+        if(catalogSynced) saveCatalog = window.cookpopSync.save(CATALOG_STATE_PATH, encodeCatalogForFirebase(catalogPayload));
+        else catalogSaveDeferred = true;
+        await Promise.all([savePersonal, saveCatalog]);
       }
       const hint = document.querySelector('.save-hint');
-      if(hint){ hint.textContent = 'salvato ✓'; setTimeout(()=>{ if(hint) hint.textContent=''; }, 1500); }
+      if(hint){
+        hint.textContent = (personalSynced && catalogSynced) ? 'salvato ✓' : 'salvato in locale, in attesa di rete…';
+        setTimeout(()=>{ if(hint) hint.textContent=''; }, 1500);
+      }
     }catch(e){ console.error('Errore salvataggio', e); }
   }
 }
