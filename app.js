@@ -3399,7 +3399,7 @@ function buildShopFlat(){
   });
   Object.entries(state.shopExtras).forEach(([id, it])=>{
     if(state.shopDismissed[id]) return;
-    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', contextShort:'Aggiunti a mano' });
+    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', contextShort:'Aggiunti a mano', cat: it.cat });
   });
   // Ingredienti finiti in Dispensa (qty scesa a 0): la voce di Dispensa non
   // viene mai cancellata quando arriva a 0, resta lì con la sua unità/luogo/
@@ -3511,7 +3511,7 @@ function renderSpesa(){
     // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
     // nel loro reparto vero, tra le sezioni normali.
     const classified = mainFlat.map(it=>{
-      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : classifyDept(it.ingrediente);
+      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (it.cat || classifyDept(it.ingrediente));
       return {...it, dept};
     });
     // unisco articoli identici (stesso ingrediente) comparsi in più ricette,
@@ -3695,6 +3695,7 @@ function renderSpesa(){
   // nota (es. "Latte" in ml): la propongo di default invece di farla
   // reinventare da capo. Se è nuovo, resta comunque scegliebile dal menu.
   const matchedPantryUnit = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].unit) || '';
+  const matchedPantryCat = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].cat) || '';
   const addIngModal = state.addIngModalOpen ? `
     <div class="filters-modal-backdrop" data-close-add-ing-modal>
       <div class="filters-modal" data-stop-close>
@@ -3721,6 +3722,13 @@ function renderSpesa(){
                 ${UNIT_ORDER.filter(u=>u!=='none').map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
               </select>
             </div>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Categoria (reparto in "Per reparto")</div>
+            <select id="shop-add-cat">
+              <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(state.addIngName || '')])})</option>
+              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${matchedPantryCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+            </select>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -4488,6 +4496,7 @@ function attachHandlers(){
     const nameInput = document.getElementById('shop-add-name');
     const qtaInput = document.getElementById('shop-add-qta');
     const unitSelect = document.getElementById('shop-add-unit');
+    const catSelect = document.getElementById('shop-add-cat');
     // Se il nome coincide con un ingrediente già in Dispensa ma a scorta 0,
     // "Aggiungi" non crea una voce doppia: riattiva quello (stessa azione di
     // "Segna da comprare" nella sezione Finiti), così resta un unico record.
@@ -4499,6 +4508,7 @@ function attachHandlers(){
       if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
         state.pantryConfirmedShop[pantryKey] = true;
         delete state.shopDismissed[`oos_${pantryKey}`];
+        if(catSelect && catSelect.value) pantryIt.cat = catSelect.value;
       } else {
         // L'unità dalla select si aggiunge solo se il campo Quantità è un
         // numero "pulito" (es. "2"): se hai scritto qualcosa di tuo (es.
@@ -4508,7 +4518,11 @@ function attachHandlers(){
           ? `${rawQta || '1'} ${unitSelect.value}`
           : rawQta;
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-        state.shopExtras[id] = { ingrediente: name, qta };
+        // Categoria scelta a mano (facoltativa): un ingrediente nuovo, mai
+        // visto prima, non ha modo di essere classificato bene da
+        // classifyDept (indovina solo da parole chiave note) — vedi il
+        // fallback in buildShopFlat/renderSpesa.
+        state.shopExtras[id] = catSelect && catSelect.value ? { ingrediente: name, qta, cat: catSelect.value } : { ingrediente: name, qta };
       }
       state.addIngModalOpen = false;
       state.addIngName = '';
