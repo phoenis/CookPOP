@@ -1090,6 +1090,13 @@ async function loadState(){
     const catalogCached = localStorage.getItem('catalog-state-cache');
     if(catalogCached) Object.assign(state, JSON.parse(catalogCached));
   }catch(e){ /* nessun catalogo in cache ancora */ }
+  // Baseline "locale" prima ancora che Firebase risponda: se l'utente tocca
+  // qualcosa mentre aspettiamo ancora la prima risposta vera (onChange più
+  // sotto), quel tocco va confrontato con QUESTO stato (cache locale), non
+  // con uno vuoto — altrimenti al momento del confronto sembrerebbe che sia
+  // cambiato "tutto" (l'intera cache) invece che solo il tocco vero.
+  lastSyncedPersonal = JSON.parse(JSON.stringify(buildPersonalPayload()));
+  lastSyncedCatalog = JSON.parse(JSON.stringify(buildCatalogPayload()));
 
   await firebaseReady;
   if(!window.cookpopSync) return;
@@ -1105,7 +1112,15 @@ async function loadState(){
         if(saved.ingredientNotes) saved.ingredientNotes = decodeKeysFromFirebase(saved.ingredientNotes);
         delete saved.shopView;
         delete saved.pantryView;
+        // Se nel frattempo (mentre aspettavamo QUESTA risposta) l'utente ha
+        // già toccato qualcosa, la Object.assign qui sotto la cancellerebbe
+        // silenziosamente sovrascrivendola con lo snapshot del server, che
+        // non la conosce ancora: la ricalcolo rispetto a lastSyncedPersonal e
+        // la riapplico subito dopo, così resta (ed è quella che poi
+        // personalSaveDeferred/persist manda davvero su Firebase).
+        const localEdits = buildFirebasePatch(buildPersonalPayload(), lastSyncedPersonal, PERSONAL_DICT_FIELDS);
         Object.assign(state, saved);
+        applyFirebasePatch(localEdits);
         try{ localStorage.setItem(personalKey, JSON.stringify(saved)); }catch(e){}
         lastSyncedPersonal = JSON.parse(JSON.stringify(saved));
       } else {
@@ -1127,7 +1142,12 @@ async function loadState(){
     window.cookpopSync.onChange(CATALOG_STATE_PATH, (saved)=>{
       if(saved){
         decodeCatalogSaved(saved);
+        // Stessa cautela del percorso personale qui sopra: una modifica al
+        // catalogo (es. una ricetta curata) fatta mentre si aspettava questa
+        // risposta non deve sparire sotto lo snapshot del server.
+        const localEdits = buildFirebasePatch(buildCatalogPayload(), lastSyncedCatalog, CATALOG_DICT_FIELDS);
         Object.assign(state, saved);
+        applyFirebasePatch(localEdits);
         try{ localStorage.setItem('catalog-state-cache', JSON.stringify(saved)); }catch(e){}
         lastSyncedCatalog = JSON.parse(JSON.stringify(saved));
       } else if(route.id === 'default'){
@@ -1224,6 +1244,25 @@ function buildFirebasePatch(newPayload, oldPayload, dictFields){
   }
   return patch;
 }
+// Inverso di buildFirebasePatch: applica un patch "percorso -> valore" (stessa
+// forma, es. {"pantryItems/farina": {...}, "weekTempoBase": "veloce"}) allo
+// state live — usato in loadState per non perdere una modifica fatta in
+// locale mentre si aspettava ancora la sincronizzazione (vedi lì).
+function applyFirebasePatch(patch){
+  for(const path in patch){
+    const value = patch[path];
+    const slash = path.indexOf('/');
+    if(slash === -1){
+      state[path] = value;
+    } else {
+      const field = path.slice(0, slash);
+      const key = fbKeyDecode(path.slice(slash + 1));
+      if(!state[field] || typeof state[field] !== 'object') state[field] = {};
+      if(value === null) delete state[field][key];
+      else state[field][key] = value;
+    }
+  }
+}
 let saveTimeout=null;
 function persist(){
   clearTimeout(saveTimeout);
@@ -1242,57 +1281,68 @@ document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'hidden') flushPendingPersist();
 });
 window.addEventListener('pagehide', flushPendingPersist);
+// Il payload personale (dispensa/menù/spesa...) come oggetto piatto pronto per
+// il confronto/salvataggio: usato sia da runPersist per scrivere, sia da
+// loadState per sapere cos'ha già in locale prima che arrivi la risposta vera
+// da Firebase (vedi lastSyncedPersonal/buildFirebasePatch più sotto).
+function buildPersonalPayload(){
+  return {
+    shopChecked: state.shopChecked,
+    shopDismissed: state.shopDismissed,
+    shopExtras: state.shopExtras,
+    shopQty: state.shopQty,
+    pantryChecked: state.pantryChecked,
+    // shopView/pantryView non persistiti: ogni apertura dell'app riparte da
+    // Per reparto/Per categoria (vedi state init), non "ricorda" l'ultima
+    // vista toccata nella sessione precedente.
+    mealsModelMigrated: state.mealsModelMigrated,
+    mealsModelMigrated2: state.mealsModelMigrated2,
+    weekOverrides: state.weekOverrides,
+    weekOverridePicked: state.weekOverridePicked,
+    weekBaseline: state.weekBaseline,
+    extraWeeks: state.extraWeeks,
+    dayLinks: state.dayLinks,
+    dayLinkNotes: state.dayLinkNotes,
+    dayPortions: state.dayPortions,
+    mealLocked: state.mealLocked,
+    weekTempoBase: state.weekTempoBase,
+    weekTempoExceptions: state.weekTempoExceptions,
+    tempoRulesMigrated: state.tempoRulesMigrated,
+    staleRecipesPurged: state.staleRecipesPurged,
+    userColors: state.userColors,
+    notifDismissed: state.notifDismissed,
+    mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
+    pantryConfirmedShop: state.pantryConfirmedShop,
+    cooks: state.cooks,
+    shopAssignees: state.shopAssignees,
+    appliedForcedWeekVersion: state.appliedForcedWeekVersion,
+    mealsDone: state.mealsDone,
+    ingredientNotes: state.ingredientNotes,
+    pantryItems: state.pantryItems,
+    pantrySeeded: state.pantrySeeded,
+    pantryQtyMigrated: state.pantryQtyMigrated,
+    pantryUtilityLuogoMigrated: state.pantryUtilityLuogoMigrated,
+    pantryUnitReviewed: state.pantryUnitReviewed,
+    pantryStapleMigrated: state.pantryStapleMigrated,
+    pantrySpanneUnitCleared: state.pantrySpanneUnitCleared,
+    pantryGroupMigrated: state.pantryGroupMigrated,
+    pantryGroupMigrated2: state.pantryGroupMigrated2,
+    whatsNewSeen: state.whatsNewSeen
+  };
+}
+// Catalogo condiviso (CATALOG_FIELDS): stessa forma per tutti gli spazi, su un
+// percorso Firebase a sé — vedi CATALOG_STATE_PATH.
+function buildCatalogPayload(){
+  const catalogPayload = {};
+  CATALOG_FIELDS.forEach(f=>{ catalogPayload[f] = state[f]; });
+  return catalogPayload;
+}
 async function runPersist(){
   saveTimeout = null;
   {
     const route = getSpaceRoute();
-    const personalPayload = {
-      shopChecked: state.shopChecked,
-      shopDismissed: state.shopDismissed,
-      shopExtras: state.shopExtras,
-      shopQty: state.shopQty,
-      pantryChecked: state.pantryChecked,
-      // shopView/pantryView non persistiti: ogni apertura dell'app riparte da
-      // Per reparto/Per categoria (vedi state init), non "ricorda" l'ultima
-      // vista toccata nella sessione precedente.
-      mealsModelMigrated: state.mealsModelMigrated,
-      mealsModelMigrated2: state.mealsModelMigrated2,
-      weekOverrides: state.weekOverrides,
-      weekOverridePicked: state.weekOverridePicked,
-      weekBaseline: state.weekBaseline,
-      extraWeeks: state.extraWeeks,
-      dayLinks: state.dayLinks,
-      dayLinkNotes: state.dayLinkNotes,
-      dayPortions: state.dayPortions,
-      mealLocked: state.mealLocked,
-      weekTempoBase: state.weekTempoBase,
-      weekTempoExceptions: state.weekTempoExceptions,
-      tempoRulesMigrated: state.tempoRulesMigrated,
-      staleRecipesPurged: state.staleRecipesPurged,
-      userColors: state.userColors,
-      notifDismissed: state.notifDismissed,
-      mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
-      pantryConfirmedShop: state.pantryConfirmedShop,
-      cooks: state.cooks,
-      shopAssignees: state.shopAssignees,
-      appliedForcedWeekVersion: state.appliedForcedWeekVersion,
-      mealsDone: state.mealsDone,
-      ingredientNotes: state.ingredientNotes,
-      pantryItems: state.pantryItems,
-      pantrySeeded: state.pantrySeeded,
-      pantryQtyMigrated: state.pantryQtyMigrated,
-      pantryUtilityLuogoMigrated: state.pantryUtilityLuogoMigrated,
-      pantryUnitReviewed: state.pantryUnitReviewed,
-      pantryStapleMigrated: state.pantryStapleMigrated,
-      pantrySpanneUnitCleared: state.pantrySpanneUnitCleared,
-      pantryGroupMigrated: state.pantryGroupMigrated,
-      pantryGroupMigrated2: state.pantryGroupMigrated2,
-      whatsNewSeen: state.whatsNewSeen
-    };
-    // Catalogo condiviso (CATALOG_FIELDS): stessa scrittura per tutti gli
-    // spazi, su un percorso Firebase a sé — vedi CATALOG_STATE_PATH.
-    const catalogPayload = {};
-    CATALOG_FIELDS.forEach(f=>{ catalogPayload[f] = state[f]; });
+    const personalPayload = buildPersonalPayload();
+    const catalogPayload = buildCatalogPayload();
     try{ localStorage.setItem('quaderno-state-' + route.id, JSON.stringify(personalPayload)); }catch(e){}
     try{ localStorage.setItem('catalog-state-cache', JSON.stringify(catalogPayload)); }catch(e){}
     try{
@@ -3707,13 +3757,12 @@ function renderSpesa(){
     
   ${addIngModal}
     <div class="buttons-fixed">
-      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
+      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
       <button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
-      ` : ''}
         ${displayDoneShoppable ? `
-          
+
     ` : ''}
-    
+
     </div>
   `;
 }
