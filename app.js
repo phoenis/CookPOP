@@ -477,7 +477,7 @@ function renderIngredientsSection(ing, ratio, ctx){
     .map(({it, idx}) => ({
       ingrediente: it.ingrediente,
       qta: scaleQtyText(it.qta, ratio) || '',
-      key: ctx ? dayIngKey(ctx.weekIdx, ctx.i, ctx.meal, ctx.role, idx) : null
+      key: ctx ? dayIngKey(ctx.weekIdx, ctx.i, ctx.meal, ctx.role, ing, idx) : null
     }));
   const mancantiBtn = mancanti.length
     ? `<div class="button-wrapper"><button class="btn is-small" data-mancanti-in-spesa="${escapeAttr(JSON.stringify(mancanti))}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button></div>`
@@ -886,6 +886,7 @@ const state = {
   pantryGroupMigrated2: false,
   pantryNamesCurated1: false,
   pantryGroupMigrated3: false,
+  shopKeysByName1: false,
   pantryGroups: {
     'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
     'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' },
@@ -1503,6 +1504,7 @@ function buildPersonalPayload(){
     pantryGroupMigrated2: state.pantryGroupMigrated2,
     pantryNamesCurated1: state.pantryNamesCurated1,
     pantryGroupMigrated3: state.pantryGroupMigrated3,
+    shopKeysByName1: state.shopKeysByName1,
     whatsNewSeen: state.whatsNewSeen
   };
 }
@@ -1875,7 +1877,27 @@ function nextCookDayFor(user){
 // (era solo "d{i}_{idx}") — le vecchie spunte/dismissioni restano quindi
 // orfane invece di riapparire nel posto sbagliato: accettabile, si
 // riazzerano da sole al primo giro di spesa dopo l'aggiornamento.
-function dayIngKey(weekIdx, i, meal, role, idx){
+// Chiave di una riga di Spesa per un ingrediente di un pasto pianificato
+// (usata da shopChecked/shopDismissed/shopQty). Legata al NOME
+// dell'ingrediente, non alla sua posizione nella ricetta: con la posizione,
+// cambiando la ricetta di un pasto o aggiungendo/togliendo ingredienti a una
+// ricetta, lo stato ("spuntato", "tolto", "mi serve comunque") finiva
+// sull'ingrediente che prendeva quel posto — es. un ingrediente che hai già
+// in Dispensa ricompariva in Spesa. list/idx: la lista ingredienti del piatto
+// e la posizione della voce, per distinguere lo stesso nome ripetuto due
+// volte nella stessa ricetta (~2, ~3...).
+function ingKeySlug(name){
+  return (name||'').trim().toLowerCase().replace(/[^a-z0-9àèéìòù]+/g, '-').replace(/^-+|-+$/g, '') || 'x';
+}
+function dayIngKey(weekIdx, i, meal, role, list, idx){
+  const slug = ingKeySlug(list[idx] && list[idx].ingrediente);
+  const occurrence = list.slice(0, idx).filter(it => ingKeySlug(it.ingrediente) === slug).length;
+  const name = occurrence ? `${slug}~${occurrence + 1}` : slug;
+  return weekIdx === 0 ? `d${i}_${meal}_${role}_${name}` : `d${weekIdx}_${i}_${meal}_${role}_${name}`;
+}
+// Vecchia chiave per posizione, solo per la migrazione una tantum (vedi
+// shopKeysByName1).
+function legacyDayIngKey(weekIdx, i, meal, role, idx){
   return weekIdx === 0 ? `d${i}_${meal}_${role}_${idx}` : `d${weekIdx}_${i}_${meal}_${role}_${idx}`;
 }
 
@@ -3600,8 +3622,9 @@ function buildShopFlat(){
     const contextShort = `${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
     const dishes = [{ role:'p', name: principale }].concat(contorni.map((c,ci)=>({ role:`c${ci}`, name:c })));
     dishes.forEach(({role, name})=>{
-      getIngredientsFor(name).forEach((it,idx)=>{
-        const key = dayIngKey(weekIdx, i, meal, role, idx);
+      const ingList = getIngredientsFor(name);
+      ingList.forEach((it,idx)=>{
+        const key = dayIngKey(weekIdx, i, meal, role, ingList, idx);
         if(state.shopDismissed[key]) return;
         // Le quantità scalate valgono solo finché non è già stato spuntato:
         // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
@@ -6948,6 +6971,40 @@ document.addEventListener('click', e=>{
       }
     }
     state.staleRecipesPurged = true;
+    persist();
+  }
+  // Una tantum: le chiavi delle righe di Spesa passano dalla posizione
+  // dell'ingrediente al suo nome (vedi dayIngKey): lo stato già salvato
+  // (spuntato/tolto/quantità) si sposta sulla chiave nuova, abbinandolo con
+  // le ricette attuali dei pasti pianificati.
+  if(!state.shopKeysByName1){
+    const moveKey = (oldKey, newKey)=>{
+      if(oldKey === newKey) return;
+      ['shopChecked','shopDismissed','shopQty'].forEach(field=>{
+        const dict = state[field];
+        if(dict && Object.prototype.hasOwnProperty.call(dict, oldKey)){
+          if(!Object.prototype.hasOwnProperty.call(dict, newKey)) dict[newKey] = dict[oldKey];
+          delete dict[oldKey];
+        }
+      });
+    };
+    const keyMap = {};
+    allPlannedShoppingMeals().forEach(({weekIdx, i, meal, principale, contorni})=>{
+      const dishes = [{ role:'p', name: principale }].concat((contorni||[]).map((c,ci)=>({ role:`c${ci}`, name:c })));
+      dishes.forEach(({role, name})=>{
+        const list = getIngredientsFor(name);
+        list.forEach((it, idx)=>{ keyMap[legacyDayIngKey(weekIdx, i, meal, role, idx)] = dayIngKey(weekIdx, i, meal, role, list, idx); });
+      });
+    });
+    Object.entries(keyMap).forEach(([oldKey, newKey])=> moveKey(oldKey, newKey));
+    // shopQty può avere chiavi composte (più righe unite in Per reparto,
+    // separate da virgola): si rimappa ogni parte.
+    Object.keys(state.shopQty || {}).forEach(k=>{
+      if(!k.includes(',')) return;
+      const mapped = k.split(',').map(part => keyMap[part] || part).join(',');
+      if(mapped !== k){ state.shopQty[mapped] = state.shopQty[k]; delete state.shopQty[k]; }
+    });
+    state.shopKeysByName1 = true;
     persist();
   }
   // Apriva in automatico la cena di oggi al caricamento, ma con una chiave
