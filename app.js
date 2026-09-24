@@ -177,9 +177,34 @@ function isStaple(ingrediente){
 // di Dispensa — il testo intero, il testo prima di un'eventuale parentesi
 // finale, e le parti separate da "o"/virgola sia fuori che dentro la
 // parentesi. Per un nome senza alternative restituisce solo il nome stesso.
+// Alternative scritte in forma abbreviata nelle ricette ("Vino bianco o
+// rosso"), dove la divisione automatica sulla "o" darebbe pezzi che da soli
+// non sono ingredienti ("rosso"): qui le parti vere, concordate con
+// l'utente. Usata sia per riconoscere la scorta in Dispensa
+// (splitIngredientCandidates) sia per l'elenco di "Gestisci ingredienti"
+// (manageableIngredientNames). Chiavi in minuscolo.
+const CURATED_ALTERNATIVE_PARTS = {
+  'vino bianco o rosso': ['Vino bianco', 'Vino rosso'],
+  'brodo di carne o vegetale': ['Brodo di carne', 'Brodo vegetale'],
+  'aceto di vino o di mele': ['Aceto di vino', 'Aceto di mele'],
+  'cipolle (borettane o rosse)': ['Cipolle borettane', 'Cipolle rosse'],
+  'cannelloni (secchi o sfoglie di pasta fresca)': ['Cannelloni secchi', 'Sfoglie di pasta fresca'],
+  'filetti di pesce bianco (orata, branzino o simili)': ['Filetti di pesce bianco', 'Filetti di orata', 'Filetti di branzino'],
+  'pollo a pezzi (cosce o petto)': ['Pollo', 'Cosce di pollo', 'Petto di pollo'],
+  'pollo a pezzi (cosce o sovracosce)': ['Pollo', 'Cosce di pollo', 'Sovracosce di pollo'],
+  'sovracosce di pollo (o petto)': ['Sovracosce di pollo', 'Petto di pollo'],
+  'cosce o sovracosce di pollo': ['Cosce di pollo', 'Sovracosce di pollo'],
+  'petto di pollo o cosce disossate': ['Petto di pollo', 'Cosce di pollo'],
+  'passata di pomodoro o concentrato': ['Passata di pomodoro', 'Concentrato di pomodoro'],
+  'manzo per brasato (muscolo o cappello del prete)': ['Manzo per brasato', 'Muscolo di manzo', 'Cappello del prete'],
+  'aglio (o mezza cipolla)': ['Aglio', 'Cipolla'],
+  'scalogno (o mezza cipolla)': ['Scalogno', 'Cipolla']
+};
 function splitIngredientCandidates(text){
   const raw = (text||'').trim();
   if(!raw) return [];
+  const curated = CURATED_ALTERNATIVE_PARTS[raw.toLowerCase()];
+  if(curated) return [...new Set([raw, ...curated])];
   const out = [raw];
   const parenMatch = raw.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
   let base = raw, inner = '';
@@ -216,6 +241,8 @@ function splitIngredientCandidates(text){
 function manageableIngredientNames(text){
   const raw = (text||'').trim();
   if(!raw) return [];
+  const curated = CURATED_ALTERNATIVE_PARTS[raw.toLowerCase()];
+  if(curated) return curated.slice();
   const parenMatch = raw.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
   if(parenMatch){
     const base = parenMatch[1].trim();
