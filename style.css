@@ -289,7 +289,8 @@
 /* pan-y (non none): la pressione lunga per trascinare deve convivere con lo
    scroll verticale normale sopra le card — none lo avrebbe bloccato del
    tutto. Non verificabile su device reale in questa sessione. */
-.meal-block{ position:relative; padding: var(--card-block); border-radius: var(--radius-modal); background-color: var(--surface); touch-action: pan-y; transition: transform .2s ease; }
+.meal-block{ position:relative; padding: var(--card-block); border-radius: var(--radius-modal); background-color: var(--surface); touch-action: pan-y; transition: transform .2s ease; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.meal-block input, .meal-block textarea{ -webkit-user-select: text; user-select: text; }
 .meal-block:has(.day-menu-empty){display: flex; padding: 0; background-color: transparent; align-items: center; justify-content: space-between;}
 .meal-block.swiping{ transition: none; }
 /* Swipe-per-svuotare: il cestino sta fermo dietro, la card scorre sopra e

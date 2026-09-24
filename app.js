@@ -2111,14 +2111,23 @@ function removeWeek(weekIdx){
 // scambio, quindi si azzera per entrambi. Le porzioni/l'eventuale
 // collegamento avanzo restano legati alla posizione (giorno+pasto), non
 // seguono la ricetta: scambiare una cena da 3 porzioni con un pranzo da 2
-// lascia 3 e 2 dove stavano, si scambia solo cosa cucinare.
+// lascia 3 e 2 dove stavano, si scambia solo cosa cucinare (principale e
+// contorni).
+// Un pasto vuoto scambiato con uno pieno deve restare vuoto (sentinella
+// MEAL_EMPTY), non '' — con '' effectiveMeal ricadrebbe sulla baseline
+// generata e al posto del pasto spostato ricomparirebbe la vecchia ricetta.
+// I contorni viaggiano insieme al principale: si sposta il piatto intero.
+function writeSwappedMeal(map, i, meal, slot){
+  writeMealPrincipale(map, i, meal, slot.principale || MEAL_EMPTY);
+  if(slot.principale && slot.contorni.length) map[i][meal].contorni = slot.contorni.slice();
+}
 function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   if(weekIdxA === weekIdxB && i === j && mealA === mealB) return;
-  const nameI = effectiveRecipeName(weekIdxA, i, mealA);
-  const nameJ = effectiveRecipeName(weekIdxB, j, mealB);
+  const slotA = effectiveMeal(weekIdxA, i, mealA);
+  const slotB = effectiveMeal(weekIdxB, j, mealB);
   const mealKeyA = mealKey(weekIdxA, i, mealA), mealKeyB = mealKey(weekIdxB, j, mealB);
-  writeMealPrincipale(weekOverridesRef(weekIdxA), i, mealA, nameJ);
-  writeMealPrincipale(weekOverridesRef(weekIdxB), j, mealB, nameI);
+  writeSwappedMeal(weekOverridesRef(weekIdxA), i, mealA, slotB);
+  writeSwappedMeal(weekOverridesRef(weekIdxB), j, mealB, slotA);
   clearMealFlag(weekOverridePickedRef(weekIdxA), i, mealA);
   clearMealFlag(weekOverridePickedRef(weekIdxB), j, mealB);
   clearMealFlag(weekMealsDoneRef(weekIdxA), i, mealA);
@@ -6227,6 +6236,7 @@ function startDayDrag(card, clientX, clientY, pointerId){
   card.classList.add('dragging');
   dragState = { sourceWeekIdx: card.dataset.weekIdx, sourceIndex: card.dataset.dayIndex, sourceMeal: card.dataset.meal, sourceCard: card, ghost, lastTarget: null };
   try{ card.setPointerCapture(pointerId); }catch(err){ /* pointer già rilasciato: il drag prosegue comunque via i listener su document */ }
+  lastPointerX = clientX;
   lastPointerY = clientY;
   if(!autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
 }
@@ -6234,7 +6244,7 @@ function positionGhost(ghost, x, y){
   ghost.style.left = (x + 14) + 'px';
   ghost.style.top = (y - 40) + 'px';
 }
-let lastPointerY = 0;
+let lastPointerX = 0, lastPointerY = 0;
 let autoScrollRAF = null;
 // Con più settimane il giorno di destinazione può essere fuori schermo: tenendo
 // il dito vicino al bordo superiore/inferiore durante il trascinamento la pagina
@@ -6245,16 +6255,26 @@ function autoScrollTick(){
   const vh = window.innerHeight;
   if(lastPointerY < margin){
     window.scrollBy(0, -maxSpeed * (1 - lastPointerY/margin));
+    updateDragTarget();
   } else if(lastPointerY > vh - margin){
     window.scrollBy(0, maxSpeed * (1 - (vh - lastPointerY)/margin));
+    updateDragTarget();
   }
   autoScrollRAF = requestAnimationFrame(autoScrollTick);
 }
 document.addEventListener('pointermove', e=>{
   if(!dragState) return;
+  lastPointerX = e.clientX;
   lastPointerY = e.clientY;
   positionGhost(dragState.ghost, e.clientX, e.clientY);
-  const el = document.elementFromPoint(e.clientX, e.clientY);
+  updateDragTarget();
+});
+// Ricalcola il pasto sotto il dito: sia a ogni movimento sia durante
+// l'auto-scroll (dito fermo vicino al bordo, la pagina scorre da sola e sotto
+// il dito passa un altro pasto senza che arrivi nessun pointermove —
+// altrimenti al rilascio si scambierebbe col pasto di prima dello scroll).
+function updateDragTarget(){
+  const el = document.elementFromPoint(lastPointerX, lastPointerY);
   // Qualsiasi pasto è un bersaglio valido, anche di tipo diverso (pranzo su
   // cena): le porzioni/l'eventuale collegamento avanzo restano legati alla
   // posizione, non alla ricetta — vedi swapDayRecipes.
@@ -6266,7 +6286,16 @@ document.addEventListener('pointermove', e=>{
   } else {
     dragState.lastTarget = null;
   }
-});
+}
+// .meal-block ha touch-action: pan-y (serve allo scroll normale della
+// pagina): senza questo, appena il dito si sposta in verticale durante il
+// trascinamento il browser comincia a scorrere e annulla il gesto con un
+// pointercancel — il drag si interrompeva e si poteva scambiare solo con un
+// pasto di fianco. Bloccando il touchmove (listener non passivo) mentre è
+// attivo un trascinamento, lo scroll lo fa solo l'auto-scroll qui sopra.
+document.addEventListener('touchmove', e=>{
+  if(dragState && e.cancelable) e.preventDefault();
+}, { passive: false });
 function endDayDrag(commit){
   if(!dragState) return;
   const { sourceWeekIdx, sourceIndex, sourceMeal, sourceCard, ghost, lastTarget } = dragState;
@@ -6274,7 +6303,7 @@ function endDayDrag(commit){
   sourceCard.classList.remove('dragging');
   if(lastTarget) lastTarget.classList.remove('drag-over');
   dragState = null;
-  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), sourceIndex, sourceMeal, parseInt(lastTarget.dataset.weekIdx,10), lastTarget.dataset.dayIndex, lastTarget.dataset.meal);
+  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), parseInt(sourceIndex,10), sourceMeal, parseInt(lastTarget.dataset.weekIdx,10), parseInt(lastTarget.dataset.dayIndex,10), lastTarget.dataset.meal);
 }
 document.addEventListener('pointerup', ()=> endDayDrag(true));
 document.addEventListener('pointercancel', ()=> endDayDrag(false));
