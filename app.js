@@ -633,6 +633,34 @@ function getRecipeDetails(name){
 // aggiunti a mano tramite il form rapido. I nomi vengono passati attraverso
 // ingredientRenames: rinominare un ingrediente in Dispensa lo aggiorna così ovunque
 // compaia nelle ricette, senza toccare i dati statici.
+// Nomi ingrediente unificati, concordati con l'utente (doppioni dello stesso
+// ingrediente scritto in modi diversi nelle ricette): valgono come sinonimi
+// di base, applicati in lettura da getIngredientsFor insieme a quelli creati
+// dall'app (state.ingredientRenames, che hanno la precedenza) — così
+// funzionano anche sulle ricette modificate dall'app, senza riscriverle.
+// Chiavi in minuscolo, come ingredientRenames.
+const CURATED_INGREDIENT_RENAMES = {
+  'carote':'Carota', 'uovo':'Uova', 'uova sode':'Uova', 'tuorli':'Uova', 'pomodoro':'Pomodori',
+  'scorza di limone':'Limone (scorza)',
+  'menta fresca':'Menta', 'mentuccia (o menta)':'Menta', 'noci sgusciate':'Noci',
+  'olio di semi per friggere':'Olio per friggere',
+  'salsiccia (verzini)':'Salsiccia', 'salsiccia di maiale':'Salsiccia',
+  'peperoncino fresco':'Peperoncino', 'peperoncino fresco o secco':'Peperoncino', 'peperoni misti (rossi e gialli)':'Peperoni',
+  'croste di parmigiano (facoltative)':'Crosta di parmigiano',
+  'pecorino romano grattugiato':'Pecorino grattugiato', 'parmigiano a scaglie':'Parmigiano grattugiato',
+  'filetti di salmone':'Salmone', 'tranci di salmone':'Salmone',
+  'vino rosso corposo':'Vino rosso', 'vino rosso leggero':'Vino rosso', 'funghi misti freschi':'Funghi misti', 'scalogno piccolo':'Scalogno',
+  'brodo vegetale o acqua':'Brodo vegetale', 'brodo vegetale o acqua calda':'Brodo vegetale',
+  'fettine di vitello (o lombata)':'Fettine di vitello', 'mozzarella o bocconcini':'Mozzarella',
+  'piselli (surgelati o già lessati)':'Piselli', 'insalata mista o lattuga':'Insalata'
+};
+// Un ingrediente di ricetta che va diviso in più righe: "Limone (scorza e
+// succo)" diventa "Limone (scorza)" + "Limone (succo)". La quantità resta
+// sulla prima riga; il succo è dello stesso limone, quindi "q.b." — altrimenti
+// in Spesa comparirebbero due limoni per una ricetta sola.
+const CURATED_INGREDIENT_SPLITS = {
+  'limone (scorza e succo)': [{ ingrediente:'Limone (scorza)' }, { ingrediente:'Limone (succo)', qta:'q.b.' }]
+};
 function getIngredientsFor(name){
   const edit = state.recipeEdits[name];
   const det = DATA.recipeDetails[name];
@@ -640,8 +668,11 @@ function getIngredientsFor(name){
   if(edit && edit.ingredienti) list = edit.ingredienti;
   else if(det) list = det.ingredienti;
   else list = state.recipeIngredients[name] || [];
-  const renames = state.ingredientRenames;
-  if(!renames || !Object.keys(renames).length) return list;
+  list = list.flatMap(it=>{
+    const split = CURATED_INGREDIENT_SPLITS[(it.ingrediente||'').trim().toLowerCase()];
+    return split ? split.map(part => Object.assign({}, it, part)) : [it];
+  });
+  const renames = Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
   return list.map(it=>{
     let displayName = it.ingrediente;
     const seen = new Set();
@@ -764,6 +795,7 @@ const state = {
   pantryUnitReviewed: false,
   pantryGroupMigrated: false,
   pantryGroupMigrated2: false,
+  pantryNamesCurated1: false,
   pantryGroups: {
     'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
     'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' },
@@ -1333,6 +1365,7 @@ function buildPersonalPayload(){
     pantrySpanneUnitCleared: state.pantrySpanneUnitCleared,
     pantryGroupMigrated: state.pantryGroupMigrated,
     pantryGroupMigrated2: state.pantryGroupMigrated2,
+    pantryNamesCurated1: state.pantryNamesCurated1,
     whatsNewSeen: state.whatsNewSeen
   };
 }
@@ -6609,6 +6642,31 @@ document.addEventListener('click', e=>{
       if(group) it.group = group;
     });
     state.pantryGroupMigrated2 = true;
+    persist();
+  }
+  // Una tantum: le voci di Dispensa scritte con uno dei nomi ora unificati
+  // (vedi CURATED_INGREDIENT_RENAMES) confluiscono nella voce col nome nuovo:
+  // quantità sommate, e unità/categoria/gruppo/luogo presi da quella vecchia
+  // solo dove la nuova non li ha già.
+  if(!state.pantryNamesCurated1){
+    Object.keys(state.pantryItems).forEach(oldKey=>{
+      const target = CURATED_INGREDIENT_RENAMES[oldKey];
+      if(!target) return;
+      const newKey = target.toLowerCase();
+      if(newKey === oldKey) return;
+      const old = state.pantryItems[oldKey];
+      const cur = state.pantryItems[newKey];
+      if(cur){
+        if(typeof old.qty === 'number') cur.qty = (typeof cur.qty === 'number' ? cur.qty : 0) + old.qty;
+        ['unit','cat','group','luogo'].forEach(f=>{ if(!cur[f] && old[f]) cur[f] = old[f]; });
+      } else {
+        state.pantryItems[newKey] = Object.assign({}, old, { nome: target });
+      }
+      delete state.pantryItems[oldKey];
+      if(state.pantryConfirmedShop[oldKey]){ state.pantryConfirmedShop[newKey] = true; delete state.pantryConfirmedShop[oldKey]; }
+      delete state.shopDismissed['oos_'+oldKey];
+    });
+    state.pantryNamesCurated1 = true;
     persist();
   }
   // Una tantum: passaggio dal modello "una ricetta per giorno" (weekOverrides/
