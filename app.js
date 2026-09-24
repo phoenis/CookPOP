@@ -571,7 +571,9 @@ function moveShopRowToPantry(cb){
   const rowKey = cb.dataset.shopKeys;
   const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
   const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
-  const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 1 : fallback);
+  const rawQty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 0 : fallback);
+  // Quantità non indicata (segnaposto "–"): conta come 1, cioè "c'è".
+  const qty = rawQty > 0 ? rawQty : 1;
   // Se in Dispensa è già impostata "Non mostrare" per questo ingrediente,
   // quella scelta manuale vince sempre: la quantità della ricetta ("12 g"
   // di sale, es.) non deve poterla resettare a un'unità tracciabile.
@@ -3688,7 +3690,7 @@ function buildShopFlat(){
     if(typeof it.qty !== 'number' || it.qty > 0) return;
     if(isLeftoverPantryItem(it)) return; // un avanzo non si ricompra
     if(state.shopDismissed[key]) return;
-    flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
+    flat.push({ key, ingrediente:it.nome, qta: '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
   return flat;
 }
@@ -3740,10 +3742,19 @@ function renderSpesa(){
     // un contatore da 1 senza unità, comunque modificabile con +/-. Unità
     // vuota (non "pz") per i conteggi generici, coerente con come Dispensa
     // tratta "pezzi/generico".
+    //
+    // Quantità non nota (ingrediente finito in Dispensa, "q.b.", "facoltativo",
+    // aggiunto a mano senza quantità, unità "Non mostrare"): niente numero
+    // inventato ("1", "1 none", "1 g" di pasta) ma un segnaposto "–"; + parte
+    // da un passo (1 pezzo, o 50 g/ml se in Dispensa l'ingrediente è tracciato
+    // a peso/volume), − fino a 0 torna al segnaposto.
     const parsedQta = parseQtyValue(qta);
-    const unit = parsedQta ? (parsedQta.unit || '') : '';
-    const step = parsedQta ? qtyStepFor(parsedQta.unit) : 1;
-    const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (parsedQta ? parsedQta.value : 1);
+    const hasAmount = !!parsedQta && parsedQta.unit !== 'none';
+    const pantryUnit = (state.pantryItems[(ingrediente||'').trim().toLowerCase()] || {}).unit;
+    const unit = hasAmount ? (parsedQta.unit || '') : (['g','kg','ml','l'].includes(pantryUnit) ? pantryUnit : '');
+    const step = qtyStepFor(unit);
+    const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (hasAmount ? parsedQta.value : 0);
+    const qtyDefault = hasAmount ? parsedQta.value : '';
     const editingQty = state.shopQtyEditingKey === rowKey;
     // Solo in Per reparto più occorrenze (giorni diversi) si uniscono in una
     // riga sola: se ne hai spuntata qualcuna ma non tutte, un segno lo dice a
@@ -3771,11 +3782,13 @@ function renderSpesa(){
         </span>
       </label>
       <span class="qty-stepper" title="Quantità da prendere">
-        <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" data-shop-qty-default="${qty}" data-shop-qty-step="${step}" aria-label="Diminuisci quantità">−</button>
+        <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Diminuisci quantità">−</button>
         ${editingQty
-          ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qty}" data-shop-qty-edit="${escapeAttr(rowKey)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
-          : `<span class="qty-num" data-shop-qty-show="${escapeAttr(rowKey)}">${qty}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
-        <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" data-shop-qty-default="${qty}" data-shop-qty-step="${step}" aria-label="Aumenta quantità">+</button>
+          ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qty > 0 ? qty : ''}" placeholder="–" data-shop-qty-edit="${escapeAttr(rowKey)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
+          : qty > 0
+            ? `<span class="qty-num" data-shop-qty-show="${escapeAttr(rowKey)}">${qty}${unit ? ' ' + escapeHtml(unit) : ''}</span>`
+            : `<span class="qty-num qty-placeholder" data-shop-qty-show="${escapeAttr(rowKey)}" title="Quantità non indicata">–</span>`}
+        <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Aumenta quantità">+</button>
       </span>
       <button class="btn-remove" data-shop-remove="${rowKey}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
     </div>`;
@@ -4648,7 +4661,7 @@ function attachHandlers(){
       const key = e.currentTarget.dataset.shopQtyInc;
       const step = parseFloat(e.currentTarget.dataset.shopQtyStep) || 1;
       const fallback = parseFloat(e.currentTarget.dataset.shopQtyDefault);
-      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : (Number.isNaN(fallback) ? 1 : fallback);
+      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : (Number.isNaN(fallback) ? 0 : fallback);
       state.shopQty[key] = Math.round((current + step) * 100) / 100;
       persist(); render();
     });
@@ -4658,7 +4671,7 @@ function attachHandlers(){
       const key = e.currentTarget.dataset.shopQtyDec;
       const step = parseFloat(e.currentTarget.dataset.shopQtyStep) || 1;
       const fallback = parseFloat(e.currentTarget.dataset.shopQtyDefault);
-      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : (Number.isNaN(fallback) ? 1 : fallback);
+      const current = (typeof state.shopQty[key] === 'number') ? state.shopQty[key] : (Number.isNaN(fallback) ? 0 : fallback);
       state.shopQty[key] = Math.max(0, Math.round((current - step) * 100) / 100);
       persist(); render();
     });
@@ -6014,7 +6027,7 @@ function attachHandlers(){
         const already = Object.values(state.shopExtras).some(ex => (ex.ingrediente||'').trim().toLowerCase() === key);
         if(!already){
           const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-          state.shopExtras[id] = { ingrediente: it.nome, qta: it.unit ? `1 ${it.unit}` : '' };
+          state.shopExtras[id] = { ingrediente: it.nome, qta: '' };
         }
       }
     });
