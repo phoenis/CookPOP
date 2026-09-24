@@ -3686,7 +3686,7 @@ function buildShopFlat(){
     // passato non vale più — quando finirà di nuovo deve ricomparire qui.
     // (Prima restava scartata per sempre: un ingrediente ricomprato da Spesa
     // e poi finito un'altra volta non tornava più tra i Finiti.)
-    if(typeof it.qty === 'number' && it.qty > 0 && state.shopDismissed[key]){ delete state.shopDismissed[key]; return; }
+    if(typeof it.qty === 'number' && it.qty > 0 && (state.shopDismissed[key] || state.shopChecked[key] !== undefined)){ delete state.shopDismissed[key]; delete state.shopChecked[key]; return; }
     if(typeof it.qty !== 'number' || it.qty > 0) return;
     if(isLeftoverPantryItem(it)) return; // un avanzo non si ricompra
     if(state.shopDismissed[key]) return;
@@ -4767,8 +4767,10 @@ function attachHandlers(){
   // isolati nel blocco Finiti (vedi il flag "confirmed" in renderSpesa).
   document.querySelectorAll('[data-finished-shop-delete]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
+      // A fine azione le righe si deselezionano: la spunta serviva solo a
+      // sceglierle, non vuol dire "già preso".
       document.querySelectorAll('.finished-shop-group input[type=checkbox]:checked').forEach(cb=>{
-        cb.dataset.shopKeys.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+        cb.dataset.shopKeys.split(',').forEach(k=>{ state.shopDismissed[k] = true; delete state.shopChecked[k]; });
       });
       persist(); render();
     });
@@ -4778,6 +4780,7 @@ function attachHandlers(){
       document.querySelectorAll('.finished-shop-group input[type=checkbox]:checked').forEach(cb=>{
         cb.dataset.shopKeys.split(',').forEach(k=>{
           if(k.startsWith('oos_')) state.pantryConfirmedShop[k.slice(4)] = true;
+          delete state.shopChecked[k];
         });
       });
       persist(); render();
