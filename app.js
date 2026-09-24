@@ -4051,7 +4051,7 @@ function renderPrep(){
                 <input class="input-search" type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
                 <button class="btn is-filters" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
               </div>
-      <button type="button" class="btn is-fixed" id="prep-search-close" aria-label="Chiudi ricerca">✕</button>
+      <button type="button" class="btn is-fixed" id="prep-search-close" aria-label="${state.filters.search ? 'Cancella ricerca' : 'Chiudi ricerca'}">✕</button>
       </div>
       ` : `<button type="button" class="btn is-fixed${state.filters.search ? ' active' : ''}" id="prep-search-toggle" aria-label="Cerca ricetta">${SEARCH_ICON_SVG}${state.filters.search ? ' Cerca' : ''}</button>`}
     </div>
@@ -5674,7 +5674,16 @@ function attachHandlers(){
     if(el) el.focus();
   });
   const prepSearchClose = document.getElementById('prep-search-close');
+  // Stessa X unica della ricerca in Dispensa (vedi pantry-search-close):
+  // con del testo lo cancella, a campo vuoto chiude la ricerca.
   if(prepSearchClose) prepSearchClose.addEventListener('click', ()=>{
+    if(state.filters.search){
+      state.filters.search = '';
+      render();
+      const el = document.getElementById('f-search');
+      if(el) el.focus();
+      return;
+    }
     state.prepSearchOpen = false;
     render();
   });
