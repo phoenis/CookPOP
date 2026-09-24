@@ -16,6 +16,7 @@
     --delete: var(--tomato); /* rosso per testo/icone "elimina": in scuro diventa più chiaro, il bordeaux non si leggerebbe */
     --surface-past: #f8f7f7; /* sfondo dei pasti già passati nel Menù: a metà tra --bg e --surface */
     --control-face: #efefef; /* fondo dei piccoli bottoni icona (es. cestino in Spesa) */
+    --accordion-border: var(--ink); /* linee sopra/sotto i titoli di sezione (settimana, giorno, reparto) */
 
     --font-family: 'Open Sans', sans-serif;
 
@@ -110,7 +111,7 @@
       --green-deep:#a3cc3f;
       --ink:#ece7e0; --ink-light:#b5afa4; --line-light:#9a9488; --line: rgba(255,255,255,0.12);
       --line-strong: rgba(255,255,255,0.35);
-      --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06);
+      --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06); --accordion-border:rgba(255,255,255,0.35);
       --delete:#f0645a; --green-mid:#a3cc3f;
     }
   }
@@ -119,7 +120,7 @@
     --green-deep:#a3cc3f;
     --ink:#ece7e0; --ink-light:#b5afa4; --line-light:#9a9488; --line: rgba(255,255,255,0.12);
     --line-strong: rgba(255,255,255,0.35);
-    --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06);
+    --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06); --accordion-border:rgba(255,255,255,0.35);
     --delete:#f0645a; --green-mid:#a3cc3f;
   }
   *{box-sizing:border-box;}
@@ -250,7 +251,7 @@
   h2.section-title{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-large); line-height:var(--line-height-small); margin:0 0 0.25rem; text-align:left; }
   p.section-sub{ font-size:var(--text-small); color:var(--ink-light); margin:0 0 1rem;  display: none;}
   h2{margin: 0;}
-  .week-title, .shop-day-title, .dept-title{ column-gap:var(--gap-icon);font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); text-transform:uppercase; /* margin-top: var(--space-large); */ /* margin-bottom:var(--space-medium); */ padding: var(--padding-xsmall) calc(var(--padding-page) * 2) var(--padding-xsmall) var(--padding-page); border-bottom: var(--border) solid var(--ink); border-top: var(--border) solid var(--ink); margin-top: -1px; display: flex; /* justify-content:space-between; */ align-items: center; flex-wrap: wrap;/* }
+  .week-title, .shop-day-title, .dept-title{ column-gap:var(--gap-icon);font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); text-transform:uppercase; /* margin-top: var(--space-large); */ /* margin-bottom:var(--space-medium); */ padding: var(--padding-xsmall) calc(var(--padding-page) * 2) var(--padding-xsmall) var(--padding-page); border-bottom: var(--border) solid var(--accordion-border); border-top: var(--border) solid var(--accordion-border); margin-top: -1px; display: flex; /* justify-content:space-between; */ align-items: center; flex-wrap: wrap;/* }
   .week-title{ */position: sticky; top: calc(3.75rem + 1px); z-index: 70; background-color: var(--bg);}
   .week-title.is-menu{justify-content: space-between; padding: var(--padding-xsmall) var(--padding-page);}
   .btn-primary-flat{ font-size:var(--text-small); padding:var(--space-xsmall) var(--space-medium); text-align:left; }
@@ -519,6 +520,10 @@
  */
   .input-search{flex: 1; background-color: transparent; border: none; padding-left: var(--padding-small);}
   .input-search:focus{border: 0; outline: 0;}
+  /* Dispensa e Ricette: niente X nativa del browser, la cancellazione la fa
+     la X della barra di ricerca (vedi pantry-search-close/prep-search-close
+     in app.js). */
+  #pantry-search::-webkit-search-cancel-button, #f-search::-webkit-search-cancel-button{ -webkit-appearance:none; appearance:none; display:none; }
   .search-toggle-btn{ flex:1; }
   .search-toggle-btn.active{ background-color:var(--gold); }
   .filters{ display:flex; flex-wrap:wrap; gap:var(--space-xsmall); margin-bottom:var(--space-medium); }
