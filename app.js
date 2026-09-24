@@ -707,6 +707,7 @@ const CURATED_INGREDIENT_RENAMES = {
   'fettine di vitello (o lombata)':'Fettine di vitello', 'mozzarella o bocconcini':'Mozzarella',
   'piselli (surgelati o già lessati)':'Piselli', 'insalata mista o lattuga':'Insalata',
   'succo di limone':'Limone (succo)',
+  'sale':'Sale fino',
   // Nomi generici di un gruppo (vedi CURATED_PANTRY_GROUPS): una ricetta che
   // li chiede viene soddisfatta da qualsiasi voce di Dispensa del gruppo.
   'pasta corta (ditalini o mista)':'Pasta corta', 'pasta corta (ditalini o tubetti)':'Pasta corta',
@@ -739,6 +740,30 @@ const CURATED_PANTRY_GROUPS = {
 const CURATED_INGREDIENT_SPLITS = {
   'limone (scorza e succo)': [{ ingrediente:'Limone (scorza)' }, { ingrediente:'Limone (succo)', qta:'q.b.' }]
 };
+// Unisce le voci di Dispensa scritte con uno dei nomi unificati (vedi
+// CURATED_INGREDIENT_RENAMES) nella voce col nome nuovo: quantità sommate, e
+// unità/categoria/gruppo/luogo presi da quella vecchia solo dove la nuova non
+// li ha già; lo stato "da comprare" passa alla voce nuova. Chiamata dalle
+// migrazioni una tantum pantryNamesCurated1/2.
+function mergeRenamedPantryItems(){
+  Object.keys(state.pantryItems).forEach(oldKey=>{
+    const target = CURATED_INGREDIENT_RENAMES[oldKey];
+    if(!target) return;
+    const newKey = target.toLowerCase();
+    if(newKey === oldKey) return;
+    const old = state.pantryItems[oldKey];
+    const cur = state.pantryItems[newKey];
+    if(cur){
+      if(typeof old.qty === 'number') cur.qty = (typeof cur.qty === 'number' ? cur.qty : 0) + old.qty;
+      ['unit','cat','group','luogo'].forEach(f=>{ if(!cur[f] && old[f]) cur[f] = old[f]; });
+    } else {
+      state.pantryItems[newKey] = Object.assign({}, old, { nome: target });
+    }
+    delete state.pantryItems[oldKey];
+    if(state.pantryConfirmedShop[oldKey]){ state.pantryConfirmedShop[newKey] = true; delete state.pantryConfirmedShop[oldKey]; }
+    delete state.shopDismissed['oos_'+oldKey];
+  });
+}
 function getIngredientsFor(name){
   const edit = state.recipeEdits[name];
   const det = DATA.recipeDetails[name];
@@ -885,6 +910,7 @@ const state = {
   pantryGroupMigrated: false,
   pantryGroupMigrated2: false,
   pantryNamesCurated1: false,
+  pantryNamesCurated2: false,
   pantryGroupMigrated3: false,
   shopKeysByName1: false,
   pantryGroups: {
@@ -1503,6 +1529,7 @@ function buildPersonalPayload(){
     pantryGroupMigrated: state.pantryGroupMigrated,
     pantryGroupMigrated2: state.pantryGroupMigrated2,
     pantryNamesCurated1: state.pantryNamesCurated1,
+    pantryNamesCurated2: state.pantryNamesCurated2,
     pantryGroupMigrated3: state.pantryGroupMigrated3,
     shopKeysByName1: state.shopKeysByName1,
     whatsNewSeen: state.whatsNewSeen
@@ -6819,24 +6846,15 @@ document.addEventListener('click', e=>{
   // quantità sommate, e unità/categoria/gruppo/luogo presi da quella vecchia
   // solo dove la nuova non li ha già.
   if(!state.pantryNamesCurated1){
-    Object.keys(state.pantryItems).forEach(oldKey=>{
-      const target = CURATED_INGREDIENT_RENAMES[oldKey];
-      if(!target) return;
-      const newKey = target.toLowerCase();
-      if(newKey === oldKey) return;
-      const old = state.pantryItems[oldKey];
-      const cur = state.pantryItems[newKey];
-      if(cur){
-        if(typeof old.qty === 'number') cur.qty = (typeof cur.qty === 'number' ? cur.qty : 0) + old.qty;
-        ['unit','cat','group','luogo'].forEach(f=>{ if(!cur[f] && old[f]) cur[f] = old[f]; });
-      } else {
-        state.pantryItems[newKey] = Object.assign({}, old, { nome: target });
-      }
-      delete state.pantryItems[oldKey];
-      if(state.pantryConfirmedShop[oldKey]){ state.pantryConfirmedShop[newKey] = true; delete state.pantryConfirmedShop[oldKey]; }
-      delete state.shopDismissed['oos_'+oldKey];
-    });
+    mergeRenamedPantryItems();
     state.pantryNamesCurated1 = true;
+    persist();
+  }
+  // Una tantum: stessa unione per i nomi aggiunti dopo (Sale → Sale fino):
+  // la voce "Sale" di Dispensa confluisce in "Sale fino" e sparisce.
+  if(!state.pantryNamesCurated2){
+    mergeRenamedPantryItems();
+    state.pantryNamesCurated2 = true;
     persist();
   }
   // Una tantum: crea i gruppi concordati (CURATED_PANTRY_GROUPS) e li assegna
