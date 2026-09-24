@@ -13,7 +13,9 @@
     --line-strong: rgba(32,30,29,0.4);
     --border: 1px;
     --border-strong: 2px;
-    --delete: var(--tomato);
+    --delete: var(--tomato); /* rosso per testo/icone "elimina": in scuro diventa più chiaro, il bordeaux non si leggerebbe */
+    --surface-past: #f8f7f7; /* sfondo dei pasti già passati nel Menù: a metà tra --bg e --surface */
+    --control-face: #efefef; /* fondo dei piccoli bottoni icona (es. cestino in Spesa) */
 
     --font-family: 'Open Sans', sans-serif;
 
@@ -98,15 +100,18 @@
   /* Scuro: automatico se il sistema lo preferisce (a meno che l'utente non
      abbia forzato "Chiaro" nelle Impostazioni), oppure sempre se ha forzato
      "Scuro" — vedi applyTheme() in app.js, che mette/toglie data-theme su
-     <html>. Solo i toni di sfondo/testo/bordo cambiano: i colori di stato
-     (gold/tomato/steel/verde/ecc.) restano gli stessi, sono già abbastanza
-     saturi da leggersi anche su sfondo scuro. */
+     <html>. Cambiano i toni di sfondo/testo/bordo; i colori di stato
+     (gold/tomato/steel/verde/ecc.) restano gli stessi, tranne quelli scuri
+     usati come testo (--delete, --green-mid), schiariti per avere su sfondo
+     scuro lo stesso contrasto che hanno in chiaro. */
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --bg:#18191b; --surface:#242423; --surface-2:rgba(255,255,255,0.05);
       --green-deep:#a3cc3f;
       --ink:#ece7e0; --ink-light:#b5afa4; --line-light:#9a9488; --line: rgba(255,255,255,0.12);
       --line-strong: rgba(255,255,255,0.35);
+      --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06);
+      --delete:#f0645a; --green-mid:#a3cc3f;
     }
   }
   :root[data-theme="dark"]{
@@ -114,6 +119,8 @@
     --green-deep:#a3cc3f;
     --ink:#ece7e0; --ink-light:#b5afa4; --line-light:#9a9488; --line: rgba(255,255,255,0.12);
     --line-strong: rgba(255,255,255,0.35);
+    --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06);
+    --delete:#f0645a; --green-mid:#a3cc3f;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -169,7 +176,7 @@
 
   /* fantasma: bordo pieno leggero, per annulla/chiudi */
   .btn.is-ghost{ border-color:var(--line); color:var(--ink-light); }
-  .btn.is-ghost:hover{ border-color:var(--tomato); color:var(--tomato); }
+  .btn.is-ghost:hover{ border-color:var(--delete); color:var(--delete); }
 
   /* solo icona: azzera il padding orizzontale, la dimensione la dà il componente */
   .btn.is-icon{ flex-shrink:0; border: 0px; padding: 0px;}
@@ -177,7 +184,7 @@
   /* solo testo, nessun bordo/fondo: link-like */
   .btn.is-text{ border:0; background:none; padding:0; }
 
-  .btn.is-danger{ color:var(--tomato); }
+  .btn.is-danger{ color:var(--delete); }
   .btn.is-block{ width:100%; }
 
   .btn-settings{ width:2.25rem; height:2.25rem; border:none; background:transparent; }
@@ -224,7 +231,7 @@
   .settings-backdrop{ display:none; position:fixed; inset:0; background:var(--overlay); z-index:200; align-items:center; justify-content:center; padding:1.25rem;  backdrop-filter: blur(var(--blur-modal));}
   .settings-backdrop.open{ display:flex; }
   .settings-item{ width:100%; margin-bottom:var(--space-small); }
-  .settings-item.settings-item-danger{ color:var(--tomato); }
+  .settings-item.settings-item-danger{ color:var(--delete); }
   .settings-credit{ text-align:center; color:var(--ink-light); font-family:var(--font-family); font-size:var(--text-xsmall); margin:0.875rem 0 0; }
   .profile-panel{ margin-bottom:var(--space-large); padding-bottom:var(--space-medium); border-bottom:1px solid var(--line); }
   .profile-name{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-large); }
@@ -363,7 +370,7 @@
   .overflow-action-label{ font-size:var(--text-body); font-weight:var(--weight-medium); }
   .overflow-action-note{ font-size:var(--text-xsmall); color:var(--ink-light); line-height:1.4; }
   .overflow-action-danger{ border-top:2px solid var(--line-strong); margin-top:var(--space-xsmall); padding-top:var(--space-medium); }
-  .overflow-action-danger .overflow-action-label{ color:var(--tomato); }
+  .overflow-action-danger .overflow-action-label{ color:var(--delete); }
   .meal-overflow-btn{ font-size:1.25rem; line-height:1; color:var(--ink-light); width:2.25rem; height:2.25rem; margin-left:auto; }
 
 .section-footer{display: flex; flex-direction: column; gap: var(--gap-btn); margin-top: var(--space-medium);}
@@ -404,10 +411,10 @@
   .status-badge.status-avanzo{background-color: var(--amber);}
   .status-badge.status-changed{background-color: var(--line-light);}
   .status-badge.status-done{background-color: var(--green-deep);}
-  .status-badge.status-locked{background-color: color-mix(in srgb, var(--tomato) 15%, transparent); color: var(--tomato);}
+  .status-badge.status-locked{background-color: color-mix(in srgb, var(--tomato) 15%, transparent); color: var(--delete);}
   .done-tag{ font-family:var(--font-family); font-size:var(--text-xsmall); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:0.04em; color:var(--green-mid); }
   .meal-lock-btn{ margin-left:auto; color:var(--ink-light); width:2.5rem; height:2.5rem; }
-  .meal-lock-btn.active{ color:var(--tomato); background-color: color-mix(in srgb, var(--tomato) 12%, transparent); border-radius:var(--radius-pill); }
+  .meal-lock-btn.active{ color:var(--delete); background-color: color-mix(in srgb, var(--tomato) 12%, transparent); border-radius:var(--radius-pill); }
   
   .ing-list{ list-style:none; padding:0; margin:0; }
   .ing-empty{ font-size:var(--text-xsmall); color:var(--ink-light); font-style:italic; margin-bottom:var(--space-xsmall); }
@@ -524,7 +531,7 @@
   .filters-modal-header h3{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-medium); margin:0; }
   .filters-close-btn, .meal-detail-close{ font-size:var(--text-medium); color:var(--ink-light); }
   .is-icon.filters-close-btn{ padding:var(--space-xxsmall) var(--space-xsmall); }
-  .filters-close-btn:hover{ color:var(--tomato); }
+  .filters-close-btn:hover{ color:var(--delete); }
   .filters-modal-footer{ display:flex; gap:var(--space-xsmall); margin-top:var(--space-large); justify-content: center; align-content: center;}
   /*.filters-modal-footer .btn{ flex:1; margin:0; text-align:center; }*/
   .filter-groups, .meal-detail-body{ display:flex; flex-direction:column; gap:var(--space-large); margin-bottom:var(--space-medium); }
@@ -599,14 +606,14 @@
     border:solid var(--green-deep); border-width:0 0.125rem 0.125rem 0;
     transform:translate(-50%,-50%) rotate(45deg);
   }
-  .qty-btn{ width:1.5rem; height:1.5rem; font-size:var(--text-small); line-height:1; border-radius: var(--radius-full); border: 1px solid var(--surface); background-color: white; }
+  .qty-btn{ width:1.5rem; height:1.5rem; font-size:var(--text-small); line-height:1; border-radius: var(--radius-full); border: 1px solid var(--surface); background-color: var(--surface); }
   .qty-btn:hover{ background:var(--surface-2); }
   .qty-num{ display:inline-block; min-width:1.375rem; text-align:center; font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-medium); cursor:text; }
   .qty-num.low{ color:var(--gold); font-weight:var(--weight-bold); }
   .qty-input{ width:2.75rem; font-family:var(--font-family); font-size:var(--text-small); text-align:center; padding:var(--space-xxsmall) 0.125rem; border-radius:0; border:1px solid var(--gold); background:var(--surface); -moz-appearance:textfield; appearance:textfield; }
   .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
   .qty-unit{ font-family:var(--font-family); font-size:var(--text-xsmall); color:var(--ink-light); margin-left:0.1875rem; }
-  .btn-remove{ width:1.5rem; height:1.5rem; color: var(--gold-dark); display: flex; padding: var(--space-xxsmall); border: none;}
+  .btn-remove{ width:1.5rem; height:1.5rem; color: var(--gold-dark); background-color: var(--control-face); display: flex; padding: var(--space-xxsmall); border: none;}
   .btn-remove svg{ width:100%; height:100%; }
   .btn-remove:hover{ opacity:0.7; }
   .save-hint{ font-family:var(--font-family); font-size:var(--text-xsmall); color:var(--ink-light); text-align:right; min-height:0.875rem; }
@@ -617,7 +624,7 @@
     justify-content: center;
   gap: var(--space-xsmall);}
   .day-card-past { color: var(--ink-light); /* padding: var(--padding-small) 0px; */}
-  .day-card-past .meal-block:has(.day-menu-row:not(.day-menu-empty)){background-color: #f8f7f7}
+  .day-card-past .meal-block:has(.day-menu-row:not(.day-menu-empty)){background-color: var(--surface-past)}
   .past-days-toggle {color: var(--ink-light);}
   .generate-week-row{ display:flex; align-items:stretch; }
   .past-days-row{ display: flex; margin-top: var(--space-medium); align-items: center; gap: var(--gap-btn); justify-content: flex-start; padding-left: 4rem; padding-bottom: var(--padding-block); color: var(--ink-light); /* border-bottom: var(--border) solid var(--line-light); */}
@@ -632,7 +639,7 @@
   .login-box .btn{ font-size:var(--text-small); padding:var(--space-small); margin-top:var(--space-xxsmall); }
   .login-box .btn:hover{ color:var(--white); }
   .login-box .btn:disabled{ opacity:0.6; }
-  .login-error{ color:var(--tomato); font-size:var(--text-xsmall); margin-top:0.625rem; min-height:1rem; }
+  .login-error{ color:var(--delete); font-size:var(--text-xsmall); margin-top:0.625rem; min-height:1rem; }
 
   [data-luogo-value="Dispensa"],[data-luogo-value="dispensa"] {color: var(--luogo-dispensa); background-color: color-mix(in lab, var(--luogo-dispensa) 15%, transparent);}
   [data-luogo-value="Ripostiglio"],[data-luogo-value="ripostiglio"] {color: var(--luogo-ripostiglio); background-color: color-mix(in lab, var(--luogo-ripostiglio) 15%, transparent);}
