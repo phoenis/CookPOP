@@ -2184,6 +2184,10 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
 // Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
 // tranne nel Menù (resta il nome dell'app — è la schermata principale).
 const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'Dispensa' };
+// X per cancellare il testo di un campo di ricerca: stesso tratto
+// dell'icona di ricerca qui sotto, dimensionata in em (segue il font del
+// campo) e in currentColor (il colore del testo).
+const CLEAR_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6 6 18M6 6l12 12"></path></svg>';
 const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></g></svg>';
 
 // Modale "Novità": compare una volta sola al prossimo caricamento (su tutti i
@@ -4315,7 +4319,10 @@ function renderDispensa(){
           <button class="btn is-icon filters-close-btn" data-close-ingredient-manager>✕</button>
         </div>
         <p class="section-sub">Tutti gli ingredienti noti al sistema — in Dispensa, nelle ricette o aggiunti a mano in Spesa. Tocca per modificarne categoria, luogo o quantità.</p>
-        <input class="input-search" type="search" id="ingredient-manager-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.ingredientManagerSearch||'')}">
+        <div class="search-field">
+          <input class="input-search" type="search" id="ingredient-manager-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.ingredientManagerSearch||'')}">
+          ${state.ingredientManagerSearch ? `<button type="button" class="search-clear" id="ingredient-manager-search-clear" aria-label="Cancella ricerca">${CLEAR_ICON_SVG}</button>` : ''}
+        </div>
         <div class="ingredient-manager-list">
           ${rows || `<p class="ing-empty">Nessun ingrediente trovato.</p>`}
         </div>
@@ -5966,6 +5973,13 @@ function attachHandlers(){
     render();
     const el = document.getElementById('ingredient-manager-search');
     el.focus(); el.selectionStart = el.value.length;
+  });
+  const ingredientManagerSearchClear = document.getElementById('ingredient-manager-search-clear');
+  if(ingredientManagerSearchClear) ingredientManagerSearchClear.addEventListener('click', ()=>{
+    state.ingredientManagerSearch = '';
+    render();
+    const el = document.getElementById('ingredient-manager-search');
+    if(el) el.focus();
   });
   // Riusa l'edit modale già esistente di Dispensa: se l'ingrediente non ha
   // ancora una voce in pantryItems gliene crea una a quantità 0 (invisibile
