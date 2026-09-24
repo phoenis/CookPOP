@@ -618,6 +618,7 @@
   }
   .qty-btn{ width:1.5rem; height:1.5rem; font-size:var(--text-small); line-height:1; border-radius: var(--radius-full); border: 1px solid var(--surface); background-color: var(--surface); }
   .qty-btn:hover{ background:var(--surface-2); }
+  .qty-num.qty-placeholder{ color:var(--ink-light); min-width:1.5rem; text-align:center; }
   .qty-num{ display:inline-block; min-width:1.375rem; text-align:center; font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-medium); cursor:text; }
   .qty-num.low{ color:var(--gold); font-weight:var(--weight-bold); }
   .qty-input{ width:2.75rem; font-family:var(--font-family); font-size:var(--text-small); text-align:center; padding:var(--space-xxsmall) 0.125rem; border-radius:0; border:1px solid var(--gold); background:var(--surface); -moz-appearance:textfield; appearance:textfield; }
