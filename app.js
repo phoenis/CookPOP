@@ -524,11 +524,7 @@ function moveShopRowToPantry(cb){
   // di sale, es.) non deve poterla resettare a un'unità tracciabile.
   const existingUnit = (state.pantryItems[(cb.dataset.shopName||'').trim().toLowerCase()] || {}).unit;
   const unit = existingUnit === 'none' ? 'none' : (cb.dataset.shopUnit || undefined);
-  // Un extra aggiunto a mano in Spesa porta con sé categoria/gruppo/luogo
-  // scelti nel modale (vedi "Aggiungi" in Spesa): entra in Dispensa completo,
-  // come se l'avessi aggiunto da lì.
-  const extra = rowKey.split(',').map(k=>state.shopExtras[k]).find(Boolean) || {};
-  upsertPantryItem(cb.dataset.shopName, extra.luogo || 'dispensa', qty, unit, extra.cat || undefined, extra.group || undefined);
+  upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
   rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
 }
 
@@ -3460,8 +3456,13 @@ function buildShopFlat(){
   // categoria — quando la spunti e la sposti in Dispensa aggiorna quello
   // stesso record invece di doverlo ricreare da capo.
   Object.entries(state.pantryItems).forEach(([pantryKey, it])=>{
-    if(typeof it.qty !== 'number' || it.qty > 0) return;
     const key = `oos_${pantryKey}`;
+    // Tornato in scorta: un'eventuale riga "finito" scartata/comprata in
+    // passato non vale più — quando finirà di nuovo deve ricomparire qui.
+    // (Prima restava scartata per sempre: un ingrediente ricomprato da Spesa
+    // e poi finito un'altra volta non tornava più tra i Finiti.)
+    if(typeof it.qty === 'number' && it.qty > 0 && state.shopDismissed[key]){ delete state.shopDismissed[key]; return; }
+    if(typeof it.qty !== 'number' || it.qty > 0) return;
     if(state.shopDismissed[key]) return;
     flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
@@ -3751,8 +3752,8 @@ function renderSpesa(){
   const matchedPantryUnit = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].unit) || '';
   const matchedPantryCat = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].cat) || '';
   // Ingrediente che non è ancora in Dispensa: come in "Aggiungi ingrediente"
-  // di Dispensa si sceglie anche gruppo e luogo, così quando lo compri e lo
-  // sposti in Dispensa entra già completo (vedi moveShopRowToPantry).
+  // di Dispensa si sceglie anche gruppo e luogo, e la voce entra subito
+  // nell'anagrafica ingredienti (vedi "Aggiungi" in attachHandlers).
   const addIngIsNew = !!addIngQuery && !state.pantryItems[addIngQuery];
   const addIngDraft = state.addIngDraft || {};
   const addIngQta = addIngDraft.qta !== undefined ? addIngDraft.qta : (matchedPantryUnit ? '1' : '');
@@ -4622,12 +4623,18 @@ function attachHandlers(){
         // fallback in buildShopFlat/renderSpesa.
         // Gruppo/luogo solo per un ingrediente nuovo (i select compaiono solo
         // allora): servono a moveShopRowToPantry per crearlo in Dispensa completo.
-        state.shopExtras[id] = {
-          ingrediente: name, qta,
-          ...(catSelect && catSelect.value ? { cat: catSelect.value } : {}),
-          ...(groupSelect && groupSelect.value ? { group: groupSelect.value } : {}),
-          ...(luogoSelect && luogoSelect.value ? { luogo: luogoSelect.value } : {})
-        };
+        state.shopExtras[id] = catSelect && catSelect.value ? { ingrediente: name, qta, cat: catSelect.value } : { ingrediente: name, qta };
+        // Ingrediente nuovo: entra subito nell'anagrafica (voce di Dispensa a
+        // scorta 0, come quando lo apri da "Gestisci ingredienti") con
+        // categoria/gruppo/luogo/unità scelti qui — in scorta ci va solo
+        // quando lo compri (moveShopRowToPantry ritrova questa voce e ne
+        // aumenta la quantità, tenendo luogo/categoria/gruppo). La sua riga
+        // "Finiti in Dispensa" si scarta: in lista c'è già come aggiunto a
+        // mano, con la quantità scritta qui.
+        if(!pantryIt){
+          upsertPantryItem(name, luogoSelect ? luogoSelect.value : 'dispensa', 0, unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
+          state.shopDismissed[`oos_${pantryKey}`] = true;
+        }
       }
       state.addIngModalOpen = false;
       state.addIngDraft = null;
