@@ -633,6 +633,59 @@ function getRecipeDetails(name){
 // aggiunti a mano tramite il form rapido. I nomi vengono passati attraverso
 // ingredientRenames: rinominare un ingrediente in Dispensa lo aggiorna così ovunque
 // compaia nelle ricette, senza toccare i dati statici.
+// Nomi ingrediente unificati, concordati con l'utente (doppioni dello stesso
+// ingrediente scritto in modi diversi nelle ricette): valgono come sinonimi
+// di base, applicati in lettura da getIngredientsFor insieme a quelli creati
+// dall'app (state.ingredientRenames, che hanno la precedenza) — così
+// funzionano anche sulle ricette modificate dall'app, senza riscriverle.
+// Chiavi in minuscolo, come ingredientRenames.
+const CURATED_INGREDIENT_RENAMES = {
+  'carote':'Carota', 'uovo':'Uova', 'uova sode':'Uova', 'tuorli':'Uova', 'pomodoro':'Pomodori',
+  'scorza di limone':'Limone (scorza)',
+  'menta fresca':'Menta', 'mentuccia (o menta)':'Menta', 'noci sgusciate':'Noci',
+  'olio di semi per friggere':'Olio per friggere',
+  'salsiccia (verzini)':'Salsiccia', 'salsiccia di maiale':'Salsiccia',
+  'peperoncino fresco':'Peperoncino', 'peperoncino fresco o secco':'Peperoncino', 'peperoni misti (rossi e gialli)':'Peperoni',
+  'croste di parmigiano (facoltative)':'Crosta di parmigiano',
+  'pecorino romano grattugiato':'Pecorino grattugiato', 'parmigiano a scaglie':'Parmigiano grattugiato',
+  'filetti di salmone':'Salmone', 'tranci di salmone':'Salmone',
+  'vino rosso corposo':'Vino rosso', 'vino rosso leggero':'Vino rosso', 'funghi misti freschi':'Funghi misti', 'scalogno piccolo':'Scalogno',
+  'brodo vegetale o acqua':'Brodo vegetale', 'brodo vegetale o acqua calda':'Brodo vegetale',
+  'fettine di vitello (o lombata)':'Fettine di vitello', 'mozzarella o bocconcini':'Mozzarella',
+  'piselli (surgelati o già lessati)':'Piselli', 'insalata mista o lattuga':'Insalata',
+  'succo di limone':'Limone (succo)',
+  // Nomi generici di un gruppo (vedi CURATED_PANTRY_GROUPS): una ricetta che
+  // li chiede viene soddisfatta da qualsiasi voce di Dispensa del gruppo.
+  'pasta corta (ditalini o mista)':'Pasta corta', 'pasta corta (ditalini o tubetti)':'Pasta corta',
+  'pasta corta (fusilli o mezze maniche)':'Pasta corta', 'pasta corta (fusilli o penne)':'Pasta corta',
+  'pasta corta (mezze maniche o penne)':'Pasta corta', 'pasta corta (orecchiette o fusilli)':'Pasta corta',
+  'pasta corta (penne o mezze maniche)':'Pasta corta', 'pasta corta (rigatoni o mezze maniche)':'Pasta corta',
+  'pasta corta (rigatoni o penne)':'Pasta corta', 'pasta mista o corta':'Pasta corta', 'pasta piccola':'Pasta corta',
+  'pasta (linguine o spaghetti)':'Pasta lunga', 'pasta (tonnarelli o spaghetti)':'Pasta lunga', 'spaghetti o bucatini':'Pasta lunga',
+  'farina 0 (o mix con manitoba)':'Farina', 'farina 00 (o mix con manitoba)':'Farina',
+  'grana o parmigiano a scaglie':'Formaggio grattugiato',
+  'olive (verdi e nere)':'Olive', 'olive nere e verdi':'Olive',
+  'aceto (balsamico o di vino)':'Aceto'
+};
+// Gruppi di Dispensa concordati con l'utente: il nome generico usato nelle
+// ricette (matchName) e i nomi delle voci di Dispensa che ne fanno parte
+// (assegnati una tantum alle voci già presenti, vedi pantryGroupMigrated3).
+const CURATED_PANTRY_GROUPS = {
+  'pasta-corta': { group:{ label:'Pasta corta', matchName:'pasta corta', cat:'pane' }, members:['fusilli','penne','pennette','rigatoni','mezze maniche','farfalle','sedani','sedanini','ditalini','tubetti','tortiglioni','pipe','conchiglie','conchiglioni','orecchiette','gomiti','caserecce','gemelli','pasta mista'] },
+  'pasta-lunga': { group:{ label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' }, members:['spaghetti','spaghettoni','linguine','tagliatelle','bucatini','tonnarelli','fettuccine','vermicelli','capellini','trenette','pappardelle','trofie'] },
+  'farina': { group:{ label:'Farina', matchName:'farina', cat:'pane' }, members:['farina 00','farina 0','manitoba','farina manitoba','farina di grano tenero'] },
+  'formaggio-grattugiato': { group:{ label:'Formaggio grattugiato', matchName:'formaggio grattugiato', cat:'latticini' }, members:['parmigiano','parmigiano grattugiato','parmigiano reggiano','grana','grana padano','pecorino','pecorino grattugiato','pecorino romano'] },
+  'olive': { group:{ label:'Olive', matchName:'olive', cat:'dispensa' }, members:['olive nere','olive verdi','olive taggiasche','olive taggiasche denocciolate','olive nere di gaeta'] },
+  'aceto': { group:{ label:'Aceto', matchName:'aceto', cat:'dispensa' }, members:['aceto balsamico','aceto di vino','aceto di vino bianco','aceto di vino rosso','aceto di mele'] },
+  'carne-macinata': { group:{ label:'Carne macinata', matchName:'carne macinata', cat:'carne' }, members:['carne macinata mista','carne macinata di manzo','macinato','macinato misto','macinato di manzo'] }
+};
+// Un ingrediente di ricetta che va diviso in più righe: "Limone (scorza e
+// succo)" diventa "Limone (scorza)" + "Limone (succo)". La quantità resta
+// sulla prima riga; il succo è dello stesso limone, quindi "q.b." — altrimenti
+// in Spesa comparirebbero due limoni per una ricetta sola.
+const CURATED_INGREDIENT_SPLITS = {
+  'limone (scorza e succo)': [{ ingrediente:'Limone (scorza)' }, { ingrediente:'Limone (succo)', qta:'q.b.' }]
+};
 function getIngredientsFor(name){
   const edit = state.recipeEdits[name];
   const det = DATA.recipeDetails[name];
@@ -640,8 +693,11 @@ function getIngredientsFor(name){
   if(edit && edit.ingredienti) list = edit.ingredienti;
   else if(det) list = det.ingredienti;
   else list = state.recipeIngredients[name] || [];
-  const renames = state.ingredientRenames;
-  if(!renames || !Object.keys(renames).length) return list;
+  list = list.flatMap(it=>{
+    const split = CURATED_INGREDIENT_SPLITS[(it.ingrediente||'').trim().toLowerCase()];
+    return split ? split.map(part => Object.assign({}, it, part)) : [it];
+  });
+  const renames = Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
   return list.map(it=>{
     let displayName = it.ingrediente;
     const seen = new Set();
@@ -660,13 +716,23 @@ function getIngredientsFor(name){
 // tutte le ricette — così anche un ingrediente mai avuto in Dispensa ma già
 // presente in una ricetta suggerisce il nome esatto, invece di farlo
 // reinventare a mano (e magari sbagliare la corrispondenza).
+// Insieme di nomi senza doppioni che differiscono solo per maiuscole/spazi
+// ("passata" e "Passata"): vince la prima grafia aggiunta — chi chiama
+// aggiunge prima i nomi di Dispensa, così resta quella scelta lì.
+function caseInsensitiveNameSet(){
+  const byKey = new Map();
+  return {
+    add(name){ const n = (name||'').trim(); const k = n.toLowerCase(); if(n && !byKey.has(k)) byKey.set(k, n); },
+    values(){ return byKey.values(); }
+  };
+}
 function allKnownIngredientNames(){
-  const names = new Set();
+  const names = caseInsensitiveNameSet();
   Object.values(state.pantryItems).forEach(it=>{ if(it.nome) names.add(it.nome.trim()); });
   allRecipeMetas().forEach(r=>{
     getIngredientsFor(r.nome).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
   });
-  return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
+  return Array.from(names.values()).sort((a,b)=>a.localeCompare(b,'it'));
 }
 
 // Come sopra ma con in più i nomi generici dei gruppi (es. "Pasta corta"),
@@ -674,9 +740,10 @@ function allKnownIngredientNames(){
 // invece di un formato specifico fa scattare il riconoscimento per gruppo
 // (vedi resolvePantryItem) su qualsiasi formato tu abbia in Dispensa.
 function allKnownIngredientNamesWithGroups(){
-  const names = new Set(allKnownIngredientNames());
+  const names = caseInsensitiveNameSet();
+  allKnownIngredientNames().forEach(n=>names.add(n));
   Object.values(state.pantryGroups || {}).forEach(g=>{ if(g.label) names.add(g.label.trim()); });
-  return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
+  return Array.from(names.values()).sort((a,b)=>a.localeCompare(b,'it'));
 }
 
 // Come allKnownIngredientNames, ma include anche gli extra aggiunti a mano
@@ -688,7 +755,7 @@ function allKnownIngredientNamesWithGroups(){
 // miste (zucchine, carote, spinaci)") non è una singola voce sensata da
 // gestire in Dispensa così com'è — qui si scompone nelle voci vere.
 function allIngredientNamesForManager(){
-  const names = new Set();
+  const names = caseInsensitiveNameSet();
   Object.values(state.pantryItems).forEach(it=>{ if(it.nome) names.add(it.nome.trim()); });
   allRecipeMetas().forEach(r=>{
     getIngredientsFor(r.nome).forEach(it=>{
@@ -698,7 +765,7 @@ function allIngredientNamesForManager(){
   });
   Object.values(state.shopExtras).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
   DATA.generalShopping.forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
-  return Array.from(names).sort((a,b)=>a.localeCompare(b,'it'));
+  return Array.from(names.values()).sort((a,b)=>a.localeCompare(b,'it'));
 }
 
 // Combobox "leggera" per un campo nome-ingrediente creato fuori dal normale
@@ -764,6 +831,8 @@ const state = {
   pantryUnitReviewed: false,
   pantryGroupMigrated: false,
   pantryGroupMigrated2: false,
+  pantryNamesCurated1: false,
+  pantryGroupMigrated3: false,
   pantryGroups: {
     'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
     'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' },
@@ -1333,6 +1402,8 @@ function buildPersonalPayload(){
     pantrySpanneUnitCleared: state.pantrySpanneUnitCleared,
     pantryGroupMigrated: state.pantryGroupMigrated,
     pantryGroupMigrated2: state.pantryGroupMigrated2,
+    pantryNamesCurated1: state.pantryNamesCurated1,
+    pantryGroupMigrated3: state.pantryGroupMigrated3,
     whatsNewSeen: state.whatsNewSeen
   };
 }
@@ -6609,6 +6680,50 @@ document.addEventListener('click', e=>{
       if(group) it.group = group;
     });
     state.pantryGroupMigrated2 = true;
+    persist();
+  }
+  // Una tantum: le voci di Dispensa scritte con uno dei nomi ora unificati
+  // (vedi CURATED_INGREDIENT_RENAMES) confluiscono nella voce col nome nuovo:
+  // quantità sommate, e unità/categoria/gruppo/luogo presi da quella vecchia
+  // solo dove la nuova non li ha già.
+  if(!state.pantryNamesCurated1){
+    Object.keys(state.pantryItems).forEach(oldKey=>{
+      const target = CURATED_INGREDIENT_RENAMES[oldKey];
+      if(!target) return;
+      const newKey = target.toLowerCase();
+      if(newKey === oldKey) return;
+      const old = state.pantryItems[oldKey];
+      const cur = state.pantryItems[newKey];
+      if(cur){
+        if(typeof old.qty === 'number') cur.qty = (typeof cur.qty === 'number' ? cur.qty : 0) + old.qty;
+        ['unit','cat','group','luogo'].forEach(f=>{ if(!cur[f] && old[f]) cur[f] = old[f]; });
+      } else {
+        state.pantryItems[newKey] = Object.assign({}, old, { nome: target });
+      }
+      delete state.pantryItems[oldKey];
+      if(state.pantryConfirmedShop[oldKey]){ state.pantryConfirmedShop[newKey] = true; delete state.pantryConfirmedShop[oldKey]; }
+      delete state.shopDismissed['oos_'+oldKey];
+    });
+    state.pantryNamesCurated1 = true;
+    persist();
+  }
+  // Una tantum: crea i gruppi concordati (CURATED_PANTRY_GROUPS) e li assegna
+  // alle voci di Dispensa già presenti che non hanno un gruppo. Il vecchio
+  // gruppo "Grana o parmigiano a scaglie" confluisce in "Formaggio
+  // grattugiato" (una voce sta in un solo gruppo, e le ricette che lo
+  // chiedevano ora chiedono il formaggio grattugiato).
+  if(!state.pantryGroupMigrated3){
+    Object.entries(CURATED_PANTRY_GROUPS).forEach(([id, def])=>{ if(!state.pantryGroups[id]) state.pantryGroups[id] = Object.assign({}, def.group); });
+    Object.keys(state.pantryItems).forEach(key=>{
+      const it = state.pantryItems[key];
+      if(!it) return;
+      if(it.group === 'grana-parmigiano') it.group = 'formaggio-grattugiato';
+      if(it.group) return;
+      const id = Object.keys(CURATED_PANTRY_GROUPS).find(g => CURATED_PANTRY_GROUPS[g].members.includes(key));
+      if(id) it.group = id;
+    });
+    delete state.pantryGroups['grana-parmigiano'];
+    state.pantryGroupMigrated3 = true;
     persist();
   }
   // Una tantum: passaggio dal modello "una ricetta per giorno" (weekOverrides/
