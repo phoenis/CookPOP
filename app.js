@@ -71,6 +71,29 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','bibite','altro','finiti'];
 const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', bibite:'Bibite', finiti:'Finiti', altro:'Altro' };
 const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', bibite:'🥤', finiti:'🗑️', altro:'🛒' };
+// Categorie create dall'utente (state.customDepts, nel catalogo condiviso:
+// { id: { label, icon } }, vedi "Gestisci categorie" in Dispensa): si
+// aggiungono a quelle di base, prima di "Altro". DEPT_ORDER/LABEL/ICON sono
+// aggiornati sul posto da applyCustomDepts (chiamata a ogni render), così
+// tutto il codice che li usa vede anche quelle nuove.
+const BASE_DEPT_ORDER = DEPT_ORDER.slice();
+const BASE_DEPT_LABEL = Object.assign({}, DEPT_LABEL);
+const BASE_DEPT_ICON = Object.assign({}, DEPT_ICON);
+function applyCustomDepts(){
+  const custom = (typeof state !== 'undefined' && state.customDepts) || {};
+  const ids = Object.keys(custom).filter(id => !BASE_DEPT_LABEL[id] && custom[id] && custom[id].label);
+  const order = BASE_DEPT_ORDER.filter(d => d !== 'altro' && d !== 'finiti').concat(ids, ['altro', 'finiti']);
+  DEPT_ORDER.length = 0;
+  order.forEach(d => DEPT_ORDER.push(d));
+  Object.keys(DEPT_LABEL).forEach(d=>{ if(!BASE_DEPT_LABEL[d]){ delete DEPT_LABEL[d]; delete DEPT_ICON[d]; } });
+  ids.forEach(id=>{ DEPT_LABEL[id] = custom[id].label; DEPT_ICON[id] = custom[id].icon || '🏷️'; });
+}
+// Categoria salvata su una voce, solo se esiste ancora (una categoria
+// personalizzata può essere stata eliminata, anche da un altro spazio):
+// altrimenti '' e si torna alla categoria automatica dal nome.
+function knownDept(cat){
+  return cat && DEPT_LABEL[cat] && cat !== 'finiti' ? cat : '';
+}
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
@@ -643,7 +666,7 @@ function renamePantryItem(oldKey, newName){
 // anche in Spesa, così un ingrediente sta nello stesso reparto in entrambe.
 function pantryCatFor(ingrediente){
   const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
-  return (it && it.cat) || '';
+  return knownDept(it && it.cat);
 }
 function classifyDept(ingrediente){
   const s = (ingrediente||'').toLowerCase();
@@ -928,6 +951,8 @@ const state = {
     'grana-parmigiano': { label:'Grana o parmigiano a scaglie', matchName:'grana o parmigiano a scaglie', cat:'latticini' }
   },
   pantryGroupsModalOpen: false,
+  deptsModalOpen: false, // non persistito: modale "Gestisci categorie" aperta/chiusa
+  customDepts: {}, // categorie create dall'utente, condivise tra gli spazi (vedi applyCustomDepts)
   pantryView: 'categoria', // non persistito (vedi persist()): stesso motivo di shopView
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
@@ -1154,7 +1179,7 @@ function getSpaceRoute(){
 // personale — un flag condiviso farebbe girare quella migrazione una sola
 // volta in assoluto (dal primo spazio ad aprire l'app) invece che una volta
 // per spazio, lasciando gli altri spazi senza gruppi assegnati alla loro Dispensa.
-const CATALOG_FIELDS = ['recipeIngredients','ingredientRenames','recipeEdits','customRecipes','hiddenRecipes','pantryGroups'];
+const CATALOG_FIELDS = ['recipeIngredients','ingredientRenames','recipeEdits','customRecipes','hiddenRecipes','pantryGroups','customDepts'];
 function decodeCatalogSaved(saved){
   if(saved.recipeIngredients) saved.recipeIngredients = decodeKeysFromFirebase(saved.recipeIngredients);
   if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
@@ -2447,6 +2472,7 @@ function renderWhatsNewModal(){
   </div>`;
 }
 function render(){
+  applyCustomDepts();
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
@@ -2498,6 +2524,7 @@ const MODAL_CHECKS = [
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen, ()=>{ state.pantryGroupsModalOpen = false; }],
+  [()=> !!state.deptsModalOpen, ()=>{ state.deptsModalOpen = false; }],
   [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
   [()=> !!state.pantryEditKey, ()=>{ state.pantryEditKey = null; }],
@@ -3803,7 +3830,7 @@ function renderSpesa(){
     // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
     // nel loro reparto vero, tra le sezioni normali.
     const classified = mainFlat.map(it=>{
-      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (it.cat || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
+      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
       return {...it, dept};
     });
     // unisco articoli identici (stesso ingrediente) comparsi in più ricette,
@@ -4363,7 +4390,7 @@ function renderDispensa(){
     }).join('');
   } else {
     const byDept = {};
-    items.forEach(it=>{ const d = it.cat || classifyDept(it.nome); (byDept[d] = byDept[d] || []).push(it); });
+    items.forEach(it=>{ const d = knownDept(it.cat) || classifyDept(it.nome); (byDept[d] = byDept[d] || []).push(it); });
     body = DEPT_ORDER.filter(d=>byDept[d] && byDept[d].length).map(d=>{
       const sectionId = `cat_${d}`;
       const isOpen = !state.pantrySectionCollapsed[sectionId];
@@ -4394,7 +4421,7 @@ function renderDispensa(){
             <input type="text" id="pantry-edit-name" value="${escapeAttr(editItem.nome)}">
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Categoria</div>
+            <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
             <select id="pantry-edit-cat">
               <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(editItem.nome)])})</option>
               ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${editItem.cat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
@@ -4444,7 +4471,7 @@ function renderDispensa(){
             <input type="text" id="pantry-add-name" placeholder="Nuovo ingrediente">
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Categoria</div>
+            <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
             <select id="pantry-add-cat">
               <option value="">Automatica (dal nome)</option>
               ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
@@ -4491,7 +4518,7 @@ function renderDispensa(){
         <p class="section-sub">Un gruppo unisce più formati (es. Fusilli, Penne) sotto il nome generico che una ricetta usa (es. "Pasta corta"): se hai scorta di uno qualsiasi dei formati assegnati a quel gruppo, la ricetta risulta "ce l'ho".</p>
         <div class="filter-groups">
           ${Object.entries(state.pantryGroups).map(([id,g])=>`
-            <div class="pantry-group-row" data-pantry-group-row="${id}">
+            <div class="pantry-group-row is-group" data-pantry-group-row="${id}">
               <input type="text" data-group-label="${id}" value="${escapeAttr(g.label)}" placeholder="Nome del gruppo">
               <input type="text" data-group-match="${id}" value="${escapeAttr(g.matchName)}" placeholder="Testo esatto nella ricetta">
               <select data-group-cat="${id}">
@@ -4519,6 +4546,46 @@ function renderDispensa(){
       </div>
     </div>` : '';
 
+  // Gestione categorie: quelle di base sono fisse (solo mostrate), quelle
+  // create dall'utente si rinominano, cambiano emoji o si eliminano — stesso
+  // schema di "Gestisci gruppi". Condivise tra gli spazi (state.customDepts).
+  const customDeptIds = Object.keys(state.customDepts || {}).filter(id => DEPT_LABEL[id] && !BASE_DEPT_LABEL[id]);
+  const deptsModal = state.deptsModalOpen ? `
+    <div class="filters-modal-backdrop" data-close-depts>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Gestisci categorie</h3>
+          <button class="btn is-icon filters-close-btn" data-close-depts>✕</button>
+        </div>
+        <p class="section-sub">Le categorie sono i reparti di Spesa e le sezioni di Dispensa. Quelle nuove compaiono prima di "Altro"; per metterci un ingrediente sceglila nel suo campo Categoria.</p>
+        <div class="filter-groups">
+          ${customDeptIds.length ? customDeptIds.map(id=>`
+            <div class="pantry-group-row">
+              <input type="text" class="dept-icon-input" data-dept-icon="${escapeAttr(id)}" value="${escapeAttr(state.customDepts[id].icon || '')}" placeholder="🏷️" aria-label="Emoji">
+              <input type="text" data-dept-label="${escapeAttr(id)}" value="${escapeAttr(state.customDepts[id].label)}" placeholder="Nome della categoria">
+              <button type="button" class="btn is-icon color-delete" data-dept-delete="${escapeAttr(id)}" aria-label="Elimina categoria"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+            </div>`).join('') : `<p class="ing-empty">Nessuna categoria creata da te.</p>`}
+        </div>
+        <div class="filter-groups">
+          <div class="filter-group">
+            <div class="filter-group-label">Nuova categoria</div>
+            <div class="pantry-group-row">
+              <input type="text" class="dept-icon-input" id="new-dept-icon" placeholder="🏷️" aria-label="Emoji">
+              <input type="text" id="new-dept-label" placeholder="Nome (es. Prodotti per la casa)">
+            </div>
+            <button type="button" class="btn is-solid" id="add-dept-btn">+ Aggiungi categoria</button>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Categorie di base</div>
+            <div class="dept-base-list">${BASE_DEPT_ORDER.filter(d => d !== 'finiti').map(d => `<span class="dept-base-chip">${BASE_DEPT_ICON[d]} ${escapeHtml(BASE_DEPT_LABEL[d])}</span>`).join('')}</div>
+          </div>
+        </div>
+        <div class="filters-modal-footer">
+          <button class="btn is-solid mini-add-btn" data-close-depts>Fatto</button>
+        </div>
+      </div>
+    </div>` : '';
+
   // "Gestisci ingredienti": anagrafica di OGNI ingrediente noto al sistema
   // (Dispensa, ricette, Spesa aggiunta a mano, "Ogni settimana"), non solo
   // quelli con scorta > 0 — tocca una riga per modificarne categoria/luogo/
@@ -4533,7 +4600,7 @@ function renderDispensa(){
     const rows = names.map(name=>{
       const key = name.trim().toLowerCase();
       const it = state.pantryItems[key];
-      const cat = (it && it.cat) || classifyDept(name);
+      const cat = knownDept(it && it.cat) || classifyDept(name);
       const statusText = (it && typeof it.qty === 'number' && it.qty > 0)
         ? `${it.qty}${it.unit ? ' ' + it.unit : ''} · ${LUOGO_LABEL[it.luogo || 'dispensa']}`
         : 'Non in dispensa';
@@ -4596,6 +4663,7 @@ function renderDispensa(){
     ${editModal}
     ${addModal}
     ${groupsModal}
+    ${deptsModal}
     ${ingredientManagerModal}
     <div class="buttons-fixed">
       <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
@@ -6275,6 +6343,56 @@ function attachHandlers(){
     });
   }
 
+  document.querySelectorAll('[data-open-depts]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.deptsModalOpen = true; render(); });
+  });
+  document.querySelectorAll('[data-close-depts]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.hasAttribute('data-stop-close')) return;
+      state.deptsModalOpen = false;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-dept-label]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const d = state.customDepts[e.currentTarget.dataset.deptLabel];
+      if(d){ d.label = e.currentTarget.value.trim() || d.label; persist(); render(); }
+    });
+  });
+  document.querySelectorAll('[data-dept-icon]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const d = state.customDepts[e.currentTarget.dataset.deptIcon];
+      if(d){ d.icon = e.currentTarget.value.trim() || '🏷️'; persist(); render(); }
+    });
+  });
+  document.querySelectorAll('[data-dept-delete]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.currentTarget.dataset.deptDelete;
+      delete state.customDepts[id];
+      // Chi la usava torna alla categoria automatica (dal nome): le voci di
+      // Dispensa, gli aggiunti a mano in Spesa e i gruppi che la suggerivano.
+      Object.values(state.pantryItems).forEach(it=>{ if(it.cat === id) delete it.cat; });
+      Object.values(state.shopExtras).forEach(it=>{ if(it.cat === id) delete it.cat; });
+      Object.values(state.pantryGroups).forEach(g=>{ if(g.cat === id) g.cat = ''; });
+      persist(); render();
+    });
+  });
+  const addDeptBtn = document.getElementById('add-dept-btn');
+  if(addDeptBtn){
+    addDeptBtn.addEventListener('click', ()=>{
+      const labelInput = document.getElementById('new-dept-label');
+      const iconInput = document.getElementById('new-dept-icon');
+      const label = labelInput.value.trim();
+      if(!label) return;
+      if(!state.customDepts) state.customDepts = {};
+      // Prefisso "c-": non si scontra mai con gli id delle categorie di base.
+      const slug = 'c-' + (label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,'') || 'categoria');
+      let id = slug, n = 2;
+      while(state.customDepts[id]) id = `${slug}-${n++}`;
+      state.customDepts[id] = { label, icon: iconInput.value.trim() || '🏷️' };
+      persist(); render();
+    });
+  }
   document.querySelectorAll('[data-pantry-edit]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.pantryEditKey = e.currentTarget.dataset.pantryEdit;
@@ -6454,6 +6572,7 @@ function goToTab(delta){
 const TAB_MENU_ITEMS = {
   dispensa: [
     { label: '🗂️ Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
+    { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } },
     { label: '+ Aggiungi ingrediente', action: ()=>{ state.pantryAddModalOpen = true; } }
   ],
   prep: [
