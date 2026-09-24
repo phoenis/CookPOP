@@ -787,7 +787,6 @@ const state = {
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
-  pantryFinishedOpen: false,
   pantrySectionCollapsed: {}, // id sezione (luogo_X / cat_X) -> true se chiusa; aperta di default se assente
   pantrySelectMode: false, // true dopo una pressione lunga: un tap semplice seleziona/deseleziona invece di aprire il luogo-picker
   pantrySelected: {}, // pantryKey -> true, selezione corrente in Dispensa (qualsiasi riga, non solo Finiti; non persistita)
@@ -2185,6 +2184,10 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
 // Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
 // tranne nel Menù (resta il nome dell'app — è la schermata principale).
 const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'Dispensa' };
+// X per cancellare il testo di un campo di ricerca: stesso tratto
+// dell'icona di ricerca qui sotto, dimensionata in em (segue il font del
+// campo) e in currentColor (il colore del testo).
+const CLEAR_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6 6 18M6 6l12 12"></path></svg>';
 const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></g></svg>';
 
 // Modale "Novità": compare una volta sola al prossimo caricamento (su tutti i
@@ -4316,7 +4319,10 @@ function renderDispensa(){
           <button class="btn is-icon filters-close-btn" data-close-ingredient-manager>✕</button>
         </div>
         <p class="section-sub">Tutti gli ingredienti noti al sistema — in Dispensa, nelle ricette o aggiunti a mano in Spesa. Tocca per modificarne categoria, luogo o quantità.</p>
-        <input class="input-search" type="search" id="ingredient-manager-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.ingredientManagerSearch||'')}">
+        <div class="search-field">
+          <input class="input-search" type="search" id="ingredient-manager-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.ingredientManagerSearch||'')}">
+          ${state.ingredientManagerSearch ? `<button type="button" class="search-clear" id="ingredient-manager-search-clear" aria-label="Cancella ricerca">${CLEAR_ICON_SVG}</button>` : ''}
+        </div>
         <div class="ingredient-manager-list">
           ${rows || `<p class="ing-empty">Nessun ingrediente trovato.</p>`}
         </div>
@@ -4325,22 +4331,8 @@ function renderDispensa(){
   })() : '';
 
   // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
-  // qui restano fuori dalle viste normali per luogo/categoria e finiscono in un
-  // accordion a parte, chiuso di default — non è un luogo assegnabile, solo
-  // uno stato. Riusa itemRow: stesso stepper/edit/luogo-picker/selezione degli altri.
-  const finishedItems = Object.entries(state.pantryItems)
-    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
-    .filter(it => typeof it.qty === 'number' && it.qty <= 0)
-    .sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
-  const finishedSection = finishedItems.length ? `
-    <div class="shop-day-group">
-      <div class="dept-title finished-toggle${state.pantryFinishedOpen ? ' open' : ''}" data-toggle-finished>
-        <span class="dept-icon">${DEPT_ICON.finiti}</span>${DEPT_LABEL.finiti} (${finishedItems.length})
-        <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
-      </div>
-    <div class="accordion-body">
-      ${state.pantryFinishedOpen ? finishedItems.map(itemRow).join('') : ''}</div>
-    </div>` : '';
+  // in Dispensa non compaiono proprio — niente sezione "Finiti" a parte (tolta
+  // su richiesta): si ritrovano in Spesa tra i Finiti e in "Gestisci ingredienti".
 
   // Barra di selezione globale (pressione lunga su una riga per attivarla):
   // vale per qualsiasi ingrediente, non solo i finiti — anche uno che hai
@@ -4367,14 +4359,13 @@ function renderDispensa(){
       
     </div>
     ${body}
-    ${finishedSection}
     <div class="save-hint"></div>
     ${editModal}
     ${addModal}
     ${groupsModal}
     ${ingredientManagerModal}
     <div class="buttons-fixed">
-      <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_')) || (finishedItems.length > 0 && !state.pantryFinishedOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
+      <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
       <div class="search_wrapper">
         ${state.pantrySearchOpen ? `<div class="input_wrapper"><input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}"></div>` : ''}
         ${state.pantrySearchOpen
@@ -4741,14 +4732,12 @@ function attachHandlers(){
   if(pantryToggleAllBtn){
     pantryToggleAllBtn.addEventListener('click', ()=>{
       const sectionEls = document.querySelectorAll('[data-toggle-pantry-section]');
-      const finishedEl = document.querySelector('[data-toggle-finished]');
-      const anyCollapsed = Array.from(sectionEls).some(el=>!el.classList.contains('open')) || (!!finishedEl && !state.pantryFinishedOpen);
+      const anyCollapsed = Array.from(sectionEls).some(el=>!el.classList.contains('open'));
       sectionEls.forEach(el=>{
         const id = el.dataset.togglePantrySection;
         if(anyCollapsed) delete state.pantrySectionCollapsed[id];
         else state.pantrySectionCollapsed[id] = true;
       });
-      if(finishedEl) state.pantryFinishedOpen = anyCollapsed;
       render();
     });
   }
@@ -5772,12 +5761,6 @@ function attachHandlers(){
       render();
     });
   });
-  document.querySelectorAll('[data-toggle-finished]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      state.pantryFinishedOpen = !state.pantryFinishedOpen;
-      render();
-    });
-  });
   const pantrySelectionDeleteBtn = document.getElementById('pantry-selection-delete');
   if(pantrySelectionDeleteBtn) pantrySelectionDeleteBtn.addEventListener('click', ()=>{
     const removed = {};
@@ -5990,6 +5973,13 @@ function attachHandlers(){
     render();
     const el = document.getElementById('ingredient-manager-search');
     el.focus(); el.selectionStart = el.value.length;
+  });
+  const ingredientManagerSearchClear = document.getElementById('ingredient-manager-search-clear');
+  if(ingredientManagerSearchClear) ingredientManagerSearchClear.addEventListener('click', ()=>{
+    state.ingredientManagerSearch = '';
+    render();
+    const el = document.getElementById('ingredient-manager-search');
+    if(el) el.focus();
   });
   // Riusa l'edit modale già esistente di Dispensa: se l'ingrediente non ha
   // ancora una voce in pantryItems gliene crea una a quantità 0 (invisibile
