@@ -524,7 +524,11 @@ function moveShopRowToPantry(cb){
   // di sale, es.) non deve poterla resettare a un'unità tracciabile.
   const existingUnit = (state.pantryItems[(cb.dataset.shopName||'').trim().toLowerCase()] || {}).unit;
   const unit = existingUnit === 'none' ? 'none' : (cb.dataset.shopUnit || undefined);
-  upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
+  // Un extra aggiunto a mano in Spesa porta con sé categoria/gruppo/luogo
+  // scelti nel modale (vedi "Aggiungi" in Spesa): entra in Dispensa completo,
+  // come se l'avessi aggiunto da lì.
+  const extra = rowKey.split(',').map(k=>state.shopExtras[k]).find(Boolean) || {};
+  upsertPantryItem(cb.dataset.shopName, extra.luogo || 'dispensa', qty, unit, extra.cat || undefined, extra.group || undefined);
   rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
 }
 
@@ -584,6 +588,12 @@ function renamePantryItem(oldKey, newName){
   return newKey;
 }
 
+// Categoria scelta a mano in Dispensa per quell'ingrediente (se c'è): vale
+// anche in Spesa, così un ingrediente sta nello stesso reparto in entrambe.
+function pantryCatFor(ingrediente){
+  const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
+  return (it && it.cat) || '';
+}
 function classifyDept(ingrediente){
   const s = (ingrediente||'').toLowerCase();
   for(const [kw, dept] of DEPT_RULES){ if(s.includes(kw)) return dept; }
@@ -748,6 +758,7 @@ const state = {
   addIngName: '', // ephemeral, non persistito: testo corrente del campo "Ingrediente" in Aggiungi (Spesa)
   addIngSuggestOpen: false, // ephemeral: se il menu dei suggerimenti è visibile
   addIngCursorPos: null, // ephemeral: posizione del cursore da ripristinare dopo il re-render a ogni tasto premuto
+  addIngDraft: null, // ephemeral: quantità/unità/categoria/gruppo/luogo già scelti in Aggiungi (Spesa), da non perdere al re-render di ogni tasto nel nome
   pantryAddModalOpen: false,
   pantryChecked: {},
   pantryItems: {},
@@ -2271,7 +2282,7 @@ const MODAL_CHECKS = [
   [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
   [()=> !!state.pantryEditKey, ()=>{ state.pantryEditKey = null; }],
   [()=> !!state.pantryAddModalOpen, ()=>{ state.pantryAddModalOpen = false; }],
-  [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; }],
+  [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
   [()=> !!state.newRecipeModalOpen, ()=>{ state.newRecipeModalOpen = false; }],
   [()=> !!state.filtersOpen, ()=>{ state.filtersOpen = false; }],
   [()=> !!state.swapOpenDay, ()=>{ state.swapOpenDay = null; }],
@@ -3554,7 +3565,7 @@ function renderSpesa(){
     // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
     // nel loro reparto vero, tra le sezioni normali.
     const classified = mainFlat.map(it=>{
-      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (it.cat || classifyDept(it.ingrediente));
+      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (it.cat || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
       return {...it, dept};
     });
     // unisco articoli identici (stesso ingrediente) comparsi in più ricette,
@@ -3739,6 +3750,14 @@ function renderSpesa(){
   // reinventare da capo. Se è nuovo, resta comunque scegliebile dal menu.
   const matchedPantryUnit = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].unit) || '';
   const matchedPantryCat = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].cat) || '';
+  // Ingrediente che non è ancora in Dispensa: come in "Aggiungi ingrediente"
+  // di Dispensa si sceglie anche gruppo e luogo, così quando lo compri e lo
+  // sposti in Dispensa entra già completo (vedi moveShopRowToPantry).
+  const addIngIsNew = !!addIngQuery && !state.pantryItems[addIngQuery];
+  const addIngDraft = state.addIngDraft || {};
+  const addIngQta = addIngDraft.qta !== undefined ? addIngDraft.qta : (matchedPantryUnit ? '1' : '');
+  const addIngUnit = addIngDraft.unit !== undefined ? addIngDraft.unit : matchedPantryUnit;
+  const addIngCat = addIngDraft.cat !== undefined ? addIngDraft.cat : matchedPantryCat;
   const addIngModal = state.addIngModalOpen ? `
     <div class="filters-modal-backdrop" data-close-add-ing-modal>
       <div class="filters-modal" data-stop-close>
@@ -3760,9 +3779,9 @@ function renderSpesa(){
           <div class="filter-group">
             <div class="filter-group-label">Quantità</div>
             <div class="pantry-group-row">
-              <input type="text" id="shop-add-qta" placeholder="Es. 1 o 1 rotolo" value="${escapeAttr(matchedPantryUnit ? '1' : '')}">
+              <input type="text" id="shop-add-qta" placeholder="Es. 1 o 1 rotolo" value="${escapeAttr(addIngQta)}">
               <select id="shop-add-unit" title="Unità (si aggiunge da sola al numero, non serve scriverla)">
-                ${UNIT_ORDER.filter(u=>u!=='none').map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
+                ${UNIT_ORDER.filter(u=>u!=='none').map(u=>`<option value="${u}" ${addIngUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
               </select>
             </div>
           </div>
@@ -3770,9 +3789,23 @@ function renderSpesa(){
             <div class="filter-group-label">Categoria (reparto in "Per reparto")</div>
             <select id="shop-add-cat">
               <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(state.addIngName || '')])})</option>
-              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${matchedPantryCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${addIngCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
             </select>
           </div>
+          ${addIngIsNew ? `
+          <div class="filter-group">
+            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta)</div>
+            <select id="shop-add-group">
+              <option value="">Nessuno</option>
+              ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${addIngDraft.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Luogo (dove va in Dispensa quando lo compri)</div>
+            <select id="shop-add-luogo">
+              ${LUOGO_ORDER.map(l=>`<option value="${l}" ${addIngDraft.luogo===l?'selected':''}>${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
+            </select>
+          </div>` : ''}
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-solid mini-add-btn" id="shop-add-btn" type="button">Aggiungi</button>
@@ -4540,6 +4573,28 @@ function attachHandlers(){
     const qtaInput = document.getElementById('shop-add-qta');
     const unitSelect = document.getElementById('shop-add-unit');
     const catSelect = document.getElementById('shop-add-cat');
+    const groupSelect = document.getElementById('shop-add-group');
+    const luogoSelect = document.getElementById('shop-add-luogo');
+    // Il modale si ridisegna a ogni tasto nel nome: quello che hai già scelto
+    // negli altri campi va tenuto da parte, altrimenti tornerebbe ai default.
+    const saveDraft = ()=>{
+      state.addIngDraft = Object.assign({}, state.addIngDraft, {
+        qta: qtaInput.value,
+        unit: unitSelect ? unitSelect.value : '',
+        cat: catSelect ? catSelect.value : '',
+        ...(groupSelect ? { group: groupSelect.value } : {}),
+        ...(luogoSelect ? { luogo: luogoSelect.value } : {})
+      });
+    };
+    [qtaInput, unitSelect, catSelect, groupSelect, luogoSelect].forEach(el=>{
+      if(el) el.addEventListener(el === qtaInput ? 'input' : 'change', saveDraft);
+    });
+    // Come in Dispensa: scelto un gruppo con la Categoria ancora su
+    // "Automatica", la si precompila dal gruppo.
+    if(groupSelect) groupSelect.addEventListener('change', e=>{
+      const group = state.pantryGroups[e.target.value];
+      if(catSelect && !catSelect.value && group && group.cat){ catSelect.value = group.cat; saveDraft(); }
+    });
     // Se il nome coincide con un ingrediente già in Dispensa ma a scorta 0,
     // "Aggiungi" non crea una voce doppia: riattiva quello (stessa azione di
     // "Segna da comprare" nella sezione Finiti), così resta un unico record.
@@ -4565,9 +4620,17 @@ function attachHandlers(){
         // visto prima, non ha modo di essere classificato bene da
         // classifyDept (indovina solo da parole chiave note) — vedi il
         // fallback in buildShopFlat/renderSpesa.
-        state.shopExtras[id] = catSelect && catSelect.value ? { ingrediente: name, qta, cat: catSelect.value } : { ingrediente: name, qta };
+        // Gruppo/luogo solo per un ingrediente nuovo (i select compaiono solo
+        // allora): servono a moveShopRowToPantry per crearlo in Dispensa completo.
+        state.shopExtras[id] = {
+          ingrediente: name, qta,
+          ...(catSelect && catSelect.value ? { cat: catSelect.value } : {}),
+          ...(groupSelect && groupSelect.value ? { group: groupSelect.value } : {}),
+          ...(luogoSelect && luogoSelect.value ? { luogo: luogoSelect.value } : {})
+        };
       }
       state.addIngModalOpen = false;
+      state.addIngDraft = null;
       state.addIngName = '';
       state.addIngSuggestOpen = false;
       state.addIngCursorPos = null;
@@ -4605,6 +4668,7 @@ function attachHandlers(){
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
       state.addIngModalOpen = false;
+      state.addIngDraft = null;
       state.addIngName = '';
       state.addIngSuggestOpen = false;
       state.addIngCursorPos = null;
