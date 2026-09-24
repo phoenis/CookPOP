@@ -4378,7 +4378,7 @@ function renderDispensa(){
       <div class="search_wrapper">
         ${state.pantrySearchOpen ? `<div class="input_wrapper"><input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}"></div>` : ''}
         ${state.pantrySearchOpen
-            ? `<button type="button" class="btn is-fixed" id="pantry-search-close" aria-label="Chiudi ricerca">✕</button>`
+            ? `<button type="button" class="btn is-fixed" id="pantry-search-close" aria-label="${state.pantrySearch ? 'Cancella ricerca' : 'Chiudi ricerca'}">✕</button>`
             : `<button type="button" class="btn is-fixed${state.pantrySearch ? ' active' : ''}" id="pantry-search-toggle" aria-label="Cerca in Dispensa">${SEARCH_ICON_SVG}</button>`}
       </div>
     </div>
@@ -5686,7 +5686,17 @@ function attachHandlers(){
     if(el) el.focus();
   });
   const pantrySearchClose = document.getElementById('pantry-search-close');
+  // Un'unica X (quella nativa del campo di ricerca è nascosta in CSS): con
+  // del testo scritto lo cancella e lascia il campo aperto per una nuova
+  // ricerca, a campo vuoto chiude la ricerca.
   if(pantrySearchClose) pantrySearchClose.addEventListener('click', ()=>{
+    if(state.pantrySearch){
+      state.pantrySearch = '';
+      render();
+      const el = document.getElementById('pantry-search');
+      if(el) el.focus();
+      return;
+    }
     state.pantrySearchOpen = false;
     render();
   });
