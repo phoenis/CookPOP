@@ -68,9 +68,9 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 // "Gestisci ingredienti". Come ogni reparto, la sezione compare in Dispensa/
 // Spesa solo quando contiene almeno una voce (stesso filtro presenza già
 // usato per tutti gli altri, vedi DEPT_ORDER.filter più sotto).
-const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro','finiti'];
-const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', finiti:'Finiti', altro:'Altro' };
-const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', finiti:'🗑️', altro:'🛒' };
+const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','bibite','altro','finiti'];
+const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', bibite:'Bibite', finiti:'Finiti', altro:'Altro' };
+const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', bibite:'🥤', finiti:'🗑️', altro:'🛒' };
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
@@ -125,7 +125,7 @@ const DEPT_RULES = [
   // (vince la prima regola che corrisponde): "Colla di pesce" non è pesce,
   // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
   // "Gnocchi di patate"/"Concentrato di pomodoro" non sono verdura fresca.
-  ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','dispensa'],
+  ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','dispensa'], ['aranciata','bibite'],
   ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'],
   ['concentrato','legumi'], ['polpa di pomodoro','legumi'],
   ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
@@ -161,6 +161,7 @@ const DEPT_RULES = [
   ['olive','dispensa'], ['capperi','dispensa'], ['pesto','dispensa'], ['maionese','dispensa'], ['besciamella','dispensa'], ['dadi','dispensa'],
   ['vino','dispensa'], ['cacao','dispensa'], ['caffè','dispensa'], ['vaniglia','dispensa'], ['zafferano','dispensa'], ['chiodi di garofano','dispensa'],
   ['pinoli','dispensa'], ['noci','dispensa'], ['mandorle','dispensa'], ['uvetta','dispensa'], ['marmellat','dispensa'],
+  ['acqua','bibite'], ['bibit','bibite'], ['birra','bibite'], ['succo di frutta','bibite'], ['tè freddo','bibite'],
 ];
 // "Di solito li hai già" non è più un flag manuale: un ingrediente parte già
 // spuntato in Spesa quando in Dispensa ce n'è davvero scorta (vedi
