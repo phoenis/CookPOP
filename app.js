@@ -68,9 +68,9 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 // "Gestisci ingredienti". Come ogni reparto, la sezione compare in Dispensa/
 // Spesa solo quando contiene almeno una voce (stesso filtro presenza già
 // usato per tutti gli altri, vedi DEPT_ORDER.filter più sotto).
-const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','altro','finiti'];
-const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', finiti:'Finiti', altro:'Altro' };
-const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', finiti:'🗑️', altro:'🛒' };
+const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','bibite','altro','finiti'];
+const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', bibite:'Bibite', finiti:'Finiti', altro:'Altro' };
+const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', bibite:'🥤', finiti:'🗑️', altro:'🛒' };
 
 const LUOGO_ORDER = ['dispensa','ripostiglio','frigo','freezer','giardino'];
 const LUOGO_LABEL = { dispensa:'Dispensa', ripostiglio:'Ripostiglio', frigo:'Frigo', freezer:'Freezer', giardino:'Giardino' };
@@ -121,6 +121,13 @@ const LUOGO_ICON = {
   giardino:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.42 39.86a12 12 0 0 0-11.28-11.28c-39.6-2.33-74.59 2.34-104 13.87C84 53.48 62.31 70.58 49.39 91.9c-17.62 29.11-17.66 64.45-.45 98.19l-17.43 17.43a12 12 0 0 0 17 17l17.43-17.43c16.74 8.54 33.88 12.85 50.45 12.85a91.3 91.3 0 0 0 47.74-13.3c21.32-12.92 38.42-34.62 49.45-62.75c11.5-29.43 16.17-64.43 13.84-104.03m-75.76 146.22C131.57 198.25 108 199.17 83.94 189l84.54-84.54a12 12 0 1 0-17-17L67 172.06c-10.14-24-9.22-47.63 3-67.72c20.91-34.53 70.54-53.72 134-52.25c1.38 63.44-17.81 113.08-52.34 133.99"></path></svg>' 
 };
 const DEPT_RULES = [
+  // Prima di tutto i nomi che contengono la parola chiave di un altro reparto
+  // (vince la prima regola che corrisponde): "Colla di pesce" non è pesce,
+  // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
+  // "Gnocchi di patate"/"Concentrato di pomodoro" non sono verdura fresca.
+  ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','dispensa'], ['aranciata','bibite'],
+  ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'],
+  ['concentrato','legumi'], ['polpa di pomodoro','legumi'],
   ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
   ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['pesce','pesce'],
   ['manzo','carne'], ['pollo','carne'], ['maiale','carne'], ['salsiccia','carne'], ['tacchino','carne'], ['vitello','carne'], ['agnello','carne'], ['straccetti','carne'], ['macinato','carne'], ['prosciutto','carne'], ['pancetta','carne'], ['guanciale','carne'], ['coniglio','carne'],
@@ -136,6 +143,25 @@ const DEPT_RULES = [
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
   ['melone','verdura'], ['anguria','verdura'], ['mela','verdura'], ['pera','verdura'], ['limone','verdura'], ['arancia','verdura'], ['banana','verdura'], ['fragol','verdura'], ['uva','verdura'],
+  // Aggiunte per svuotare "Altro" (ingredienti delle ricette che nessuna
+  // regola sopra riconosceva).
+  ['cipoll','verdura'], ['borettan','verdura'], ['scalogno','verdura'], ['porr','verdura'], ['sedano','verdura'], ['finocchi','verdura'],
+  ['carciof','verdura'], ['funghi','verdura'], ['broccol','verdura'], ['cavolfior','verdura'], ['verza','verdura'], ['cime di rapa','verdura'],
+  ['friariell','verdura'], ['spinaci','verdura'], ['bietol','verdura'], ['asparag','verdura'], ['cetriol','verdura'], ['radicchio','verdura'],
+  ['rucola','verdura'], ['zucca','verdura'], ['piselli','verdura'], ['verdur','verdura'], ['prezzemolo','verdura'], ['salvia','verdura'],
+  ['menta','verdura'], ['aneto','verdura'], ['aranc','verdura'], ['mele','verdura'], ['pere','verdura'],
+  ['ragù','legumi'], ['carne','carne'], ['arista','carne'], ['controfiletto','carne'], ['scamone','carne'], ['cappello del prete','carne'], ['muscolo','carne'],
+  ['cappone','carne'], ['cosce','carne'], ['petto','carne'], ['cotenna','carne'], ['speck','carne'], ['spiedini','carne'],
+  ['baccal','pesce'], ['cozze','pesce'], ['vongole','pesce'], ['orata','pesce'], ['polpo','pesce'],
+  ['burrata','latticini'], ['brie','latticini'], ['caciocavallo','latticini'], ['fontina','latticini'], ['gorgonzola','latticini'], ['taleggio','latticini'],
+  ['mascarpone','latticini'], ['pecorino','latticini'], ['provolone','latticini'], ['scamorza','latticini'], ['panna','latticini'], ['latticello','latticini'],
+  ['spaghetti','pane'], ['rigatoni','pane'], ['orecchiette','pane'], ['trenette','pane'], ['trofie','pane'], ['cannelloni','pane'],
+  ['sfoglie','pane'], ['tortellini','pane'], ['semol','pane'], ['cereali','pane'], ['panini','pane'], ['savoiardi','pane'], ['vialone','pane'],
+  ['legumi','legumi'], ['cannellini','legumi'], ['mais','legumi'],
+  ['olive','dispensa'], ['capperi','dispensa'], ['pesto','dispensa'], ['maionese','dispensa'], ['besciamella','dispensa'], ['dadi','dispensa'],
+  ['vino','dispensa'], ['cacao','dispensa'], ['caffè','dispensa'], ['vaniglia','dispensa'], ['zafferano','dispensa'], ['chiodi di garofano','dispensa'],
+  ['pinoli','dispensa'], ['noci','dispensa'], ['mandorle','dispensa'], ['uvetta','dispensa'], ['marmellat','dispensa'],
+  ['acqua','bibite'], ['bibit','bibite'], ['birra','bibite'], ['succo di frutta','bibite'], ['tè freddo','bibite'],
 ];
 // "Di solito li hai già" non è più un flag manuale: un ingrediente parte già
 // spuntato in Spesa quando in Dispensa ce n'è davvero scorta (vedi
@@ -151,9 +177,34 @@ function isStaple(ingrediente){
 // di Dispensa — il testo intero, il testo prima di un'eventuale parentesi
 // finale, e le parti separate da "o"/virgola sia fuori che dentro la
 // parentesi. Per un nome senza alternative restituisce solo il nome stesso.
+// Alternative scritte in forma abbreviata nelle ricette ("Vino bianco o
+// rosso"), dove la divisione automatica sulla "o" darebbe pezzi che da soli
+// non sono ingredienti ("rosso"): qui le parti vere, concordate con
+// l'utente. Usata sia per riconoscere la scorta in Dispensa
+// (splitIngredientCandidates) sia per l'elenco di "Gestisci ingredienti"
+// (manageableIngredientNames). Chiavi in minuscolo.
+const CURATED_ALTERNATIVE_PARTS = {
+  'vino bianco o rosso': ['Vino bianco', 'Vino rosso'],
+  'brodo di carne o vegetale': ['Brodo di carne', 'Brodo vegetale'],
+  'aceto di vino o di mele': ['Aceto di vino', 'Aceto di mele'],
+  'cipolle (borettane o rosse)': ['Cipolle borettane', 'Cipolle rosse'],
+  'cannelloni (secchi o sfoglie di pasta fresca)': ['Cannelloni secchi', 'Sfoglie di pasta fresca'],
+  'filetti di pesce bianco (orata, branzino o simili)': ['Filetti di pesce bianco', 'Filetti di orata', 'Filetti di branzino'],
+  'pollo a pezzi (cosce o petto)': ['Pollo', 'Cosce di pollo', 'Petto di pollo'],
+  'pollo a pezzi (cosce o sovracosce)': ['Pollo', 'Cosce di pollo', 'Sovracosce di pollo'],
+  'sovracosce di pollo (o petto)': ['Sovracosce di pollo', 'Petto di pollo'],
+  'cosce o sovracosce di pollo': ['Cosce di pollo', 'Sovracosce di pollo'],
+  'petto di pollo o cosce disossate': ['Petto di pollo', 'Cosce di pollo'],
+  'passata di pomodoro o concentrato': ['Passata di pomodoro', 'Concentrato di pomodoro'],
+  'manzo per brasato (muscolo o cappello del prete)': ['Manzo per brasato', 'Muscolo di manzo', 'Cappello del prete'],
+  'aglio (o mezza cipolla)': ['Aglio', 'Cipolla'],
+  'scalogno (o mezza cipolla)': ['Scalogno', 'Cipolla']
+};
 function splitIngredientCandidates(text){
   const raw = (text||'').trim();
   if(!raw) return [];
+  const curated = CURATED_ALTERNATIVE_PARTS[raw.toLowerCase()];
+  if(curated) return [...new Set([raw, ...curated])];
   const out = [raw];
   const parenMatch = raw.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
   let base = raw, inner = '';
@@ -190,6 +241,8 @@ function splitIngredientCandidates(text){
 function manageableIngredientNames(text){
   const raw = (text||'').trim();
   if(!raw) return [];
+  const curated = CURATED_ALTERNATIVE_PARTS[raw.toLowerCase()];
+  if(curated) return curated.slice();
   const parenMatch = raw.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
   if(parenMatch){
     const base = parenMatch[1].trim();
@@ -1339,7 +1392,53 @@ function applyFirebasePatch(patch){
   }
 }
 let saveTimeout=null;
+// Avanzi in Dispensa (creati da "Cucinata" → avanzo, vedi il modale fatto):
+// sono resti di una ricetta, non ingredienti da ricomprare. Riconosciuti dal
+// flag leftover (dai nuovi in poi) o dal reparto "Avanzi" (quelli creati
+// prima del flag, che di default finivano lì).
+function isLeftoverPantryItem(it){
+  return !!it && (it.leftover === true || it.cat === 'avanzi');
+}
+// Un avanzo finito (scorta 0) non resta in Dispensa come un ingrediente
+// "finito" da ricomprare: sparisce del tutto. Chiamata da persist(), così
+// vale per ogni modo in cui la scorta arriva a 0 (spunta, −, modifica, pasto
+// cucinato). Ritorna le voci tolte, per un eventuale "Annulla".
+function purgeFinishedLeftovers(){
+  const removed = [];
+  Object.keys(state.pantryItems).forEach(key=>{
+    const it = state.pantryItems[key];
+    if(!isLeftoverPantryItem(it) || typeof it.qty !== 'number' || it.qty > 0) return;
+    removed.push({ key, item: it, confirmed: state.pantryConfirmedShop[key], dismissed: state.shopDismissed['oos_'+key] });
+    delete state.pantryItems[key];
+    delete state.pantryConfirmedShop[key];
+    delete state.shopDismissed['oos_'+key];
+  });
+  return removed;
+}
+function restoreLeftovers(removed){
+  removed.forEach(({ key, item, confirmed, dismissed })=>{
+    state.pantryItems[key] = item;
+    if(confirmed !== undefined) state.pantryConfirmedShop[key] = confirmed;
+    if(dismissed !== undefined) state.shopDismissed['oos_'+key] = dismissed;
+  });
+}
+// Per i gesti diretti in Dispensa (spunta di presenza, −): se l'avanzo è
+// appena finito lo toglie subito e offre "Annulla" — un tocco sbagliato non
+// deve far perdere l'avanzo senza rimedio.
+function finishLeftoverWithUndo(key){
+  const it = state.pantryItems[key];
+  if(!isLeftoverPantryItem(it) || typeof it.qty !== 'number' || it.qty > 0) return false;
+  const removed = purgeFinishedLeftovers().filter(r => r.key === key);
+  persist(); render();
+  showUndoToast(`Avanzo finito: «${it.nome}» tolto dalla Dispensa`, ()=>{
+    removed.forEach(r=>{ r.item.qty = 1; });
+    restoreLeftovers(removed);
+    persist(); render();
+  });
+  return true;
+}
 function persist(){
+  purgeFinishedLeftovers();
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(runPersist, 350);
 }
@@ -3537,6 +3636,7 @@ function buildShopFlat(){
     // e poi finito un'altra volta non tornava più tra i Finiti.)
     if(typeof it.qty === 'number' && it.qty > 0 && state.shopDismissed[key]){ delete state.shopDismissed[key]; return; }
     if(typeof it.qty !== 'number' || it.qty > 0) return;
+    if(isLeftoverPantryItem(it)) return; // un avanzo non si ricompra
     if(state.shopDismissed[key]) return;
     flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
@@ -5478,7 +5578,13 @@ function attachHandlers(){
       // testo da solo non basta, va spuntato esplicitamente.
       const leftover = (state.doneModalLeftover || '').trim();
       if(state.doneModalLeftoverChecked && leftover){
+        const leftoverKey = leftover.toLowerCase();
+        const existing = state.pantryItems[leftoverKey];
         upsertPantryItem(leftover, state.doneModalLeftoverLuogo, 1, 'none', state.doneModalLeftoverCat);
+        // Segnato come avanzo (vedi isLeftoverPantryItem) anche se il reparto
+        // scelto non è "Avanzi" — ma non se il nome coincide con un
+        // ingrediente vero già in Dispensa, che deve restare tale.
+        if(!existing || existing.leftover) state.pantryItems[leftoverKey].leftover = true;
       }
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(!mealsDone[i]) mealsDone[i] = {};
@@ -5937,10 +6043,12 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-qty-dec]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const it = state.pantryItems[e.currentTarget.dataset.qtyDec];
+      const key = e.currentTarget.dataset.qtyDec;
+      const it = state.pantryItems[key];
       if(!it) return;
       const step = qtyStepFor(it.unit);
       it.qty = Math.max(0, Math.round(((typeof it.qty === 'number' ? it.qty : 0) - step) * 100) / 100);
+      if(finishLeftoverWithUndo(key)) return;
       persist(); render();
     });
   });
@@ -5960,6 +6068,7 @@ function attachHandlers(){
       if(!it) return;
       it.qty = e.currentTarget.checked ? 1 : 0;
       if(it.qty > 0) delete state.pantryConfirmedShop[key];
+      if(finishLeftoverWithUndo(key)) return;
       persist(); render();
     });
   });
