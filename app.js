@@ -2121,11 +2121,34 @@ function writeSwappedMeal(map, i, meal, slot){
   writeMealPrincipale(map, i, meal, slot.principale || MEAL_EMPTY);
   if(slot.principale && slot.contorni.length) map[i][meal].contorni = slot.contorni.slice();
 }
+// Stato "grezzo" di un pasto nelle tre mappe per settimana (override,
+// fatto, scelto-a-mano), per poterlo rimettere com'era con "Annulla":
+// undefined = la chiave non c'era, e al ripristino va tolta di nuovo (non
+// messa a null, altrimenti un pasto generato resterebbe bloccato).
+function snapshotMealSlot(weekIdx, i, meal){
+  const read = map => (map[i] && map[i][meal] !== undefined) ? JSON.parse(JSON.stringify(map[i][meal])) : undefined;
+  return { weekIdx, i, meal,
+    override: read(weekOverridesRef(weekIdx)),
+    done: read(weekMealsDoneRef(weekIdx)),
+    picked: read(weekOverridePickedRef(weekIdx)) };
+}
+function restoreMealSlot({ weekIdx, i, meal, override, done, picked }){
+  [[weekOverridesRef(weekIdx), override, emptyDaySlot], [weekMealsDoneRef(weekIdx), done, ()=>({})], [weekOverridePickedRef(weekIdx), picked, ()=>({})]].forEach(([map, value, makeDay])=>{
+    if(value !== undefined){
+      if(!map[i]) map[i] = makeDay();
+      map[i][meal] = value;
+    } else if(map[i]){
+      delete map[i][meal];
+    }
+  });
+}
 function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   if(weekIdxA === weekIdxB && i === j && mealA === mealB) return;
   const slotA = effectiveMeal(weekIdxA, i, mealA);
   const slotB = effectiveMeal(weekIdxB, j, mealB);
   const mealKeyA = mealKey(weekIdxA, i, mealA), mealKeyB = mealKey(weekIdxB, j, mealB);
+  const snapA = snapshotMealSlot(weekIdxA, i, mealA), snapB = snapshotMealSlot(weekIdxB, j, mealB);
+  const linksSnap = snapshotMealLinks(mealKeyA).concat(snapshotMealLinks(mealKeyB));
   writeSwappedMeal(weekOverridesRef(weekIdxA), i, mealA, slotB);
   writeSwappedMeal(weekOverridesRef(weekIdxB), j, mealB, slotA);
   clearMealFlag(weekOverridePickedRef(weekIdxA), i, mealA);
@@ -2139,6 +2162,12 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   state.swapOpenDay = null;
   persist();
   render();
+  showUndoToast('Ricette scambiate', ()=>{
+    restoreMealSlot(snapA);
+    restoreMealSlot(snapB);
+    restoreMealLinks(linksSnap);
+    persist(); render();
+  });
 }
 
 // Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
