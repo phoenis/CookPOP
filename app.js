@@ -2108,11 +2108,11 @@ function removeWeek(weekIdx){
 // Scambia due pasti qualsiasi (anche pranzo con cena, anche tra settimane
 // diverse — drag&drop nel Menù): entrambi diventano override manuali,
 // coerente con "Cambia ricetta" — il "fatta" non ha più senso dopo lo
-// scambio, quindi si azzera per entrambi. Le porzioni/l'eventuale
-// collegamento avanzo restano legati alla posizione (giorno+pasto), non
-// seguono la ricetta: scambiare una cena da 3 porzioni con un pranzo da 2
-// lascia 3 e 2 dove stavano, si scambia solo cosa cucinare (principale e
-// contorni).
+// scambio, quindi si azzera per entrambi. Le porzioni restano legate alla
+// posizione (giorno+pasto), non seguono la ricetta: scambiare una cena da 3
+// porzioni con un pranzo da 2 lascia 3 e 2 dove stavano, si scambia solo
+// cosa cucinare (principale e contorni). Un collegamento "avanzo di" invece
+// si scioglie: non avrebbe più senso con la ricetta nuova.
 // Un pasto vuoto scambiato con uno pieno deve restare vuoto (sentinella
 // MEAL_EMPTY), non '' — con '' effectiveMeal ricadrebbe sulla baseline
 // generata e al posto del pasto spostato ricomparirebbe la vecchia ricetta.
@@ -2149,6 +2149,7 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   const mealKeyA = mealKey(weekIdxA, i, mealA), mealKeyB = mealKey(weekIdxB, j, mealB);
   const snapA = snapshotMealSlot(weekIdxA, i, mealA), snapB = snapshotMealSlot(weekIdxB, j, mealB);
   const linksSnap = snapshotMealLinks(mealKeyA).concat(snapshotMealLinks(mealKeyB));
+  const portionsA = state.dayPortions[mealKeyA], portionsB = state.dayPortions[mealKeyB];
   writeSwappedMeal(weekOverridesRef(weekIdxA), i, mealA, slotB);
   writeSwappedMeal(weekOverridesRef(weekIdxB), j, mealB, slotA);
   clearMealFlag(weekOverridePickedRef(weekIdxA), i, mealA);
@@ -2159,6 +2160,10 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   clearDayLink(mealKeyB);
   unlinkDaysPointingTo(mealKeyA);
   unlinkDaysPointingTo(mealKeyB);
+  // Le porzioni restano al pasto (dipendono da chi c'è a tavola, non dal
+  // piatto): clearDayLink le ha tolte insieme al link, qui si rimettono.
+  if(portionsA !== undefined) state.dayPortions[mealKeyA] = portionsA;
+  if(portionsB !== undefined) state.dayPortions[mealKeyB] = portionsB;
   state.swapOpenDay = null;
   persist();
   render();
