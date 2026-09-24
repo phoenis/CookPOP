@@ -1365,7 +1365,53 @@ function applyFirebasePatch(patch){
   }
 }
 let saveTimeout=null;
+// Avanzi in Dispensa (creati da "Cucinata" → avanzo, vedi il modale fatto):
+// sono resti di una ricetta, non ingredienti da ricomprare. Riconosciuti dal
+// flag leftover (dai nuovi in poi) o dal reparto "Avanzi" (quelli creati
+// prima del flag, che di default finivano lì).
+function isLeftoverPantryItem(it){
+  return !!it && (it.leftover === true || it.cat === 'avanzi');
+}
+// Un avanzo finito (scorta 0) non resta in Dispensa come un ingrediente
+// "finito" da ricomprare: sparisce del tutto. Chiamata da persist(), così
+// vale per ogni modo in cui la scorta arriva a 0 (spunta, −, modifica, pasto
+// cucinato). Ritorna le voci tolte, per un eventuale "Annulla".
+function purgeFinishedLeftovers(){
+  const removed = [];
+  Object.keys(state.pantryItems).forEach(key=>{
+    const it = state.pantryItems[key];
+    if(!isLeftoverPantryItem(it) || typeof it.qty !== 'number' || it.qty > 0) return;
+    removed.push({ key, item: it, confirmed: state.pantryConfirmedShop[key], dismissed: state.shopDismissed['oos_'+key] });
+    delete state.pantryItems[key];
+    delete state.pantryConfirmedShop[key];
+    delete state.shopDismissed['oos_'+key];
+  });
+  return removed;
+}
+function restoreLeftovers(removed){
+  removed.forEach(({ key, item, confirmed, dismissed })=>{
+    state.pantryItems[key] = item;
+    if(confirmed !== undefined) state.pantryConfirmedShop[key] = confirmed;
+    if(dismissed !== undefined) state.shopDismissed['oos_'+key] = dismissed;
+  });
+}
+// Per i gesti diretti in Dispensa (spunta di presenza, −): se l'avanzo è
+// appena finito lo toglie subito e offre "Annulla" — un tocco sbagliato non
+// deve far perdere l'avanzo senza rimedio.
+function finishLeftoverWithUndo(key){
+  const it = state.pantryItems[key];
+  if(!isLeftoverPantryItem(it) || typeof it.qty !== 'number' || it.qty > 0) return false;
+  const removed = purgeFinishedLeftovers().filter(r => r.key === key);
+  persist(); render();
+  showUndoToast(`Avanzo finito: «${it.nome}» tolto dalla Dispensa`, ()=>{
+    removed.forEach(r=>{ r.item.qty = 1; });
+    restoreLeftovers(removed);
+    persist(); render();
+  });
+  return true;
+}
 function persist(){
+  purgeFinishedLeftovers();
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(runPersist, 350);
 }
@@ -3563,6 +3609,7 @@ function buildShopFlat(){
     // e poi finito un'altra volta non tornava più tra i Finiti.)
     if(typeof it.qty === 'number' && it.qty > 0 && state.shopDismissed[key]){ delete state.shopDismissed[key]; return; }
     if(typeof it.qty !== 'number' || it.qty > 0) return;
+    if(isLeftoverPantryItem(it)) return; // un avanzo non si ricompra
     if(state.shopDismissed[key]) return;
     flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
@@ -5504,7 +5551,13 @@ function attachHandlers(){
       // testo da solo non basta, va spuntato esplicitamente.
       const leftover = (state.doneModalLeftover || '').trim();
       if(state.doneModalLeftoverChecked && leftover){
+        const leftoverKey = leftover.toLowerCase();
+        const existing = state.pantryItems[leftoverKey];
         upsertPantryItem(leftover, state.doneModalLeftoverLuogo, 1, 'none', state.doneModalLeftoverCat);
+        // Segnato come avanzo (vedi isLeftoverPantryItem) anche se il reparto
+        // scelto non è "Avanzi" — ma non se il nome coincide con un
+        // ingrediente vero già in Dispensa, che deve restare tale.
+        if(!existing || existing.leftover) state.pantryItems[leftoverKey].leftover = true;
       }
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(!mealsDone[i]) mealsDone[i] = {};
@@ -5963,10 +6016,12 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-qty-dec]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const it = state.pantryItems[e.currentTarget.dataset.qtyDec];
+      const key = e.currentTarget.dataset.qtyDec;
+      const it = state.pantryItems[key];
       if(!it) return;
       const step = qtyStepFor(it.unit);
       it.qty = Math.max(0, Math.round(((typeof it.qty === 'number' ? it.qty : 0) - step) * 100) / 100);
+      if(finishLeftoverWithUndo(key)) return;
       persist(); render();
     });
   });
@@ -5986,6 +6041,7 @@ function attachHandlers(){
       if(!it) return;
       it.qty = e.currentTarget.checked ? 1 : 0;
       if(it.qty > 0) delete state.pantryConfirmedShop[key];
+      if(finishLeftoverWithUndo(key)) return;
       persist(); render();
     });
   });
