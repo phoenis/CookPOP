@@ -121,6 +121,13 @@ const LUOGO_ICON = {
   giardino:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.42 39.86a12 12 0 0 0-11.28-11.28c-39.6-2.33-74.59 2.34-104 13.87C84 53.48 62.31 70.58 49.39 91.9c-17.62 29.11-17.66 64.45-.45 98.19l-17.43 17.43a12 12 0 0 0 17 17l17.43-17.43c16.74 8.54 33.88 12.85 50.45 12.85a91.3 91.3 0 0 0 47.74-13.3c21.32-12.92 38.42-34.62 49.45-62.75c11.5-29.43 16.17-64.43 13.84-104.03m-75.76 146.22C131.57 198.25 108 199.17 83.94 189l84.54-84.54a12 12 0 1 0-17-17L67 172.06c-10.14-24-9.22-47.63 3-67.72c20.91-34.53 70.54-53.72 134-52.25c1.38 63.44-17.81 113.08-52.34 133.99"></path></svg>' 
 };
 const DEPT_RULES = [
+  // Prima di tutto i nomi che contengono la parola chiave di un altro reparto
+  // (vince la prima regola che corrisponde): "Colla di pesce" non è pesce,
+  // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
+  // "Gnocchi di patate"/"Concentrato di pomodoro" non sono verdura fresca.
+  ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','dispensa'],
+  ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'],
+  ['concentrato','legumi'], ['polpa di pomodoro','legumi'],
   ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
   ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['pesce','pesce'],
   ['manzo','carne'], ['pollo','carne'], ['maiale','carne'], ['salsiccia','carne'], ['tacchino','carne'], ['vitello','carne'], ['agnello','carne'], ['straccetti','carne'], ['macinato','carne'], ['prosciutto','carne'], ['pancetta','carne'], ['guanciale','carne'], ['coniglio','carne'],
@@ -136,6 +143,24 @@ const DEPT_RULES = [
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
   ['melone','verdura'], ['anguria','verdura'], ['mela','verdura'], ['pera','verdura'], ['limone','verdura'], ['arancia','verdura'], ['banana','verdura'], ['fragol','verdura'], ['uva','verdura'],
+  // Aggiunte per svuotare "Altro" (ingredienti delle ricette che nessuna
+  // regola sopra riconosceva).
+  ['cipoll','verdura'], ['borettan','verdura'], ['scalogno','verdura'], ['porr','verdura'], ['sedano','verdura'], ['finocchi','verdura'],
+  ['carciof','verdura'], ['funghi','verdura'], ['broccol','verdura'], ['cavolfior','verdura'], ['verza','verdura'], ['cime di rapa','verdura'],
+  ['friariell','verdura'], ['spinaci','verdura'], ['bietol','verdura'], ['asparag','verdura'], ['cetriol','verdura'], ['radicchio','verdura'],
+  ['rucola','verdura'], ['zucca','verdura'], ['piselli','verdura'], ['verdur','verdura'], ['prezzemolo','verdura'], ['salvia','verdura'],
+  ['menta','verdura'], ['aneto','verdura'], ['aranc','verdura'], ['mele','verdura'], ['pere','verdura'],
+  ['ragù','legumi'], ['carne','carne'], ['arista','carne'], ['controfiletto','carne'], ['scamone','carne'], ['cappello del prete','carne'], ['muscolo','carne'],
+  ['cappone','carne'], ['cosce','carne'], ['petto','carne'], ['cotenna','carne'], ['speck','carne'], ['spiedini','carne'],
+  ['baccal','pesce'], ['cozze','pesce'], ['vongole','pesce'], ['orata','pesce'], ['polpo','pesce'],
+  ['burrata','latticini'], ['brie','latticini'], ['caciocavallo','latticini'], ['fontina','latticini'], ['gorgonzola','latticini'], ['taleggio','latticini'],
+  ['mascarpone','latticini'], ['pecorino','latticini'], ['provolone','latticini'], ['scamorza','latticini'], ['panna','latticini'], ['latticello','latticini'],
+  ['spaghetti','pane'], ['rigatoni','pane'], ['orecchiette','pane'], ['trenette','pane'], ['trofie','pane'], ['cannelloni','pane'],
+  ['sfoglie','pane'], ['tortellini','pane'], ['semol','pane'], ['cereali','pane'], ['panini','pane'], ['savoiardi','pane'], ['vialone','pane'],
+  ['legumi','legumi'], ['cannellini','legumi'], ['mais','legumi'],
+  ['olive','dispensa'], ['capperi','dispensa'], ['pesto','dispensa'], ['maionese','dispensa'], ['besciamella','dispensa'], ['dadi','dispensa'],
+  ['vino','dispensa'], ['cacao','dispensa'], ['caffè','dispensa'], ['vaniglia','dispensa'], ['zafferano','dispensa'], ['chiodi di garofano','dispensa'],
+  ['pinoli','dispensa'], ['noci','dispensa'], ['mandorle','dispensa'], ['uvetta','dispensa'], ['marmellat','dispensa'],
 ];
 // "Di solito li hai già" non è più un flag manuale: un ingrediente parte già
 // spuntato in Spesa quando in Dispensa ce n'è davvero scorta (vedi
