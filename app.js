@@ -584,6 +584,12 @@ function renamePantryItem(oldKey, newName){
   return newKey;
 }
 
+// Categoria scelta a mano in Dispensa per quell'ingrediente (se c'è): vale
+// anche in Spesa, così un ingrediente sta nello stesso reparto in entrambe.
+function pantryCatFor(ingrediente){
+  const it = state.pantryItems[(ingrediente||'').trim().toLowerCase()];
+  return (it && it.cat) || '';
+}
 function classifyDept(ingrediente){
   const s = (ingrediente||'').toLowerCase();
   for(const [kw, dept] of DEPT_RULES){ if(s.includes(kw)) return dept; }
@@ -748,6 +754,7 @@ const state = {
   addIngName: '', // ephemeral, non persistito: testo corrente del campo "Ingrediente" in Aggiungi (Spesa)
   addIngSuggestOpen: false, // ephemeral: se il menu dei suggerimenti è visibile
   addIngCursorPos: null, // ephemeral: posizione del cursore da ripristinare dopo il re-render a ogni tasto premuto
+  addIngDraft: null, // ephemeral: quantità/unità/categoria/gruppo/luogo già scelti in Aggiungi (Spesa), da non perdere al re-render di ogni tasto nel nome
   pantryAddModalOpen: false,
   pantryChecked: {},
   pantryItems: {},
@@ -2108,17 +2115,50 @@ function removeWeek(weekIdx){
 // Scambia due pasti qualsiasi (anche pranzo con cena, anche tra settimane
 // diverse — drag&drop nel Menù): entrambi diventano override manuali,
 // coerente con "Cambia ricetta" — il "fatta" non ha più senso dopo lo
-// scambio, quindi si azzera per entrambi. Le porzioni/l'eventuale
-// collegamento avanzo restano legati alla posizione (giorno+pasto), non
-// seguono la ricetta: scambiare una cena da 3 porzioni con un pranzo da 2
-// lascia 3 e 2 dove stavano, si scambia solo cosa cucinare.
+// scambio, quindi si azzera per entrambi. Le porzioni restano legate alla
+// posizione (giorno+pasto), non seguono la ricetta: scambiare una cena da 3
+// porzioni con un pranzo da 2 lascia 3 e 2 dove stavano, si scambia solo
+// cosa cucinare (principale e contorni). Un collegamento "avanzo di" invece
+// si scioglie: non avrebbe più senso con la ricetta nuova.
+// Un pasto vuoto scambiato con uno pieno deve restare vuoto (sentinella
+// MEAL_EMPTY), non '' — con '' effectiveMeal ricadrebbe sulla baseline
+// generata e al posto del pasto spostato ricomparirebbe la vecchia ricetta.
+// I contorni viaggiano insieme al principale: si sposta il piatto intero.
+function writeSwappedMeal(map, i, meal, slot){
+  writeMealPrincipale(map, i, meal, slot.principale || MEAL_EMPTY);
+  if(slot.principale && slot.contorni.length) map[i][meal].contorni = slot.contorni.slice();
+}
+// Stato "grezzo" di un pasto nelle tre mappe per settimana (override,
+// fatto, scelto-a-mano), per poterlo rimettere com'era con "Annulla":
+// undefined = la chiave non c'era, e al ripristino va tolta di nuovo (non
+// messa a null, altrimenti un pasto generato resterebbe bloccato).
+function snapshotMealSlot(weekIdx, i, meal){
+  const read = map => (map[i] && map[i][meal] !== undefined) ? JSON.parse(JSON.stringify(map[i][meal])) : undefined;
+  return { weekIdx, i, meal,
+    override: read(weekOverridesRef(weekIdx)),
+    done: read(weekMealsDoneRef(weekIdx)),
+    picked: read(weekOverridePickedRef(weekIdx)) };
+}
+function restoreMealSlot({ weekIdx, i, meal, override, done, picked }){
+  [[weekOverridesRef(weekIdx), override, emptyDaySlot], [weekMealsDoneRef(weekIdx), done, ()=>({})], [weekOverridePickedRef(weekIdx), picked, ()=>({})]].forEach(([map, value, makeDay])=>{
+    if(value !== undefined){
+      if(!map[i]) map[i] = makeDay();
+      map[i][meal] = value;
+    } else if(map[i]){
+      delete map[i][meal];
+    }
+  });
+}
 function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   if(weekIdxA === weekIdxB && i === j && mealA === mealB) return;
-  const nameI = effectiveRecipeName(weekIdxA, i, mealA);
-  const nameJ = effectiveRecipeName(weekIdxB, j, mealB);
+  const slotA = effectiveMeal(weekIdxA, i, mealA);
+  const slotB = effectiveMeal(weekIdxB, j, mealB);
   const mealKeyA = mealKey(weekIdxA, i, mealA), mealKeyB = mealKey(weekIdxB, j, mealB);
-  writeMealPrincipale(weekOverridesRef(weekIdxA), i, mealA, nameJ);
-  writeMealPrincipale(weekOverridesRef(weekIdxB), j, mealB, nameI);
+  const snapA = snapshotMealSlot(weekIdxA, i, mealA), snapB = snapshotMealSlot(weekIdxB, j, mealB);
+  const linksSnap = snapshotMealLinks(mealKeyA).concat(snapshotMealLinks(mealKeyB));
+  const portionsA = state.dayPortions[mealKeyA], portionsB = state.dayPortions[mealKeyB];
+  writeSwappedMeal(weekOverridesRef(weekIdxA), i, mealA, slotB);
+  writeSwappedMeal(weekOverridesRef(weekIdxB), j, mealB, slotA);
   clearMealFlag(weekOverridePickedRef(weekIdxA), i, mealA);
   clearMealFlag(weekOverridePickedRef(weekIdxB), j, mealB);
   clearMealFlag(weekMealsDoneRef(weekIdxA), i, mealA);
@@ -2127,9 +2167,19 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
   clearDayLink(mealKeyB);
   unlinkDaysPointingTo(mealKeyA);
   unlinkDaysPointingTo(mealKeyB);
+  // Le porzioni restano al pasto (dipendono da chi c'è a tavola, non dal
+  // piatto): clearDayLink le ha tolte insieme al link, qui si rimettono.
+  if(portionsA !== undefined) state.dayPortions[mealKeyA] = portionsA;
+  if(portionsB !== undefined) state.dayPortions[mealKeyB] = portionsB;
   state.swapOpenDay = null;
   persist();
   render();
+  showUndoToast('Ricette scambiate', ()=>{
+    restoreMealSlot(snapA);
+    restoreMealSlot(snapB);
+    restoreMealLinks(linksSnap);
+    persist(); render();
+  });
 }
 
 // Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
@@ -2228,7 +2278,7 @@ const MODAL_CHECKS = [
   [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
   [()=> !!state.pantryEditKey, ()=>{ state.pantryEditKey = null; }],
   [()=> !!state.pantryAddModalOpen, ()=>{ state.pantryAddModalOpen = false; }],
-  [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; }],
+  [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
   [()=> !!state.newRecipeModalOpen, ()=>{ state.newRecipeModalOpen = false; }],
   [()=> !!state.filtersOpen, ()=>{ state.filtersOpen = false; }],
   [()=> !!state.swapOpenDay, ()=>{ state.swapOpenDay = null; }],
@@ -3406,8 +3456,13 @@ function buildShopFlat(){
   // categoria — quando la spunti e la sposti in Dispensa aggiorna quello
   // stesso record invece di doverlo ricreare da capo.
   Object.entries(state.pantryItems).forEach(([pantryKey, it])=>{
-    if(typeof it.qty !== 'number' || it.qty > 0) return;
     const key = `oos_${pantryKey}`;
+    // Tornato in scorta: un'eventuale riga "finito" scartata/comprata in
+    // passato non vale più — quando finirà di nuovo deve ricomparire qui.
+    // (Prima restava scartata per sempre: un ingrediente ricomprato da Spesa
+    // e poi finito un'altra volta non tornava più tra i Finiti.)
+    if(typeof it.qty === 'number' && it.qty > 0 && state.shopDismissed[key]){ delete state.shopDismissed[key]; return; }
+    if(typeof it.qty !== 'number' || it.qty > 0) return;
     if(state.shopDismissed[key]) return;
     flat.push({ key, ingrediente:it.nome, qta: it.unit ? `1 ${it.unit}` : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
   });
@@ -3511,7 +3566,7 @@ function renderSpesa(){
     // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
     // nel loro reparto vero, tra le sezioni normali.
     const classified = mainFlat.map(it=>{
-      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (it.cat || classifyDept(it.ingrediente));
+      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (it.cat || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
       return {...it, dept};
     });
     // unisco articoli identici (stesso ingrediente) comparsi in più ricette,
@@ -3696,6 +3751,14 @@ function renderSpesa(){
   // reinventare da capo. Se è nuovo, resta comunque scegliebile dal menu.
   const matchedPantryUnit = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].unit) || '';
   const matchedPantryCat = (state.pantryItems[addIngQuery] && state.pantryItems[addIngQuery].cat) || '';
+  // Ingrediente che non è ancora in Dispensa: come in "Aggiungi ingrediente"
+  // di Dispensa si sceglie anche gruppo e luogo, e la voce entra subito
+  // nell'anagrafica ingredienti (vedi "Aggiungi" in attachHandlers).
+  const addIngIsNew = !!addIngQuery && !state.pantryItems[addIngQuery];
+  const addIngDraft = state.addIngDraft || {};
+  const addIngQta = addIngDraft.qta !== undefined ? addIngDraft.qta : (matchedPantryUnit ? '1' : '');
+  const addIngUnit = addIngDraft.unit !== undefined ? addIngDraft.unit : matchedPantryUnit;
+  const addIngCat = addIngDraft.cat !== undefined ? addIngDraft.cat : matchedPantryCat;
   const addIngModal = state.addIngModalOpen ? `
     <div class="filters-modal-backdrop" data-close-add-ing-modal>
       <div class="filters-modal" data-stop-close>
@@ -3717,9 +3780,9 @@ function renderSpesa(){
           <div class="filter-group">
             <div class="filter-group-label">Quantità</div>
             <div class="pantry-group-row">
-              <input type="text" id="shop-add-qta" placeholder="Es. 1 o 1 rotolo" value="${escapeAttr(matchedPantryUnit ? '1' : '')}">
+              <input type="text" id="shop-add-qta" placeholder="Es. 1 o 1 rotolo" value="${escapeAttr(addIngQta)}">
               <select id="shop-add-unit" title="Unità (si aggiunge da sola al numero, non serve scriverla)">
-                ${UNIT_ORDER.filter(u=>u!=='none').map(u=>`<option value="${u}" ${matchedPantryUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
+                ${UNIT_ORDER.filter(u=>u!=='none').map(u=>`<option value="${u}" ${addIngUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
               </select>
             </div>
           </div>
@@ -3727,9 +3790,23 @@ function renderSpesa(){
             <div class="filter-group-label">Categoria (reparto in "Per reparto")</div>
             <select id="shop-add-cat">
               <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(state.addIngName || '')])})</option>
-              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${matchedPantryCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${addIngCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
             </select>
           </div>
+          ${addIngIsNew ? `
+          <div class="filter-group">
+            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta)</div>
+            <select id="shop-add-group">
+              <option value="">Nessuno</option>
+              ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${addIngDraft.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Luogo (dove va in Dispensa quando lo compri)</div>
+            <select id="shop-add-luogo">
+              ${LUOGO_ORDER.map(l=>`<option value="${l}" ${addIngDraft.luogo===l?'selected':''}>${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
+            </select>
+          </div>` : ''}
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-solid mini-add-btn" id="shop-add-btn" type="button">Aggiungi</button>
@@ -4497,6 +4574,28 @@ function attachHandlers(){
     const qtaInput = document.getElementById('shop-add-qta');
     const unitSelect = document.getElementById('shop-add-unit');
     const catSelect = document.getElementById('shop-add-cat');
+    const groupSelect = document.getElementById('shop-add-group');
+    const luogoSelect = document.getElementById('shop-add-luogo');
+    // Il modale si ridisegna a ogni tasto nel nome: quello che hai già scelto
+    // negli altri campi va tenuto da parte, altrimenti tornerebbe ai default.
+    const saveDraft = ()=>{
+      state.addIngDraft = Object.assign({}, state.addIngDraft, {
+        qta: qtaInput.value,
+        unit: unitSelect ? unitSelect.value : '',
+        cat: catSelect ? catSelect.value : '',
+        ...(groupSelect ? { group: groupSelect.value } : {}),
+        ...(luogoSelect ? { luogo: luogoSelect.value } : {})
+      });
+    };
+    [qtaInput, unitSelect, catSelect, groupSelect, luogoSelect].forEach(el=>{
+      if(el) el.addEventListener(el === qtaInput ? 'input' : 'change', saveDraft);
+    });
+    // Come in Dispensa: scelto un gruppo con la Categoria ancora su
+    // "Automatica", la si precompila dal gruppo.
+    if(groupSelect) groupSelect.addEventListener('change', e=>{
+      const group = state.pantryGroups[e.target.value];
+      if(catSelect && !catSelect.value && group && group.cat){ catSelect.value = group.cat; saveDraft(); }
+    });
     // Se il nome coincide con un ingrediente già in Dispensa ma a scorta 0,
     // "Aggiungi" non crea una voce doppia: riattiva quello (stessa azione di
     // "Segna da comprare" nella sezione Finiti), così resta un unico record.
@@ -4522,9 +4621,23 @@ function attachHandlers(){
         // visto prima, non ha modo di essere classificato bene da
         // classifyDept (indovina solo da parole chiave note) — vedi il
         // fallback in buildShopFlat/renderSpesa.
+        // Gruppo/luogo solo per un ingrediente nuovo (i select compaiono solo
+        // allora): servono a moveShopRowToPantry per crearlo in Dispensa completo.
         state.shopExtras[id] = catSelect && catSelect.value ? { ingrediente: name, qta, cat: catSelect.value } : { ingrediente: name, qta };
+        // Ingrediente nuovo: entra subito nell'anagrafica (voce di Dispensa a
+        // scorta 0, come quando lo apri da "Gestisci ingredienti") con
+        // categoria/gruppo/luogo/unità scelti qui — in scorta ci va solo
+        // quando lo compri (moveShopRowToPantry ritrova questa voce e ne
+        // aumenta la quantità, tenendo luogo/categoria/gruppo). La sua riga
+        // "Finiti in Dispensa" si scarta: in lista c'è già come aggiunto a
+        // mano, con la quantità scritta qui.
+        if(!pantryIt){
+          upsertPantryItem(name, luogoSelect ? luogoSelect.value : 'dispensa', 0, unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
+          state.shopDismissed[`oos_${pantryKey}`] = true;
+        }
       }
       state.addIngModalOpen = false;
+      state.addIngDraft = null;
       state.addIngName = '';
       state.addIngSuggestOpen = false;
       state.addIngCursorPos = null;
@@ -4562,6 +4675,7 @@ function attachHandlers(){
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
       state.addIngModalOpen = false;
+      state.addIngDraft = null;
       state.addIngName = '';
       state.addIngSuggestOpen = false;
       state.addIngCursorPos = null;
@@ -6227,6 +6341,7 @@ function startDayDrag(card, clientX, clientY, pointerId){
   card.classList.add('dragging');
   dragState = { sourceWeekIdx: card.dataset.weekIdx, sourceIndex: card.dataset.dayIndex, sourceMeal: card.dataset.meal, sourceCard: card, ghost, lastTarget: null };
   try{ card.setPointerCapture(pointerId); }catch(err){ /* pointer già rilasciato: il drag prosegue comunque via i listener su document */ }
+  lastPointerX = clientX;
   lastPointerY = clientY;
   if(!autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
 }
@@ -6234,7 +6349,7 @@ function positionGhost(ghost, x, y){
   ghost.style.left = (x + 14) + 'px';
   ghost.style.top = (y - 40) + 'px';
 }
-let lastPointerY = 0;
+let lastPointerX = 0, lastPointerY = 0;
 let autoScrollRAF = null;
 // Con più settimane il giorno di destinazione può essere fuori schermo: tenendo
 // il dito vicino al bordo superiore/inferiore durante il trascinamento la pagina
@@ -6245,16 +6360,26 @@ function autoScrollTick(){
   const vh = window.innerHeight;
   if(lastPointerY < margin){
     window.scrollBy(0, -maxSpeed * (1 - lastPointerY/margin));
+    updateDragTarget();
   } else if(lastPointerY > vh - margin){
     window.scrollBy(0, maxSpeed * (1 - (vh - lastPointerY)/margin));
+    updateDragTarget();
   }
   autoScrollRAF = requestAnimationFrame(autoScrollTick);
 }
 document.addEventListener('pointermove', e=>{
   if(!dragState) return;
+  lastPointerX = e.clientX;
   lastPointerY = e.clientY;
   positionGhost(dragState.ghost, e.clientX, e.clientY);
-  const el = document.elementFromPoint(e.clientX, e.clientY);
+  updateDragTarget();
+});
+// Ricalcola il pasto sotto il dito: sia a ogni movimento sia durante
+// l'auto-scroll (dito fermo vicino al bordo, la pagina scorre da sola e sotto
+// il dito passa un altro pasto senza che arrivi nessun pointermove —
+// altrimenti al rilascio si scambierebbe col pasto di prima dello scroll).
+function updateDragTarget(){
+  const el = document.elementFromPoint(lastPointerX, lastPointerY);
   // Qualsiasi pasto è un bersaglio valido, anche di tipo diverso (pranzo su
   // cena): le porzioni/l'eventuale collegamento avanzo restano legati alla
   // posizione, non alla ricetta — vedi swapDayRecipes.
@@ -6266,7 +6391,16 @@ document.addEventListener('pointermove', e=>{
   } else {
     dragState.lastTarget = null;
   }
-});
+}
+// .meal-block ha touch-action: pan-y (serve allo scroll normale della
+// pagina): senza questo, appena il dito si sposta in verticale durante il
+// trascinamento il browser comincia a scorrere e annulla il gesto con un
+// pointercancel — il drag si interrompeva e si poteva scambiare solo con un
+// pasto di fianco. Bloccando il touchmove (listener non passivo) mentre è
+// attivo un trascinamento, lo scroll lo fa solo l'auto-scroll qui sopra.
+document.addEventListener('touchmove', e=>{
+  if(dragState && e.cancelable) e.preventDefault();
+}, { passive: false });
 function endDayDrag(commit){
   if(!dragState) return;
   const { sourceWeekIdx, sourceIndex, sourceMeal, sourceCard, ghost, lastTarget } = dragState;
@@ -6274,7 +6408,7 @@ function endDayDrag(commit){
   sourceCard.classList.remove('dragging');
   if(lastTarget) lastTarget.classList.remove('drag-over');
   dragState = null;
-  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), sourceIndex, sourceMeal, parseInt(lastTarget.dataset.weekIdx,10), lastTarget.dataset.dayIndex, lastTarget.dataset.meal);
+  if(commit && lastTarget) swapDayRecipes(parseInt(sourceWeekIdx,10), parseInt(sourceIndex,10), sourceMeal, parseInt(lastTarget.dataset.weekIdx,10), parseInt(lastTarget.dataset.dayIndex,10), lastTarget.dataset.meal);
 }
 document.addEventListener('pointerup', ()=> endDayDrag(true));
 document.addEventListener('pointercancel', ()=> endDayDrag(false));
