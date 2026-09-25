@@ -4558,7 +4558,8 @@ function renderDispensa(){
   // Gestione categorie: quelle di base sono fisse (solo mostrate), quelle
   // create dall'utente si rinominano, cambiano emoji o si eliminano — stesso
   // schema di "Gestisci gruppi". Condivise tra gli spazi (state.customDepts).
-  const editableDeptIds = DEPT_ORDER.filter(d => d !== 'finiti');
+  // In ordine alfabetico (non in quello dei reparti): qui si cercano per nome.
+  const editableDeptIds = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=>DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
   const deptsModal = state.deptsModalOpen ? `
     <div class="filters-modal-backdrop" data-close-depts>
       <div class="filters-modal" data-stop-close>
@@ -4568,6 +4569,7 @@ function renderDispensa(){
         </div>
         <p class="section-sub">Le categorie sono i reparti di Spesa e le sezioni di Dispensa. Tutte si possono rinominare o cambiare di emoji; quelle create da te si possono anche eliminare, e compaiono prima di "Altro".</p>
         <div class="filter-groups">
+          <div class="dept-list">
           ${editableDeptIds.map(id=>`
             <div class="pantry-group-row">
               <input type="text" class="dept-icon-input" data-dept-icon="${escapeAttr(id)}" value="${escapeAttr(DEPT_ICON[id] || '')}" placeholder="🏷️" aria-label="Emoji">
@@ -4576,6 +4578,7 @@ function renderDispensa(){
                 ? `<span class="dept-delete-spacer" aria-hidden="true"></span>`
                 : `<button type="button" class="btn is-icon color-delete" data-dept-delete="${escapeAttr(id)}" aria-label="Elimina categoria"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>`}
             </div>`).join('')}
+          </div>
         </div>
         <div class="filter-groups">
           <div class="filter-group">

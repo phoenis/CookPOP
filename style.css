@@ -382,7 +382,11 @@
   .pantry-group-row input[type=text]{ flex:1; min-width:0; }
   .pantry-group-row select{ flex:1; min-width:0; }
   .pantry-group-row input.dept-icon-input{ flex:0 0 3.25rem; text-align:center; }
-  .dept-delete-spacer{ flex:0 0 auto; width:2.2em; }
+  /* Cestino e spazio vuoto al suo posto (categorie di base) della stessa
+     larghezza, così i campi del nome sono tutti allineati. */
+  .dept-list .pantry-group-row > .btn.is-icon, .dept-delete-spacer{ flex:0 0 1.875rem; width:1.875rem; }
+  .dept-list{ display:flex; flex-direction:column; gap:var(--space-xsmall); }
+  .dept-list .pantry-group-row{ margin-bottom:0; }
   /* "Gestisci" (categorie/gruppi) a destra della riga dell'etichetta, non
      subito dopo il testo. */
   .filter-group-label{ align-items:center; }
