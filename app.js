@@ -2482,8 +2482,6 @@ const WHATS_NEW = {
   title: 'Novità',
   items: [
     'In Dispensa ora c\'è anche la sezione "Casa"! Accanto a "Cibo" trovi detersivi, igiene, carta forno e tutto ciò che non si mangia, divisi in Pulizia, Igiene e cura, Cucina e Altro. Finiscono in lista spesa come il resto, dopo il cibo.',
-    'Nuovo pulsante + in Dispensa e in Ricette per aggiungere al volo.',
-    'Categorie personalizzabili: da "Gestisci categorie" puoi crearne di nuove, rinominarle e cambiare emoji.',
     'Ingredienti riordinati: doppioni unificati, nuovi gruppi (Farina, Formaggio grattugiato, Olive…) e quasi nulla più in "Altro".',
     'Ricette in ordine alfabetico, e tante piccole correzioni: modalità scura, quantità in lista spesa, avanzi finiti, spunte che non partono più da sole.'
   ]
