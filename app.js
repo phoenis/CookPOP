@@ -68,9 +68,9 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 // "Gestisci ingredienti". Come ogni reparto, la sezione compare in Dispensa/
 // Spesa solo quando contiene almeno una voce (stesso filtro presenza già
 // usato per tutti gli altri, vedi DEPT_ORDER.filter più sotto).
-const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','bibite','altro','pulizia','igiene','cucina-casa','altro-casa','finiti'];
-const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', bibite:'Bibite', finiti:'Finiti', altro:'Altro', pulizia:'Pulizia', igiene:'Igiene e cura', 'cucina-casa':'Cucina', 'altro-casa':'Altro' };
-const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', bibite:'🥤', finiti:'🗑️', altro:'🛒', pulizia:'🧽', igiene:'🧴', 'cucina-casa':'🧻', 'altro-casa':'📦' };
+const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','base','dispensa','surgelati','bibite','altro','pulizia','igiene','cucina-casa','altro-casa','finiti'];
+const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', base:'Base', bibite:'Bibite', finiti:'Finiti', altro:'Altro', pulizia:'Pulizia', igiene:'Igiene e cura', 'cucina-casa':'Cucina', 'altro-casa':'Altro' };
+const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', base:'⚙️', bibite:'🥤', finiti:'🗑️', altro:'🛒', pulizia:'🧽', igiene:'🧴', 'cucina-casa':'🧻', 'altro-casa':'📦' };
 // Categorie create dall'utente (state.customDepts, nel catalogo condiviso:
 // { id: { label, icon } }, vedi "Gestisci categorie" in Dispensa): si
 // aggiungono a quelle di base, prima di "Altro". DEPT_ORDER/LABEL/ICON sono
@@ -122,7 +122,8 @@ function applyCustomDepts(){
 // only: 'casa' per le sole categorie non alimentari (form di un prodotto).
 function deptOptionsHtml(selected, only){
   const opt = d => `<option value="${d}" ${selected===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`;
-  const list = DEPT_ORDER.filter(d => d !== 'finiti');
+  // In ordine alfabetico (dentro Cibo e dentro Casa), come in "Gestisci categorie".
+  const list = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
   if(only === 'casa') return list.filter(isNonFoodDept).map(opt).join('');
   return `<optgroup label="Cibo">${list.filter(d => !isNonFoodDept(d)).map(opt).join('')}</optgroup><optgroup label="Casa">${list.filter(isNonFoodDept).map(opt).join('')}</optgroup>`;
 }
@@ -202,7 +203,7 @@ const DEPT_RULES = [
   // (vince la prima regola che corrisponde): "Colla di pesce" non è pesce,
   // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
   // "Gnocchi di patate"/"Concentrato di pomodoro" non sono verdura fresca.
-  ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','dispensa'], ['aranciata','bibite'],
+  ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','base'], ['aranciata','bibite'],
   ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'],
   ['concentrato','legumi'], ['polpa di pomodoro','legumi'],
   ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
@@ -213,9 +214,11 @@ const DEPT_RULES = [
   ['pane','pane'], ['farina','pane'], ['pasta','pane'], ['riso','pane'], ['lievito','pane'],
   // Le voci "peperoncino" e "peperon" (stem di peperone/peperoni) vanno controllate
   // prima di "pepe", altrimenti "pepe" le intercetta per prima essendo una sua sottostringa.
-  ['peperoncino','dispensa'], ['peperon','verdura'],
-  ['sale','dispensa'], ['olio','dispensa'], ['pepe','dispensa'], ['aceto','dispensa'], ['zucchero','dispensa'], ['spezie','dispensa'],
-  ['origano','dispensa'], ['rosmarino','dispensa'], ['timo','dispensa'], ['alloro','dispensa'], ['cannella','dispensa'], ['paprika','dispensa'], ['noce moscata','dispensa'],
+  // "Base": sale, pepe, olio, aceto, spezie ed erbe aromatiche secche — i
+  // condimenti di base, separati da sughi/conserve di "Dispensa e condimenti".
+  ['peperoncino','base'], ['peperon','verdura'],
+  ['sale','base'], ['olio','base'], ['pepe','base'], ['aceto','base'], ['zucchero','dispensa'], ['spezie','base'],
+  ['origano','base'], ['rosmarino','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'],
   ['senape','dispensa'], ['miele','dispensa'], ['pangrattato','dispensa'],
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
@@ -236,7 +239,7 @@ const DEPT_RULES = [
   ['sfoglie','pane'], ['tortellini','pane'], ['semol','pane'], ['cereali','pane'], ['panini','pane'], ['savoiardi','pane'], ['vialone','pane'],
   ['legumi','legumi'], ['cannellini','legumi'], ['mais','legumi'],
   ['olive','dispensa'], ['capperi','dispensa'], ['pesto','dispensa'], ['maionese','dispensa'], ['besciamella','dispensa'], ['dadi','dispensa'],
-  ['vino','dispensa'], ['cacao','dispensa'], ['caffè','dispensa'], ['vaniglia','dispensa'], ['zafferano','dispensa'], ['chiodi di garofano','dispensa'],
+  ['vino','dispensa'], ['cacao','dispensa'], ['caffè','dispensa'], ['vaniglia','dispensa'], ['zafferano','base'], ['chiodi di garofano','base'],
   ['pinoli','dispensa'], ['noci','dispensa'], ['mandorle','dispensa'], ['uvetta','dispensa'], ['marmellat','dispensa'],
   ['acqua','bibite'], ['bibit','bibite'], ['birra','bibite'], ['succo di frutta','bibite'], ['tè freddo','bibite'],
 ];
@@ -974,6 +977,7 @@ const state = {
   pantryNamesCurated2: false,
   pantryGroupMigrated3: false,
   shopKeysByName1: false,
+  baseDeptMigrated1: false,
   pantryGroups: {
     'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
     'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' },
@@ -1596,6 +1600,7 @@ function buildPersonalPayload(){
     pantryNamesCurated2: state.pantryNamesCurated2,
     pantryGroupMigrated3: state.pantryGroupMigrated3,
     shopKeysByName1: state.shopKeysByName1,
+    baseDeptMigrated1: state.baseDeptMigrated1,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy
   };
@@ -7118,6 +7123,30 @@ document.addEventListener('click', e=>{
     });
     delete state.pantryGroups['grana-parmigiano'];
     state.pantryGroupMigrated3 = true;
+    persist();
+  }
+  // Una tantum: "Base" è diventata una categoria di base (id 'base'). Una
+  // categoria "Base" creata a mano (customDepts, catalogo condiviso)
+  // confluisce qui: le voci/gruppi che la usavano passano a 'base', l'emoji
+  // scelta resta come personalizzazione. In più sale, pepe, olio, aceto,
+  // spezie messi a mano in "Dispensa e condimenti" passano a Base.
+  if(!state.baseDeptMigrated1){
+    const custom = state.customDepts || {};
+    const oldIds = Object.keys(custom).filter(id => !BASE_DEPT_LABEL[id] && custom[id] && !custom[id].nonFood && (custom[id].label || '').trim().toLowerCase() === 'base');
+    const toBase = cat => oldIds.includes(cat);
+    Object.values(state.pantryItems).forEach(it=>{
+      if(!it) return;
+      if(toBase(it.cat)) it.cat = 'base';
+      else if(it.cat === 'dispensa' && classifyDept(it.nome) === 'base') it.cat = 'base';
+    });
+    Object.values(state.shopExtras || {}).forEach(it=>{ if(it && (toBase(it.cat) || (it.cat === 'dispensa' && classifyDept(it.ingrediente) === 'base'))) it.cat = 'base'; });
+    Object.values(state.pantryGroups || {}).forEach(g=>{ if(g && toBase(g.cat)) g.cat = 'base'; });
+    oldIds.forEach(id=>{
+      const icon = custom[id].icon;
+      if(icon && icon !== BASE_DEPT_ICON.base){ state.customDepts.base = Object.assign({}, state.customDepts.base, { icon }); }
+      delete state.customDepts[id];
+    });
+    state.baseDeptMigrated1 = true;
     persist();
   }
   // Una tantum: passaggio dal modello "una ricetta per giorno" (weekOverrides/
