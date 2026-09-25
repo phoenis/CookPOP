@@ -4226,6 +4226,9 @@ function renderPrep(){
     if(state.filters.search && !r.nome.toLowerCase().includes(state.filters.search.toLowerCase())) return false;
     return true;
   });
+  // In ordine alfabetico per nome (prima seguivano l'ordine del catalogo,
+  // con le ricette create a mano in fondo).
+  list.sort((a,b)=> a.nome.localeCompare(b.nome, 'it', { sensitivity:'base' }));
   // Il dettaglio non è più un accordion inline (vedi renderRecipeDetailScreen
   // sopra, a tutto schermo come nel Menù): la card resta sempre nella sua
   // forma compatta, tap ovunque su di essa (data-toggle-recipe è
