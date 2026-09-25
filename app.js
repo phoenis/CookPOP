@@ -119,12 +119,14 @@ function applyCustomDepts(){
 // personalizzata può essere stata eliminata, anche da un altro spazio):
 // altrimenti '' e si torna alla categoria automatica dal nome.
 // <option> delle categorie per un <select>, divise in "Cibo" e "Casa".
-// only: 'casa' per le sole categorie non alimentari (form di un prodotto).
+// only: 'casa' per le sole categorie non alimentari (form di un prodotto),
+// 'cibo' per le sole alimentari (form di un ingrediente, gruppi).
 function deptOptionsHtml(selected, only){
   const opt = d => `<option value="${d}" ${selected===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`;
   // In ordine alfabetico (dentro Cibo e dentro Casa), come in "Gestisci categorie".
   const list = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
   if(only === 'casa') return list.filter(isNonFoodDept).map(opt).join('');
+  if(only === 'cibo') return list.filter(d => !isNonFoodDept(d)).map(opt).join('');
   return `<optgroup label="Cibo">${list.filter(d => !isNonFoodDept(d)).map(opt).join('')}</optgroup><optgroup label="Casa">${list.filter(isNonFoodDept).map(opt).join('')}</optgroup>`;
 }
 // Unità per un prodotto di casa: solo conteggio generico o presenza/assenza
@@ -4463,8 +4465,9 @@ function renderDispensa(){
 
   const editItem = state.pantryEditKey ? state.pantryItems[state.pantryEditKey] : null;
   // Prodotto di casa: niente gruppo e solo unità pezzi/"Non mostrare", come
-  // in "Aggiungi prodotto"; la categoria invece resta sceglibile tra tutte,
-  // per poter riportare nel cibo un ingrediente riconosciuto male.
+  // in "Aggiungi prodotto". Le categorie sono solo quelle della sua parte
+  // (Cibo o Casa), più un'unica voce "↔" per spostarlo nell'altra se è stato
+  // riconosciuto male (finisce nel suo "Altro", poi si sceglie la categoria).
   const editingHome = !!editItem && isNonFoodDept(knownDept(editItem.cat) || classifyDept(editItem.nome));
   const editModal = editItem ? `
     <div class="filters-modal-backdrop" data-close-pantry-edit>
@@ -4482,7 +4485,8 @@ function renderDispensa(){
             <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
             <select id="pantry-edit-cat">
               <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(editItem.nome)])})</option>
-              ${deptOptionsHtml(editItem.cat)}
+              ${deptOptionsHtml(editItem.cat, editingHome ? 'casa' : 'cibo')}
+              <option value="${editingHome ? 'altro' : 'altro-casa'}">${editingHome ? '↔ È un alimento (sposta in Cibo)' : '↔ È un prodotto per la casa (sposta in Casa)'}</option>
             </select>
           </div>
           ${editingHome ? '' : `<div class="filter-group">
@@ -4536,7 +4540,7 @@ function renderDispensa(){
             <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
             <select id="pantry-add-cat">
               <option value="">Automatica (dal nome)</option>
-              ${deptOptionsHtml('', addingHome ? 'casa' : undefined)}
+              ${deptOptionsHtml('', addingHome ? 'casa' : 'cibo')}
             </select>
           </div>
           ${addingHome ? '' : `<div class="filter-group">
@@ -4585,7 +4589,7 @@ function renderDispensa(){
               <input type="text" data-group-match="${id}" value="${escapeAttr(g.matchName)}" placeholder="Testo esatto nella ricetta">
               <select data-group-cat="${id}">
                 <option value="">Nessuna categoria suggerita</option>
-                ${deptOptionsHtml(g.cat)}
+                ${deptOptionsHtml(g.cat, 'cibo')}
               </select>
               <button type="button" class="btn is-icon color-delete" data-group-delete="${id}" aria-label="Elimina gruppo"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
             </div>`).join('')}
@@ -4597,7 +4601,7 @@ function renderDispensa(){
             <input type="text" id="new-group-match" placeholder="Testo esatto come compare nelle ricette">
             <select id="new-group-cat">
               <option value="">Nessuna categoria suggerita</option>
-              ${deptOptionsHtml('')}
+              ${deptOptionsHtml('', 'cibo')}
             </select>
             <button type="button" class="btn is-solid" id="add-group-btn">+ Aggiungi gruppo</button>
           </div>
