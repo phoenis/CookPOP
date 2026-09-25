@@ -4354,7 +4354,8 @@ function renderPrep(){
               </div>
       <button type="button" class="btn is-fixed" id="prep-search-close" aria-label="${state.filters.search ? 'Cancella ricerca' : 'Chiudi ricerca'}">✕</button>
       </div>
-      ` : `<button type="button" class="btn is-fixed${state.filters.search ? ' active' : ''}" id="prep-search-toggle" aria-label="Cerca ricetta">${SEARCH_ICON_SVG}${state.filters.search ? ' Cerca' : ''}</button>`}
+      ` : `<button type="button" class="btn is-fixed${state.filters.search ? ' active' : ''}" id="prep-search-toggle" aria-label="Cerca ricetta">${SEARCH_ICON_SVG}${state.filters.search ? ' Cerca' : ''}</button>
+      <button class="btn is-fixed" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
     </div>
   `;
 }
@@ -6006,6 +6007,10 @@ function attachHandlers(){
   if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); const el=document.getElementById('f-search'); el.focus(); el.selectionStart = el.value.length; });
   const pantrySearch = document.getElementById('pantry-search');
   if(pantrySearch) pantrySearch.addEventListener('input', e=>{ state.pantrySearch = e.target.value; render(); const el=document.getElementById('pantry-search'); el.focus(); el.selectionStart = el.value.length; });
+  // "+" di Ricette: stesso modale di "+ Aggiungi ricetta" nel menu ⋯
+  // (nascosto mentre la ricerca è aperta, come in Dispensa).
+  const prepFab = document.getElementById('prep-fab');
+  if(prepFab) prepFab.addEventListener('click', ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; render(); });
   const prepSearchToggle = document.getElementById('prep-search-toggle');
   if(prepSearchToggle) prepSearchToggle.addEventListener('click', ()=>{
     state.prepSearchOpen = true;
