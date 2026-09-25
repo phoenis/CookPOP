@@ -387,6 +387,8 @@
   .dept-list .pantry-group-row > .btn.is-icon, .dept-delete-spacer{ flex:0 0 1.875rem; width:1.875rem; }
   .dept-list{ display:flex; flex-direction:column; gap:var(--space-xsmall); }
   .dept-list .pantry-group-row{ margin-bottom:0; }
+  .pantry-group-row select.dept-type-select{ flex:0 0 auto; width:auto; }
+  .ingredient-manager-section{ margin-top:var(--space-medium); }
   /* "Gestisci" (categorie/gruppi) a destra della riga dell'etichetta, non
      subito dopo il testo. */
   .filter-group-label{ align-items:center; }

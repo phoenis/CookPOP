@@ -68,9 +68,9 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 // "Gestisci ingredienti". Come ogni reparto, la sezione compare in Dispensa/
 // Spesa solo quando contiene almeno una voce (stesso filtro presenza già
 // usato per tutti gli altri, vedi DEPT_ORDER.filter più sotto).
-const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','bibite','altro','finiti'];
-const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', bibite:'Bibite', finiti:'Finiti', altro:'Altro' };
-const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', bibite:'🥤', finiti:'🗑️', altro:'🛒' };
+const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','dispensa','surgelati','bibite','altro','pulizia','igiene','cucina-casa','altro-casa','finiti'];
+const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', bibite:'Bibite', finiti:'Finiti', altro:'Altro', pulizia:'Pulizia', igiene:'Igiene e cura', 'cucina-casa':'Cucina', 'altro-casa':'Altro' };
+const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', bibite:'🥤', finiti:'🗑️', altro:'🛒', pulizia:'🧽', igiene:'🧴', 'cucina-casa':'🧻', 'altro-casa':'📦' };
 // Categorie create dall'utente (state.customDepts, nel catalogo condiviso:
 // { id: { label, icon } }, vedi "Gestisci categorie" in Dispensa): si
 // aggiungono a quelle di base, prima di "Altro". DEPT_ORDER/LABEL/ICON sono
@@ -79,6 +79,22 @@ const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', l
 const BASE_DEPT_ORDER = DEPT_ORDER.slice();
 const BASE_DEPT_LABEL = Object.assign({}, DEPT_LABEL);
 const BASE_DEPT_ICON = Object.assign({}, DEPT_ICON);
+// Categorie "Casa" (non alimentari: detersivi, igiene, carta forno...): in
+// Dispensa stanno nella vista Casa invece che in Cibo, in Spesa vengono dopo
+// quelle alimentari, e i loro prodotti non compaiono tra i suggerimenti degli
+// ingredienti di una ricetta. Quelle di base sono fisse; una categoria creata
+// dall'utente è "Casa" se ha nonFood: true.
+const BASE_NONFOOD_DEPTS = ['pulizia','igiene','cucina-casa','altro-casa'];
+function isNonFoodDept(d){
+  if(BASE_NONFOOD_DEPTS.includes(d)) return true;
+  const custom = (typeof state !== 'undefined' && state.customDepts) || {};
+  return !BASE_DEPT_LABEL[d] && !!(custom[d] && custom[d].nonFood);
+}
+// Un ingrediente/prodotto è "di casa" se la sua categoria (scelta a mano o
+// automatica dal nome) è non alimentare.
+function isNonFoodName(name){
+  return isNonFoodDept(pantryCatFor(name) || classifyDept(name));
+}
 // Anche le categorie di base si possono rinominare o cambiare di emoji:
 // in quel caso customDepts ha una voce con lo stesso id della categoria di
 // base, che ne sovrascrive solo nome/emoji (non si possono eliminare, le
@@ -86,7 +102,9 @@ const BASE_DEPT_ICON = Object.assign({}, DEPT_ICON);
 function applyCustomDepts(){
   const custom = (typeof state !== 'undefined' && state.customDepts) || {};
   const ids = Object.keys(custom).filter(id => !BASE_DEPT_LABEL[id] && custom[id] && custom[id].label);
-  const order = BASE_DEPT_ORDER.filter(d => d !== 'altro' && d !== 'finiti').concat(ids, ['altro', 'finiti']);
+  const foodIds = ids.filter(id => !custom[id].nonFood), nonFoodIds = ids.filter(id => custom[id].nonFood);
+  const baseFood = BASE_DEPT_ORDER.filter(d => d !== 'altro' && d !== 'finiti' && !BASE_NONFOOD_DEPTS.includes(d));
+  const order = baseFood.concat(foodIds, ['altro'], BASE_NONFOOD_DEPTS, nonFoodIds, ['finiti']);
   DEPT_ORDER.length = 0;
   order.forEach(d => DEPT_ORDER.push(d));
   Object.keys(DEPT_LABEL).forEach(d=>{ if(!BASE_DEPT_LABEL[d]){ delete DEPT_LABEL[d]; delete DEPT_ICON[d]; } });
@@ -100,6 +118,12 @@ function applyCustomDepts(){
 // Categoria salvata su una voce, solo se esiste ancora (una categoria
 // personalizzata può essere stata eliminata, anche da un altro spazio):
 // altrimenti '' e si torna alla categoria automatica dal nome.
+// <option> delle categorie per un <select>, divise in "Cibo" e "Casa".
+function deptOptionsHtml(selected){
+  const opt = d => `<option value="${d}" ${selected===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`;
+  const list = DEPT_ORDER.filter(d => d !== 'finiti');
+  return `<optgroup label="Cibo">${list.filter(d => !isNonFoodDept(d)).map(opt).join('')}</optgroup><optgroup label="Casa">${list.filter(isNonFoodDept).map(opt).join('')}</optgroup>`;
+}
 function knownDept(cat){
   return cat && DEPT_LABEL[cat] && cat !== 'finiti' ? cat : '';
 }
@@ -153,6 +177,17 @@ const LUOGO_ICON = {
   giardino:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.42 39.86a12 12 0 0 0-11.28-11.28c-39.6-2.33-74.59 2.34-104 13.87C84 53.48 62.31 70.58 49.39 91.9c-17.62 29.11-17.66 64.45-.45 98.19l-17.43 17.43a12 12 0 0 0 17 17l17.43-17.43c16.74 8.54 33.88 12.85 50.45 12.85a91.3 91.3 0 0 0 47.74-13.3c21.32-12.92 38.42-34.62 49.45-62.75c11.5-29.43 16.17-64.43 13.84-104.03m-75.76 146.22C131.57 198.25 108 199.17 83.94 189l84.54-84.54a12 12 0 1 0-17-17L67 172.06c-10.14-24-9.22-47.63 3-67.72c20.91-34.53 70.54-53.72 134-52.25c1.38 63.44-17.81 113.08-52.34 133.99"></path></svg>' 
 };
 const DEPT_RULES = [
+  // Prodotti per la casa (vista Casa in Dispensa): prima di tutto il resto,
+  // perché nomi come "Sale per lavastoviglie" o "Aceto per pulizie"
+  // conterrebbero parole chiave alimentari.
+  ['lavastoviglie','pulizia'], ['per pulizie','pulizia'], ['detersiv','pulizia'], ['ammorbident','pulizia'], ['candeggin','pulizia'],
+  ['sgrassator','pulizia'], ['anticalcare','pulizia'], ['detergent','pulizia'], ['brillantant','pulizia'], ['smacchiator','pulizia'],
+  ['igienizzant','pulizia'], ['spugn','pulizia'], ['panno','pulizia'], ['sacchi spazzatura','pulizia'], ['sacchi immondizia','pulizia'],
+  ['carta igienica','igiene'], ['sapone','igiene'], ['shampoo','igiene'], ['bagnoschiuma','igiene'], ['doccia schiuma','igiene'],
+  ['dentifricio','igiene'], ['spazzolin','igiene'], ['deodorant','igiene'], ['assorbent','igiene'], ['cotton fioc','igiene'],
+  ['dischetti struccanti','igiene'], ['rasoi','igiene'], ['collutorio','igiene'], ['fazzoletti','igiene'], ['balsamo per capelli','igiene'],
+  ['carta forno','cucina-casa'], ['pellicola','cucina-casa'], ['alluminio','cucina-casa'], ['sacchetti','cucina-casa'], ['scottex','cucina-casa'],
+  ['carta assorbente','cucina-casa'], ['tovaglioli','cucina-casa'], ['stuzzicadenti','cucina-casa'], ['stuzzicaden','cucina-casa'],
   // Prima di tutto i nomi che contengono la parola chiave di un altro reparto
   // (vince la prima regola che corrisponde): "Colla di pesce" non è pesce,
   // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
@@ -853,7 +888,9 @@ function allKnownIngredientNames(){
 // (vedi resolvePantryItem) su qualsiasi formato tu abbia in Dispensa.
 function allKnownIngredientNamesWithGroups(){
   const names = caseInsensitiveNameSet();
-  allKnownIngredientNames().forEach(n=>names.add(n));
+  // Usata per gli ingredienti delle ricette: i prodotti per la casa
+  // (detersivi, igiene...) non c'entrano.
+  allKnownIngredientNames().filter(n => !isNonFoodName(n)).forEach(n=>names.add(n));
   Object.values(state.pantryGroups || {}).forEach(g=>{ if(g.label) names.add(g.label.trim()); });
   return Array.from(names.values()).sort((a,b)=>a.localeCompare(b,'it'));
 }
@@ -962,7 +999,7 @@ const state = {
   pantryGroupsModalOpen: false,
   deptsModalOpen: false, // non persistito: modale "Gestisci categorie" aperta/chiusa
   customDepts: {}, // categorie create dall'utente, condivise tra gli spazi (vedi applyCustomDepts)
-  pantryView: 'categoria', // non persistito (vedi persist()): stesso motivo di shopView
+  pantryView: 'cibo', // 'cibo' | 'casa' — non persistito (vedi persist()): stesso motivo di shopView
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
@@ -3517,7 +3554,7 @@ function renderMenu(){
               ${state.doneModalLeftoverCatPickerOpen ? `
               <div class="luogo-picker-backdrop" data-done-leftover-cat-close></div>
               <div class="luogo-picker is-category">
-                ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===state.doneModalLeftoverCat?' active':''}" data-done-leftover-cat-set="${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
+                ${DEPT_ORDER.filter(d=>d!=='finiti' && !isNonFoodDept(d)).map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===state.doneModalLeftoverCat?' active':''}" data-done-leftover-cat-set="${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
               </div>` : ''}
             </div>
             <input type="text" placeholder="es. ${escapeAttr(doneName || 'Avanzo')}" value="${escapeAttr(state.doneModalLeftover || '')}" data-done-leftover-input>
@@ -3866,11 +3903,14 @@ function renderSpesa(){
       byDept[it.dept].push(it);
     });
 
-    // Alfabetico per nome reparto, ma "Altro" resta penultimo e "Finiti" ultimo.
+    // Alfabetico per nome reparto: prima il cibo (con "Altro" in fondo), poi
+    // i prodotti per la casa (col loro "Altro" in fondo), "Finiti" ultimo.
     const deptsPresent = DEPT_ORDER.filter(dept => byDept[dept] && byDept[dept].length);
-    const sortedDepts = deptsPresent.filter(d => d !== 'altro' && d !== 'finiti')
-      .sort((a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
+    const byLabel = (a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it');
+    const sortedDepts = deptsPresent.filter(d => d !== 'altro' && d !== 'finiti' && !isNonFoodDept(d)).sort(byLabel);
     if(deptsPresent.includes('altro')) sortedDepts.push('altro');
+    sortedDepts.push(...deptsPresent.filter(d => d !== 'altro-casa' && isNonFoodDept(d)).sort(byLabel));
+    if(deptsPresent.includes('altro-casa')) sortedDepts.push('altro-casa');
     if(deptsPresent.includes('finiti')) sortedDepts.push('finiti');
     hasFinitiThisView = deptsPresent.includes('finiti');
 
@@ -4063,7 +4103,7 @@ function renderSpesa(){
             <div class="filter-group-label">Categoria (reparto in "Per reparto")</div>
             <select id="shop-add-cat">
               <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(state.addIngName || '')])})</option>
-              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${addIngCat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              ${deptOptionsHtml(addIngCat)}
             </select>
           </div>
           ${addIngIsNew ? `
@@ -4380,27 +4420,17 @@ function renderDispensa(){
     body = searchTerm
       ? `<p class="ing-empty">Nessun ingrediente trovato per "${escapeHtml(state.pantrySearch.trim())}".</p>`
       : `<p class="ing-empty">Vuota per ora — spunta qualcosa in Spesa o tocca il + per aggiungere un ingrediente.</p>`;
-  } else if(state.pantryView === 'luogo'){
-    const byLuogo = {};
-    items.forEach(it=>{ (byLuogo[it.luogo] = byLuogo[it.luogo] || []).push(it); });
-    body = LUOGO_ORDER.filter(l=>byLuogo[l] && byLuogo[l].length).map(l=>{
-      const sectionId = `luogo_${l}`;
-      const isOpen = !state.pantrySectionCollapsed[sectionId];
-      return `
-      <div class="shop-day-group">
-        <div class="shop-day-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
-          <span class="dept-icon">${LUOGO_ICON[l]}</span>${LUOGO_LABEL[l]}
-          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
-        </div>
-        <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">
-          ${byLuogo[l].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('')}
-        </div>
-      </div>`;
-    }).join('');
   } else {
+    // Vista Cibo o Casa: stesse sezioni per categoria, solo le categorie di
+    // quel tipo (vedi isNonFoodDept). Il luogo resta su ogni voce (icona a
+    // sinistra), non è più una vista a sé.
+    const wantNonFood = state.pantryView === 'casa';
     const byDept = {};
     items.forEach(it=>{ const d = knownDept(it.cat) || classifyDept(it.nome); (byDept[d] = byDept[d] || []).push(it); });
-    body = DEPT_ORDER.filter(d=>byDept[d] && byDept[d].length).map(d=>{
+    const depts = DEPT_ORDER.filter(d=>byDept[d] && byDept[d].length && isNonFoodDept(d) === wantNonFood);
+    body = !depts.length
+      ? `<p class="ing-empty">${searchTerm ? `Nessun prodotto trovato per "${escapeHtml(state.pantrySearch.trim())}" in ${wantNonFood ? 'Casa' : 'Cibo'}.` : (wantNonFood ? 'Nessun prodotto per la casa, per ora — tocca il + per aggiungerne uno (detersivi, igiene, carta forno...).' : 'Nessun alimento, per ora.')}</p>`
+      : depts.map(d=>{
       const sectionId = `cat_${d}`;
       const isOpen = !state.pantrySectionCollapsed[sectionId];
       return `
@@ -4433,7 +4463,7 @@ function renderDispensa(){
             <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
             <select id="pantry-edit-cat">
               <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(editItem.nome)])})</option>
-              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${editItem.cat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              ${deptOptionsHtml(editItem.cat)}
             </select>
           </div>
           <div class="filter-group">
@@ -4471,19 +4501,19 @@ function renderDispensa(){
     <div class="filters-modal-backdrop" data-close-pantry-add-modal>
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
-          <h3>Aggiungi ingrediente</h3>
+          <h3>${state.pantryView === 'casa' ? 'Aggiungi prodotto' : 'Aggiungi ingrediente'}</h3>
           <button class="btn is-icon filters-close-btn" data-close-pantry-add-modal>✕</button>
         </div>
         <div class="filter-groups">
           <div class="filter-group">
             <div class="filter-group-label">Ingrediente</div>
-            <input type="text" id="pantry-add-name" placeholder="Nuovo ingrediente">
+            <input type="text" id="pantry-add-name" placeholder="${state.pantryView === 'casa' ? 'Es. Detersivo piatti' : 'Nuovo ingrediente'}">
           </div>
           <div class="filter-group">
             <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
             <select id="pantry-add-cat">
               <option value="">Automatica (dal nome)</option>
-              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              ${deptOptionsHtml('')}
             </select>
           </div>
           <div class="filter-group">
@@ -4532,7 +4562,7 @@ function renderDispensa(){
               <input type="text" data-group-match="${id}" value="${escapeAttr(g.matchName)}" placeholder="Testo esatto nella ricetta">
               <select data-group-cat="${id}">
                 <option value="">Nessuna categoria suggerita</option>
-                ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}" ${g.cat===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+                ${deptOptionsHtml(g.cat)}
               </select>
               <button type="button" class="btn is-icon color-delete" data-group-delete="${id}" aria-label="Elimina gruppo"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
             </div>`).join('')}
@@ -4544,7 +4574,7 @@ function renderDispensa(){
             <input type="text" id="new-group-match" placeholder="Testo esatto come compare nelle ricette">
             <select id="new-group-cat">
               <option value="">Nessuna categoria suggerita</option>
-              ${DEPT_ORDER.filter(d=>d!=='finiti').map(d=>`<option value="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`).join('')}
+              ${deptOptionsHtml('')}
             </select>
             <button type="button" class="btn is-solid" id="add-group-btn">+ Aggiungi gruppo</button>
           </div>
@@ -4559,7 +4589,18 @@ function renderDispensa(){
   // create dall'utente si rinominano, cambiano emoji o si eliminano — stesso
   // schema di "Gestisci gruppi". Condivise tra gli spazi (state.customDepts).
   // In ordine alfabetico (non in quello dei reparti): qui si cercano per nome.
-  const editableDeptIds = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=>DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
+  // In ordine alfabetico (non in quello dei reparti): qui si cercano per nome.
+  // Divise in Cibo e Casa; quelle create dall'utente possono cambiare tipo.
+  const sortedDepts = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=>DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
+  const deptRowHtml = id=>`
+            <div class="pantry-group-row">
+              <input type="text" class="dept-icon-input" data-dept-icon="${escapeAttr(id)}" value="${escapeAttr(DEPT_ICON[id] || '')}" placeholder="🏷️" aria-label="Emoji">
+              <input type="text" data-dept-label="${escapeAttr(id)}" value="${escapeAttr(DEPT_LABEL[id])}" placeholder="${escapeAttr(BASE_DEPT_LABEL[id] || 'Nome della categoria')}">
+              ${BASE_DEPT_LABEL[id] ? '' : `<select class="dept-type-select" data-dept-type="${escapeAttr(id)}" aria-label="Tipo"><option value="cibo" ${isNonFoodDept(id)?'':'selected'}>Cibo</option><option value="casa" ${isNonFoodDept(id)?'selected':''}>Casa</option></select>`}
+              ${BASE_DEPT_LABEL[id]
+                ? `<span class="dept-delete-spacer" aria-hidden="true"></span>`
+                : `<button type="button" class="btn is-icon color-delete" data-dept-delete="${escapeAttr(id)}" aria-label="Elimina categoria"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>`}
+            </div>`;
   const deptsModal = state.deptsModalOpen ? `
     <div class="filters-modal-backdrop" data-close-depts>
       <div class="filters-modal" data-stop-close>
@@ -4567,17 +4608,15 @@ function renderDispensa(){
           <h3>Gestisci categorie</h3>
           <button class="btn is-icon filters-close-btn" data-close-depts>✕</button>
         </div>
-        <p class="section-sub">Le categorie sono i reparti di Spesa e le sezioni di Dispensa. Tutte si possono rinominare o cambiare di emoji; quelle create da te si possono anche eliminare, e compaiono prima di "Altro".</p>
+        <p class="section-sub">Le categorie sono i reparti di Spesa e le sezioni di Dispensa, divise in Cibo e Casa (prodotti non alimentari). Tutte si possono rinominare o cambiare di emoji; quelle create da te si possono anche spostare tra Cibo e Casa o eliminare.</p>
         <div class="filter-groups">
-          <div class="dept-list">
-          ${editableDeptIds.map(id=>`
-            <div class="pantry-group-row">
-              <input type="text" class="dept-icon-input" data-dept-icon="${escapeAttr(id)}" value="${escapeAttr(DEPT_ICON[id] || '')}" placeholder="🏷️" aria-label="Emoji">
-              <input type="text" data-dept-label="${escapeAttr(id)}" value="${escapeAttr(DEPT_LABEL[id])}" placeholder="${escapeAttr(BASE_DEPT_LABEL[id] || 'Nome della categoria')}">
-              ${BASE_DEPT_LABEL[id]
-                ? `<span class="dept-delete-spacer" aria-hidden="true"></span>`
-                : `<button type="button" class="btn is-icon color-delete" data-dept-delete="${escapeAttr(id)}" aria-label="Elimina categoria"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>`}
-            </div>`).join('')}
+          <div class="filter-group">
+            <div class="filter-group-label">Cibo</div>
+            <div class="dept-list">${sortedDepts.filter(d => !isNonFoodDept(d)).map(deptRowHtml).join('')}</div>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Casa</div>
+            <div class="dept-list">${sortedDepts.filter(isNonFoodDept).map(deptRowHtml).join('')}</div>
           </div>
         </div>
         <div class="filter-groups">
@@ -4585,7 +4624,8 @@ function renderDispensa(){
             <div class="filter-group-label">Nuova categoria</div>
             <div class="pantry-group-row">
               <input type="text" class="dept-icon-input" id="new-dept-icon" placeholder="🏷️" aria-label="Emoji">
-              <input type="text" id="new-dept-label" placeholder="Nome (es. Prodotti per la casa)">
+              <input type="text" id="new-dept-label" placeholder="Nome (es. Animali)">
+              <select class="dept-type-select" id="new-dept-type" aria-label="Tipo"><option value="cibo" ${state.pantryView === 'casa' ? '' : 'selected'}>Cibo</option><option value="casa" ${state.pantryView === 'casa' ? 'selected' : ''}>Casa</option></select>
             </div>
             <button type="button" class="btn is-solid" id="add-dept-btn">+ Aggiungi categoria</button>
           </div>
@@ -4607,7 +4647,7 @@ function renderDispensa(){
   const ingredientManagerModal = state.ingredientManagerOpen ? (()=>{
     const search = (state.ingredientManagerSearch||'').trim().toLowerCase();
     const names = allIngredientNamesForManager().filter(n => !search || n.toLowerCase().includes(search));
-    const rows = names.map(name=>{
+    const rowHtml = name=>{
       const key = name.trim().toLowerCase();
       const it = state.pantryItems[key];
       const cat = knownDept(it && it.cat) || classifyDept(name);
@@ -4620,7 +4660,12 @@ function renderDispensa(){
         <span class="ingredient-manager-name">${escapeHtml(name)}</span>
         <span class="ingredient-manager-status">${escapeHtml(statusText)}</span>
       </button>`;
-    }).join('');
+    };
+    // I prodotti per la casa (categoria non alimentare) in una sezione a sé,
+    // dopo gli ingredienti: non si mescolano col cibo.
+    const foodNames = names.filter(n => !isNonFoodName(n));
+    const homeNames = names.filter(n => isNonFoodName(n));
+    const rows = foodNames.map(rowHtml).join('') + (homeNames.length ? `<div class="filter-group-label ingredient-manager-section">Casa</div>${homeNames.map(rowHtml).join('')}` : '');
     return `
     <div class="filters-modal-backdrop" data-close-ingredient-manager>
       <div class="filters-modal" data-stop-close>
@@ -4664,8 +4709,8 @@ function renderDispensa(){
   return `
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
     <div class="view-toggle">
-      <button class="view-btn ${state.pantryView!=='luogo'?'active':''}" data-pantry-view="categoria">Per categoria</button>
-      <button class="view-btn ${state.pantryView==='luogo'?'active':''}" data-pantry-view="luogo">Per luogo</button>
+      <button class="view-btn ${state.pantryView!=='casa'?'active':''}" data-pantry-view="cibo">Cibo</button>
+      <button class="view-btn ${state.pantryView==='casa'?'active':''}" data-pantry-view="casa">Casa</button>
       
     </div>
     ${body}
@@ -4676,7 +4721,7 @@ function renderDispensa(){
     ${deptsModal}
     ${ingredientManagerModal}
     <div class="buttons-fixed">
-      <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith(state.pantryView === 'luogo' ? 'luogo_' : 'cat_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
+      <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith('cat_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
       <div class="search_wrapper">
         ${state.pantrySearchOpen ? `<div class="input_wrapper"><input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}"></div>` : ''}
         ${state.pantrySearchOpen
@@ -6238,7 +6283,11 @@ function attachHandlers(){
     const unitSelect = document.getElementById('pantry-add-unit');
     const doAdd = ()=>{
       if(!nameInput.value.trim()) return;
-      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, unitSelect ? unitSelect.value : '', catSelect ? catSelect.value : '', groupSelect ? groupSelect.value : '');
+      // Dalla vista Casa, un prodotto che la categoria automatica non
+      // riconosce come "di casa" finisce in Casa › Altro invece che nel cibo.
+      let cat = catSelect ? catSelect.value : '';
+      if(!cat && state.pantryView === 'casa' && !isNonFoodDept(classifyDept(nameInput.value))) cat = 'altro-casa';
+      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, unitSelect ? unitSelect.value : '', cat, groupSelect ? groupSelect.value : '');
       state.pantryAddModalOpen = false;
       persist(); render();
     };
@@ -6398,6 +6447,14 @@ function attachHandlers(){
       persist(); render();
     });
   });
+  document.querySelectorAll('[data-dept-type]').forEach(sel=>{
+    sel.addEventListener('change', e=>{
+      const d = state.customDepts[e.currentTarget.dataset.deptType];
+      if(!d) return;
+      if(e.currentTarget.value === 'casa') d.nonFood = true; else delete d.nonFood;
+      persist(); render();
+    });
+  });
   document.querySelectorAll('[data-dept-delete]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const id = e.currentTarget.dataset.deptDelete;
@@ -6422,7 +6479,8 @@ function attachHandlers(){
       const slug = 'c-' + (label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,'') || 'categoria');
       let id = slug, n = 2;
       while(state.customDepts[id]) id = `${slug}-${n++}`;
-      state.customDepts[id] = { label, icon: iconInput.value.trim() || '🏷️' };
+      const typeSelect = document.getElementById('new-dept-type');
+      state.customDepts[id] = Object.assign({ label, icon: iconInput.value.trim() || '🏷️' }, typeSelect && typeSelect.value === 'casa' ? { nonFood: true } : {});
       persist(); render();
     });
   }
@@ -6593,7 +6651,7 @@ function goToTab(delta){
       state.shopView = state.shopView === 'reparto' ? 'giorno' : 'reparto';
       render();
     } else if(state.tab === 'dispensa'){
-      state.pantryView = state.pantryView === 'luogo' ? 'categoria' : 'luogo';
+      state.pantryView = state.pantryView === 'casa' ? 'cibo' : 'casa';
       render();
     }
   }, { passive: true });
