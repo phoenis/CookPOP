@@ -2478,13 +2478,14 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
-  version: '2026-09-08',
+  version: '2026-09-25',
   title: 'Novità',
   items: [
-    'Il tasto "Annulla" ora compare anche spuntando in Modalità spesa, con Elimina/Svuota/Sposta in dispensa, generando o rigenerando il menù, eliminando una ricetta o una settimana, e cambiando la ricetta di un pasto.',
-    'Nuovo campo di ricerca in Dispensa.',
-    '48 ricette nuove nel catalogo, con procedimento e fonte — comprese le prime ricette dolci (Tiramisù, panna cotta, torta di mele).',
-    'Sistemata la tipologia di piatto (primo/secondo/contorno/ecc.) su tutte le ricette esistenti.'
+    'In Dispensa ora c\'è anche la sezione "Casa"! Accanto a "Cibo" trovi detersivi, igiene, carta forno e tutto ciò che non si mangia, divisi in Pulizia, Igiene e cura, Cucina e Altro. Finiscono in lista spesa come il resto, dopo il cibo.',
+    'Nuovo pulsante + in Dispensa e in Ricette per aggiungere al volo.',
+    'Categorie personalizzabili: da "Gestisci categorie" puoi crearne di nuove, rinominarle e cambiare emoji.',
+    'Ingredienti riordinati: doppioni unificati, nuovi gruppi (Farina, Formaggio grattugiato, Olive…) e quasi nulla più in "Altro".',
+    'Ricette in ordine alfabetico, e tante piccole correzioni: modalità scura, quantità in lista spesa, avanzi finiti, spunte che non partono più da sole.'
   ]
 };
 function renderWhatsNewModal(){
