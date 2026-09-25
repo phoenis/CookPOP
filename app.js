@@ -240,13 +240,6 @@ const DEPT_RULES = [
   ['pinoli','dispensa'], ['noci','dispensa'], ['mandorle','dispensa'], ['uvetta','dispensa'], ['marmellat','dispensa'],
   ['acqua','bibite'], ['bibit','bibite'], ['birra','bibite'], ['succo di frutta','bibite'], ['tè freddo','bibite'],
 ];
-// "Di solito li hai già" non è più un flag manuale: un ingrediente parte già
-// spuntato in Spesa quando in Dispensa ce n'è davvero scorta (vedi
-// hasPantryStock/isStapleConfirmed) — niente più bandierina indipendente da
-// aggiornare a mano, la quantità reale è l'unica fonte di verità.
-function isStaple(ingrediente){
-  return hasPantryStock(ingrediente);
-}
 
 // Un nome ingrediente tipo "Scalogno o cipolla" o "Pasta corta (ditalini o
 // mista)" descrive alternative intercambiabili: genera, dal più specifico al
@@ -485,19 +478,6 @@ function pantryStatusFor(ingrediente, neededQtaText){
   return have.value >= needComparable.value ? 'in-casa' : 'poco';
 }
 
-// Un basilare può comparire con più chiavi (una per occorrenza/giorno in Per
-// giorno, unite in una sola riga in Per reparto quando la quantità coincide):
-// senza questa riconciliazione, spuntarne una in Per giorno e lasciarne
-// un'altra intonsa faceva risultare la riga unita "non spuntata" in Per
-// reparto pur avendone spuntata almeno una — le due viste devono concordare
-// sullo stesso fatto (ce l'hai o no), non dipendere da come sono raggruppate.
-// Un "de-spuntato" esplicito (l'hai tolto perché in realtà manca) vince su uno
-// "spuntato" esplicito altrove, che a sua volta vince sul solo dato di Dispensa.
-function isStapleConfirmed(it){
-  if(it.keys.some(k => state.shopChecked[k] === false)) return false;
-  if(it.keys.some(k => state.shopChecked[k] === true)) return true;
-  return hasPantryStock(it.ingrediente);
-}
 
 // Estrae il numero di porzioni base da un testo tipo "3 porzioni" o
 // "4 porzioni (base per più pasti)": null se non parsabile (nessuno scaling).
@@ -3780,18 +3760,17 @@ function buildShopFlat(){
 
 function renderSpesa(){
   // Chi ha già scorta sufficiente in Dispensa non compare proprio qui (vedi
-  // buildShopFlat) — se serve comunque, si riaggiunge a mano con "+ ingrediente
-  // extra". isStaple/isStapleConfirmed restano solo per il raro caso di una
-  // riga con scorta che l'utente aveva già de-spuntato esplicitamente prima
-  // di questo comportamento: quella resta visibile, coerente con la scelta fatta allora.
+  // buildShopFlat) — se serve comunque, si riaggiunge a mano con "+". Una
+  // riga è spuntata solo se l'hai spuntata tu: niente più spunta automatica
+  // "ce l'hai già" in base alla Dispensa (faceva partire già spuntato un
+  // ingrediente aggiunto a mano proprio perché serviva comunque).
   const mainFlat = buildShopFlat();
 
   // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
   // quantità testuale) in Per reparto: se ne hai spuntata una qualsiasi in
   // Per giorno, la riga unita deve leggersi spuntata anche qui — un de-spuntato
   // esplicito vince comunque, per non perdere di vista quello che manca ancora.
-  function isItemChecked(keys, ingrediente){
-    if(isStaple(ingrediente)) return isStapleConfirmed({keys, ingrediente});
+  function isItemChecked(keys){
     if(keys.some(k=>state.shopChecked[k] === false)) return false;
     if(keys.some(k=>state.shopChecked[k] === true)) return true;
     return false;
@@ -5060,16 +5039,14 @@ function attachHandlers(){
   });
   const resetBtn = document.getElementById('reset-shop');
   // Solo le spunte: azzerare anche gli eliminati farebbe ricomparire tutto
-  // quello che avevi tolto con "Elimina" (spesso già spuntato di default se
-  // basilare), gonfiando il conteggio invece di limitarsi a deselezionare.
-  // "Falso" esplicito e non solo cancellato: un basilare che hai in Dispensa,
-  // se solo cancellato, tornerebbe subito spuntato da solo (vedi
-  // isStapleConfirmed) — "Svuota spunte" deve fare una cosa sola e precisa,
-  // niente eccezioni per i basilari.
+  // quello che avevi tolto con "Elimina", gonfiando il conteggio invece di
+  // limitarsi a deselezionare. Le spunte si cancellano, non si mettono a
+  // "falso": per un ingrediente di ricetta il falso esplicito vuol dire "mi
+  // serve comunque" e lo farebbe restare in lista anche se ce l'hai.
   if(resetBtn) resetBtn.addEventListener('click', ()=>{
     const items = buildShopFlat();
     const prevChecked = items.map(it => state.shopChecked[it.key]);
-    items.forEach(it => { state.shopChecked[it.key] = false; });
+    items.forEach(it => { if(state.shopChecked[it.key] === true) delete state.shopChecked[it.key]; });
     persist(); render();
     showUndoToast('Spunte azzerate', ()=>{
       items.forEach((it, idx)=>{
