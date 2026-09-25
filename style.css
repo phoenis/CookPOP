@@ -381,8 +381,17 @@
   .pantry-group-row{ display:flex; gap:var(--space-xsmall); align-items:center; margin-bottom:var(--space-small); }
   .pantry-group-row input[type=text]{ flex:1; min-width:0; }
   .pantry-group-row select{ flex:1; min-width:0; }
-  .filter-group select{ width:100%; font-family:var(--font-family); font-size:var(--text-body); padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:var(--border) solid var(--line); background:var(--form-background); }
-  .filter-group input{ font-family: var(--font-family); font-size: var(--text-body); flex:1; padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:var(--border) solid var(--line); background:var(--form-background); }
+  .pantry-group-row input.dept-icon-input{ flex:0 0 3.25rem; text-align:center; }
+  /* Gestisci gruppi: nome e testo della ricetta sulla prima riga, categoria
+     suggerita e cestino sotto — tre campi su una riga sola erano illeggibili
+     su telefono. */
+  .pantry-group-row.is-group{ flex-wrap:wrap; padding-bottom:var(--space-small); border-bottom:var(--border) dashed var(--line); }
+  .pantry-group-row.is-group input[type=text]{ flex:1 1 calc(50% - var(--space-xsmall)); }
+  .pantry-group-row.is-group select{ flex:1 1 auto; width:auto; }
+  .dept-base-list{ display:flex; flex-wrap:wrap; gap:var(--space-xxsmall) var(--space-xsmall); }
+  .dept-base-chip{ font-size:var(--text-small); color:var(--ink-light); background:var(--surface-2); border-radius:var(--radius-pill); padding:0.125rem var(--space-xsmall); }
+  .filter-group select, .pantry-group-row select{ width:100%; font-family:var(--font-family); font-size:var(--text-body); padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:var(--border) solid var(--line); background:var(--form-background); }
+  .filter-group input, .pantry-group-row input{ font-family: var(--font-family); font-size: var(--text-body); flex:1; padding:var(--space-xsmall) var(--space-xsmall); border-radius:var(--form-border-radius); border:var(--border) solid var(--line); background:var(--form-background); }
   .add-ing-combo{ position:relative; }
   .add-ing-combo input{ width:100%; }
   .edit-ing-row .add-ing-combo{ flex:1.6; min-width:0; }
