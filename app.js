@@ -4728,6 +4728,7 @@ function renderDispensa(){
             ? `<button type="button" class="btn is-fixed" id="pantry-search-close" aria-label="${state.pantrySearch ? 'Cancella ricerca' : 'Chiudi ricerca'}">✕</button>`
             : `<button type="button" class="btn is-fixed${state.pantrySearch ? ' active' : ''}" id="pantry-search-toggle" aria-label="Cerca in Dispensa">${SEARCH_ICON_SVG}</button>`}
       </div>
+      ${state.pantrySearchOpen ? '' : `<button class="btn is-fixed" id="pantry-fab" type="button" aria-label="${state.pantryView === 'casa' ? 'Aggiungi prodotto' : 'Aggiungi ingrediente'}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
     </div>
     ${selectionBar}
   `;
@@ -6031,6 +6032,10 @@ function attachHandlers(){
     state.prepSearchOpen = false;
     render();
   });
+  // "+" di Dispensa: stesso modale di "+ Aggiungi ingrediente" nel menu ⋯
+  // (titolo/categoria di ripiego seguono la vista Cibo/Casa aperta).
+  const pantryFab = document.getElementById('pantry-fab');
+  if(pantryFab) pantryFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
   const pantrySearchToggle = document.getElementById('pantry-search-toggle');
   if(pantrySearchToggle) pantrySearchToggle.addEventListener('click', ()=>{
     state.pantrySearchOpen = true;
@@ -6288,6 +6293,10 @@ function attachHandlers(){
       let cat = catSelect ? catSelect.value : '';
       if(!cat && state.pantryView === 'casa' && !isNonFoodDept(classifyDept(nameInput.value))) cat = 'altro-casa';
       upsertPantryItem(nameInput.value, luogoSelect.value, undefined, unitSelect ? unitSelect.value : '', cat, groupSelect ? groupSelect.value : '');
+      // Se è finito nell'altra vista (es. "Detersivo" aggiunto da Cibo), ci
+      // si sposta lì: altrimenti sembrerebbe non essere stato aggiunto.
+      const addedIsHome = isNonFoodDept(knownDept(cat) || classifyDept(nameInput.value));
+      state.pantryView = addedIsHome ? 'casa' : 'cibo';
       state.pantryAddModalOpen = false;
       persist(); render();
     };
