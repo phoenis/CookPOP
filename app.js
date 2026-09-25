@@ -995,7 +995,8 @@ const state = {
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   prepSearchOpen: false, // non persistito: campo di ricerca ricette (Prep) visibile o ridotto a icona
   pantrySearchOpen: false, // non persistito: campo di ricerca Dispensa visibile o ridotto a icona
-  whatsNewSeen: null, // ultima WHATS_NEW.version già chiusa dall'utente (vedi renderWhatsNewModal)
+  whatsNewSeen: null, // vecchio: una sola "già vista" per tutto lo spazio — non più usato, vedi whatsNewSeenBy
+  whatsNewSeenBy: {}, // { persona: ultima WHATS_NEW.version chiusa } — per persona, non per spazio (vedi renderWhatsNewModal)
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
@@ -1429,7 +1430,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors'];
+const PERSONAL_DICT_FIELDS = ['whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -1595,7 +1596,8 @@ function buildPersonalPayload(){
     pantryNamesCurated2: state.pantryNamesCurated2,
     pantryGroupMigrated3: state.pantryGroupMigrated3,
     shopKeysByName1: state.shopKeysByName1,
-    whatsNewSeen: state.whatsNewSeen
+    whatsNewSeen: state.whatsNewSeen,
+    whatsNewSeenBy: state.whatsNewSeenBy
   };
 }
 // Catalogo condiviso (CATALOG_FIELDS): stessa forma per tutti gli spazi, su un
@@ -2472,9 +2474,9 @@ const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'
 const CLEAR_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6 6 18M6 6l12 12"></path></svg>';
 const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></g></svg>';
 
-// Modale "Novità": compare una volta sola al prossimo caricamento (su tutti i
-// dispositivi, lo stato è condiviso) quando `version` è diversa da
-// state.whatsNewSeen, poi resta chiusa finché non si cambia di nuovo
+// Modale "Novità": compare una volta sola per persona al prossimo caricamento
+// (su tutti i suoi dispositivi) quando `version` è diversa da quella che ha
+// già chiuso (state.whatsNewSeenBy), poi resta chiusa finché non si cambia di nuovo
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
@@ -2486,8 +2488,24 @@ const WHATS_NEW = {
     'Ricette in ordine alfabetico, e tante piccole correzioni: modalità scura, quantità in lista spesa, avanzi finiti, spunte che non partono più da sole.'
   ]
 };
+// Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
+// stesso spazio: prima, se la chiudeva uno, non compariva più all'altro).
+function whatsNewViewerKey(){
+  const u = getCurrentUser();
+  if(u) return u;
+  const name = (loggedInEmail || '').split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+  return name || 'me';
+}
+function hasSeenWhatsNew(){
+  return !WHATS_NEW || (state.whatsNewSeenBy || {})[whatsNewViewerKey()] === WHATS_NEW.version;
+}
+function markWhatsNewSeen(){
+  if(!WHATS_NEW) return;
+  if(!state.whatsNewSeenBy) state.whatsNewSeenBy = {};
+  state.whatsNewSeenBy[whatsNewViewerKey()] = WHATS_NEW.version;
+}
 function renderWhatsNewModal(){
-  if(!WHATS_NEW || state.whatsNewSeen === WHATS_NEW.version) return '';
+  if(hasSeenWhatsNew()) return '';
   return `
   <div class="filters-modal-backdrop" data-close-whats-new>
     <div class="filters-modal" data-stop-close>
@@ -2575,7 +2593,7 @@ const MODAL_CHECKS = [
   [()=> !!state.expandedDay, ()=>{ state.expandedDay = null; }],
   [()=> isSettingsBackdropOpen(), ()=> closeSettingsBackdrop()],
   [()=> isTopbarMenuOpen(), ()=> closeTopbarMenu()],
-  [()=> !!(WHATS_NEW && state.whatsNewSeen !== WHATS_NEW.version), ()=>{ if(WHATS_NEW) state.whatsNewSeen = WHATS_NEW.version; persist(); }],
+  [()=> !hasSeenWhatsNew(), ()=>{ markWhatsNewSeen(); persist(); }],
 ];
 function countOpenModals(){
   return MODAL_CHECKS.reduce((n, [isOpen])=> n + (isOpen() ? 1 : 0), 0);
@@ -5036,7 +5054,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-close-whats-new]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(e.target.hasAttribute('data-stop-close')) return;
-      if(WHATS_NEW) state.whatsNewSeen = WHATS_NEW.version;
+      markWhatsNewSeen();
       persist(); render();
     });
   });
