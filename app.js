@@ -119,10 +119,20 @@ function applyCustomDepts(){
 // personalizzata può essere stata eliminata, anche da un altro spazio):
 // altrimenti '' e si torna alla categoria automatica dal nome.
 // <option> delle categorie per un <select>, divise in "Cibo" e "Casa".
-function deptOptionsHtml(selected){
+// only: 'casa' per le sole categorie non alimentari (form di un prodotto).
+function deptOptionsHtml(selected, only){
   const opt = d => `<option value="${d}" ${selected===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`;
   const list = DEPT_ORDER.filter(d => d !== 'finiti');
+  if(only === 'casa') return list.filter(isNonFoodDept).map(opt).join('');
   return `<optgroup label="Cibo">${list.filter(d => !isNonFoodDept(d)).map(opt).join('')}</optgroup><optgroup label="Casa">${list.filter(isNonFoodDept).map(opt).join('')}</optgroup>`;
+}
+// Unità per un prodotto di casa: solo conteggio generico o presenza/assenza
+// (grammi/litri non servono, nessuna ricetta li confronta). L'unità già
+// impostata, se diversa, resta tra le opzioni per non perderla in silenzio.
+const HOME_UNITS = ['', 'none'];
+function homeUnitOptionsHtml(selected){
+  const units = HOME_UNITS.concat(selected && !HOME_UNITS.includes(selected) ? [selected] : []);
+  return units.map(u=>`<option value="${u}" ${(selected||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('');
 }
 function knownDept(cat){
   return cat && DEPT_LABEL[cat] && cat !== 'finiti' ? cat : '';
@@ -4447,11 +4457,15 @@ function renderDispensa(){
   }
 
   const editItem = state.pantryEditKey ? state.pantryItems[state.pantryEditKey] : null;
+  // Prodotto di casa: niente gruppo e solo unità pezzi/"Non mostrare", come
+  // in "Aggiungi prodotto"; la categoria invece resta sceglibile tra tutte,
+  // per poter riportare nel cibo un ingrediente riconosciuto male.
+  const editingHome = !!editItem && isNonFoodDept(knownDept(editItem.cat) || classifyDept(editItem.nome));
   const editModal = editItem ? `
     <div class="filters-modal-backdrop" data-close-pantry-edit>
       <div class="filters-modal" data-stop-close>
         <div class="filters-modal-header">
-          <h3>Modifica ingrediente</h3>
+          <h3>${editingHome ? 'Modifica prodotto' : 'Modifica ingrediente'}</h3>
           <button class="btn is-icon filters-close-btn" data-close-pantry-edit>✕</button>
         </div>
         <div class="filter-groups">
@@ -4466,13 +4480,13 @@ function renderDispensa(){
               ${deptOptionsHtml(editItem.cat)}
             </select>
           </div>
-          <div class="filter-group">
+          ${editingHome ? '' : `<div class="filter-group">
             <div class="filter-group-label">Gruppo (es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
             <select id="pantry-edit-group">
               <option value="">Nessuno</option>
               ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${editItem.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}
             </select>
-          </div>
+          </div>`}
           <div class="filter-group">
             <div class="filter-group-label">Luogo</div>
             <select id="pantry-edit-luogo">
@@ -4484,9 +4498,9 @@ function renderDispensa(){
             <input type="number" min="0" step="${qtyStepFor(editItem.unit)}" id="pantry-edit-qty" value="${editItem.qty}">
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
+            <div class="filter-group-label">${editingHome ? 'Unità' : 'Unità (per confrontare con quanto serve in ricetta)'}</div>
             <select id="pantry-edit-unit">
-              ${UNIT_ORDER.map(u=>`<option value="${u}" ${(editItem.unit||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
+              ${editingHome ? homeUnitOptionsHtml(editItem.unit) : UNIT_ORDER.map(u=>`<option value="${u}" ${(editItem.unit||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -4497,6 +4511,10 @@ function renderDispensa(){
       </div>
     </div>` : '';
 
+  // Dalla vista Casa si aggiunge un prodotto, non un ingrediente: solo
+  // categorie Casa, niente gruppo (servono alle ricette), unità solo
+  // pezzi/generico o "Non mostrare".
+  const addingHome = state.pantryView === 'casa';
   const addModal = state.pantryAddModalOpen ? `
     <div class="filters-modal-backdrop" data-close-pantry-add-modal>
       <div class="filters-modal" data-stop-close>
@@ -4506,23 +4524,23 @@ function renderDispensa(){
         </div>
         <div class="filter-groups">
           <div class="filter-group">
-            <div class="filter-group-label">Ingrediente</div>
+            <div class="filter-group-label">${addingHome ? 'Prodotto' : 'Ingrediente'}</div>
             <input type="text" id="pantry-add-name" placeholder="${state.pantryView === 'casa' ? 'Es. Detersivo piatti' : 'Nuovo ingrediente'}">
           </div>
           <div class="filter-group">
             <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
             <select id="pantry-add-cat">
               <option value="">Automatica (dal nome)</option>
-              ${deptOptionsHtml('')}
+              ${deptOptionsHtml('', addingHome ? 'casa' : undefined)}
             </select>
           </div>
-          <div class="filter-group">
+          ${addingHome ? '' : `<div class="filter-group">
             <div class="filter-group-label">Gruppo (es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
             <select id="pantry-add-group">
               <option value="">Nessuno</option>
               ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}">${escapeHtml(g.label)}</option>`).join('')}
             </select>
-          </div>
+          </div>`}
           <div class="filter-group">
             <div class="filter-group-label">Luogo</div>
             <select id="pantry-add-luogo">
@@ -4530,9 +4548,9 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Unità (per confrontare con quanto serve in ricetta)</div>
+            <div class="filter-group-label">${addingHome ? 'Unità' : 'Unità (per confrontare con quanto serve in ricetta)'}</div>
             <select id="pantry-add-unit">
-              ${UNIT_ORDER.map(u=>`<option value="${u}">${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
+              ${addingHome ? homeUnitOptionsHtml('') : UNIT_ORDER.map(u=>`<option value="${u}">${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
             </select>
           </div>
         </div>
