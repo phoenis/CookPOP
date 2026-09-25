@@ -79,6 +79,10 @@ const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', l
 const BASE_DEPT_ORDER = DEPT_ORDER.slice();
 const BASE_DEPT_LABEL = Object.assign({}, DEPT_LABEL);
 const BASE_DEPT_ICON = Object.assign({}, DEPT_ICON);
+// Anche le categorie di base si possono rinominare o cambiare di emoji:
+// in quel caso customDepts ha una voce con lo stesso id della categoria di
+// base, che ne sovrascrive solo nome/emoji (non si possono eliminare, le
+// regole automatiche e il resto dell'app contano su di loro).
 function applyCustomDepts(){
   const custom = (typeof state !== 'undefined' && state.customDepts) || {};
   const ids = Object.keys(custom).filter(id => !BASE_DEPT_LABEL[id] && custom[id] && custom[id].label);
@@ -86,6 +90,11 @@ function applyCustomDepts(){
   DEPT_ORDER.length = 0;
   order.forEach(d => DEPT_ORDER.push(d));
   Object.keys(DEPT_LABEL).forEach(d=>{ if(!BASE_DEPT_LABEL[d]){ delete DEPT_LABEL[d]; delete DEPT_ICON[d]; } });
+  Object.keys(BASE_DEPT_LABEL).forEach(d=>{
+    const o = custom[d];
+    DEPT_LABEL[d] = (o && o.label) || BASE_DEPT_LABEL[d];
+    DEPT_ICON[d] = (o && o.icon) || BASE_DEPT_ICON[d];
+  });
   ids.forEach(id=>{ DEPT_LABEL[id] = custom[id].label; DEPT_ICON[id] = custom[id].icon || '🏷️'; });
 }
 // Categoria salvata su una voce, solo se esiste ancora (una categoria
@@ -4059,7 +4068,7 @@ function renderSpesa(){
           </div>
           ${addIngIsNew ? `
           <div class="filter-group">
-            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta)</div>
+            <div class="filter-group-label">Gruppo (es. un formato di pasta)</div>
             <select id="shop-add-group">
               <option value="">Nessuno</option>
               ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${addIngDraft.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}
@@ -4428,7 +4437,7 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
+            <div class="filter-group-label">Gruppo (es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
             <select id="pantry-edit-group">
               <option value="">Nessuno</option>
               ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${editItem.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}
@@ -4478,7 +4487,7 @@ function renderDispensa(){
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Gruppo (facoltativo — es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
+            <div class="filter-group-label">Gruppo (es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
             <select id="pantry-add-group">
               <option value="">Nessuno</option>
               ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}">${escapeHtml(g.label)}</option>`).join('')}
@@ -4549,7 +4558,7 @@ function renderDispensa(){
   // Gestione categorie: quelle di base sono fisse (solo mostrate), quelle
   // create dall'utente si rinominano, cambiano emoji o si eliminano — stesso
   // schema di "Gestisci gruppi". Condivise tra gli spazi (state.customDepts).
-  const customDeptIds = Object.keys(state.customDepts || {}).filter(id => DEPT_LABEL[id] && !BASE_DEPT_LABEL[id]);
+  const editableDeptIds = DEPT_ORDER.filter(d => d !== 'finiti');
   const deptsModal = state.deptsModalOpen ? `
     <div class="filters-modal-backdrop" data-close-depts>
       <div class="filters-modal" data-stop-close>
@@ -4557,14 +4566,16 @@ function renderDispensa(){
           <h3>Gestisci categorie</h3>
           <button class="btn is-icon filters-close-btn" data-close-depts>✕</button>
         </div>
-        <p class="section-sub">Le categorie sono i reparti di Spesa e le sezioni di Dispensa. Quelle nuove compaiono prima di "Altro"; per metterci un ingrediente sceglila nel suo campo Categoria.</p>
+        <p class="section-sub">Le categorie sono i reparti di Spesa e le sezioni di Dispensa. Tutte si possono rinominare o cambiare di emoji; quelle create da te si possono anche eliminare, e compaiono prima di "Altro".</p>
         <div class="filter-groups">
-          ${customDeptIds.length ? customDeptIds.map(id=>`
+          ${editableDeptIds.map(id=>`
             <div class="pantry-group-row">
-              <input type="text" class="dept-icon-input" data-dept-icon="${escapeAttr(id)}" value="${escapeAttr(state.customDepts[id].icon || '')}" placeholder="🏷️" aria-label="Emoji">
-              <input type="text" data-dept-label="${escapeAttr(id)}" value="${escapeAttr(state.customDepts[id].label)}" placeholder="Nome della categoria">
-              <button type="button" class="btn is-icon color-delete" data-dept-delete="${escapeAttr(id)}" aria-label="Elimina categoria"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
-            </div>`).join('') : `<p class="ing-empty">Nessuna categoria creata da te.</p>`}
+              <input type="text" class="dept-icon-input" data-dept-icon="${escapeAttr(id)}" value="${escapeAttr(DEPT_ICON[id] || '')}" placeholder="🏷️" aria-label="Emoji">
+              <input type="text" data-dept-label="${escapeAttr(id)}" value="${escapeAttr(DEPT_LABEL[id])}" placeholder="${escapeAttr(BASE_DEPT_LABEL[id] || 'Nome della categoria')}">
+              ${BASE_DEPT_LABEL[id]
+                ? `<span class="dept-delete-spacer" aria-hidden="true"></span>`
+                : `<button type="button" class="btn is-icon color-delete" data-dept-delete="${escapeAttr(id)}" aria-label="Elimina categoria"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>`}
+            </div>`).join('')}
         </div>
         <div class="filter-groups">
           <div class="filter-group">
@@ -4574,10 +4585,6 @@ function renderDispensa(){
               <input type="text" id="new-dept-label" placeholder="Nome (es. Prodotti per la casa)">
             </div>
             <button type="button" class="btn is-solid" id="add-dept-btn">+ Aggiungi categoria</button>
-          </div>
-          <div class="filter-group">
-            <div class="filter-group-label">Categorie di base</div>
-            <div class="dept-base-list">${BASE_DEPT_ORDER.filter(d => d !== 'finiti').map(d => `<span class="dept-base-chip">${BASE_DEPT_ICON[d]} ${escapeHtml(BASE_DEPT_LABEL[d])}</span>`).join('')}</div>
           </div>
         </div>
         <div class="filters-modal-footer">
@@ -6353,16 +6360,39 @@ function attachHandlers(){
       render();
     });
   });
+  // Per una categoria di base la voce in customDepts si crea al primo
+  // cambio; svuotare il campo la riporta al nome/emoji originale.
+  const deptEntry = id=>{
+    if(!state.customDepts) state.customDepts = {};
+    if(!state.customDepts[id]) state.customDepts[id] = {};
+    return state.customDepts[id];
+  };
   document.querySelectorAll('[data-dept-label]').forEach(inp=>{
     inp.addEventListener('change', e=>{
-      const d = state.customDepts[e.currentTarget.dataset.deptLabel];
-      if(d){ d.label = e.currentTarget.value.trim() || d.label; persist(); render(); }
+      const id = e.currentTarget.dataset.deptLabel;
+      const value = e.currentTarget.value.trim();
+      if(BASE_DEPT_LABEL[id]){
+        const d = deptEntry(id);
+        if(value && value !== BASE_DEPT_LABEL[id]) d.label = value; else delete d.label;
+        if(!d.label && !d.icon) delete state.customDepts[id];
+      } else if(state.customDepts[id] && value){
+        state.customDepts[id].label = value;
+      }
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-dept-icon]').forEach(inp=>{
     inp.addEventListener('change', e=>{
-      const d = state.customDepts[e.currentTarget.dataset.deptIcon];
-      if(d){ d.icon = e.currentTarget.value.trim() || '🏷️'; persist(); render(); }
+      const id = e.currentTarget.dataset.deptIcon;
+      const value = e.currentTarget.value.trim();
+      if(BASE_DEPT_LABEL[id]){
+        const d = deptEntry(id);
+        if(value && value !== BASE_DEPT_ICON[id]) d.icon = value; else delete d.icon;
+        if(!d.label && !d.icon) delete state.customDepts[id];
+      } else if(state.customDepts[id]){
+        state.customDepts[id].icon = value || '🏷️';
+      }
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-dept-delete]').forEach(btn=>{
