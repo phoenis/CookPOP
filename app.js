@@ -2026,7 +2026,7 @@ function suggestSwaps(weekIdx, i, exclude){
   WEEK_DISPLAY_ORDER.forEach(di => { const n = effectiveRecipeName(weekIdx, di); if(n) inPlan.add(n); });
   const isWeekend = i === 5 || i === 6;
   const WEEKDAY_TEMPO = ['express','veloce','normale'];
-  const scored = allRecipeMetas().filter(r => r.tipologia !== 'dolce' && !inPlan.has(r.nome) && !(exclude && exclude.has(r.nome))).map(r=>{
+  const scored = allRecipeMetas().filter(r => isMainDish(r) && !inPlan.has(r.nome) && !(exclude && exclude.has(r.nome))).map(r=>{
     const isLong = r.tempoBucket === 'progetto' || r.tempoBucket === 'lunga';
     const isFreezable = r.freezerNew === 'congelabile' || r.freezerNew === 'base';
     let motivo;
@@ -2042,95 +2042,110 @@ function suggestSwaps(weekIdx, i, exclude){
   return scored.slice(0,3);
 }
 
-// Sceglie principale (+ eventuale contorno) di cena per ogni giorno, e di
-// pranzo solo per Ven/Sab/Dom (indici 4/5/6) — Lun-Gio pranzo restano vuoti,
-// li popola l'avanzo automatico della cena di ieri (vedi generateWeek). Un
-// principale con tipologia "secondo" prova ad agganciarsi un contorno dallo
-// stesso pool filtrato per tetto tempo: se il pool contorni è vuoto per quel
-// giorno si salta senza bloccare nulla. I contorni non contano nel
-// bilanciamento categoria, che riguarda solo la varietà dei principali.
-// Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
-// (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
 // Tetto di durata effettivo per un giorno+pasto: l'eccezione se c'è,
 // altrimenti la base (cena per ogni giorno, pranzo solo ven/sab/dom).
 function getTempoCap(day, meal){
   return state.weekTempoExceptions[`${day}_${meal}`] || state.weekTempoBase || 'progetto';
 }
+// Un piatto "da pasto" (principale): primo, secondo o piatto unico. Contorni
+// e antipasti non sono mai il piatto di un pasto (prima potevano esserlo:
+// "Insalata verde" come pranzo), i dolci neanche.
+const MAIN_TIPOLOGIE = ['primo','secondo','unico'];
+function isMainDish(r){ return !!r && MAIN_TIPOLOGIE.includes(r.tipologia); }
+// Il piatto dà la porzione di verdura? Sì se è di categoria verdure o un
+// contorno, oppure se tra gli ingredienti c'è una verdura "vera" — non
+// quelle da soffritto/aroma (aglio, cipolla, sedano, carota, erbe, limone).
+const VEG_AROMATICS = ['aglio','cipoll','scalogno','sedano','carot','prezzemolo','basilico','limone','menta','salvia','rosmarino','alloro','timo','origano','peperoncino','aneto'];
+function recipeGivesVeg(r){
+  if(!r) return false;
+  if(r.categoriaNew === 'verdure' || r.tipologia === 'contorno') return true;
+  return getIngredientsFor(r.nome).some(it=>{
+    const n = (it.ingrediente || '').toLowerCase();
+    return classifyDept(n) === 'verdura' && !VEG_AROMATICS.some(a => n.includes(a));
+  });
+}
+// Sceglie i pasti della settimana (cena ogni giorno, pranzo solo Ven/Sab/Dom
+// — Lun-Gio pranzo sono gli avanzi della cena di ieri, vedi generateWeek):
+// - principale solo primo/secondo/piatto unico (isMainDish), di stagione,
+//   mai ripetuto, entro il tetto di tempo di quel pasto;
+// - varietà nell'ordine in cui si mangia: tipo di piatto diverso dal pasto
+//   precedente (primo ↔ secondo, gli avanzi contano come la cena da cui
+//   vengono), poi categoria diversa dal precedente e meno usata;
+// - ricette "ogni tanto" al massimo una a settimana; quelle con preparazione
+//   in anticipo (ammollo, marinatura, lievitazione...) preferite nel weekend;
+// - contorno solo se serve per la verdura del giorno: ogni giorno almeno un
+//   pasto con verdura (recipeGivesVeg), altrimenti un contorno alla cena.
+// Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
+// (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
 function pickWeekRecipes(){
   const season = currentSeasonKey();
-  // I dolci (tipologia "dolce") non sono un piatto forte da pranzo/cena: il
-  // generatore non li propone mai come principale. Restano comunque nel
-  // catalogo, cercabili/aggiungibili a mano dal Ricettario.
-  const nonDolce = r => r.tipologia !== 'dolce';
-  let pool = allRecipeMetas().filter(nonDolce).filter(r => r.stagioni.includes(season) || r.stagioni.includes('tutto'));
-  if(pool.length < 7) pool = allRecipeMetas().filter(nonDolce); // fallback di sicurezza, non dovrebbe servire
+  const inSeason = r => r.stagioni.includes(season) || r.stagioni.includes('tutto');
+  let pool = allRecipeMetas().filter(isMainDish).filter(inSeason);
+  if(pool.length < 10) pool = allRecipeMetas().filter(isMainDish); // fallback di sicurezza, non dovrebbe servire
+  const contorniPool = allRecipeMetas().filter(r => r.tipologia === 'contorno' && inSeason(r));
 
-  // mescolo
-  const shuffled = pool.slice();
-  for(let i = shuffled.length - 1; i > 0; i--){
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
+  const shuffle = arr => { const a = arr.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const shuffled = shuffle(pool);
+  const shuffledContorni = shuffle(contorniPool);
 
   const usedNames = new Set();
   const catCount = {};
-  let prevCat = null;
+  let prevCat = null, prevKind = null, ogniTantoUsed = 0;
+  const withinCap = (list, day, meal)=>{
+    const capIdx = TEMPO_ORDER.indexOf(getTempoCap(day, meal));
+    if(capIdx >= TEMPO_ORDER.length - 1) return list;
+    const allowed = TEMPO_ORDER.slice(0, capIdx + 1);
+    const limited = list.filter(r => allowed.includes(r.tempoBucket));
+    return limited.length ? limited : list; // rispetta il tetto se possibile
+  };
 
   function pickPrincipale(day, meal){
-    const cap = getTempoCap(day, meal);
-    const capIdx = TEMPO_ORDER.indexOf(cap);
-    // candidati non ancora usati, ordinati per preferenza: categoria diversa dal giorno prima
-    // e categoria meno usata finora nella settimana
-    let candidates = shuffled.filter(r => !usedNames.has(r.nome));
-    if(capIdx < TEMPO_ORDER.length - 1){
-      const allowed = TEMPO_ORDER.slice(0, capIdx + 1);
-      const limited = candidates.filter(r => allowed.includes(r.tempoBucket));
-      if(limited.length > 0) candidates = limited; // rispetta il tetto di durata scelto per quel giorno, se disponibili
-    }
-    if(candidates.length === 0) candidates = shuffled; // esaurito il pool, riparto (raro)
-
-    candidates = candidates.slice().sort((a,b)=>{
-      const aSamePrev = a.categoriaNew === prevCat ? 1 : 0;
-      const bSamePrev = b.categoriaNew === prevCat ? 1 : 0;
-      if(aSamePrev !== bSamePrev) return aSamePrev - bSamePrev; // penalizza stessa categoria di ieri
-      const aCount = catCount[a.categoriaNew] || 0;
-      const bCount = catCount[b.categoriaNew] || 0;
-      return aCount - bCount; // preferisci categoria meno usata
-    });
-
+    const isWeekend = day >= 5;
+    let candidates = shuffled.filter(r => !usedNames.has(r.nome) && !(r.gradimento === 'ogni-tanto' && ogniTantoUsed >= 1));
+    if(!candidates.length) candidates = shuffled.filter(r => !usedNames.has(r.nome));
+    if(!candidates.length) candidates = shuffled; // esaurito il pool, riparto (raro)
+    candidates = withinCap(candidates, day, meal);
+    const needsPrep = r => r.pianificazione && r.pianificazione !== 'nessuna';
+    candidates = candidates.slice().sort((a,b)=>
+      ((a.tipologia === prevKind) - (b.tipologia === prevKind))            // alterna primo/secondo
+      || ((a.categoriaNew === prevCat) - (b.categoriaNew === prevCat))      // categoria diversa dal pasto prima
+      || ((!isWeekend && needsPrep(a)) - (!isWeekend && needsPrep(b)))      // preparazioni lunghe nel weekend
+      || ((catCount[a.categoriaNew] || 0) - (catCount[b.categoriaNew] || 0)) // categoria meno usata
+    );
     const chosen = candidates[0];
     usedNames.add(chosen.nome);
     catCount[chosen.categoriaNew] = (catCount[chosen.categoriaNew] || 0) + 1;
+    if(chosen.gradimento === 'ogni-tanto') ogniTantoUsed++;
     prevCat = chosen.categoriaNew;
+    prevKind = chosen.tipologia;
     return chosen;
   }
   function pickContorno(day, meal){
-    const cap = getTempoCap(day, meal);
-    const capIdx = TEMPO_ORDER.indexOf(cap);
-    let candidates = shuffled.filter(r => r.tipologia === 'contorno' && !usedNames.has(r.nome));
-    if(capIdx < TEMPO_ORDER.length - 1){
-      const allowed = TEMPO_ORDER.slice(0, capIdx + 1);
-      const limited = candidates.filter(r => allowed.includes(r.tempoBucket));
-      if(limited.length > 0) candidates = limited;
-    }
+    let candidates = withinCap(shuffledContorni.filter(r => !usedNames.has(r.nome)), day, meal);
     if(!candidates.length) return null; // nessun contorno disponibile: va bene comunque
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    const chosen = candidates[0];
     usedNames.add(chosen.nome);
     return chosen;
   }
-  function pickMeal(day, meal){
-    const principale = pickPrincipale(day, meal);
-    const contorno = principale.tipologia === 'secondo' ? pickContorno(day, meal) : null;
-    return { principale, contorni: contorno ? [contorno] : [] };
-  }
 
+  // Principali, nell'ordine in cui si mangia: Lun-Gio solo cena (a pranzo ci
+  // sono gli avanzi di ieri, stesso tipo della cena precedente), Ven-Dom
+  // prima il pranzo e poi la cena.
   const days = [];
   for(let day = 0; day < 7; day++){
-    days.push({
-      cena: pickMeal(day, 'cena'),
-      pranzo: (day === 4 || day === 5 || day === 6) ? pickMeal(day, 'pranzo') : null
-    });
+    const pranzo = day >= 4 ? { principale: pickPrincipale(day, 'pranzo'), contorni: [] } : null;
+    const cena = { principale: pickPrincipale(day, 'cena'), contorni: [] };
+    days.push({ cena, pranzo });
   }
+  // Verdura del giorno: il pranzo Lun-Gio è la cena di ieri (contorno
+  // compreso). Si parte da domenica, la cui cena fa da pranzo al lunedì.
+  const mealGivesVeg = m => !!m && (recipeGivesVeg(m.principale) || m.contorni.some(recipeGivesVeg));
+  const lunchOf = day => day <= 3 ? days[(day + 6) % 7].cena : days[day].pranzo;
+  [6,0,1,2,3,4,5].forEach(day=>{
+    if(mealGivesVeg(lunchOf(day)) || mealGivesVeg(days[day].cena)) return;
+    const contorno = pickContorno(day, 'cena');
+    if(contorno) days[day].cena.contorni.push(contorno);
+  });
   return days;
 }
 
