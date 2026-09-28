@@ -256,6 +256,50 @@ test('finestre: Impostazioni dal menu in alto, Esc chiude una alla volta', async
   eq(page.errors, [], 'errori JS');
 });
 
+test('generatore: settimane equilibrate secondo le linee guida (30 settimane)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const slots = weekPlanSlots(), seq = weekEatenSequence(slots);
+    const problems = [];
+    for(let n = 0; n < 30; n++){
+      const days = pickWeekRecipes();
+      const picks = slots.map(s => days[s.day][s.meal].principale);
+      const prot = {}, base = {};
+      seq.forEach(({ slot }) => { const x = picks[slot]; prot[recipeProteina(x)] = (prot[recipeProteina(x)] || 0) + 1; base[recipeBase(x)] = (base[recipeBase(x)] || 0) + 1; });
+      Object.entries(WEEK_PROTEINA_TARGETS).forEach(([k, [mi, ma]]) => { const c = prot[k] || 0; if(c < mi || c > ma) problems.push(`${k}=${c}`); });
+      if((base.pasta || 0) > WEEK_BASE_TARGETS.pasta[1]) problems.push(`pasta=${base.pasta}`);
+      if(new Set(picks.map(x => x.nome)).size !== picks.length) problems.push('ricetta ripetuta');
+      slots.forEach(s => { const m = days[s.day][s.meal]; if(!recipeGivesVeg(m.principale) && !m.contorni.some(recipeGivesVeg)) problems.push(`senza verdura ${s.day}_${s.meal}`); });
+      for(let k = 1; k < seq.length; k++){
+        if(seq[k].slot === seq[k-1].slot) continue;
+        const a = recipeProteina(picks[seq[k-1].slot]), b = recipeProteina(picks[seq[k].slot]);
+        if(a === b && a !== 'nessuna') problems.push(`${a} due volte di fila`);
+      }
+    }
+    return problems;
+  });
+  eq(r, [], 'settimane fuori equilibrio');
+});
+
+test('generatore: un pasto bloccato conta nell\'equilibrio', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const salmone = getRecipeMeta('Trancio di salmone al forno');
+    const days = pickWeekRecipes({ '4_cena': salmone });
+    const pesci = [];
+    days.forEach((d, i) => ['pranzo','cena'].forEach(m => { if(d[m] && recipeProteina(d[m].principale) === 'pesce') pesci.push(`${i}_${m}`); }));
+    return { kept: days[4].cena.principale.nome, pesci: pesci.length };
+  });
+  eq(r.kept, 'Trancio di salmone al forno', 'pasto bloccato cambiato');
+  assert(r.pesci >= 2 && r.pesci <= 3, `pesce ${r.pesci} volte`);
+});
+
+test('ricette: base e proteina modificabili da "Modifica ricetta"', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'prep'; state.recipeEditName = 'Pasta al pesto'; render(); });
+  eq(await page.$eval('#edit-base', el => el.value), 'pasta', 'base mostrata');
+  await page.selectOption('#edit-proteina', 'formaggi');
+  await page.click('[data-save-recipe-edit]');
+  eq(await page.evaluate(() => recipeProteina(getRecipeMeta('Pasta al pesto'))), 'formaggi');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

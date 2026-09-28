@@ -2399,45 +2399,154 @@ function getTempoCap(day, meal){
 // "Insalata verde" come pranzo), i dolci neanche.
 const MAIN_TIPOLOGIE = ['primo','secondo','unico'];
 function isMainDish(r){ return !!r && MAIN_TIPOLOGIE.includes(r.tipologia); }
-// Il piatto dà la porzione di verdura? Sì se è di categoria verdure o un
-// contorno, oppure se tra gli ingredienti c'è una verdura "vera" — non
-// quelle da soffritto/aroma (aglio, cipolla, sedano, carota, erbe, limone).
-const VEG_AROMATICS = ['aglio','cipoll','scalogno','sedano','carot','prezzemolo','basilico','limone','menta','salvia','rosmarino','alloro','timo','origano','peperoncino','aneto'];
+// Il piatto dà la porzione di verdura? Sì se tra gli ingredienti c'è una
+// verdura "vera" — non quelle da soffritto/aroma (aglio, cipolla, sedano,
+// carota, erbe, limone) e non le patate, che sono un carboidrato (Linee
+// guida CREA). Senza ingredienti salvati: sì per le verdure e i contorni che
+// non siano di patate.
+const VEG_AROMATICS = ['aglio','cipoll','scalogno','sedano','carot','prezzemolo','basilico','limone','menta','salvia','rosmarino','alloro','timo','origano','peperoncino','aneto','patat'];
 function recipeGivesVeg(r){
   if(!r) return false;
-  if(r.categoriaNew === 'verdure' || r.tipologia === 'contorno') return true;
-  return getIngredientsFor(r.nome).some(it=>{
+  const ingredienti = getIngredientsFor(r.nome);
+  if(!ingredienti.length) return r.categoriaNew === 'verdure' || (r.tipologia === 'contorno' && guessRecipeBase(r) !== 'patate');
+  return ingredienti.some(it=>{
     const n = (it.ingrediente || '').toLowerCase();
     return classifyDept(n) === 'verdura' && !VEG_AROMATICS.some(a => n.includes(a));
   });
 }
+// --- Equilibrio della settimana -------------------------------------------
+// Ogni piatto principale ha due etichette: la base di carboidrati e la fonte
+// di proteine principale. Il catalogo le ha scritte (campi base/proteina,
+// controllate a mano); per le ricette nuove si ricavano dagli ingredienti
+// (guessRecipeBase/guessRecipeProteina) e si possono correggere da
+// "Modifica ricetta".
+const BASE_ORDER = ['pasta','riso','patate','cereali','pane','nessuna'];
+const BASE_LABEL = { pasta:'Pasta', riso:'Riso', patate:'Patate e gnocchi', cereali:'Polenta e altri cereali', pane:'Pane, pizza e impasti', nessuna:'Nessuna' };
+const PROTEINA_ORDER = ['legumi','pesce','carne-bianca','carne-rossa','salumi','uova','formaggi','nessuna'];
+const PROTEINA_LABEL = { legumi:'Legumi', pesce:'Pesce', 'carne-bianca':'Carne bianca', 'carne-rossa':'Carne rossa', salumi:'Salumi e salsiccia', uova:'Uova', formaggi:'Formaggi', nessuna:'Nessuna' };
+// Frequenze in pasti a settimana (14 pasti: pranzo e cena, gli avanzi
+// contano come un pasto in più), dalle Linee guida CREA 2018 per una sana
+// alimentazione: legumi 3-4, pesce 2-3, carne bianca 2, carne rossa 1,
+// salumi occasionali, uova 2-4 (1-2 pasti), formaggi circa 3; patate 1-2.
+// La pasta andrebbe bene anche ogni giorno: il tetto a 4 è per la varietà.
+const WEEK_PROTEINA_TARGETS = { legumi:[3,4], pesce:[2,3], 'carne-bianca':[2,2], 'carne-rossa':[0,1], salumi:[0,1], uova:[1,2], formaggi:[2,3], nessuna:[0,2] };
+const WEEK_BASE_TARGETS = { pasta:[0,4], riso:[0,3], patate:[0,2], cereali:[0,3], pane:[0,3], nessuna:[0,5] };
+const has = (text, words) => words.some(w => text.includes(w));
+function recipeIngredientText(r){
+  return getIngredientsFor(r.nome).map(it => (it.ingrediente || '').toLowerCase()).join(' | ');
+}
+function guessRecipeBase(r){
+  const name = (r.nome || '').toLowerCase();
+  const ing = recipeIngredientText(r);
+  const all = name + ' | ' + ing;
+  // Pasta sfoglia/brisé (torte salate) non è pasta; pane raffermo e
+  // pangrattato per legare o gratinare non fanno del piatto un piatto di pane.
+  if(has(all, ['pasta sfoglia','pasta brisé','torta salata'])) return 'pane';
+  if(r.categoriaNew === 'pasta' || has(all, ['pasta','spaghetti','penne','rigatoni','orecchiette','tortellini','lasagn','cannelloni','trofie','bucatini','linguine','tagliatelle','ravioli','tortelli','fusilli','paccheri'])) return 'pasta';
+  if(has(all, ['riso','risotto','carnaroli','arborio','vialone'])) return 'riso';
+  if(has(all, ['gnocchi'])) return has(all, ['semolino']) ? 'cereali' : 'patate';
+  if(has(all, ['polenta','farina di mais','cous cous','couscous','farro','orzo','semolino','cereali'])) return 'cereali';
+  if(/\b(pizza|focaccia|pane|crostini|panzanella|piadina)\b/.test(name) || has(ing, ['panini','pane per crostini'])) return 'pane';
+  if(has(all, ['patate','patata'])) return 'patate';
+  return 'nessuna';
+}
+function guessRecipeProteina(r){
+  const cat = r.categoriaNew;
+  if(cat === 'legumi') return 'legumi';
+  if(cat === 'pesce') return 'pesce';
+  if(cat === 'uova') return 'uova';
+  const ing = recipeIngredientText(r) + ' | ' + (r.nome || '').toLowerCase();
+  if(has(ing, ['salmone','merluzzo','tonno','baccalà','orata','branzino','pesce','gamberi','vongole','cozze','polpo','calamari','seppie'])) return 'pesce';
+  if(has(ing, ['manzo','vitello','bistecca','brasato','ossibuch','macinata','agnello','maiale','arista','lonza','costine','cotenna','spezzatino','hamburger','ragù'])) return 'carne-rossa';
+  if(has(ing, ['pollo','tacchino','coniglio'])) return 'carne-bianca';
+  if(has(ing, ['salsiccia','salsicce','prosciutto','speck','pancetta','guanciale','mortadella','salame','wurstel'])) return 'salumi';
+  if(has(ing.replace(/fagiolini/g, ''), ['ceci','fagioli','lenticchie','legumi','piselli','fave'])) return 'legumi';
+  if(cat === 'uova' || has(ing, ['frittata'])) return 'uova';
+  if(has(ing, ['mozzarella','ricotta','gorgonzola','taleggio','provola','scamorza','fontina','stracchino','burrata','caciocavallo','formaggi','pecorino','besciamella'])) return 'formaggi';
+  if(has(ing, ['uova','uovo'])) return 'uova';
+  return 'nessuna';
+}
+function recipeBase(r){ return (r && BASE_ORDER.includes(r.base)) ? r.base : guessRecipeBase(r); }
+function recipeProteina(r){ return (r && PROTEINA_ORDER.includes(r.proteina)) ? r.proteina : guessRecipeProteina(r); }
+
 // Sceglie i pasti della settimana (cena ogni giorno, pranzo solo Ven/Sab/Dom
-// — Lun-Gio pranzo sono gli avanzi della cena di ieri, vedi generateWeek):
-// - principale solo primo/secondo/piatto unico (isMainDish), di stagione,
-//   mai ripetuto, entro il tetto di tempo di quel pasto;
-// - varietà nell'ordine in cui si mangia: tipo di piatto diverso dal pasto
-//   precedente (primo ↔ secondo, gli avanzi contano come la cena da cui
-//   vengono), poi categoria diversa dal precedente e meno usata;
-// - ricette "ogni tanto" al massimo una a settimana; quelle con preparazione
-//   in anticipo (ammollo, marinatura, lievitazione...) preferite nel weekend;
-// - contorno solo se serve per la verdura del giorno: ogni giorno almeno un
-//   pasto con verdura (recipeGivesVeg), altrimenti un contorno alla cena.
+// — Lun-Gio pranzo sono gli avanzi della cena di ieri, vedi generateWeek).
+// Vincoli fissi: solo primi/secondi/piatti unici (isMainDish), di stagione,
+// mai ripetuti, entro il tetto di tempo del pasto. Dentro questi vincoli la
+// settimana si sceglie per equilibrio (weekPlanScore): proteine e basi
+// vicine alle frequenze di WEEK_*_TARGETS, niente stessa proteina o stessa
+// base in due pasti di fila, preparazioni lunghe nel weekend, al massimo una
+// ricetta "ogni tanto". Si parte da una settimana a caso e la si migliora
+// cambiando un piatto alla volta (o scambiandone due) finché il punteggio
+// scende; più ripartenze, si tiene la migliore — casuale ma equilibrata.
+// Poi la verdura: ogni pasto cucinato che non ne ha (recipeGivesVeg) riceve
+// un contorno, e l'avanzo del giorno dopo se lo porta dietro.
+// fixed: { 'giorno_pasto': meta } per i pasti bloccati, che contano
+// nell'equilibrio ma non si cambiano.
 // Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
 // (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
-function pickWeekRecipes(){
+const LEFTOVER_SOURCE_DAYS = [6,0,1,2]; // cene che fanno anche da pranzo il giorno dopo
+function weekPlanSlots(){
+  const slots = [];
+  for(let day = 0; day < 7; day++){
+    if(day >= 4) slots.push({ day, meal:'pranzo' });
+    slots.push({ day, meal:'cena' });
+  }
+  return slots; // nell'ordine in cui si mangia (pranzi lun-gio a parte: sono avanzi)
+}
+// Sequenza dei 14 pasti mangiati: indice nello slots + se è un avanzo.
+function weekEatenSequence(slots){
+  const idx = (day, meal) => slots.findIndex(s => s.day === day && s.meal === meal);
+  const seq = [];
+  for(let day = 0; day < 7; day++){
+    if(day <= 3) seq.push({ slot: idx((day + 6) % 7, 'cena'), leftover: true });
+    else seq.push({ slot: idx(day, 'pranzo'), leftover: false });
+    seq.push({ slot: idx(day, 'cena'), leftover: false });
+  }
+  return seq;
+}
+function targetDistance(count, [min, max]){ return count < min ? min - count : (count > max ? count - max : 0); }
+function weekPlanScore(picks, slots, seq){
+  let score = 0;
+  const prot = {}, base = {};
+  seq.forEach(({ slot })=>{
+    const r = picks[slot];
+    const p = recipeProteina(r), b = recipeBase(r);
+    prot[p] = (prot[p] || 0) + 1;
+    base[b] = (base[b] || 0) + 1;
+  });
+  Object.entries(WEEK_PROTEINA_TARGETS).forEach(([k, range]) => { score += 10 * targetDistance(prot[k] || 0, range); });
+  Object.entries(WEEK_BASE_TARGETS).forEach(([k, range]) => { score += 6 * targetDistance(base[k] || 0, range); });
+  // Varietà tra un pasto e il successivo (un avanzo accanto alla cena da cui
+  // viene è lo stesso piatto per forza: non conta).
+  for(let k = 1; k < seq.length; k++){
+    if(seq[k].slot === seq[k-1].slot) continue;
+    const a = picks[seq[k-1].slot], b = picks[seq[k].slot];
+    const pa = recipeProteina(a), pb = recipeProteina(b);
+    const ba = recipeBase(a), bb = recipeBase(b);
+    if(pa === pb && pa !== 'nessuna') score += 4;
+    if(ba === bb && ba !== 'nessuna') score += 3;
+    if(a.categoriaNew === b.categoriaNew) score += 1;
+    if(a.tipologia === b.tipologia) score += 1;
+  }
+  let ogniTanto = 0;
+  picks.forEach((r, i)=>{
+    const needsPrep = r.pianificazione && r.pianificazione !== 'nessuna';
+    if(needsPrep && slots[i].day < 5) score += 2;
+    if(r.gradimento === 'ogni-tanto') ogniTanto++;
+  });
+  if(ogniTanto > 1) score += 20 * (ogniTanto - 1);
+  return score;
+}
+function pickWeekRecipes(fixed){
+  fixed = fixed || {};
   const season = currentSeasonKey();
   const inSeason = r => r.stagioni.includes(season) || r.stagioni.includes('tutto');
   let pool = allRecipeMetas().filter(isMainDish).filter(inSeason);
-  if(pool.length < 10) pool = allRecipeMetas().filter(isMainDish); // fallback di sicurezza, non dovrebbe servire
-  const contorniPool = allRecipeMetas().filter(r => r.tipologia === 'contorno' && inSeason(r));
-
-  const shuffle = arr => { const a = arr.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  const shuffled = shuffle(pool);
-  const shuffledContorni = shuffle(contorniPool);
-
-  const usedNames = new Set();
-  const catCount = {};
-  let prevCat = null, prevKind = null, ogniTantoUsed = 0;
+  if(pool.length < 20) pool = allRecipeMetas().filter(isMainDish); // fallback di sicurezza, non dovrebbe servire
+  const contorniPool = allRecipeMetas().filter(r => r.tipologia === 'contorno' && inSeason(r) && recipeGivesVeg(r));
+  const rand = n => Math.floor(Math.random() * n);
+  const shuffle = arr => { const a = arr.slice(); for(let i = a.length - 1; i > 0; i--){ const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const withinCap = (list, day, meal)=>{
     const capIdx = TEMPO_ORDER.indexOf(getTempoCap(day, meal));
     if(capIdx >= TEMPO_ORDER.length - 1) return list;
@@ -2446,52 +2555,67 @@ function pickWeekRecipes(){
     return limited.length ? limited : list; // rispetta il tetto se possibile
   };
 
-  function pickPrincipale(day, meal){
-    const isWeekend = day >= 5;
-    let candidates = shuffled.filter(r => !usedNames.has(r.nome) && !(r.gradimento === 'ogni-tanto' && ogniTantoUsed >= 1));
-    if(!candidates.length) candidates = shuffled.filter(r => !usedNames.has(r.nome));
-    if(!candidates.length) candidates = shuffled; // esaurito il pool, riparto (raro)
-    candidates = withinCap(candidates, day, meal);
-    const needsPrep = r => r.pianificazione && r.pianificazione !== 'nessuna';
-    candidates = candidates.slice().sort((a,b)=>
-      ((a.tipologia === prevKind) - (b.tipologia === prevKind))            // alterna primo/secondo
-      || ((a.categoriaNew === prevCat) - (b.categoriaNew === prevCat))      // categoria diversa dal pasto prima
-      || ((!isWeekend && needsPrep(a)) - (!isWeekend && needsPrep(b)))      // preparazioni lunghe nel weekend
-      || ((catCount[a.categoriaNew] || 0) - (catCount[b.categoriaNew] || 0)) // categoria meno usata
-    );
-    const chosen = candidates[0];
-    usedNames.add(chosen.nome);
-    catCount[chosen.categoriaNew] = (catCount[chosen.categoriaNew] || 0) + 1;
-    if(chosen.gradimento === 'ogni-tanto') ogniTantoUsed++;
-    prevCat = chosen.categoriaNew;
-    prevKind = chosen.tipologia;
-    return chosen;
-  }
-  function pickContorno(day, meal){
-    let candidates = withinCap(shuffledContorni.filter(r => !usedNames.has(r.nome)), day, meal);
-    if(!candidates.length) return null; // nessun contorno disponibile: va bene comunque
-    const chosen = candidates[0];
-    usedNames.add(chosen.nome);
-    return chosen;
-  }
+  const slots = weekPlanSlots();
+  const seq = weekEatenSequence(slots);
+  const fixedAt = slots.map(s => fixed[`${s.day}_${s.meal}`] || null);
+  const fixedNames = new Set(fixedAt.filter(Boolean).map(r => r.nome));
+  const candidates = slots.map((s, i) => fixedAt[i] ? [fixedAt[i]] : withinCap(pool.filter(r => !fixedNames.has(r.nome)), s.day, s.meal));
 
-  // Principali, nell'ordine in cui si mangia: Lun-Gio solo cena (a pranzo ci
-  // sono gli avanzi di ieri, stesso tipo della cena precedente), Ven-Dom
-  // prima il pranzo e poi la cena.
-  const days = [];
-  for(let day = 0; day < 7; day++){
-    const pranzo = day >= 4 ? { principale: pickPrincipale(day, 'pranzo'), contorni: [] } : null;
-    const cena = { principale: pickPrincipale(day, 'cena'), contorni: [] };
-    days.push({ cena, pranzo });
+  function randomWeek(){
+    const used = new Set(fixedNames);
+    return slots.map((s, i)=>{
+      if(fixedAt[i]) return fixedAt[i];
+      const free = candidates[i].filter(r => !used.has(r.nome));
+      const r = free.length ? free[rand(free.length)] : candidates[i][rand(candidates[i].length)];
+      used.add(r.nome);
+      return r;
+    });
   }
-  // Verdura del giorno: il pranzo Lun-Gio è la cena di ieri (contorno
-  // compreso). Si parte da domenica, la cui cena fa da pranzo al lunedì.
-  const mealGivesVeg = m => !!m && (recipeGivesVeg(m.principale) || m.contorni.some(recipeGivesVeg));
-  const lunchOf = day => day <= 3 ? days[(day + 6) % 7].cena : days[day].pranzo;
-  [6,0,1,2,3,4,5].forEach(day=>{
-    if(mealGivesVeg(lunchOf(day)) || mealGivesVeg(days[day].cena)) return;
-    const contorno = pickContorno(day, 'cena');
-    if(contorno) days[day].cena.contorni.push(contorno);
+  const free = slots.map((s, i) => i).filter(i => !fixedAt[i]);
+  function improve(picks){
+    let score = weekPlanScore(picks, slots, seq);
+    for(let it = 0; it < 1500 && score > 0; it++){
+      const next = picks.slice();
+      const i = free[rand(free.length)];
+      if(Math.random() < 0.3 && free.length > 1){
+        // scambio di due pasti (se entrambi i piatti vanno bene nell'altro)
+        const j = free[rand(free.length)];
+        if(i === j || !candidates[j].includes(picks[i]) || !candidates[i].includes(picks[j])) continue;
+        next[i] = picks[j]; next[j] = picks[i];
+      } else {
+        const used = new Set(picks.map(r => r.nome));
+        const r = candidates[i][rand(candidates[i].length)];
+        if(used.has(r.nome)) continue;
+        next[i] = r;
+      }
+      const nextScore = weekPlanScore(next, slots, seq);
+      if(nextScore <= score){ picks = next; score = nextScore; }
+    }
+    return { picks, score };
+  }
+  let best = null;
+  for(let attempt = 0; attempt < 6; attempt++){
+    const res = improve(randomWeek());
+    if(!best || res.score < best.score) best = res;
+    if(best.score === 0) break;
+  }
+  const picks = best.picks;
+
+  const days = [];
+  for(let day = 0; day < 7; day++) days.push({ cena: null, pranzo: null });
+  slots.forEach((s, i)=>{ days[s.day][s.meal] = { principale: picks[i], contorni: [] }; });
+  // Verdura a ogni pasto: un contorno dove il piatto non ne ha. Senza
+  // ripetere lo stesso contorno nella settimana, finché ce ne sono.
+  const usedContorni = new Set();
+  const shuffledContorni = shuffle(contorniPool);
+  slots.forEach(s=>{
+    const m = days[s.day][s.meal];
+    if(recipeGivesVeg(m.principale)) return;
+    const fits = withinCap(shuffledContorni, s.day, s.meal);
+    const contorno = fits.find(r => !usedContorni.has(r.nome)) || fits[0];
+    if(!contorno) return; // nessun contorno di stagione: va bene comunque
+    usedContorni.add(contorno.nome);
+    m.contorni.push(contorno);
   });
   return days;
 }
@@ -2757,9 +2881,8 @@ function generateWeek(weekIdx){
   // Pasti bloccati (state.mealLocked) di questa settimana: catturo la loro
   // ricetta effettiva ATTUALE (principale+contorni) e l'eventuale link avanzo
   // prima di rigenerare, per riscriverli identici dopo — vedi il ripristino
-  // più sotto. Il generatore non sa nulla dei blocchi: può comunque
-  // "spendere" una scelta su un giorno che poi viene riscritto, la varietà
-  // non si ottimizza intorno ai pasti bloccati (semplificazione accettata).
+  // più sotto. Il generatore li riceve come fissi (vedi pickWeekRecipes):
+  // non li cambia, ma ne tiene conto per l'equilibrio della settimana.
   const lockedMeals = [];
   for(let li=0; li<7; li++){
     ['pranzo','cena'].forEach(lm=>{
@@ -2769,7 +2892,13 @@ function generateWeek(weekIdx){
       }
     });
   }
-  const days = pickWeekRecipes();
+  // I pasti bloccati restano com'erano, ma pesano sull'equilibrio della settimana.
+  const fixed = {};
+  lockedMeals.forEach(({i, meal, data, link})=>{
+    const meta = !link && data.principale ? getRecipeMeta(data.principale) : null;
+    if(meta && (meal === 'cena' || i >= 4)) fixed[`${i}_${meal}`] = meta;
+  });
+  const days = pickWeekRecipes(fixed);
   const baseline = {};
   days.forEach((d, i) => {
     baseline[i] = {
@@ -2951,12 +3080,13 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
-  version: '2026-09-25',
+  version: '2026-09-28',
   title: 'Novità',
   items: [
-    'In Dispensa ora c\'è anche la sezione "Casa"! Accanto a "Cibo" trovi detersivi, igiene, carta forno e tutto ciò che non si mangia, divisi in Pulizia, Igiene e cura, Cucina e Altro. Finiscono in lista spesa come il resto, dopo il cibo.',
-    'Ingredienti riordinati: doppioni unificati, nuovi gruppi (Farina, Formaggio grattugiato, Olive…) e quasi nulla più in "Altro".',
-    'Ricette in ordine alfabetico, e tante piccole correzioni: modalità scura, quantità in lista spesa, avanzi finiti, spunte che non partono più da sole.'
+    'Settimane più equilibrate: il generatore segue le Linee guida CREA — legumi 3-4 volte, pesce 2-3, carne bianca 2, carne rossa e salumi al massimo una, uova e formaggi con misura — e alterna pasta, riso, patate, polenta e pane. La pasta non va oltre 4 pasti.',
+    'Verdura a ogni pasto: se il piatto non ne ha, arriva un contorno (le patate non contano come verdura).',
+    'In "Modifica ricetta" puoi vedere e correggere base e fonte di proteine di ogni ricetta.',
+    'Ogni sabato la settimana passa da sola alla successiva, l\'app si apre anche senza rete, e ogni ricetta ha il suo link alla fonte.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3349,6 +3479,19 @@ function renderRecipeEditModal(){
             <select id="edit-tipologia">
               ${TIPO_ORDER.map(t=>`<option value="${t}" ${(rec.tipologia||'primo')===t?'selected':''}>${tipoIcon(t)} ${escapeHtml(TIPO_LABEL[t])}</option>`).join('')}
             </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🌾 Base di carboidrati</div>
+            <select id="edit-base">
+              ${BASE_ORDER.map(b=>`<option value="${b}" ${recipeBase(rec)===b?'selected':''}>${escapeHtml(BASE_LABEL[b])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">🥚 Fonte di proteine</div>
+            <select id="edit-proteina">
+              ${PROTEINA_ORDER.map(p=>`<option value="${p}" ${recipeProteina(rec)===p?'selected':''}>${escapeHtml(PROTEINA_LABEL[p])}</option>`).join('')}
+            </select>
+            <div class="section-sub">Servono al generatore per una settimana equilibrata.</div>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5c0-2.64-2.05-4.78-4.65-4.96M19 18H6c-2.21 0-4-1.79-4-4s1.79-4 4-4h.71C7.37 7.69 9.48 6 12 6c3.04 0 5.5 2.46 5.5 5.5v.5H19c1.66 0 3 1.34 3 3s-1.34 3-3 3"></path></svg> Stagioni</div>
@@ -6554,6 +6697,8 @@ function attachHandlers(){
         porzioni: document.getElementById('edit-porzioni').value.trim(),
         categoriaNew: document.getElementById('edit-categoria').value,
         tipologia: document.getElementById('edit-tipologia').value,
+        base: document.getElementById('edit-base').value,
+        proteina: document.getElementById('edit-proteina').value,
         stagioni: stagioni.length ? stagioni : ['tutto'],
         freezerNew: document.getElementById('edit-freezer-new').value,
         avanziNew: document.getElementById('edit-avanzi-new').value,
