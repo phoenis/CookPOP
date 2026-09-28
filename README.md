@@ -183,3 +183,15 @@ sincronizzazione e migrazioni di uno stato vecchio.
 
 Le migrazioni una tantum dello stato stanno in `MIGRATIONS` (app.js), in
 ordine: se ne aggiungi una, mettila in fondo con un flag nuovo.
+
+## Offline e cache
+
+`sw.js` è un service worker, registrato da `app.js`:
+- la pagina va sempre prima in rete (se non risponde entro 4 s si usa la copia salvata);
+- i file con `?v=` si servono dalla cache, e una versione nuova sostituisce la vecchia;
+- Firebase non passa dal service worker.
+
+Dopo la prima apertura l'app si apre anche senza rete, con i dati dell'ultima
+sincronizzazione. Per pubblicare una modifica basta alzare il `?v=` del file in
+`index.html`, come sempre. "Aggiorna app" resta l'azzeramento totale: cancella
+cache e service worker e ricarica.
