@@ -46,7 +46,7 @@ async function openApp(ctx, baseUrl, saved){
   if(saved) await page.addInitScript(s => localStorage.setItem('quaderno-state-default', s), JSON.stringify(saved));
   await page.goto(baseUrl + '/index.html');
   await page.waitForFunction(() => typeof state !== 'undefined' && document.querySelector('#panel') && document.querySelector('#panel').children.length > 0, null, { timeout: 15000 });
-  await page.evaluate(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, { [whatsNewViewerKey()]: WHATS_NEW.version }); });
+  await page.evaluate(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, { [whatsNewViewerKey()]: WHATS_NEW.version }); render(); });
   return page;
 }
 
@@ -216,6 +216,44 @@ test('ricette: tutte hanno un link alla fonte, anche se modificate senza link', 
   });
   eq(r.without, [], 'ricette senza link');
   assert(/^https:\/\//.test(r.carbonara), 'link perso dalla ricetta modificata');
+});
+
+test('finestre: dialog accessibile, fuoco dentro, Tab intrappolato, Esc chiude e ridà il fuoco', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'prep'; state.prepSearchOpen = true; render(); });
+  await page.focus('[data-open-filters]');
+  await page.keyboard.press('Enter');
+  const open = await page.evaluate(() => {
+    const d = document.querySelector('[role="dialog"]');
+    const title = d && document.getElementById(d.getAttribute('aria-labelledby'));
+    return {
+      dialog: !!d, modal: d && d.getAttribute('aria-modal'), title: title && title.textContent.trim(),
+      focusInside: !!d && d.contains(document.activeElement),
+      tabsInert: document.querySelector('nav.tabs').inert,
+      closeLabel: d && d.querySelector('.filters-close-btn') && d.querySelector('.filters-close-btn').getAttribute('aria-label')
+    };
+  });
+  eq(open.dialog, true, 'role=dialog');
+  eq(open.modal, 'true', 'aria-modal');
+  assert(open.title, 'titolo della finestra');
+  eq(open.focusInside, true, 'fuoco dentro la finestra');
+  eq(open.tabsInert, true, 'barra delle schede inerte');
+  eq(open.closeLabel, 'Chiudi', 'etichetta del bottone ✕');
+  for(let k = 0; k < 40; k++) await page.keyboard.press('Tab');
+  eq(await page.evaluate(() => document.querySelector('[role="dialog"]').contains(document.activeElement)), true, 'Tab esce dalla finestra');
+  await page.keyboard.press('Escape');
+  const closed = await page.evaluate(() => ({ open: state.filtersOpen, focus: document.activeElement && document.activeElement.hasAttribute('data-open-filters'), tabsInert: document.querySelector('nav.tabs').inert }));
+  eq(closed, { open: false, focus: true, tabsInert: false });
+});
+
+test('finestre: Impostazioni dal menu in alto, Esc chiude una alla volta', async ({ page }) => {
+  await page.click('#topbar-menu-btn');
+  eq(await page.evaluate(() => document.getElementById('topbar-menu').getAttribute('role')), 'dialog', 'menu come dialog');
+  await page.click('[data-topbar-menu-settings]');
+  const r = await page.evaluate(() => { const d = document.querySelector('#settings-backdrop [role="dialog"]'); return { dialog: !!d, focus: !!d && d.contains(document.activeElement), panelInert: !!document.getElementById('panel').closest('[inert]') }; });
+  eq(r, { dialog: true, focus: true, panelInert: true });
+  await page.keyboard.press('Escape');
+  eq(await page.evaluate(() => ({ open: isSettingsBackdropOpen(), panelInert: !!document.getElementById('panel').closest('[inert]') })), { open: false, panelInert: false });
+  eq(page.errors, [], 'errori JS');
 });
 
 // ---------------------------------------------------------------- runner
