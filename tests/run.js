@@ -195,6 +195,19 @@ test('layout: ricette aggiuntive dal nome lungo vanno a capo senza allargare la 
   assert(r.page <= 390, `pagina larga ${r.page}px`);
 });
 
+test('spesa: quantità dello stesso ingrediente sommate', async ({ page }) => {
+  const r = await page.evaluate(() => [
+    combineQtyTexts(['200 g', '150 g']),
+    combineQtyTexts(['200 g', '200 g']),             // doppioni: prima ne restava uno solo
+    combineQtyTexts(['2 spicchi', '2 spicchi', '1 spicchio']),
+    combineQtyTexts(['500 g', '1 kg']),
+    combineQtyTexts(['q.b.', 'q.b.']),
+    combineQtyTexts(['1 cucchiaio', '1 cucchiaio', 'q.b.']),
+    combineQtyTexts(['100 ml', '2 cucchiai'])
+  ]);
+  eq(r, ['350 g', '400 g', '5 spicchi', '1,5 kg', 'q.b.', '2 cucchiai + q.b.', '100 ml + 2 cucchiai']);
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

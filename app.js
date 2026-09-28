@@ -443,31 +443,38 @@ function usedQtyForPantry(pantryUnit, qtaText, ratio){
 // base comune e riformatta; se sono la stessa unità testuale non convertibile
 // (es. "spicchio") somma comunque i numeri; altrimenti (q.b., unità diverse
 // non comparabili) non inventa un totale e le accosta con "+".
+// Singolare/plurale delle unità "a pezzi" più comuni nel catalogo, per
+// sommare "2 spicchi" + "1 spicchio" come stessa unità.
+const QTY_UNIT_PLURAL = { spicchio:'spicchi', cucchiaio:'cucchiai', cucchiaino:'cucchiaini', pezzo:'pezzi', foglia:'foglie', fetta:'fette', costa:'coste', rametto:'rametti', bustina:'bustine', filetto:'filetti', cespo:'cespi', gambo:'gambi', rotolo:'rotoli', bicchiere:'bicchieri', mazzo:'mazzi', mazzetto:'mazzetti', tazzina:'tazzine', foglio:'fogli', bacca:'bacche', grande:'grandi', media:'medie', medio:'medi', piccola:'piccole', piccolo:'piccoli' };
+const QTY_UNIT_SINGULAR = Object.fromEntries(Object.entries(QTY_UNIT_PLURAL).map(([s,p])=>[p,s]));
+function singularUnit(u){ return QTY_UNIT_SINGULAR[u] || u; }
+function formatQtyNumber(n){ return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','); }
 function combineQtyTexts(qtaTexts){
-  const texts = [...new Set(qtaTexts.filter(Boolean).map(t=>t.trim()))];
-  if(texts.length <= 1) return texts[0] || '';
-  const parsed = texts.map(t => ({ text: t, val: parseQtyValue(t) }));
-  if(parsed.every(p => p.val)){
-    const sameUnit = parsed.every(p => (p.val.unit||'') === (parsed[0].val.unit||''));
-    if(sameUnit){
-      const total = parsed.reduce((s,p)=> s + p.val.value, 0);
-      const unit = parsed[0].val.unit;
-      const totalStr = Number.isInteger(total) ? String(total) : total.toFixed(1).replace('.', ',');
-      return unit ? `${totalStr} ${unit}` : totalStr;
-    }
-    const comparable = parsed.map(p => toComparableUnit(p.val.value, p.val.unit));
-    if(comparable.every(Boolean) && comparable.every(c => c.base === comparable[0].base)){
-      const totalBase = comparable.reduce((s,c)=> s + c.value, 0);
+  const all = qtaTexts.filter(Boolean).map(t=>t.trim()).filter(Boolean);
+  if(all.length <= 1) return all[0] || '';
+  // Le quantità numeriche si sommano TUTTE, anche se identiche (due ricette
+  // da "200 g" fanno 400 g — prima i doppioni si scartavano e ne restava una
+  // sola); le voci non numeriche (q.b., "facoltativo"...) si tengono una volta.
+  const numeric = [], other = [];
+  all.forEach(t=>{ const val = parseQtyValue(t); if(val) numeric.push({ text: t, val }); else if(!other.includes(t)) other.push(t); });
+  let parts = [];
+  if(numeric.length){
+    const unitOf = p => singularUnit(p.val.unit || '');
+    const comparable = numeric.map(p => toComparableUnit(p.val.value, p.val.unit));
+    if(numeric.every(p => unitOf(p) === unitOf(numeric[0])) && !comparable[0]){
+      const total = numeric.reduce((sum,p)=> sum + p.val.value, 0);
+      const unit = unitOf(numeric[0]);
+      const shownUnit = unit && total > 1 ? (QTY_UNIT_PLURAL[unit] || unit) : unit;
+      parts.push(shownUnit ? `${formatQtyNumber(total)} ${shownUnit}` : formatQtyNumber(total));
+    } else if(comparable.every(Boolean) && comparable.every(c => c.base === comparable[0].base)){
+      const totalBase = comparable.reduce((sum,c)=> sum + c.value, 0);
       const isWeight = comparable[0].base === 'g';
-      if(totalBase >= 1000){
-        const kilos = totalBase / 1000;
-        const kiloStr = Number.isInteger(kilos) ? String(kilos) : kilos.toFixed(1).replace('.', ',');
-        return `${kiloStr} ${isWeight ? 'kg' : 'l'}`;
-      }
-      return `${Math.round(totalBase)} ${isWeight ? 'g' : 'ml'}`;
+      parts.push(totalBase >= 1000 ? `${formatQtyNumber(totalBase / 1000)} ${isWeight ? 'kg' : 'l'}` : `${Math.round(totalBase)} ${isWeight ? 'g' : 'ml'}`);
+    } else {
+      parts = numeric.map(p => p.text); // unità non confrontabili: niente totale inventato
     }
   }
-  return texts.join(' + ');
+  return parts.concat(other).join(' + ');
 }
 
 // Stato di un ingrediente rispetto alla Dispensa: 'manca' se assente o a
