@@ -208,6 +208,16 @@ test('spesa: quantità dello stesso ingrediente sommate', async ({ page }) => {
   eq(r, ['350 g', '400 g', '5 spicchi', '1,5 kg', 'q.b.', '2 cucchiai + q.b.', '100 ml + 2 cucchiai']);
 });
 
+test('ricette: tutte hanno un link alla fonte, anche se modificate senza link', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const without = Object.keys(DATA.recipeDetails).filter(n => !DATA.recipeDetails[n].link);
+    state.recipeEdits['Carbonara'] = { link: '' };
+    return { without, carbonara: getRecipeDetails('Carbonara').link };
+  });
+  eq(r.without, [], 'ricette senza link');
+  assert(/^https:\/\//.test(r.carbonara), 'link perso dalla ricetta modificata');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

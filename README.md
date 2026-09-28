@@ -11,8 +11,8 @@ come JSON compatto), la logica dell'app in `app.js`, lo stile in `style.css`;
 il catalogo separato permette al browser di non riscaricarlo quando cambia
 solo la logica: se modifichi `catalog.js` alza il suo `?v=` in `index.html`.
 - Un oggetto `DATA` con **237 ricette** (vedi `DATA.recipeDetails`): la
-  maggior parte "curate" con ingredienti reali, procedimento, tempi e (dove
-  trovato) link alla fonte; 48 importate più di recente hanno ingredienti e
+  maggior parte "curate" con ingredienti reali, procedimento e tempi; tutte
+  hanno un `link` a una ricetta di riferimento online; 48 importate più di recente hanno ingredienti e
   metadati completi ma `procedimento: []` ancora da scrivere (vedi Curatela
   delle ricette più sotto).
 - Persistenza su Firebase Realtime Database, divisa su **due livelli** (vedi
@@ -106,7 +106,7 @@ resto dell'app (non viene incorporato in `index.html`).
 ## Curatela delle ricette
 
 La maggior parte delle ricette ha ormai `recipeDetails` completo (ingredienti
-precisi, procedimento, tempo esatto, e link alla fonte dove trovato). Fanno
+precisi, procedimento, tempo esatto e link alla fonte). Fanno
 eccezione 48 ricette importate da un CSV categorizzato dall'utente (settembre
 2026): hanno ingredienti e metadati (categoria, tempo, stagioni, tipologia,
 ecc.) ma `procedimento: []` vuoto — vanno curate una per una seguendo il

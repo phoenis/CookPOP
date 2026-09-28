@@ -752,7 +752,11 @@ function getRecipeDetails(name){
   const base = DATA.recipeDetails[name] || null;
   const edit = state.recipeEdits[name];
   if(!edit) return base;
-  return Object.assign({}, base || {}, edit);
+  const merged = Object.assign({}, base || {}, edit);
+  // Una modifica salvata quando la ricetta non aveva ancora un link lo
+  // registra vuoto: il link aggiunto poi al catalogo resta comunque visibile.
+  if(!merged.link && base && base.link) merged.link = base.link;
+  return merged;
 }
 
 // Ingredienti "veri" per una ricetta: se è stata modificata a mano uso quelli
