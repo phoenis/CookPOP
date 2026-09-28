@@ -980,6 +980,7 @@ const state = {
   pantryGroupMigrated3: false,
   shopKeysByName1: false,
   baseDeptMigrated1: false,
+  orphanWeekKeysPurged1: false,
   pantryGroups: {
     'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
     'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' },
@@ -1603,6 +1604,7 @@ function buildPersonalPayload(){
     pantryGroupMigrated3: state.pantryGroupMigrated3,
     shopKeysByName1: state.shopKeysByName1,
     baseDeptMigrated1: state.baseDeptMigrated1,
+    orphanWeekKeysPurged1: state.orphanWeekKeysPurged1,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy
   };
@@ -2279,6 +2281,56 @@ function toggleShopAssignee(store){
   else delete state.shopAssignees[store];
   persist(); render();
 }
+// Stato legato a un pasto con il numero della settimana nella chiave
+// ("1_3_cena": settimana 1, giovedì, cena) o nel valore (dayLinks punta a un
+// altro pasto). Le righe di Spesa di una settimana extra hanno la forma
+// "d<settimana>_<giorno>_<pasto>_..." (quelle della settimana corrente
+// "d<giorno>_<pasto>_...", vedi dayIngKey).
+const WEEK_KEYED_FIELDS = ['mealLocked','dayLinks','dayLinkNotes','dayPortions','cooks'];
+const WEEK_SHOP_FIELDS = ['shopChecked','shopDismissed','shopQty'];
+// Riscrive ogni chiave legata a una settimana secondo mapWeek(weekIdx):
+// un numero = nuova settimana, null = da cancellare. Usata quando si
+// elimina una settimana extra (le successive scalano di una posizione) e
+// prima di generare una settimana nuova (niente residui di una vecchia).
+function remapWeekKeys(mapWeek){
+  const remapMealKey = key=>{
+    const m = /^(\d+)_(\d+)_(pranzo|cena)$/.exec(key);
+    if(!m) return key;
+    const w = mapWeek(parseInt(m[1], 10));
+    return w === null ? null : `${w}_${m[2]}_${m[3]}`;
+  };
+  WEEK_KEYED_FIELDS.forEach(field=>{
+    const dict = state[field];
+    if(!dict) return;
+    const next = {};
+    Object.keys(dict).forEach(key=>{
+      const newKey = remapMealKey(key);
+      if(newKey === null) return;
+      let value = dict[key];
+      if(field === 'dayLinks'){ value = remapMealKey(value); if(value === null) return; }
+      next[newKey] = value;
+    });
+    state[field] = next;
+  });
+  const remapShopKey = key=>{
+    const m = /^d(\d+)_(\d+)_(pranzo|cena)_(.*)$/.exec(key);
+    if(!m) return key; // settimana corrente o voce non di un pasto: invariata
+    const w = mapWeek(parseInt(m[1], 10));
+    if(w === null) return null;
+    return w === 0 ? `d${m[2]}_${m[3]}_${m[4]}` : `d${w}_${m[2]}_${m[3]}_${m[4]}`;
+  };
+  WEEK_SHOP_FIELDS.forEach(field=>{
+    const dict = state[field];
+    if(!dict) return;
+    const next = {};
+    Object.keys(dict).forEach(key=>{
+      const parts = key.split(',').map(remapShopKey);
+      if(parts.some(k => k === null)) return;
+      next[parts.join(',')] = dict[key];
+    });
+    state[field] = next;
+  });
+}
 // Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
 // state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
 // Cattura l'intera pianificazione (tutte le settimane) prima di un'azione che
@@ -2313,6 +2365,11 @@ function restorePlanningState(snap){
   state.mealLocked = snap.mealLocked;
 }
 function generateWeek(weekIdx){
+  // Settimana extra nuova (non ancora esistente): qualunque stato rimasto con
+  // il suo numero (blocchi, avanzi, porzioni... di una settimana eliminata in
+  // passato, quando non venivano ripuliti) non le appartiene — si cancella,
+  // altrimenti un vecchio blocco la lasciava con giorni vuoti.
+  if(weekIdx > 0 && !state.extraWeeks[weekIdx-1]) remapWeekKeys(w => w === weekIdx ? null : w);
   // Pasti bloccati (state.mealLocked) di questa settimana: catturo la loro
   // ricetta effettiva ATTUALE (principale+contorni) e l'eventuale link avanzo
   // prima di rigenerare, per riscriverli identici dopo — vedi il ripristino
@@ -2380,7 +2437,9 @@ function generateWeek(weekIdx){
     const targetBaseline = weekIdx === 0 ? state.weekBaseline : state.extraWeeks[weekIdx-1].baseline;
     lockedMeals.forEach(({i, meal, data, link})=>{
       const lkey = `${weekIdx}_${i}_${meal}`;
-      if(data.principale && !getRecipeMeta(data.principale)){
+      // Blocco su un pasto vuoto, o su una ricetta che non esiste più: non
+      // c'è niente da preservare, si sblocca e resta la ricetta appena generata.
+      if(!data.principale || !getRecipeMeta(data.principale)){
         delete state.mealLocked[lkey];
         return;
       }
@@ -2398,14 +2457,19 @@ function generateWeek(weekIdx){
 function addWeek(){
   generateWeek(state.extraWeeks.length + 1);
 }
-// Rimuove una settimana extra: le successive scalano di una posizione, ma dato
-// che il loro weekIdx è sempre derivato dalla posizione nell'array (mai un id
-// fisso salvato altrove) non serve nessuna migrazione.
+// Rimuove una settimana extra: le successive scalano di una posizione, e con
+// loro lo stato che porta il numero di settimana nella chiave (blocchi,
+// avanzi, porzioni, chi cucina, spunte di Spesa — vedi remapWeekKeys): quello
+// della settimana eliminata sparisce. Prima restava lì e finiva sulla
+// settimana che prendeva quel posto (es. vecchi blocchi → giorni vuoti).
 function removeWeek(weekIdx){
   if(weekIdx === 0) return;
   const removedIndex = weekIdx - 1;
   const removedWeek = state.extraWeeks[removedIndex];
+  const keyedSnap = {};
+  WEEK_KEYED_FIELDS.concat(WEEK_SHOP_FIELDS).forEach(f=>{ keyedSnap[f] = JSON.parse(JSON.stringify(state[f] || {})); });
   state.extraWeeks.splice(removedIndex, 1);
+  remapWeekKeys(w => w < weekIdx ? w : (w === weekIdx ? null : w - 1));
   state.expandedDay = null;
   state.swapOpenDay = null;
   state.genSettingsOpen = null;
@@ -2413,6 +2477,7 @@ function removeWeek(weekIdx){
   render();
   showUndoToast('Settimana eliminata', ()=>{
     state.extraWeeks.splice(removedIndex, 0, removedWeek);
+    Object.assign(state, keyedSnap);
     persist(); render();
   });
 }
@@ -7166,6 +7231,15 @@ document.addEventListener('click', e=>{
       delete state.customDepts[id];
     });
     state.baseDeptMigrated1 = true;
+    persist();
+  }
+  // Una tantum: stato rimasto da settimane extra eliminate prima che
+  // removeWeek lo ripulisse (chiavi con un numero di settimana che non
+  // esiste più) — si cancella.
+  if(!state.orphanWeekKeysPurged1){
+    const weekCount = 1 + state.extraWeeks.length;
+    remapWeekKeys(w => w < weekCount ? w : null);
+    state.orphanWeekKeysPurged1 = true;
     persist();
   }
   // Una tantum: passaggio dal modello "una ricetta per giorno" (weekOverrides/
