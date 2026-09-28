@@ -170,6 +170,18 @@ test('digitazione: il cursore resta dov\'era anche se la ricerca ridisegna la pa
   eq(r, { id: 'f-search', value: 'pasta', caret: 2 });
 });
 
+test('offline: dopo la prima apertura l\'app si apre anche senza rete', async ({ page }) => {
+  await page.waitForFunction(() => navigator.serviceWorker.getRegistration().then(r => !!(r && r.active)), null, { timeout: 10000 });
+  await page.reload(); // ora sotto il controllo del service worker: i file finiscono in cache
+  await page.waitForFunction(() => navigator.serviceWorker.controller && document.querySelector('#panel').children.length > 0);
+  await page.context().setOffline(true);
+  await page.reload();
+  await page.waitForFunction(() => typeof state !== 'undefined' && document.querySelector('#panel').children.length > 0, null, { timeout: 15000 });
+  const n = await page.evaluate(() => Object.keys(DATA.recipeDetails).length);
+  assert(n > 100, 'catalogo non caricato offline');
+  await page.context().setOffline(false);
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
@@ -183,7 +195,7 @@ test('digitazione: il cursore resta dov\'era anche se la ricerca ridisegna la pa
     await ctx.route(/gstatic\.com|firebase/, r => r.abort());
     try{
       const page = await openApp(ctx, baseUrl, t.opts && t.opts.saved);
-      await t.fn({ page });
+      await Promise.race([t.fn({ page }), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout (60s)')), 60000))]);
       console.log('  ✓', t.name);
     }catch(e){
       failed++;

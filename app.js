@@ -7428,6 +7428,12 @@ document.addEventListener('click', e=>{
   render();
 })();
 
+// Service worker (sw.js): apertura veloce e funzionamento offline. Si
+// registra a pagina caricata, per non rubare banda al primo avvio.
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+
 (function(){
   const btn = document.getElementById('refresh-btn');
   if(!btn) return;
