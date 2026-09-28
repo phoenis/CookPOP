@@ -699,3 +699,6 @@
   [data-luogo-value="Freezer"].active,[data-luogo-value="freezer"].active {color: var(--white); background-color: var(--luogo-freezer);}
   [data-luogo-value="Giardino"].active,[data-luogo-value="giardino"].active {color: var(--white); background-color: var(--luogo-giardino);}
 
+
+/* Il fuoco va sulla finestra stessa all'apertura (vedi syncDialogs): niente riquadro attorno. */
+[role="dialog"]:focus{ outline:none; }

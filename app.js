@@ -3003,6 +3003,7 @@ function render(){
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
   const panel = document.getElementById('panel');
   const focus = captureFocus(panel);
+  dialogOpenerBeforeRender = describeElement(document.activeElement);
   let html = '';
   if(state.tab === 'menu') html = renderMenu();
   if(state.tab === 'spesa') html = renderSpesa();
@@ -3105,9 +3106,133 @@ const MODAL_CHECKS = [
 function countOpenModals(){
   return MODAL_CHECKS.reduce((n, [isOpen])=> n + (isOpen() ? 1 : 0), 0);
 }
+// --- Accessibilità delle finestre -------------------------------------------
+// Tutte le finestre (modali, schermate a tutto schermo, Impostazioni, menu
+// della topbar) passano da qui dopo ogni apertura/chiusura, invece di toccare
+// uno per uno i loro template: syncDialogs le marca come dialog (role,
+// aria-modal, titolo), sposta il fuoco nella finestra appena aperta, rende
+// inerte tutto ciò che sta sotto (lettori di schermo e Tab non ci arrivano),
+// e alla chiusura riporta il fuoco sul bottone da cui era stata aperta.
+// Esc chiude la finestra in cima, Tab gira solo al suo interno.
+const DIALOG_LAYER_SELECTOR = '.filters-modal-backdrop, .meal-detail-screen, #settings-backdrop.open, #topbar-menu-backdrop.open';
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+let dialogOpenerBeforeRender = null;
+let dialogStack = []; // [{ sig, opener }] dal basso verso l'alto
+let dialogIdSeq = 0;
+// Identità stabile di un elemento tra un render e l'altro (il DOM viene
+// ricreato): id oppure i suoi attributi data-*. null se non identificabile.
+function describeElement(el){
+  if(!el || el === document.body || !el.tagName) return null;
+  const tag = el.tagName.toLowerCase();
+  if(el.id) return tag + '#' + CSS.escape(el.id);
+  const attrs = [...el.attributes].filter(a => a.name.startsWith('data-'));
+  if(!attrs.length) return null;
+  return tag + attrs.map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
+}
+function dialogOf(layer){
+  return layer.querySelector('.filters-modal, .topbar-menu') || layer;
+}
+function openDialogLayers(){
+  const layers = [...document.querySelectorAll(DIALOG_LAYER_SELECTOR)].filter(el => el.getClientRects().length);
+  // In cima: z-index più alto, a parità l'ultimo nel documento.
+  const z = el => parseInt(getComputedStyle(el).zIndex, 10) || 0;
+  return layers.map((el, i) => ({ el, i, z: z(el) })).sort((a, b) => (a.z - b.z) || (a.i - b.i)).map(x => x.el);
+}
+function labelDialog(dialog){
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  if(!dialog.hasAttribute('tabindex')) dialog.setAttribute('tabindex', '-1');
+  if(dialog.classList.contains('topbar-menu')){ dialog.setAttribute('aria-label', 'Menu'); return; }
+  const title = dialog.querySelector('.filters-modal-header h3, .meal-detail-title, h3, h2');
+  if(title){
+    if(!title.id) title.id = 'dialog-title-' + (++dialogIdSeq);
+    dialog.setAttribute('aria-labelledby', title.id);
+  }
+  dialog.querySelectorAll('button').forEach(b=>{
+    if(!b.hasAttribute('aria-label') && b.textContent.trim() === '✕') b.setAttribute('aria-label', 'Chiudi');
+  });
+}
+// Che finestra è (non il suo contenuto: il titolo può cambiare mentre resta
+// aperta): classe e attributi data-* del contenitore e del suo bottone ✕.
+function dialogSignature(layer){
+  const names = el => el ? [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name).join(',') : '';
+  const closeBtn = dialogOf(layer).querySelector('.filters-close-btn, .meal-detail-close, [aria-label="Chiudi"]');
+  return (layer.id || layer.className) + '|' + names(layer) + '|' + names(closeBtn);
+}
+function setBackgroundInert(top){
+  document.querySelectorAll('[data-dialog-inert]').forEach(el=>{ el.inert = false; el.removeAttribute('data-dialog-inert'); });
+  if(!top) return;
+  // Risalendo dalla finestra in cima fino a body, tutto ciò che le sta
+  // accanto diventa inerte (tranne il toast "Annulla", che deve restare
+  // toccabile anche a finestra aperta).
+  for(let node = top; node && node !== document.body; node = node.parentElement){
+    const parent = node.parentElement;
+    if(!parent) break;
+    [...parent.children].forEach(sib=>{
+      if(sib === node || /^(SCRIPT|STYLE|LINK)$/.test(sib.tagName) || sib.classList.contains('undo-toast')) return;
+      if(sib.contains(top)) return;
+      sib.inert = true;
+      sib.setAttribute('data-dialog-inert', '');
+    });
+  }
+}
+function focusIfPresent(selector){
+  if(!selector) return false;
+  const el = document.querySelector(selector);
+  if(!el || !el.getClientRects().length) return false;
+  el.focus({ preventScroll: true });
+  return document.activeElement === el;
+}
+function syncDialogs(){
+  const layers = openDialogLayers();
+  layers.forEach(l => labelDialog(dialogOf(l)));
+  const sigs = layers.map(dialogSignature);
+  const opener = dialogOpenerBeforeRender || describeElement(document.activeElement);
+  dialogOpenerBeforeRender = null;
+  // Finestre chiuse (dall'alto): il fuoco torna a chi le aveva aperte.
+  let restoreTo = null;
+  while(dialogStack.length && !sigs.includes(dialogStack[dialogStack.length - 1].sig)){
+    restoreTo = dialogStack.pop().opener;
+  }
+  dialogStack = dialogStack.filter(d => sigs.includes(d.sig));
+  // Finestre nuove: si ricorda il bottone da cui sono state aperte.
+  let opened = false;
+  sigs.forEach(sig=>{
+    if(!dialogStack.some(d => d.sig === sig)){ dialogStack.push({ sig, opener }); opened = true; }
+  });
+  const top = layers.length ? dialogOf(layers[layers.length - 1]) : null;
+  setBackgroundInert(top);
+  if(restoreTo && !opened){
+    const back = document.querySelector(restoreTo);
+    if(back && (!top || top.contains(back)) && focusIfPresent(restoreTo)) return;
+  }
+  // Fuoco sulla finestra stessa (non sul primo campo: su telefono aprirebbe
+  // la tastiera), solo se non è già dentro (es. si sta scrivendo).
+  if(top && !top.contains(document.activeElement)) top.focus({ preventScroll: true });
+}
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    for(const [isOpen, close] of MODAL_CHECKS){
+      if(isOpen()){ e.preventDefault(); close(); render(); break; }
+    }
+    return;
+  }
+  if(e.key !== 'Tab') return;
+  const layers = openDialogLayers();
+  if(!layers.length) return;
+  const dialog = dialogOf(layers[layers.length - 1]);
+  const items = [...dialog.querySelectorAll(FOCUSABLE_SELECTOR)].filter(el => el.getClientRects().length);
+  if(!items.length){ e.preventDefault(); dialog.focus(); return; }
+  const first = items[0], last = items[items.length - 1];
+  const inside = dialog.contains(document.activeElement);
+  if(e.shiftKey && (!inside || document.activeElement === first || document.activeElement === dialog)){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && (!inside || document.activeElement === last)){ e.preventDefault(); first.focus(); }
+});
+
 let modalHistoryDepth = 0;
 let suppressPopstateNav = false;
 function reconcileModalHistory(){
+  syncDialogs();
   const openCount = countOpenModals();
   if(openCount > modalHistoryDepth){
     for(let i = modalHistoryDepth; i < openCount; i++) history.pushState({ cookpopModalDepth: i + 1 }, '');
