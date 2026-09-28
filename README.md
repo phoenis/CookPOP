@@ -5,9 +5,11 @@ Nessuna build: si apre e basta. Online su https://phoenis.github.io/CookPOP/
 
 ## Come funziona
 
-Dati e logica vivono in `app.js` (un oggetto `DATA` incorporato come JSON
-compatto in cima al file, più tutta la logica dell'app), lo stile in
-`style.css`, `index.html` li carica entrambi:
+Il catalogo ricette vive in `catalog.js` (una sola riga: `const DATA = {...}`
+come JSON compatto), la logica dell'app in `app.js`, lo stile in `style.css`;
+`index.html` li carica in quest'ordine (`catalog.js` prima di `app.js`). Tenere
+il catalogo separato permette al browser di non riscaricarlo quando cambia
+solo la logica: se modifichi `catalog.js` alza il suo `?v=` in `index.html`.
 - Un oggetto `DATA` con **237 ricette** (vedi `DATA.recipeDetails`): la
   maggior parte "curate" con ingredienti reali, procedimento, tempi e (dove
   trovato) link alla fonte; 48 importate più di recente hanno ingredienti e
@@ -97,9 +99,9 @@ resto dell'app (non viene incorporato in `index.html`).
   Usalo come fonte quando devi curare una nuova ricetta e vuoi sapere il nome
   esatto, la categoria originale ecc.
 - `app-data-current.json` — lo stato completo attualmente incorporato in
-  `app.js` (`DATA`), byte-per-byte identico al JSON che segue `const DATA = `
-  sulla prima riga del file. È il file da modificare se aggiorni le ricette:
-  poi va reiniettato in `app.js` sostituendo quella riga.
+  `catalog.js` (`DATA`), byte-per-byte identico al JSON che segue `const DATA = `
+  nel file. È il file da modificare se aggiorni le ricette: poi va reiniettato
+  in `catalog.js` sostituendo quella riga.
 
 ## Curatela delle ricette
 
@@ -114,7 +116,7 @@ Per curare o correggere una ricetta: cerca fonti italiane affidabili (2-3),
 scrivi ingredienti/procedimento con parole proprie (mai copiare testo, per
 diritto d'autore), aggiorna la entry in `DATA.recipeDetails` nello stesso
 formato delle altre, e allinea `DATA.recipeIngredientsInitial` per quella
-ricetta. Poi rigenera `app.js` sostituendo la prima riga (`const DATA = {...}`)
+ricetta. Poi rigenera `catalog.js` sostituendo la sua riga (`const DATA = {...}`)
 con il JSON aggiornato di `app-data-current.json`.
 
 Ogni ingrediente va tenuto come voce separata in `ingredienti` — mai
@@ -167,3 +169,17 @@ lo stesso schema per coerenza con i filtri esistenti.
   tempo
 - Icone categoria: 🍝 pasta, 🍚 riso, 🥩 carne, 🐟 pesce, 🫘 legumi, 🥚 uova,
   🥦 verdure, 🥧 forno, 🍰 dolci
+
+## Test
+
+`tests/run.js` apre l'app vera in Chromium headless (Playwright), con Firebase
+bloccato, e controlla le parti più delicate: avvio senza errori, generatore
+della settimana, pasti bloccati, passaggio automatico del sabato, patch di
+sincronizzazione e migrazioni di uno stato vecchio.
+
+    npm i -D playwright && npx playwright install chromium   # una volta
+    node tests/run.js              # tutti
+    node tests/run.js rollover     # solo quelli che contengono "rollover"
+
+Le migrazioni una tantum dello stato stanno in `MIGRATIONS` (app.js), in
+ordine: se ne aggiungi una, mettila in fondo con un flag nuovo.
