@@ -182,6 +182,19 @@ test('offline: dopo la prima apertura l\'app si apre anche senza rete', async ({
   await page.context().setOffline(false);
 });
 
+test('layout: ricette aggiuntive dal nome lungo vanno a capo senza allargare la pagina', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const r = await page.evaluate(() => {
+    const long = Object.keys(DATA.recipeDetails).sort((a, b) => b.length - a.length);
+    const i = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1; // oggi, così il pasto è visibile
+    state.tab = 'menu'; writeMealPrincipale(state.weekOverrides, i, 'cena', 'Pasta al pesto');
+    setMealContorni(0, i, 'cena', [long[0], long[1]]); render();
+    return { page: document.documentElement.scrollWidth, chips: document.querySelectorAll('.contorni-row .status-badge').length };
+  });
+  eq(r.chips, 2, 'chip visibili');
+  assert(r.page <= 390, `pagina larga ${r.page}px`);
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
