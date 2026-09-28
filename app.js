@@ -981,6 +981,7 @@ const state = {
   shopKeysByName1: false,
   baseDeptMigrated1: false,
   orphanWeekKeysPurged1: false,
+  week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
     'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
     'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' },
@@ -1605,6 +1606,7 @@ function buildPersonalPayload(){
     shopKeysByName1: state.shopKeysByName1,
     baseDeptMigrated1: state.baseDeptMigrated1,
     orphanWeekKeysPurged1: state.orphanWeekKeysPurged1,
+    week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy
   };
@@ -1788,7 +1790,9 @@ function effectiveMeal(weekIdx, i, meal){
   if(override && override.principale) return override;
   const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
   if(baseline && baseline.principale) return baseline;
-  if(weekIdx === 0 && meal === 'cena' && DATA.week1[i].cena) return { principale: DATA.week1[i].cena, contorni: [] };
+  // Menù di partenza storico (DATA.week1): solo per dati di prima che le
+  // settimane scorressero da sole — una settimana passata/nuova vuota resta vuota.
+  if(weekIdx === 0 && meal === 'cena' && !state.week0Start && DATA.week1[i].cena) return { principale: DATA.week1[i].cena, contorni: [] };
   return { principale: null, contorni: [] };
 }
 // Aggiunge/toglie un contorno al pasto "meal" del giorno i senza toccare il
@@ -1818,7 +1822,7 @@ function effectiveRecipeMeta(weekIdx, i, meal='cena'){
   if(override && override.principale) return getRecipeMeta(override.principale);
   const baseline = readMealSlot(weekBaselineRef(weekIdx), i, meal);
   if(baseline && baseline.principale) return getRecipeMeta(baseline.principale);
-  if(weekIdx === 0 && meal === 'cena'){
+  if(weekIdx === 0 && meal === 'cena' && !state.week0Start){
     const match = DATA.week1[i].catalogMatch;
     return match ? getRecipeMeta(match) : null;
   }
@@ -1827,7 +1831,7 @@ function effectiveRecipeMeta(weekIdx, i, meal='cena'){
 function effectiveCategoria(weekIdx, i, meal='cena'){
   const rec = effectiveRecipeMeta(weekIdx, i, meal);
   if(rec) return rec.categoriaNew;
-  return (weekIdx === 0 && meal === 'cena') ? (DATA.week1[i].fallbackCategoria || '') : '';
+  return (weekIdx === 0 && meal === 'cena' && !state.week0Start) ? (DATA.week1[i].fallbackCategoria || '') : '';
 }
 
 const MONTHS_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
@@ -2313,8 +2317,14 @@ function remapWeekKeys(mapWeek){
     state[field] = next;
   });
   const remapShopKey = key=>{
+    const m0 = /^d(\d+)_(pranzo|cena)_(.*)$/.exec(key);
+    if(m0){ // riga della settimana corrente (0)
+      const w0 = mapWeek(0);
+      if(w0 === null) return null;
+      return w0 === 0 ? key : `d${w0}_${m0[1]}_${m0[2]}_${m0[3]}`;
+    }
     const m = /^d(\d+)_(\d+)_(pranzo|cena)_(.*)$/.exec(key);
-    if(!m) return key; // settimana corrente o voce non di un pasto: invariata
+    if(!m) return key; // voce non di un pasto: invariata
     const w = mapWeek(parseInt(m[1], 10));
     if(w === null) return null;
     return w === 0 ? `d${m[2]}_${m[3]}_${m[4]}` : `d${w}_${m[2]}_${m[3]}_${m[4]}`;
@@ -2330,6 +2340,39 @@ function remapWeekKeys(mapWeek){
     });
     state[field] = next;
   });
+}
+// Passaggio di settimana: la settimana 0 è sempre quella che parte dall'ultimo
+// sabato (vedi upcomingSaturday), ma i dati non si spostavano da soli — ogni
+// sabato il menù della settimana appena finita restava lì con le date nuove,
+// e la settimana successiva già pianificata slittava di altri 7 giorni.
+// state.week0Start ricorda il sabato a cui appartengono i dati della
+// settimana 0: se nel frattempo è arrivato un sabato nuovo, la successiva
+// diventa la corrente (una volta per ogni settimana passata), quella finita
+// si scarta insieme al suo stato per pasto (vedi remapWeekKeys). Gira solo a
+// dati sincronizzati (vedi render), così due telefoni non la fanno due volte.
+function isoLocalDate(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function rolloverWeeksIfNeeded(){
+  const cur = upcomingSaturday();
+  const curIso = isoLocalDate(cur);
+  if(state.week0Start === curIso) return false;
+  if(!state.week0Start){ state.week0Start = curIso; persist(); return false; }
+  const [y, m, d] = state.week0Start.split('-').map(Number);
+  const weeks = Math.round((new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) - new Date(y, m-1, d)) / (7 * 86400000));
+  for(let k = 0; k < weeks; k++){
+    const next = state.extraWeeks.shift();
+    state.weekBaseline = (next && next.baseline) || {};
+    state.weekOverrides = (next && next.overrides) || {};
+    state.weekOverridePicked = (next && next.overridePicked) || {};
+    state.mealsDone = (next && next.mealsDone) || {};
+    remapWeekKeys(w => w === 0 ? null : w - 1);
+  }
+  state.week0Start = curIso; // (anche se l'orologio è tornato indietro: si riallinea e basta)
+  state.expandedDay = null;
+  state.swapOpenDay = null;
+  persist();
+  return weeks > 0;
 }
 // Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
 // state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
@@ -2613,6 +2656,7 @@ function renderWhatsNewModal(){
 }
 function render(){
   applyCustomDepts();
+  if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
@@ -2945,7 +2989,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       // Nome a cui torna davvero "Torna alla ricetta originale": la baseline
       // (proposta del generatore), o — solo cena, settimana 0 — il piatto
       // del foglio originale se non c'è mai stata una baseline generata.
-      const originalName = (baseline && baseline.principale) || (weekIdx === 0 && meal === 'cena' ? DATA.week1[i].cena : '') || '';
+      const originalName = (baseline && baseline.principale) || (weekIdx === 0 && meal === 'cena' && !state.week0Start ? DATA.week1[i].cena : '') || '';
       const overflowItems = [
         { label:'È avanzo di…', note:'Collega questo pasto a una cena passata: gli ingredienti non tornano in spesa.', attr:`data-open-avanzodi-picker="${mk}"` },
         hasOverride ? { label: originalName ? `Torna a «${originalName}»` : 'Torna alla ricetta originale', note:'Rimette la proposta di partenza del generatore.', attr:`data-reset-swap="${mk}"` } : null,
