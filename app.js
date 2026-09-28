@@ -1,3 +1,8 @@
+// Ordinamento alfabetico italiano: un Intl.Collator riusato è molto più
+// veloce di localeCompare(…,'it'), che ne ricrea uno a ogni confronto (nel
+// Ricettario, ~2000 confronti a ogni render).
+const IT_COLLATOR = new Intl.Collator('it');
+const IT_COLLATOR_BASE = new Intl.Collator('it', { sensitivity:'base' });
 const CAT_COLOR = {
   'pasta':'var(--sage)', 'riso':'var(--amber)', 'carne':'var(--tomato)', 'pesce':'var(--steel)',
   'legumi':'var(--gold-dark)', 'uova':'var(--amber)', 'verdure':'var(--green-mid)', 'forno':'var(--plum)',
@@ -122,7 +127,7 @@ function applyCustomDepts(){
 function deptOptionsHtml(selected, only){
   const opt = d => `<option value="${d}" ${selected===d?'selected':''}>${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</option>`;
   // In ordine alfabetico (dentro Cibo e dentro Casa), come in "Gestisci categorie".
-  const list = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
+  const list = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=> IT_COLLATOR.compare(DEPT_LABEL[a], DEPT_LABEL[b]));
   if(only === 'casa') return list.filter(isNonFoodDept).map(opt).join('');
   if(only === 'cibo') return list.filter(d => !isNonFoodDept(d)).map(opt).join('');
   return `<optgroup label="Cibo">${list.filter(d => !isNonFoodDept(d)).map(opt).join('')}</optgroup><optgroup label="Casa">${list.filter(isNonFoodDept).map(opt).join('')}</optgroup>`;
@@ -872,7 +877,7 @@ function allKnownIngredientNames(){
   allRecipeMetas().forEach(r=>{
     getIngredientsFor(r.nome).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
   });
-  return Array.from(names.values()).sort((a,b)=>a.localeCompare(b,'it'));
+  return Array.from(names.values()).sort((a,b)=>IT_COLLATOR.compare(a, b));
 }
 
 // Come sopra ma con in più i nomi generici dei gruppi (es. "Pasta corta"),
@@ -885,7 +890,7 @@ function allKnownIngredientNamesWithGroups(){
   // (detersivi, igiene...) non c'entrano.
   allKnownIngredientNames().filter(n => !isNonFoodName(n)).forEach(n=>names.add(n));
   Object.values(state.pantryGroups || {}).forEach(g=>{ if(g.label) names.add(g.label.trim()); });
-  return Array.from(names.values()).sort((a,b)=>a.localeCompare(b,'it'));
+  return Array.from(names.values()).sort((a,b)=>IT_COLLATOR.compare(a, b));
 }
 
 // Come allKnownIngredientNames, ma include anche gli extra aggiunti a mano
@@ -907,7 +912,7 @@ function allIngredientNamesForManager(){
   });
   Object.values(state.shopExtras).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
   DATA.generalShopping.forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
-  return Array.from(names.values()).sort((a,b)=>a.localeCompare(b,'it'));
+  return Array.from(names.values()).sort((a,b)=>IT_COLLATOR.compare(a, b));
 }
 
 // Combobox "leggera" per un campo nome-ingrediente creato fuori dal normale
@@ -2986,14 +2991,49 @@ function render(){
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
   const panel = document.getElementById('panel');
-  if(state.tab === 'menu') panel.innerHTML = renderMenu();
-  if(state.tab === 'spesa') panel.innerHTML = renderSpesa();
-  if(state.tab === 'prep') panel.innerHTML = renderPrep();
-  if(state.tab === 'dispensa') panel.innerHTML = renderDispensa();
-  panel.innerHTML += renderUndoToast();
-  panel.innerHTML += renderWhatsNewModal();
+  const focus = captureFocus(panel);
+  let html = '';
+  if(state.tab === 'menu') html = renderMenu();
+  if(state.tab === 'spesa') html = renderSpesa();
+  if(state.tab === 'prep') html = renderPrep();
+  if(state.tab === 'dispensa') html = renderDispensa();
+  // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
+  // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
+  panel.innerHTML = html + renderUndoToast() + renderWhatsNewModal();
   attachHandlers();
+  restoreFocus(panel, focus);
   reconcileModalHistory();
+}
+// Il render sostituisce tutto il pannello, compreso il campo in cui si sta
+// scrivendo: prima ne ricordo l'identità (id o attributi data-*) e la
+// posizione del cursore, dopo rimetto il fuoco sul campo nuovo equivalente.
+// Così il cursore resta dov'era (prima ogni campo lo riportava in fondo, e
+// correggere una lettera a metà parola era impossibile).
+function captureFocus(panel){
+  const el = document.activeElement;
+  if(!el || !panel.contains(el) || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return null;
+  let selector = el.tagName.toLowerCase();
+  if(el.id) selector += '#' + CSS.escape(el.id);
+  else {
+    const attrs = [...el.attributes].filter(a => a.name.startsWith('data-'));
+    if(!attrs.length) return null;
+    selector += attrs.map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
+  }
+  let start = null, end = null;
+  try{ start = el.selectionStart; end = el.selectionEnd; }catch(e){}
+  return { selector, start, end };
+}
+function restoreFocus(panel, focus){
+  if(!focus) return;
+  const el = panel.querySelector(focus.selector);
+  if(!el) return;
+  const cur = document.activeElement;
+  if(cur && cur !== el && cur !== document.body && panel.contains(cur)) return; // attachHandlers ha già messo il fuoco altrove apposta (es. un campo appena aperto)
+  if(cur !== el) el.focus({ preventScroll: true });
+  if(typeof focus.start === 'number' && el.value !== undefined){
+    const len = el.value.length;
+    try{ el.setSelectionRange(Math.min(focus.start, len), Math.min(focus.end, len)); }catch(e){}
+  }
 }
 
 // --- Tasto "indietro" del telefono chiude modali/schermate invece di uscire
@@ -4368,7 +4408,7 @@ function renderSpesa(){
     // Alfabetico per nome reparto: prima il cibo (con "Altro" in fondo), poi
     // i prodotti per la casa (col loro "Altro" in fondo), "Finiti" ultimo.
     const deptsPresent = DEPT_ORDER.filter(dept => byDept[dept] && byDept[dept].length);
-    const byLabel = (a,b)=> DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it');
+    const byLabel = (a,b)=> IT_COLLATOR.compare(DEPT_LABEL[a], DEPT_LABEL[b]);
     const sortedDepts = deptsPresent.filter(d => d !== 'altro' && d !== 'finiti' && !isNonFoodDept(d)).sort(byLabel);
     if(deptsPresent.includes('altro')) sortedDepts.push('altro');
     sortedDepts.push(...deptsPresent.filter(d => d !== 'altro-casa' && isNonFoodDept(d)).sort(byLabel));
@@ -4701,7 +4741,7 @@ function renderPrep(){
   });
   // In ordine alfabetico per nome (prima seguivano l'ordine del catalogo,
   // con le ricette create a mano in fondo).
-  list.sort((a,b)=> a.nome.localeCompare(b.nome, 'it', { sensitivity:'base' }));
+  list.sort((a,b)=> IT_COLLATOR_BASE.compare(a.nome, b.nome));
   // Il dettaglio non è più un accordion inline (vedi renderRecipeDetailScreen
   // sopra, a tutto schermo come nel Menù): la card resta sempre nella sua
   // forma compatta, tap ovunque su di essa (data-toggle-recipe è
@@ -4906,7 +4946,7 @@ function renderDispensa(){
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
         <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">
-          ${byDept[d].sort((a,b)=>a.nome.localeCompare(b.nome,'it')).map(itemRow).join('')}
+          ${byDept[d].sort((a,b)=>IT_COLLATOR.compare(a.nome, b.nome)).map(itemRow).join('')}
         </div>
       </div>`;
     }).join('');
@@ -5067,7 +5107,7 @@ function renderDispensa(){
   // In ordine alfabetico (non in quello dei reparti): qui si cercano per nome.
   // In ordine alfabetico (non in quello dei reparti): qui si cercano per nome.
   // Divise in Cibo e Casa; quelle create dall'utente possono cambiare tipo.
-  const sortedDepts = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=>DEPT_LABEL[a].localeCompare(DEPT_LABEL[b], 'it'));
+  const sortedDepts = DEPT_ORDER.filter(d => d !== 'finiti').sort((a,b)=>IT_COLLATOR.compare(DEPT_LABEL[a], DEPT_LABEL[b]));
   const deptRowHtml = id=>`
             <div class="pantry-group-row">
               <input type="text" class="dept-icon-input" data-dept-icon="${escapeAttr(id)}" value="${escapeAttr(DEPT_ICON[id] || '')}" placeholder="🏷️" aria-label="Emoji">
@@ -5615,9 +5655,7 @@ function attachHandlers(){
       const key = `${e.target.dataset.contornoSearch}_contorno`;
       if(!state.swapFilters[key]) state.swapFilters[key] = {search:''};
       state.swapFilters[key].search = e.target.value;
-      render();
-      const el = document.querySelector(`[data-contorno-search="${e.currentTarget.dataset.contornoSearch}"]`);
-      if(el){ el.focus(); el.selectionStart = el.value.length; }
+      render(); // fuoco e cursore: vedi restoreFocus
     });
   });
   // data-contorno-pick/data-contorno-remove: delegati su document, vedi in
@@ -5952,9 +5990,7 @@ function attachHandlers(){
       const i = e.target.dataset.swapSearch;
       if(!state.swapFilters[i]) state.swapFilters[i] = {search:'', cat:'same'};
       state.swapFilters[i].search = e.target.value;
-      render();
-      const el = document.querySelector(`[data-swap-search="${i}"]`);
-      if(el){ el.focus(); el.selectionStart = el.value.length; }
+      render(); // fuoco e cursore: vedi restoreFocus
     });
   });
   document.querySelectorAll('[data-swap-pick]').forEach(row=>{
@@ -6152,9 +6188,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-done-leftover-input]').forEach(inp=>{
     inp.addEventListener('input', e=>{
       state.doneModalLeftover = e.target.value;
-      render();
-      const el = document.querySelector('[data-done-leftover-input]');
-      if(el){ el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
+      render(); // fuoco e cursore: vedi restoreFocus
     });
   });
   document.querySelectorAll('[data-done-leftover-toggle]').forEach(cb=>{
@@ -6482,9 +6516,9 @@ function attachHandlers(){
   }
 
   const fSearch = document.getElementById('f-search');
-  if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); const el=document.getElementById('f-search'); el.focus(); el.selectionStart = el.value.length; });
+  if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); });
   const pantrySearch = document.getElementById('pantry-search');
-  if(pantrySearch) pantrySearch.addEventListener('input', e=>{ state.pantrySearch = e.target.value; render(); const el=document.getElementById('pantry-search'); el.focus(); el.selectionStart = el.value.length; });
+  if(pantrySearch) pantrySearch.addEventListener('input', e=>{ state.pantrySearch = e.target.value; render(); });
   // "+" di Ricette: stesso modale di "+ Aggiungi ricetta" nel menu ⋯
   // (nascosto mentre la ricerca è aperta, come in Dispensa).
   const prepFab = document.getElementById('prep-fab');
@@ -6819,9 +6853,7 @@ function attachHandlers(){
   const ingredientManagerSearch = document.getElementById('ingredient-manager-search');
   if(ingredientManagerSearch) ingredientManagerSearch.addEventListener('input', e=>{
     state.ingredientManagerSearch = e.target.value;
-    render();
-    const el = document.getElementById('ingredient-manager-search');
-    el.focus(); el.selectionStart = el.value.length;
+    render(); // fuoco e cursore: vedi restoreFocus
   });
   const ingredientManagerSearchClear = document.getElementById('ingredient-manager-search-clear');
   if(ingredientManagerSearchClear) ingredientManagerSearchClear.addEventListener('click', ()=>{

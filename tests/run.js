@@ -160,6 +160,16 @@ test('migrazioni: uno stato vecchio (una ricetta al giorno) viene convertito', a
   }
 });
 
+test('digitazione: il cursore resta dov\'era anche se la ricerca ridisegna la pagina', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'prep'; state.prepSearchOpen = true; render(); });
+  await page.click('#f-search');
+  await page.keyboard.type('psta');
+  for(let k = 0; k < 3; k++) await page.keyboard.press('ArrowLeft');
+  await page.keyboard.type('a');
+  const r = await page.evaluate(() => { const el = document.activeElement; return { id: el.id, value: el.value, caret: el.selectionStart }; });
+  eq(r, { id: 'f-search', value: 'pasta', caret: 2 });
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
