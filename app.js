@@ -1287,6 +1287,7 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  prepPantryMode: false, // non persistito: Ricette in modalità "Con quello che ho"
   prepSearchOpen: false, // non persistito: campo di ricerca ricette (Prep) visibile o ridotto a icona
   pantrySearchOpen: false, // non persistito: campo di ricerca Dispensa visibile o ridotto a icona
   whatsNewSeen: null, // vecchio: una sola "già vista" per tutto lo spazio — non più usato, vedi whatsNewSeenBy
@@ -2823,6 +2824,34 @@ function weekPlanScore(picks, slots, seq){
 // spezie, reparto "base"). pantryPlanScore vale sempre meno di 1 punto:
 // non può mai far perdere equilibrio, sceglie solo tra settimane equivalenti.
 const PANTRY_EXPIRY_HORIZON = 7; // giorni: oltre, la scadenza non guida la scelta
+// Voci di Dispensa (cibo, con scorta) che scadono entro PANTRY_EXPIRY_HORIZON:
+// chiave voce -> giorni alla scadenza.
+function pantryExpiringMap(){
+  const expiring = {};
+  Object.entries(state.pantryItems).forEach(([key, it])=>{
+    const d = pantryExpiryDays(it);
+    if(d !== null && d >= 0 && d <= PANTRY_EXPIRY_HORIZON && !isNonFoodDept(knownDept(it.cat) || classifyDept(it.nome))) expiring[key] = d;
+  });
+  return expiring;
+}
+// Quanto di una ricetta c'è già in Dispensa (sale, olio e spezie esclusi,
+// reparto "base", e l'acqua): usato dal generatore e da "Con quello che ho"
+// in Ricette.
+// exp: voci in scadenza che la ricetta userebbe, { key, nome, d }.
+function recipePantryMatch(nome, expiring){
+  const ings = getIngredientsFor(nome).filter(it => it.ingrediente && classifyDept(it.ingrediente) !== 'base' && !/^acqua\b/i.test(it.ingrediente.trim()));
+  const missing = [];
+  let have = 0;
+  const exp = [];
+  ings.forEach(it=>{
+    if(pantryStatusFor(it.ingrediente, it.qta) === 'manca') missing.push(it.ingrediente);
+    else have++;
+    const p = resolvePantryItem(it.ingrediente);
+    const key = p && (p.nome || '').trim().toLowerCase();
+    if(key && expiring[key] !== undefined && !exp.some(e => e.key === key)) exp.push({ key, nome: p.nome, d: expiring[key] });
+  });
+  return { total: ings.length, have, missing, cov: ings.length ? have / ings.length : 0, exp };
+}
 function buildPantryPlanContext(weekIdx, slots){
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -2831,24 +2860,13 @@ function buildPantryPlanContext(weekIdx, slots){
     const d = dates[WEEK_DISPLAY_ORDER.indexOf(s.day)];
     return Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - today) / 86400000);
   });
-  const expiring = {}; // chiave voce di Dispensa -> giorni alla scadenza
-  Object.entries(state.pantryItems).forEach(([key, it])=>{
-    const d = pantryExpiryDays(it);
-    if(d !== null && d >= 0 && d <= PANTRY_EXPIRY_HORIZON && !isNonFoodDept(knownDept(it.cat) || classifyDept(it.nome))) expiring[key] = d;
-  });
+  const expiring = pantryExpiringMap();
   const expMax = Object.values(expiring).reduce((sum, d) => sum + 1 / (1 + d), 0);
   const cache = new Map();
   function recipeInfo(r){
     if(cache.has(r.nome)) return cache.get(r.nome);
-    const ings = getIngredientsFor(r.nome).filter(it => it.ingrediente && classifyDept(it.ingrediente) !== 'base');
-    const inHouse = ings.filter(it => pantryStatusFor(it.ingrediente, it.qta) !== 'manca').length;
-    const exp = [];
-    ings.forEach(it=>{
-      const p = resolvePantryItem(it.ingrediente);
-      const key = p && (p.nome || '').trim().toLowerCase();
-      if(key && expiring[key] !== undefined && !exp.some(e => e.key === key)) exp.push({ key, d: expiring[key] });
-    });
-    const info = { cov: ings.length ? inHouse / ings.length : 0, exp };
+    const m = recipePantryMatch(r.nome, expiring);
+    const info = { cov: m.cov, exp: m.exp };
     cache.set(r.nome, info);
     return info;
   }
@@ -3431,9 +3449,12 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
-  version: '2026-09-30',
+  version: '2026-10-01',
   title: 'Novità',
   items: [
+    'Menù: sotto il titolo della settimana vedi quante volte ci sono legumi, pesce, carne, uova e formaggi, con quello che manca o è di troppo. Si aggiorna anche quando cambi i pasti a mano.',
+    'Ricette: "🧺 Con quello che ho" mostra le ricette che puoi fare con la Dispensa, prima quelle che usano cose in scadenza, e dice cosa manca.',
+    'Impostazioni ora è una pagina, con il backup dei dati (Scarica backup e Ripristina).',
     'Scadenze in Dispensa: in "Modifica ingrediente" segni quando scade (+3 giorni, +1 settimana, +1 mese o una data). Quello che scade a breve compare in cima, in "In scadenza".',
     'Il generatore guarda la Dispensa: usa prima quello che sta per scadere, nei giorni giusti, e preferisce le ricette di cui hai già gli ingredienti — sempre senza perdere l\'equilibrio della settimana.',
     'Ricette: gradimento con un tocco nella scheda ("Vi piace?"), foto del piatto, e le ricette del quaderno di casa.',
@@ -4486,6 +4507,53 @@ function genSettingsButtonAccent(target){
   return `<button class="btn is-double is-right is-accent" type="button" data-open-gen-settings="${target}" aria-label="Impostazioni generazione menù"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37c1 .608 2.296.07 2.572-1.065"></path><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0-6 0"></path></g></svg></button>`;
 }
 
+// Equilibrio della settimana, come la vede il generatore (WEEK_*_TARGETS):
+// conta le proteine dei pasti effettivamente in Menù, avanzi compresi (ogni
+// pasto mangiato conta, come in weekEatenSequence), anche dopo i cambi a
+// mano. I "pochi" si segnalano solo a settimana quasi piena: con metà dei
+// pasti ancora da decidere mancherebbe sempre tutto.
+const BALANCE_FULL_FROM = 12;
+function weekBalance(weekIdx){
+  const prot = {}, base = {};
+  let planned = 0;
+  WEEK_DISPLAY_ORDER.forEach(i=>{
+    ['pranzo','cena'].forEach(meal=>{
+      const r = effectiveRecipeMeta(weekIdx, i, meal);
+      if(!r) return;
+      planned++;
+      const p = recipeProteina(r), b = recipeBase(r);
+      prot[p] = (prot[p] || 0) + 1;
+      base[b] = (base[b] || 0) + 1;
+    });
+  });
+  const checkLow = planned >= BALANCE_FULL_FROM;
+  const status = (count, [min, max]) => count > max ? 'high' : (checkLow && count < min ? 'low' : 'ok');
+  const items = PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k=>({ key:k, count: prot[k] || 0, range: WEEK_PROTEINA_TARGETS[k], status: status(prot[k] || 0, WEEK_PROTEINA_TARGETS[k]) }))
+    .filter(it => it.key !== 'salumi' || it.count > 0);
+  const pasta = { key:'pasta', count: base.pasta || 0, range: WEEK_BASE_TARGETS.pasta, status: status(base.pasta || 0, WEEK_BASE_TARGETS.pasta) };
+  return { planned, checkLow, items, pasta };
+}
+function renderWeekBalance(weekIdx){
+  const bal = weekBalance(weekIdx);
+  if(!bal.planned) return '';
+  const rangeText = ([min, max]) => min === max ? `${min}` : (min ? `${min}-${max}` : `max ${max}`);
+  const pills = bal.items.map(it => `<span class="balance-pill is-${it.status}" title="Consigliati: ${rangeText(it.range)}">${escapeHtml(PROTEINA_LABEL[it.key])} <b>${it.count}</b></span>`).join('');
+  const label = it => (PROTEINA_LABEL[it.key] || 'Pasta').toLowerCase();
+  const low = bal.items.filter(it => it.status === 'low').map(it => `${label(it)} ${it.count} (almeno ${it.range[0]})`);
+  const high = bal.items.concat([bal.pasta]).filter(it => it.status === 'high').map(it => `${label(it)} ${it.count} (massimo ${it.range[1]})`);
+  const notes = [];
+  if(low.length) notes.push(`Pochi: ${low.join(' · ')}`);
+  if(high.length) notes.push(`Troppi: ${high.join(' · ')}`);
+  let verdict;
+  if(notes.length) verdict = `<p class="balance-verdict is-warn">${escapeHtml(notes.join('. '))}</p>`;
+  else if(bal.checkLow) verdict = `<p class="balance-verdict is-ok">✓ Settimana equilibrata</p>`;
+  else verdict = `<p class="balance-verdict">${bal.planned} pasti su 14 decisi: l'equilibrio si valuta a settimana quasi piena.</p>`;
+  return `<div class="week-balance" aria-label="Equilibrio della settimana">
+      <div class="balance-pills">${pills}</div>
+      ${verdict}
+    </div>`;
+}
+
 // Un blocco settimana completo: intestazione con data, striscia categorie,
 // 7 giorni, e i controlli per generare/rigenerare (e, per le extra, rimuovere).
 function renderWeekSection(weekIdx){
@@ -4538,6 +4606,7 @@ function renderWeekSection(weekIdx){
     <section class="week-section">
       <h2 class="week-title is-menu">Settimana del ${weekLabelFor(weekIdx)} ${genSettingsButton(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
+      ${renderWeekBalance(weekIdx)}
       ${days}
     </section>`;
 }
@@ -5388,6 +5457,31 @@ function renderPrep(){
   // In ordine alfabetico per nome (prima seguivano l'ordine del catalogo,
   // con le ricette create a mano in fondo).
   list.sort((a,b)=> IT_COLLATOR_BASE.compare(a.nome, b.nome));
+  // "Con quello che ho": solo le ricette con almeno metà degli ingredienti
+  // in Dispensa o che usano qualcosa in scadenza; in cima quelle che usano
+  // le cose più urgenti con più ingredienti già in casa (urgenza + copertura,
+  // entrambe tra 0 e circa 1), a parità quelle a cui manca meno. Gli altri filtri
+  // restano validi (es. solo primi, solo di stagione).
+  const pantryMode = !!state.prepPantryMode;
+  const matches = {};
+  if(pantryMode){
+    const expiring = pantryExpiringMap();
+    list.forEach(r=>{ matches[r.nome] = recipePantryMatch(r.nome, expiring); });
+    const urgency = m => m.exp.reduce((sum, e) => sum + 1 / (1 + e.d), 0);
+    list = list.filter(r => matches[r.nome].total && (matches[r.nome].cov >= 0.5 || matches[r.nome].exp.length));
+    list.sort((a,b)=>{
+      const ma = matches[a.nome], mb = matches[b.nome];
+      return ((urgency(mb) + mb.cov) - (urgency(ma) + ma.cov)) || (ma.missing.length - mb.missing.length) || IT_COLLATOR_BASE.compare(a.nome, b.nome);
+    });
+  }
+  const pantryMatchHtml = m=>{
+    if(!m) return '';
+    const missingText = m.missing.length
+      ? `manca ${m.missing.slice(0, 3).map(escapeHtml).join(', ')}${m.missing.length > 3 ? ` e altri ${m.missing.length - 3}` : ''}`
+      : 'hai tutto';
+    const exp = m.exp.slice().sort((a, b) => a.d - b.d).map(e => `<span class="pantry-match-exp">${escapeHtml(e.nome)} ${e.d === 0 ? 'scade oggi' : e.d === 1 ? 'scade domani' : `scade tra ${e.d} giorni`}</span>`).join('');
+    return `<div class="pantry-match"><span class="pantry-match-count${m.missing.length ? '' : ' is-all'}">${m.have} su ${m.total} in casa · ${missingText}</span>${exp}</div>`;
+  };
   // Il dettaglio non è più un accordion inline (vedi renderRecipeDetailScreen
   // sopra, a tutto schermo come nel Menù): la card resta sempre nella sua
   // forma compatta, tap ovunque su di essa (data-toggle-recipe è
@@ -5400,6 +5494,7 @@ function renderPrep(){
         <div>
           <div class="recipe-title">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
           <span class="day-time">${escapeHtml(r.tempo)}</span>
+          ${pantryMatchHtml(matches[r.nome])}
         </div>
         <div class="day-row-side">
           ${GRAD_ICON[r.gradimento] ? `<span class="grad-icon" title="${escapeAttr(stripHtml(GRAD_LABEL[r.gradimento]))}" aria-label="${escapeAttr(stripHtml(GRAD_LABEL[r.gradimento]))}">${GRAD_ICON[r.gradimento]}</span>` : ''}
@@ -5503,8 +5598,14 @@ function renderPrep(){
 
 
     ${filtersModal}
-    <div class="shop-checks"><div class="shop-progress">${list.length} ricette trovate</div></div>
-    <div class="accordion-body">${cards || '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>'}</div>
+    <div class="prep-toolbar">
+      <button type="button" class="btn is-chip pantry-mode-chip${pantryMode ? ' active' : ''}" data-toggle-pantry-mode aria-pressed="${pantryMode}">🧺 Con quello che ho</button>
+      <div class="shop-progress">${list.length} ricette trovate</div>
+    </div>
+    ${pantryMode ? `<p class="pantry-mode-note">Ricette con almeno metà degli ingredienti in Dispensa, prima quelle che usano cose in scadenza. Sale, olio e spezie non contano.</p>` : ''}
+    <div class="accordion-body">${cards || (pantryMode
+      ? '<p class="pantry-mode-empty">Nessuna ricetta si fa con quello che c\'è in Dispensa. Aggiungi quello che hai in casa, o togli qualche filtro.</p>'
+      : '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>')}</div>
     ${renderRecipeEditModal()}
     ${newRecipeModal}
     ${recipeDetailScreen}
@@ -7230,6 +7331,10 @@ function attachHandlers(){
   // (nascosto mentre la ricerca è aperta, come in Dispensa).
   const prepFab = document.getElementById('prep-fab');
   if(prepFab) prepFab.addEventListener('click', ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; render(); });
+  document.querySelectorAll('[data-toggle-pantry-mode]').forEach(btn=> btn.addEventListener('click', ()=>{
+    state.prepPantryMode = !state.prepPantryMode;
+    render();
+  }));
   const prepSearchToggle = document.getElementById('prep-search-toggle');
   if(prepSearchToggle) prepSearchToggle.addEventListener('click', ()=>{
     state.prepSearchOpen = true;
