@@ -748,6 +748,92 @@ function getRecipeMeta(name){
   const edit = state.recipeEdits[name];
   return Object.assign({ stagioni:['tutto'], gradimento:'', attrezzatura:[], tipologia:'primo' }, base, edit);
 }
+// --- Foto del piatto --------------------------------------------------------
+// Una foto per ricetta, per ricordarsi com'è venuto il piatto. Non sta nel
+// catalogo (lo appesantirebbe per tutti a ogni sincronizzazione) ma in un
+// percorso Firebase a sé, RECIPE_PHOTOS_PATH/<nome ricetta>, letto solo
+// quando si apre quella ricetta. La foto si riduce sul telefono prima di
+// salvarla (lato lungo 1024 px, JPEG ~100-200 KB). Condivisa come il
+// catalogo: la vede chiunque apra la stessa ricetta.
+const RECIPE_PHOTOS_PATH = 'recipe-photos';
+const recipePhotoCache = {}; // nome -> { status:'loading'|'ok'|'none'|'error', src }
+function recipePhotoPath(name){ return `${RECIPE_PHOTOS_PATH}/${fbKeyEncode(name)}`; }
+function ensureRecipePhoto(name){
+  if(!name || recipePhotoCache[name] || !window.cookpopSync || !window.cookpopSync.load) return;
+  recipePhotoCache[name] = { status:'loading' };
+  window.cookpopSync.load(recipePhotoPath(name)).then(val=>{
+    recipePhotoCache[name] = val && val.data ? { status:'ok', src: val.data } : { status:'none' };
+    render();
+  }).catch(()=>{ recipePhotoCache[name] = { status:'error' }; render(); });
+}
+function recipePhotoHtml(name){
+  if(!name || !window.cookpopSync) return '';
+  ensureRecipePhoto(name);
+  const c = recipePhotoCache[name] || { status:'loading' };
+  if(c.status === 'loading') return '';
+  const input = label => `<label class="btn is-chip recipe-photo-btn">${label}<input type="file" accept="image/*" hidden data-recipe-photo-input="${escapeAttr(name)}"></label>`;
+  if(c.status === 'saving') return `<div class="recipe-photo-actions"><span class="section-sub">Salvataggio della foto…</span></div>`;
+  const error = c.message ? `<div class="recipe-photo-error">${escapeHtml(c.message)}</div>` : '';
+  if(c.status === 'ok') return `
+    <figure class="recipe-photo"><img src="${escapeAttr(c.src)}" alt="Foto del piatto: ${escapeAttr(name)}"></figure>
+    <div class="recipe-photo-actions">${input('📷 Cambia foto')}<button type="button" class="btn is-chip" data-recipe-photo-remove="${escapeAttr(name)}">Rimuovi foto</button></div>${error}`;
+  return `<div class="recipe-photo-actions">${input('📷 Aggiungi una foto del piatto')}</div>${error}`;
+}
+function loadImageFile(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('immagine non leggibile')); };
+    img.src = url;
+  });
+}
+async function resizeImageToDataUrl(file, maxSide = 1024, maxChars = 300000){
+  const img = await loadImageFile(file);
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  let quality = 0.8, out = canvas.toDataURL('image/jpeg', quality);
+  while(out.length > maxChars && quality > 0.4){ quality -= 0.1; out = canvas.toDataURL('image/jpeg', quality); }
+  return out;
+}
+const PHOTO_SAVE_ERROR = 'Foto non salvata: controlla la connessione. Se il problema resta, in Firebase manca la regola per "recipe-photos" (vedi README).';
+async function saveRecipePhoto(name, dataUrl){
+  const prev = recipePhotoCache[name];
+  recipePhotoCache[name] = { status:'saving' };
+  render();
+  try{
+    await window.cookpopSync.save(recipePhotoPath(name), dataUrl ? { data: dataUrl, updatedAt: Date.now(), by: whatsNewViewerKey() } : null);
+    recipePhotoCache[name] = dataUrl ? { status:'ok', src: dataUrl } : { status:'none' };
+  }catch(e){
+    recipePhotoCache[name] = Object.assign({}, prev && prev.status !== 'saving' ? prev : { status:'none' }, { message: PHOTO_SAVE_ERROR });
+  }
+  render();
+}
+document.addEventListener('change', async e=>{
+  const input = e.target.closest && e.target.closest('[data-recipe-photo-input]');
+  if(!input || !input.files || !input.files[0]) return;
+  const name = input.dataset.recipePhotoInput;
+  try{
+    const dataUrl = await resizeImageToDataUrl(input.files[0]);
+    await saveRecipePhoto(name, dataUrl);
+  }catch(err){
+    recipePhotoCache[name] = Object.assign({}, recipePhotoCache[name], { message: 'Questa immagine non si riesce a leggere: prova con un\'altra foto.' });
+    render();
+  }
+});
+document.addEventListener('click', e=>{
+  const btn = e.target.closest && e.target.closest('[data-recipe-photo-remove]');
+  if(!btn) return;
+  const name = btn.dataset.recipePhotoRemove;
+  const prev = recipePhotoCache[name];
+  saveRecipePhoto(name, null).then(()=>{
+    if(prev && prev.status === 'ok' && recipePhotoCache[name].status === 'none') showUndoToast('Foto rimossa', ()=> saveRecipePhoto(name, prev.src));
+  });
+});
+
 // Fonte della ricetta: un indirizzo web diventa "Vedi ricetta" (si apre in
 // una nuova scheda); un testo qualsiasi (es. "ricettario", per le ricette
 // copiate da un quaderno) si mostra così com'è, senza link.
@@ -1120,7 +1206,7 @@ window.addEventListener('hashchange', ()=>{
 const firebaseReady = (async ()=>{
   try{
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js");
-    const { getDatabase, ref, set: fbSet, update: fbUpdate, onValue } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js");
+    const { getDatabase, ref, set: fbSet, update: fbUpdate, onValue, get: fbGet } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js");
     const { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js");
     const firebaseConfig = {
       apiKey: "AIzaSyDVlyYgyJ1rTtyitMc3xoNhvBm3HPpC0g8",
@@ -1142,7 +1228,10 @@ const firebaseReady = (async ()=>{
       // Multi-path update: scrive solo le chiavi passate (es. "pantryItems/farina"),
       // lasciando intatto tutto il resto del percorso — vedi buildFirebasePatch/runPersist.
       patch(path, data){ return Object.keys(data).length ? fbUpdate(ref(db, path), data) : Promise.resolve(); },
-      onChange(path, cb){ onValue(ref(db, path), (snap)=>cb(snap.val())); }
+      onChange(path, cb){ onValue(ref(db, path), (snap)=>cb(snap.val())); },
+      // Lettura una tantum (niente ascolto continuo): per le foto delle
+      // ricette, che si scaricano solo quando si apre quella ricetta.
+      load(path){ return fbGet(ref(db, path)).then(snap => snap.val()); }
     };
     const auth = getAuth(app);
     window.cookpopAuth = {
@@ -3874,6 +3963,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
     </div>
     <div class="meal-detail-body">
       <div class="detail-box">
+        ${rec ? recipePhotoHtml(name) : ''}
         ${tagsHtml}
         ${dayMetaHtml}
         ${soakChip}
@@ -5003,6 +5093,7 @@ function renderRecipeDetailScreen(name){
     </div>
     <div class="meal-detail-body">
       <div class="detail-box">
+        ${recipePhotoHtml(name)}
         ${tagsHtml}
         ${ingHtml}
         ${stepsHtml}

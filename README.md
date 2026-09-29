@@ -64,10 +64,15 @@ regole che ha oggi `quaderno-state`, es.:
   "rules": {
     "quaderno-state": { ".read": "auth != null", ".write": "auth != null" },
     "catalog-state":  { ".read": "auth != null", ".write": "auth != null" },
-    "spaces":         { ".read": "auth != null", ".write": "auth != null" }
+    "spaces":         { ".read": "auth != null", ".write": "auth != null" },
+    "recipe-photos":  { ".read": "auth != null", ".write": "auth != null" }
   }
 }
 ```
+`recipe-photos` contiene le foto dei piatti (una per ricetta, ridotta sul
+telefono a ~100-200 KB, vedi `recipePhotoHtml` in app.js): è un percorso a
+parte perché si scarica solo quando si apre quella ricetta, non a ogni
+sincronizzazione del catalogo.
 (adatta la condizione `auth != null` a quella che le regole attuali usano già
 per `quaderno-state`, se diversa — l'importante è che `catalog-state` e
 `spaces` abbiano la stessa).

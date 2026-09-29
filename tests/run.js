@@ -329,6 +329,33 @@ test('spesa: la nota di una riga dice solo giorno e pasto, senza il nome della r
   notes.forEach(n => { assert(!n.includes('lenticchie'), `nota con il nome della ricetta: ${n}`); assert(/· (Pranzo|Cena)$/.test(n), `nota inattesa: ${n}`); });
 });
 
+test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuovere', async ({ page }) => {
+  await page.evaluate(() => {
+    window.__photos = {};
+    window.cookpopSync = {
+      load: async path => window.__photos[path] || null,
+      save: async (path, data) => { if(data === null) delete window.__photos[path]; else window.__photos[path] = data; },
+      patch: async () => {}, onChange: () => {}
+    };
+    state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render();
+  });
+  await page.waitForSelector('[data-recipe-photo-input]', { state: 'attached' });
+  // immagine di prova 3000x2000 generata nel browser
+  const png = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 3000; c.height = 2000; const x = c.getContext('2d'); x.fillStyle = '#c33'; x.fillRect(0, 0, 3000, 2000); return c.toDataURL('image/png').split(',')[1]; });
+  await page.setInputFiles('[data-recipe-photo-input]', { name: 'piatto.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await page.waitForSelector('.recipe-photo img');
+  const saved = await page.evaluate(() => { const v = Object.values(window.__photos)[0]; const img = document.querySelector('.recipe-photo img'); return { keys: Object.keys(window.__photos), jpeg: v.data.startsWith('data:image/jpeg'), size: v.data.length, w: img.naturalWidth }; });
+  eq(saved.keys, ['recipe-photos/Carbonara'], 'percorso');
+  assert(saved.jpeg && saved.size < 300000, `foto troppo grande: ${saved.size}`);
+  eq(saved.w, 1024, 'lato lungo ridotto a 1024');
+  await page.click('[data-recipe-photo-remove]');
+  await page.waitForSelector('.recipe-photo img', { state: 'detached' });
+  eq(await page.evaluate(() => Object.keys(window.__photos)), [], 'foto rimossa');
+  await page.click('.undo-toast button');
+  await page.waitForSelector('.recipe-photo img');
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
