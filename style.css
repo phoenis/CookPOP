@@ -800,3 +800,9 @@
 /* Pane nella modale "Ricetta fatta!" (mealHasBread). */
 .done-bread{ margin-bottom:var(--space-small); }
 .done-bread-left{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); }
+
+/* Promemoria backup (Impostazioni e menu ⋮). */
+.backup-status.is-due{ color:var(--ink); font-weight:var(--weight-bold); }
+.menu-badge{ margin-left:auto; padding:0 var(--space-xsmall); border-radius:var(--radius-pill); background:var(--amber); color:var(--on-amber); font-size:var(--text-xxsmall, 0.7rem); font-weight:var(--weight-bold); }
+/* "Vi piace?" nella finestra "Ricetta fatta!". */
+.done-grad{ margin-bottom:var(--space-small); }

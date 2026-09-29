@@ -358,7 +358,7 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
 
 test('ricette: gradimento visibile e modificabile con un tocco, senza perdere altre modifiche', async ({ page }) => {
   await page.evaluate(() => { state.recipeEdits['Carbonara'] = { ricordare: 'nota mia' }; state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render(); });
-  eq(await page.$eval('.grad-chip.active', el => el.dataset.grad), 'ci-piace', 'gradimento mostrato');
+  eq(await page.evaluate(() => ({ active: !!document.querySelector('.grad-chip.active'), grad: getRecipeMeta('Carbonara').gradimento })), { active: false, grad: '' }, 'senza gradimento di partenza');
   await page.click('[data-set-gradimento="Carbonara"][data-grad="preferita"]');
   const r = await page.evaluate(() => ({ grad: getRecipeMeta('Carbonara').gradimento, nota: getRecipeDetails('Carbonara').ricordare, active: document.querySelector('.grad-chip.active').dataset.grad }));
   eq(r, { grad: 'preferita', nota: 'nota mia', active: 'preferita' });
@@ -566,6 +566,7 @@ test('pane: segnando il pasto come mangiato si tolgono i panini (cena sempre, pr
     state.extraWeeks = []; generateWeek(1);
     Object.keys(state.pantryItems).filter(k => ['pane','panini','panino'].includes(k)).forEach(k => delete state.pantryItems[k]);
     upsertPantryItem('Pane', 'dispensa', 6);
+    writeMealPrincipale(weekOverridesRef(1), 1, 'cena', 'Carbonara'); // ricetta nota, senza pane tra gli ingredienti
     state.tab = 'menu'; render();
     const click = sel => document.querySelector(sel).click();
     const out = { lunchMon: mealHasBread(0, 'pranzo'), lunchSat: mealHasBread(5, 'pranzo'), dinnerTue: mealHasBread(1, 'cena') };
@@ -586,6 +587,63 @@ test('pane: segnando il pasto come mangiato si tolgono i panini (cena sempre, pr
   await page.click('.undo-toast button');
   eq(await page.evaluate(() => ({ qty: state.pantryItems['pane'].qty, done: !!(weekMealsDoneRef(1)[5] && weekMealsDoneRef(1)[5].pranzo) })), { qty: 4, done: false }, 'annulla');
   eq(page.errors, [], 'errori JS');
+});
+
+test('gradimento: nessuno di partenza, la migrazione toglie quelli salvati, e si vota da "Ricetta fatta!"', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const noneInCatalog = DATA.recipes.every(x => !x.gradimento);
+    state.recipeEdits['Carbonara'] = { gradimento: 'preferita', ricordare: 'nota' };
+    state.gradimentoReset1 = false; runMigrations();
+    const migrated = { grad: getRecipeMeta('Carbonara').gradimento, nota: getRecipeDetails('Carbonara').ricordare };
+    state.extraWeeks = []; generateWeek(1);
+    writeMealPrincipale(weekOverridesRef(1), 1, 'cena', 'Carbonara');
+    state.tab = 'menu'; render();
+    document.querySelector('[data-toggle-done="1_1_cena"]').click();
+    document.querySelector('.done-grad [data-set-gradimento="Carbonara"][data-grad="ci-piace"]').click();
+    return { noneInCatalog, migrated, voted: getRecipeMeta('Carbonara').gradimento, modalOpen: state.doneModalDay === '1_1_cena' };
+  });
+  eq(r, { noneInCatalog: true, migrated: { grad: '', nota: 'nota' }, voted: 'ci-piace', modalOpen: true });
+  eq(page.errors, [], 'errori JS');
+});
+
+test('spesa: il pane per i pasti in menù meno quello in Dispensa; si aggiorna se ne compri meno', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1);
+    Object.keys(state.pantryItems).filter(k => ['pane','panini','panino'].includes(k)).forEach(k => delete state.pantryItems[k]);
+    const meals = breadMealsAhead();
+    upsertPantryItem('Pane', 'dispensa', 3);
+    const row = buildShopFlat().find(it => it.key.startsWith('bread_'));
+    state.shopDismissed[row.key] = true; // comprato/tolto
+    upsertPantryItem('Pane', 'dispensa', 2);
+    const row2 = buildShopFlat().find(it => it.key.startsWith('bread_'));
+    state.pantryItems['pane'].qty = 100;
+    const none = buildShopFlat().some(it => it.key.startsWith('bread_'));
+    return { atLeastWeek: meals >= 9, qta: row.qta === String(meals - 3), dept: classifyDept(row.ingrediente), again: !!row2 && row2.qta === String(meals - 5), none };
+  });
+  eq(r, { atLeastWeek: true, qta: true, dept: 'pane', again: true, none: false });
+});
+
+test('menù: avviso di ciò che scade presto, "Cosa cucino" apre Con quello che ho, ✕ lo chiude fino a domani', async ({ page }) => {
+  await page.evaluate(() => { upsertPantryItem('Zucchine', 'frigo', 3); state.pantryItems['zucchine'].scadenza = addDaysIso(1); state.tab = 'menu'; render(); });
+  eq(await page.evaluate(() => { const b = document.querySelector('.expiry-banner'); return b && b.textContent.includes('Zucchine') && b.textContent.includes('domani'); }), true, 'avviso');
+  await page.click('[data-expiry-cook]');
+  eq(await page.evaluate(() => ({ tab: state.tab, mode: state.prepPantryMode })), { tab: 'prep', mode: true }, 'cosa cucino');
+  await page.evaluate(() => { state.tab = 'menu'; render(); });
+  await page.click('[data-dismiss-expiry-banner]');
+  eq(await page.evaluate(() => !!document.querySelector('.expiry-banner')), false, 'chiuso');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('backup: promemoria se non c\'è un backup recente, sparisce dopo averlo scaricato', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    localStorage.removeItem(LAST_BACKUP_KEY);
+    const before = backupOverdue();
+    localStorage.setItem(LAST_BACKUP_KEY, isoLocalDate(new Date(Date.now() - 40 * 86400000)));
+    const old = backupOverdue();
+    localStorage.setItem(LAST_BACKUP_KEY, isoLocalDate(new Date()));
+    return { before, old, now: backupOverdue(), html: backupStatusHtml().includes('Ultimo backup') };
+  });
+  eq(r, { before: true, old: true, now: false, html: true });
 });
 
 // ---------------------------------------------------------------- runner
