@@ -793,3 +793,7 @@
 .exp-confirm-stepper .btn.is-icon{ width:2.25rem; height:2.25rem; border-radius:50%; background:var(--surface-2); font-size:var(--text-medium); }
 .exp-confirm-stepper .btn.is-icon:disabled{ opacity:0.35; }
 .exp-confirm-toggle{ font-size:var(--text-xsmall); color:var(--ink-light); text-decoration:underline; min-width:4rem; text-align:right; }
+
+/* Pane nella modale "Ricetta fatta!" (mealHasBread). */
+.done-bread{ margin-bottom:var(--space-small); }
+.done-bread-left{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); }

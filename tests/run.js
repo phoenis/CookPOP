@@ -561,6 +561,34 @@ test('spesa: i freschi spostati in Dispensa hanno la scadenza stimata, da confer
   eq(page.errors, [], 'errori JS');
 });
 
+test('pane: segnando il pasto come mangiato si tolgono i panini (cena sempre, pranzo solo nel weekend)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1);
+    Object.keys(state.pantryItems).filter(k => ['pane','panini','panino'].includes(k)).forEach(k => delete state.pantryItems[k]);
+    upsertPantryItem('Pane', 'dispensa', 6);
+    state.breadPerMeal = 1;
+    state.tab = 'menu'; render();
+    const click = sel => document.querySelector(sel).click();
+    const out = { lunchMon: mealHasBread(0, 'pranzo'), lunchSat: mealHasBread(5, 'pranzo'), dinnerTue: mealHasBread(1, 'cena') };
+    // cena di martedì: modale con 1 panino, + ne fa 2
+    click('[data-toggle-done="1_1_cena"]');
+    out.modalBread = state.doneModalBread;
+    click('[data-done-bread="1"]');
+    click('[data-confirm-done="1_1_cena"]');
+    out.afterDinner = state.pantryItems['pane'].qty;
+    // pranzo di sabato come avanzo della cena di venerdì: si toglie subito, con Annulla
+    state.dayLinks['1_5_pranzo'] = '1_4_cena'; render();
+    click('[data-toggle-done="1_5_pranzo"]');
+    out.afterLeftover = state.pantryItems['pane'].qty;
+    out.toast = state.undoToast && state.undoToast.message;
+    return out;
+  });
+  eq(r, { lunchMon: false, lunchSat: true, dinnerTue: true, modalBread: 1, afterDinner: 4, afterLeftover: 3, toast: 'Tolto il pane: ne restano 3' });
+  await page.click('.undo-toast button');
+  eq(await page.evaluate(() => ({ qty: state.pantryItems['pane'].qty, done: !!(weekMealsDoneRef(1)[5] && weekMealsDoneRef(1)[5].pranzo) })), { qty: 4, done: false }, 'annulla');
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
