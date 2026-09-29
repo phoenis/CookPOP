@@ -8206,6 +8206,68 @@ if('serviceWorker' in navigator && (location.protocol === 'https:' || location.h
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 }
 
+// --- Backup dei dati ---------------------------------------------------------
+// "Scarica backup" (Impostazioni) salva un file JSON con i dati personali dello
+// spazio (Dispensa, menù, spesa, chi cucina...) e il catalogo condiviso
+// (ricette modificate o create, sinonimi, gruppi, categorie): le stesse due
+// parti che si salvano su Firebase (buildPersonalPayload/buildCatalogPayload).
+// "Ripristina" li rimette com'erano nel file, dopo una conferma, e si
+// sincronizza come ogni altra modifica; "Annulla" torna a prima del
+// ripristino. Le foto dei piatti non sono incluse (stanno a parte).
+const BACKUP_FORMAT = 'cookpop-backup';
+function buildBackup(){
+  return {
+    format: BACKUP_FORMAT,
+    version: 1,
+    createdAt: new Date().toISOString(),
+    space: getSpaceRoute().id,
+    personal: JSON.parse(JSON.stringify(buildPersonalPayload())),
+    catalog: JSON.parse(JSON.stringify(buildCatalogPayload()))
+  };
+}
+function applyBackupParts(personal, catalog){
+  Object.keys(personal || {}).forEach(k=>{ state[k] = personal[k]; });
+  CATALOG_FIELDS.forEach(f=>{ if(catalog && f in catalog) state[f] = catalog[f] || {}; });
+}
+function downloadBackup(){
+  const data = buildBackup();
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `cookpop-backup-${isoLocalDate(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+// Ritorna un messaggio d'errore, o null se il file è stato ripristinato.
+function restoreBackup(data, confirmFn){
+  if(!data || data.format !== BACKUP_FORMAT || !data.personal || !data.catalog) return 'Questo file non è un backup di CookPOP.';
+  const when = data.createdAt ? new Date(data.createdAt).toLocaleString('it-IT', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : 'data sconosciuta';
+  const otherSpace = data.space && data.space !== getSpaceRoute().id ? `\n\nAttenzione: è il backup di un altro spazio ("${data.space}").` : '';
+  const ok = (confirmFn || window.confirm)(`Ripristinare il backup del ${when}?\n\nDispensa, menù, spesa e ricette tornano come erano allora, su tutti i dispositivi (il catalogo delle ricette anche per gli altri spazi). Subito dopo potrai ancora annullare.${otherSpace}`);
+  if(!ok) return null;
+  const before = { personal: JSON.parse(JSON.stringify(buildPersonalPayload())), catalog: JSON.parse(JSON.stringify(buildCatalogPayload())) };
+  applyBackupParts(data.personal, data.catalog);
+  persist(); render();
+  showUndoToast('Backup ripristinato', ()=>{ applyBackupParts(before.personal, before.catalog); persist(); render(); });
+  return null;
+}
+(function(){
+  const dl = document.getElementById('backup-download');
+  if(dl) dl.addEventListener('click', downloadBackup);
+  const input = document.getElementById('backup-restore-input');
+  if(input) input.addEventListener('change', async ()=>{
+    const file = input.files && input.files[0];
+    input.value = '';
+    if(!file) return;
+    let data = null;
+    try{ data = JSON.parse(await file.text()); }catch(e){ /* non è JSON */ }
+    const err = restoreBackup(data);
+    if(err) window.alert(err);
+    else closeSettingsBackdrop();
+  });
+})();
+
 (function(){
   const btn = document.getElementById('refresh-btn');
   if(!btn) return;
