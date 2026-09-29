@@ -319,6 +319,16 @@ test('generatore: legumi 3-4 volte in ogni stagione', async ({ page }) => {
   eq(r, { primavera: [], estate: [], autunno: [], inverno: [] }, 'settimane con legumi fuori da 3-4');
 });
 
+test('spesa: la nota di una riga dice solo giorno e pasto, senza il nome della ricetta', async ({ page }) => {
+  const notes = await page.evaluate(() => {
+    const i = (new Date().getDay() + 6) % 7;
+    writeMealPrincipale(state.weekOverrides, i, 'cena', 'Pasta e lenticchie');
+    return [...new Set(buildShopFlat().filter(it => it.isRecipe).map(it => it.contextShort))];
+  });
+  assert(notes.length > 0, 'nessuna riga dalla ricetta');
+  notes.forEach(n => { assert(!n.includes('lenticchie'), `nota con il nome della ricetta: ${n}`); assert(/· (Pranzo|Cena)$/.test(n), `nota inattesa: ${n}`); });
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
