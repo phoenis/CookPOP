@@ -370,6 +370,46 @@ test('ricette: gradimento visibile e modificabile con un tocco, senza perdere al
   eq(await page.evaluate(() => getRecipeMeta('Carbonara').gradimento), 'ogni-tanto', 'da Modifica ricetta');
 });
 
+test('ingredienti: "Unisci con…" unisce due nomi in ricette, Dispensa e note, con Annulla', async ({ page }) => {
+  const before0 = await page.evaluate(() => {
+    upsertPantryItem('Passata', 'dispensa', 2);
+    upsertPantryItem('Passata di pomodoro', 'dispensa', 1);
+    state.ingredientNotes['passata di pomodoro'] = 'quella in bottiglia';
+    state.tab = 'dispensa'; state.pantryEditKey = 'passata di pomodoro'; render();
+    return { n: recipesUsingIngredient('Passata di pomodoro').length, a: state.pantryItems['passata di pomodoro'].qty, b: state.pantryItems['passata'].qty };
+  });
+  const { n: before, a: qtyOld, b: qtyNew } = before0;
+  assert(before > 5, 'ricette con la passata');
+  await page.click('[data-open-merge]');
+  await page.fill('#merge-search', 'passata');
+  await page.click('[data-merge-pick="Passata"]');
+  const summary = await page.$eval('.merge-effects', el => el.textContent);
+  assert(summary.includes(`${before} ricette`), `riepilogo: ${summary}`);
+  await page.click('[data-merge-confirm]');
+  const r = await page.evaluate(() => ({
+    oldRecipes: recipesUsingIngredient('Passata di pomodoro').length,
+    newRecipes: recipesUsingIngredient('Passata').length,
+    qty: state.pantryItems['passata'] && state.pantryItems['passata'].qty,
+    oldItem: !!state.pantryItems['passata di pomodoro'],
+    note: state.ingredientNotes['passata'],
+    edit: state.pantryEditKey
+  }));
+  eq(r, { oldRecipes: 0, newRecipes: before, qty: qtyOld + qtyNew, oldItem: false, note: 'quella in bottiglia', edit: 'passata' });
+  await page.click('.undo-toast button');
+  const undone = await page.evaluate(() => ({ recipes: recipesUsingIngredient('Passata di pomodoro').length, old: state.pantryItems['passata di pomodoro'].qty, nuovo: state.pantryItems['passata'].qty }));
+  eq(undone, { recipes: before, old: qtyOld, nuovo: qtyNew }, 'annulla');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('ingredienti: unire A in B dopo B in A non crea un giro', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    mergeIngredientInto('Pomodorini', 'Pomodori');
+    mergeIngredientInto('Pomodori', 'Pomodorini');
+    return [resolveIngredientName('Pomodori'), resolveIngredientName('Pomodorini')];
+  });
+  eq(r, ['Pomodorini', 'Pomodorini']);
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

@@ -717,3 +717,8 @@
 .btn.is-chip.grad-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-xsmall); }
 .btn.is-chip.grad-chip.active{ background:var(--ink); color:var(--bg); }
 .grad-icon{ font-size:var(--text-small); margin-right:var(--space-xxsmall, 0.25rem); }
+
+/* "Unisci con…" (vedi renderMergeIngredientModal). */
+.merge-summary{ font-size:var(--text-medium, 1rem); margin:var(--space-small) 0; }
+.merge-effects{ margin:0 0 var(--space-medium, 1rem); padding-left:1.2rem; display:flex; flex-direction:column; gap:var(--space-xxsmall, 0.25rem); font-size:var(--text-small); }
+.btn.is-chip.merge-open-btn{ padding:var(--space-xxsmall, 0.25rem) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); }
