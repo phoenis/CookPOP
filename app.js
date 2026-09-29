@@ -964,7 +964,7 @@ document.addEventListener('click', e=>{
   if(!GRAD_ORDER.includes(grad) || (getRecipeMeta(name) || {}).gradimento === grad) return;
   state.recipeEdits[name] = Object.assign({}, state.recipeEdits[name], { gradimento: grad });
   persist(); render();
-});
+}, true); // in cattura: dentro le finestre (es. "Ricetta fatta!") il primo [data-stop-close] ferma la risalita
 function sourceLinkHtml(det){
   const link = det && det.link ? String(det.link).trim() : '';
   if(!link) return '';
@@ -1933,6 +1933,17 @@ const MIGRATIONS = [
       const mapped = k.split(',').map(part => keyMap[part] || part).join(',');
       if(mapped !== k){ state.shopQty[mapped] = state.shopQty[k]; delete state.shopQty[k]; }
     });
+  }},
+  // 21. Una tantum: gradimento azzerato su tutte le ricette (richiesta di
+  // Mara, ottobre 2026): si ricomincia a votarle sul serio quando si segnano
+  // cucinate. Il catalogo (catalog.js) è già senza gradimento; qui si tolgono
+  // quelli salvati nelle modifiche e nelle ricette aggiunte a mano. Il
+  // catalogo è condiviso tra gli spazi: gira solo nello spazio di casa, così
+  // l'apertura dell'app da un altro spazio non cancella i voti dati dopo.
+  { flag: 'gradimentoReset1', run(){
+    if(getSpaceRoute().id !== 'default') return;
+    Object.values(state.recipeEdits || {}).forEach(edit=>{ if(edit && 'gradimento' in edit) edit.gradimento = ''; });
+    Object.values(state.customRecipes || {}).forEach(r=>{ if(r && 'gradimento' in r) r.gradimento = ''; });
   }}
 ];
 function runMigrations(){
@@ -3463,9 +3474,13 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
-  version: '2026-10-03',
+  version: '2026-10-04',
   title: 'Novità',
   items: [
+    'Gradimento azzerato su tutte le ricette: da ora lo date voi quando segnate una ricetta come cucinata ("Vi piace?" nella finestra "Ricetta fatta!").',
+    'Spesa: il pane si aggiunge da solo, 1 panino per ogni cena (e pranzo nel weekend) in menù, meno quelli che hai già.',
+    'Menù: in cima un avviso con quello che scade presto, e "Cosa cucino" per vedere le ricette che lo usano.',
+    'Impostazioni: vedi quando hai fatto l\'ultimo backup; dopo un mese te lo ricorda anche nel menu ⋮.',
     'Pane: quando segni come mangiata una cena (o un pranzo nel weekend), nella finestra c\'è anche il pane: 1 panino, con + se sono 2. Si toglie dalla voce "Pane" in Dispensa, così vedi quando sta finendo.',
     'Spesa: quando sposti in Dispensa frutta, verdura, carne, pesce, latticini o uova, la scadenza è già stimata. Confermi con "Va bene" o la sistemi subito con − e +.',
     'Menù: sotto il titolo della settimana vedi quante volte ci sono legumi, pesce, carne, uova e formaggi, con quello che manca o è di troppo. Si aggiorna anche quando cambi i pasti a mano.',
@@ -4702,6 +4717,30 @@ function renderMenu(){
     }
   }
 
+  // "In scadenza" anche nel Menù: quello che scade entro EXPIRY_SOON_DAYS
+  // (o è già scaduto ma c'è ancora), con un tocco su "Cosa cucino" per le
+  // ricette che lo usano (Ricette → Con quello che ho). Chiuso, non torna
+  // fino a domani su questo telefono.
+  let expiryBanner = '';
+  if(!expiryBannerDismissedToday()){
+    const soon = Object.values(state.pantryItems)
+      .map(it => ({ it, d: pantryExpiryDays(it) }))
+      .filter(x => x.d !== null && x.d <= EXPIRY_SOON_DAYS && !isNonFoodDept(knownDept(x.it.cat) || classifyDept(x.it.nome)))
+      .sort((a, b) => a.d - b.d);
+    if(soon.length){
+      const when = d => d < 0 ? 'scaduto' : d === 0 ? 'oggi' : d === 1 ? 'domani' : `tra ${d} giorni`;
+      const list = soon.slice(0, 3).map(x => `<b>${escapeHtml(x.it.nome)}</b> (${when(x.d)})`).join(', ') + (soon.length > 3 ? ` e altri ${soon.length - 3}` : '');
+      expiryBanner = `
+        <div class="eaten-reminder-banner expiry-banner">
+          <span>⏰ Scade presto: ${list}</span>
+          <div class="eaten-reminder-actions">
+            <button type="button" class="btn is-solid mini-add-btn" data-expiry-cook>Cosa cucino</button>
+            <button type="button" class="btn is-ghost" data-dismiss-expiry-banner aria-label="Chiudi fino a domani">✕</button>
+          </div>
+        </div>`;
+    }
+  }
+
   let doneModal = '';
   if(state.doneModalDay !== null){
     const { weekIdx: doneWeekIdx, i: di, meal: doneMeal } = parseMealKey(state.doneModalDay);
@@ -4781,6 +4820,7 @@ function renderMenu(){
           <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
         </div>
         <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa — il resto degli ingredienti non cambia.</p>
+        ${doneName && getRecipeMeta(doneName) ? `<div class="done-grad">${gradimentoPickerHtml(doneName)}</div>` : ''}
         ${breadRowHtml}
         ${uniqueIng.length ? `
         ${normalRowsHtml ? `<div class="done-ing-list">${normalRowsHtml}</div>` : ''}
@@ -4931,6 +4971,7 @@ function renderMenu(){
   const contornoPickerScreen = pickerScreenFor('contornoPickerOpenMeal', renderContornoPickerScreen);
   return `
     ${eatenReminderBanner}
+    ${expiryBanner}
     ${reminderBanner}
     ${weekSections}
     ${doneModal}
@@ -4989,6 +5030,8 @@ function buildShopFlat(){
       });
     });
   });
+  const bread = breadShopNeed();
+  if(bread && !state.shopDismissed[bread.key]) flat.push({ key: bread.key, ingrediente: bread.nome, qta: String(bread.need), dove:'', note:'', context:'Pane per i pasti', contextShort:`Pane per ${bread.meals} pasti` });
   DATA.generalShopping.forEach((it,idx)=>{
     const key = `gen_${idx}`;
     if(state.shopDismissed[key]) return;
@@ -5710,7 +5753,44 @@ function breadCountable(it){ return !!(it && (it.unit || '') === '' ); }
 // Il pane è già tra gli ingredienti della ricetta (es. "uovo/pane"): lo conta la ricetta.
 function recipeListsBread(ingredients){
   const bread = breadPantryItem();
-  return ingredients.some(it => bread ? resolvePantryItem(it.ingrediente) === bread : BREAD_NAMES.some(n => (it.ingrediente || '').trim().toLowerCase() === n.toLowerCase()));
+  // Anche "Pane casereccio", "Panini al latte"... (non pangrattato né pan di Spagna).
+  return ingredients.some(it => (bread && resolvePantryItem(it.ingrediente) === bread) || /^(pane|panini|panino)\b/i.test((it.ingrediente || '').trim()));
+}
+// Pane da comprare: 1 panino per ogni pasto col pane ancora da mangiare (da
+// oggi in poi, settimane in più comprese; solo pasti impostati e non ancora
+// segnati), meno quelli già in Dispensa. Una riga sola in Spesa: la chiave
+// cambia col numero, così dopo aver comprato meno del necessario (o se il menù
+// cambia) la riga torna per il resto, anche se quella di prima era spuntata.
+function breadMealsAhead(){
+  let count = 0;
+  const startPos = findTodayPos() ?? 0;
+  const weeks = [0, ...state.extraWeeks.map((_,n)=>n+1)];
+  weeks.forEach(weekIdx=>{
+    const done = weekMealsDoneRef(weekIdx);
+    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{
+      if(weekIdx === 0 && pos < startPos) return;
+      ['pranzo','cena'].forEach(meal=>{
+        if(!mealHasBread(i, meal)) return;
+        if(weekIdx === 0 && pos === startPos && meal === 'pranzo' && isTodayLunchPast()) return;
+        if(done[i] && done[i][meal]) return;
+        if(effectiveMeal(weekIdx, i, meal).principale) count++;
+      });
+    });
+  });
+  return count;
+}
+function breadShopNeed(){
+  const it = breadPantryItem();
+  if(it && !breadCountable(it)) return null;
+  const meals = breadMealsAhead();
+  const have = it && typeof it.qty === 'number' ? Math.max(0, it.qty) : 0;
+  const need = meals * BREAD_PER_MEAL - have;
+  if(need <= 0) return null;
+  return { key: `bread_${need}`, nome: it ? it.nome : 'Pane', need, meals };
+}
+const EXPIRY_BANNER_KEY = 'cookpop-expiry-banner-closed';
+function expiryBannerDismissedToday(){
+  try{ return localStorage.getItem(EXPIRY_BANNER_KEY) === isoLocalDate(new Date()); }catch(e){ return false; }
 }
 function takeBread(n){
   const it = breadPantryItem();
@@ -7493,6 +7573,17 @@ function attachHandlers(){
   // (nascosto mentre la ricerca è aperta, come in Dispensa).
   const prepFab = document.getElementById('prep-fab');
   if(prepFab) prepFab.addEventListener('click', ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; render(); });
+  document.querySelectorAll('[data-dismiss-expiry-banner]').forEach(btn=> btn.addEventListener('click', ()=>{
+    try{ localStorage.setItem(EXPIRY_BANNER_KEY, isoLocalDate(new Date())); }catch(e){}
+    render();
+  }));
+  document.querySelectorAll('[data-expiry-cook]').forEach(btn=> btn.addEventListener('click', ()=>{
+    state.prepPantryMode = true;
+    location.hash = '#prep';
+    state.tab = 'prep';
+    render();
+    window.scrollTo(0, 0);
+  }));
   document.querySelectorAll('[data-toggle-balance-details]').forEach(btn=> btn.addEventListener('click', ()=>{
     state.balanceDetailsOpen = !state.balanceDetailsOpen;
     render();
@@ -8172,6 +8263,7 @@ const TAB_MENU_ITEMS = {
     }
     refreshThemeRow();
     refreshAccentRow();
+    refreshBackupStatus();
     settingsBackdrop.classList.add('open');
     settingsBackdrop.scrollTop = 0;
     reconcileModalHistory();
@@ -8188,7 +8280,7 @@ const TAB_MENU_ITEMS = {
     const extraHtml = currentExtraItems.length
       ? `<div class="topbar-menu-sep"></div>` + currentExtraItems.map((it,idx)=>`<button type="button" class="topbar-menu-item" data-topbar-menu-action="${idx}">${it.label}</button>`).join('')
       : '';
-    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>⚙️ Impostazioni</button>${extraHtml}`;
+    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>⚙️ Impostazioni${backupOverdue() ? '<span class="menu-badge">backup</span>' : ''}</button>${extraHtml}`;
   };
   const openTopbarMenu = ()=>{
     renderTopbarMenuContent();
@@ -8504,7 +8596,36 @@ function applyBackupParts(personal, catalog){
   Object.keys(personal || {}).forEach(k=>{ state[k] = personal[k]; });
   CATALOG_FIELDS.forEach(f=>{ if(catalog && f in catalog) state[f] = catalog[f] || {}; });
 }
+// Ultimo backup scaricato da questo telefono (solo qui, non sincronizzato):
+// in Impostazioni si vede quando, e dopo BACKUP_REMIND_DAYS lo ricorda,
+// anche nel menu ⋮.
+const LAST_BACKUP_KEY = 'cookpop-last-backup';
+const BACKUP_REMIND_DAYS = 30;
+function lastBackupDate(){
+  try{ return localStorage.getItem(LAST_BACKUP_KEY) || null; }catch(e){ return null; }
+}
+function backupOverdue(){
+  const last = lastBackupDate();
+  if(!last) return true;
+  const d = daysUntilDate(last);
+  return d === null || -d > BACKUP_REMIND_DAYS;
+}
+function backupStatusHtml(){
+  const last = lastBackupDate();
+  if(!last) return '<span class="backup-status is-due">Da questo telefono non hai ancora scaricato un backup.</span>';
+  const [y, m, d] = last.split('-').map(Number);
+  const label = new Date(y, m - 1, d).toLocaleDateString('it-IT', { day:'numeric', month:'long' });
+  return backupOverdue()
+    ? `<span class="backup-status is-due">Ultimo backup il ${label}: è passato più di un mese, scaricane uno nuovo.</span>`
+    : `<span class="backup-status">Ultimo backup il ${label}.</span>`;
+}
+function refreshBackupStatus(){
+  const el = document.getElementById('backup-status');
+  if(el) el.innerHTML = backupStatusHtml();
+}
 function downloadBackup(){
+  try{ localStorage.setItem(LAST_BACKUP_KEY, isoLocalDate(new Date())); }catch(e){}
+  refreshBackupStatus();
   const data = buildBackup();
   const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
