@@ -209,7 +209,7 @@ const DEPT_RULES = [
   // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
   // "Gnocchi di patate"/"Concentrato di pomodoro" non sono verdura fresca.
   ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','base'], ['aranciata','bibite'],
-  ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'],
+  ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'], ['farro','pane'], ['tahina','dispensa'],
   ['concentrato','legumi'], ['polpa di pomodoro','legumi'],
   ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
   ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['pesce','pesce'],

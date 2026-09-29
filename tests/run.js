@@ -300,6 +300,25 @@ test('ricette: base e proteina modificabili da "Modifica ricetta"', async ({ pag
   eq(await page.evaluate(() => recipeProteina(getRecipeMeta('Pasta al pesto'))), 'formaggi');
 });
 
+test('generatore: legumi 3-4 volte in ogni stagione', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const orig = currentSeasonKey, out = {};
+    const slots = weekPlanSlots(), seq = weekEatenSequence(slots);
+    for(const season of ['primavera','estate','autunno','inverno']){
+      window.currentSeasonKey = () => season;
+      const counts = [];
+      for(let n = 0; n < 10; n++){
+        const days = pickWeekRecipes();
+        counts.push(seq.filter(({ slot }) => { const s = slots[slot]; return recipeProteina(days[s.day][s.meal].principale) === 'legumi'; }).length);
+      }
+      out[season] = counts.filter(c => c < 3 || c > 4);
+    }
+    window.currentSeasonKey = orig;
+    return out;
+  });
+  eq(r, { primavera: [], estate: [], autunno: [], inverno: [] }, 'settimane con legumi fuori da 3-4');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
