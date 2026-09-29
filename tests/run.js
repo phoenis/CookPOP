@@ -544,6 +544,23 @@ test('ricette: "Con quello che ho" mostra ciò che si fa con la Dispensa, prima 
   eq(page.errors, [], 'errori JS');
 });
 
+test('spesa: i freschi spostati in Dispensa hanno la scadenza stimata, da confermare o sistemare', async ({ page }) => {
+  await page.evaluate(() => {
+    ['zucchine','petto di pollo','spaghetti'].forEach(k => delete state.pantryItems[k]);
+    state.shopExtras = { e1: { ingrediente: 'Zucchine', qta: '4' }, e2: { ingrediente: 'Petto di pollo', qta: '1' }, e3: { ingrediente: 'Spaghetti', qta: '1' } };
+    state.shopChecked = { e1: true, e2: true, e3: true }; state.tab = 'spesa'; state.shopView = 'reparto'; render();
+  });
+  await page.click('#move-checked-to-pantry');
+  const r1 = await page.evaluate(() => ({ keys: expiryConfirmKeys().sort(), zucchine: daysUntilDate(state.pantryItems['zucchine'].scadenza), pollo: daysUntilDate(state.pantryItems['petto di pollo'].scadenza), spaghetti: state.pantryItems['spaghetti'].scadenza || null, modal: !!document.querySelector('[data-exp-confirm-shift]') }));
+  eq(r1, { keys: ['petto di pollo', 'zucchine'], zucchine: 5, pollo: 2, spaghetti: null, modal: true });
+  await page.click('[data-exp-confirm-shift="zucchine"][data-exp-shift="1"]');
+  await page.click('[data-exp-confirm-toggle="petto di pollo"]');
+  eq(await page.evaluate(() => ({ z: daysUntilDate(state.pantryItems['zucchine'].scadenza), p: state.pantryItems['petto di pollo'].scadenza || null })), { z: 6, p: null }, 'sistemate');
+  await page.click('.filters-modal-footer [data-exp-confirm-close]');
+  eq(await page.evaluate(() => ({ open: !!document.querySelector('[data-exp-confirm-shift]'), z: daysUntilDate(state.pantryItems['zucchine'].scadenza) })), { open: false, z: 6 }, 'chiusa');
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

@@ -782,3 +782,14 @@
 .pantry-match-count{ color:var(--ink-light); }
 .pantry-match-count.is-all{ color:color-mix(in srgb, var(--green-deep) 60%, var(--ink)); font-weight:var(--weight-bold); }
 .pantry-match-exp{ padding:0 var(--space-xsmall); border-radius:var(--radius-pill); background:var(--amber); color:var(--on-amber); white-space:nowrap; }
+
+/* Scadenze stimate da confermare dopo la spesa (renderExpiryConfirmModal). */
+.exp-confirm-sub{ font-family:var(--font-family); font-size:var(--text-small); color:var(--ink-light); margin:0 0 var(--space-small); }
+.exp-confirm-list{ display:flex; flex-direction:column; border-top:1px solid var(--line); }
+.exp-confirm-row{ display:flex; align-items:center; gap:var(--space-xsmall); padding:var(--space-small) 0; border-bottom:1px solid var(--line); }
+.exp-confirm-info{ flex:1; min-width:0; }
+.exp-confirm-name{ font-family:var(--font-family); font-weight:var(--weight-bold); }
+.exp-confirm-when{ font-family:var(--font-family); font-size:var(--text-small); color:var(--ink-light); }
+.exp-confirm-stepper .btn.is-icon{ width:2.25rem; height:2.25rem; border-radius:50%; background:var(--surface-2); font-size:var(--text-medium); }
+.exp-confirm-stepper .btn.is-icon:disabled{ opacity:0.35; }
+.exp-confirm-toggle{ font-size:var(--text-xsmall); color:var(--ink-light); text-decoration:underline; min-width:4rem; text-align:right; }
