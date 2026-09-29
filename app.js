@@ -4503,7 +4503,9 @@ function buildShopFlat(){
     // loro righe si aggregano sempre sotto lo stesso titolo di sezione in
     // Spesa (un pasto = una sezione, non una per ricetta).
     const context = `${giorno} ${dateLabel} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
-    const contextShort = `${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
+    // Nota delle righe in Per reparto: solo giorno e pasto, il nome della
+    // ricetta la rendeva troppo lunga (resta nell'intestazione di Per giorno).
+    const contextShort = `${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${MEAL_LABEL[meal]}`;
     const dishes = [{ role:'p', name: principale }].concat(contorni.map((c,ci)=>({ role:`c${ci}`, name:c })));
     dishes.forEach(({role, name})=>{
       const ingList = getIngredientsFor(name);
