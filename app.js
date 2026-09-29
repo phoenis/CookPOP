@@ -61,6 +61,7 @@ const FREEZER_ORDER = ['congelabile','meal-prep','base'];
 
 const GRAD_LABEL = { 'preferita':'❤️ Preferita', 'ci-piace':'🙂 Ci piace', 'ogni-tanto':'😐 Ogni tanto', 'da-provare':'🧪 Da provare' };
 const GRAD_ORDER = ['preferita','ci-piace','ogni-tanto','da-provare'];
+const GRAD_ICON = { 'preferita':'❤️', 'ci-piace':'🙂', 'ogni-tanto':'😐', 'da-provare':'🧪' };
 
 const ATTREZZ_LABEL = { 'Padella':'Padella', 'Pentola':'Pentola', 'Forno':'Forno', 'Piastra':'Piastra', 'Moulinex':'Moulinex', 'Frullatore':'Frullatore', 'Fritto':'Fritto' };
 const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullatore','Fritto'];
@@ -837,6 +838,28 @@ document.addEventListener('click', e=>{
 // Fonte della ricetta: un indirizzo web diventa "Vedi ricetta" (si apre in
 // una nuova scheda); un testo qualsiasi (es. "ricettario", per le ricette
 // copiate da un quaderno) si mostra così com'è, senza link.
+// Gradimento della ricetta, visibile e modificabile con un tocco dalla scheda
+// (prima solo come filtro, e cambiarlo voleva dire passare da "Modifica
+// ricetta"). Si salva come le altre modifiche al catalogo (state.recipeEdits),
+// aggiungendosi a quelle già fatte invece di sostituirle.
+function gradimentoPickerHtml(name){
+  const r = getRecipeMeta(name);
+  if(!r) return '';
+  return `
+    <div class="grad-picker" role="group" aria-label="Gradimento">
+      <span class="grad-picker-label">Vi piace?</span>
+      ${GRAD_ORDER.map(g=>`<button type="button" class="btn is-chip grad-chip${r.gradimento===g?' active':''}" aria-pressed="${r.gradimento===g}" data-set-gradimento="${escapeAttr(name)}" data-grad="${g}">${escapeHtml(GRAD_LABEL[g])}</button>`).join('')}
+    </div>`;
+}
+document.addEventListener('click', e=>{
+  const chip = e.target.closest && e.target.closest('[data-set-gradimento]');
+  if(!chip) return;
+  const name = chip.dataset.setGradimento;
+  const grad = chip.dataset.grad;
+  if(!GRAD_ORDER.includes(grad) || (getRecipeMeta(name) || {}).gradimento === grad) return;
+  state.recipeEdits[name] = Object.assign({}, state.recipeEdits[name], { gradimento: grad });
+  persist(); render();
+});
 function sourceLinkHtml(det){
   const link = det && det.link ? String(det.link).trim() : '';
   if(!link) return '';
@@ -3579,6 +3602,13 @@ function renderRecipeEditModal(){
             </select>
           </div>
           <div class="filter-group">
+            <div class="filter-group-label">❤️ Gradimento</div>
+            <select id="edit-gradimento">
+              ${GRAD_ORDER.includes(rec.gradimento) ? '' : '<option value="" selected>—</option>'}
+              ${GRAD_ORDER.map(g=>`<option value="${g}" ${rec.gradimento===g?'selected':''}>${escapeHtml(GRAD_LABEL[g])}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-group">
             <div class="filter-group-label">🌾 Base di carboidrati</div>
             <select id="edit-base">
               ${BASE_ORDER.map(b=>`<option value="${b}" ${recipeBase(rec)===b?'selected':''}>${escapeHtml(BASE_LABEL[b])}</option>`).join('')}
@@ -3965,6 +3995,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
       <div class="detail-box">
         ${rec ? recipePhotoHtml(name) : ''}
         ${tagsHtml}
+        ${rec ? gradimentoPickerHtml(name) : ''}
         ${dayMetaHtml}
         ${soakChip}
         ${portionsControl}
@@ -5095,6 +5126,7 @@ function renderRecipeDetailScreen(name){
       <div class="detail-box">
         ${recipePhotoHtml(name)}
         ${tagsHtml}
+        ${gradimentoPickerHtml(name)}
         ${ingHtml}
         ${stepsHtml}
         ${noteBox}
@@ -5137,6 +5169,7 @@ function renderPrep(){
           <span class="day-time">${escapeHtml(r.tempo)}</span>
         </div>
         <div class="day-row-side">
+          ${GRAD_ICON[r.gradimento] ? `<span class="grad-icon" title="${escapeAttr(stripHtml(GRAD_LABEL[r.gradimento]))}" aria-label="${escapeAttr(stripHtml(GRAD_LABEL[r.gradimento]))}">${GRAD_ICON[r.gradimento]}</span>` : ''}
           <span class="cat-icon" title="${escapeAttr(CAT_LABEL[r.categoriaNew])}">${catIcon(r.categoriaNew)}</span>
         </div>
       </div>
@@ -6799,6 +6832,7 @@ function attachHandlers(){
         porzioni: document.getElementById('edit-porzioni').value.trim(),
         categoriaNew: document.getElementById('edit-categoria').value,
         tipologia: document.getElementById('edit-tipologia').value,
+        gradimento: document.getElementById('edit-gradimento').value,
         base: document.getElementById('edit-base').value,
         proteina: document.getElementById('edit-proteina').value,
         stagioni: stagioni.length ? stagioni : ['tutto'],

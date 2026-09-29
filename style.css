@@ -602,7 +602,7 @@
 
   .inv-item, .recipe-card{ display:flex; align-items:center; gap:var(--space-xsmall); padding:var(--space-xsmall) var(--space-xxsmall); border-bottom:1px dashed var(--line); position:relative; }
   .inv-item.is-avanzi{padding-left: 0; padding-right: 0;}
-  .recipe-card{padding-right: 3rem;}
+  .recipe-card{padding-right: 5rem;} /* spazio per le icone a destra: gradimento + categoria */
   .full-badge{display: none;}
   .recipe-title{font-weight: var(--weight-medium);}
   .inv-name{ flex:1; min-width:0; text-align:left; font-weight:var(--weight-medium); font-size:var(--text-small); justify-content: left; }
@@ -710,3 +710,10 @@
 .recipe-photo-actions{ display:flex; flex-wrap:wrap; gap:var(--space-xsmall, 0.5rem); margin-bottom:var(--space-small); }
 .recipe-photo-btn{ cursor:pointer; }
 .recipe-photo-error{ color:var(--delete); font-size:var(--text-xsmall); margin-bottom:var(--space-small); }
+
+/* Gradimento nella scheda ricetta (vedi gradimentoPickerHtml). */
+.grad-picker{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-xsmall); margin:var(--space-small) 0; }
+.grad-picker-label{ font-size:var(--text-xsmall); font-weight:var(--weight-medium); color:var(--muted, inherit); margin-right:var(--space-xxsmall, 0.25rem); }
+.btn.is-chip.grad-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-xsmall); }
+.btn.is-chip.grad-chip.active{ background:var(--ink); color:var(--bg); }
+.grad-icon{ font-size:var(--text-small); margin-right:var(--space-xxsmall, 0.25rem); }

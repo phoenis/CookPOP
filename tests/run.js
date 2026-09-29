@@ -356,6 +356,20 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
   eq(page.errors, [], 'errori JS');
 });
 
+test('ricette: gradimento visibile e modificabile con un tocco, senza perdere altre modifiche', async ({ page }) => {
+  await page.evaluate(() => { state.recipeEdits['Carbonara'] = { ricordare: 'nota mia' }; state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render(); });
+  eq(await page.$eval('.grad-chip.active', el => el.dataset.grad), 'ci-piace', 'gradimento mostrato');
+  await page.click('[data-set-gradimento="Carbonara"][data-grad="preferita"]');
+  const r = await page.evaluate(() => ({ grad: getRecipeMeta('Carbonara').gradimento, nota: getRecipeDetails('Carbonara').ricordare, active: document.querySelector('.grad-chip.active').dataset.grad }));
+  eq(r, { grad: 'preferita', nota: 'nota mia', active: 'preferita' });
+  await page.evaluate(() => { state.expandedRecipe = null; render(); });
+  eq(await page.$eval('[data-toggle-recipe="Carbonara"] .grad-icon', el => el.textContent), '❤️', 'icona nella card');
+  await page.evaluate(() => { state.recipeEditName = 'Carbonara'; render(); });
+  await page.selectOption('#edit-gradimento', 'ogni-tanto');
+  await page.click('[data-save-recipe-edit]');
+  eq(await page.evaluate(() => getRecipeMeta('Carbonara').gradimento), 'ogni-tanto', 'da Modifica ricetta');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
