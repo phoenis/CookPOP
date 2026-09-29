@@ -3612,7 +3612,7 @@ function describeElement(el){
   return tag + attrs.map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
 }
 function dialogOf(layer){
-  return layer.querySelector('.filters-modal, .topbar-menu') || layer;
+  return layer.querySelector('.filters-modal, .topbar-menu, .settings-page') || layer;
 }
 function openDialogLayers(){
   const layers = [...document.querySelectorAll(DIALOG_LAYER_SELECTOR)].filter(el => el.getClientRects().length);
@@ -4471,7 +4471,7 @@ function renderProfilePanel(){
     <div class="profile-panel">
       <div class="profile-name">${escapeHtml(COOK_LABEL[user])}</div>
       <p class="profile-next-cook">${nextLine}</p>
-      <div class="filter-group-label">Il tuo colore</div>
+      <div class="settings-field-label">Il tuo colore nei turni di cucina</div>
       <div class="color-swatch-row">${swatches}</div>
     </div>`;
 }
@@ -7894,15 +7894,19 @@ const TAB_MENU_ITEMS = {
     accentRow.innerHTML = USER_COLOR_PRESETS.map(c=>`<button type="button" class="color-swatch${active===c?' active':''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
   };
   const open = ()=>{
-    if(profilePanel) profilePanel.innerHTML = renderProfilePanel();
+    if(profilePanel){
+      profilePanel.innerHTML = renderProfilePanel();
+      const section = document.getElementById('profile-section');
+      if(section) section.hidden = !profilePanel.innerHTML;
+    }
     refreshThemeRow();
     refreshAccentRow();
     settingsBackdrop.classList.add('open');
+    settingsBackdrop.scrollTop = 0;
     reconcileModalHistory();
   };
   const close = ()=>{ settingsBackdrop.classList.remove('open'); reconcileModalHistory(); };
   if(settingsClose) settingsClose.addEventListener('click', close);
-  settingsBackdrop.addEventListener('click', e=>{ if(e.target === settingsBackdrop) close(); });
 
   // Menu "tre puntini" della topbar: Impostazioni + le voci di TAB_MENU_ITEMS
   // per la tab corrente, ricalcolate a ogni apertura così restano coerenti
