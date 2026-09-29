@@ -602,7 +602,7 @@
 
   .inv-item, .recipe-card{ display:flex; align-items:center; gap:var(--space-xsmall); padding:var(--space-xsmall) var(--space-xxsmall); border-bottom:1px dashed var(--line); position:relative; }
   .inv-item.is-avanzi{padding-left: 0; padding-right: 0;}
-  .recipe-card{padding-right: 3rem;}
+  .recipe-card{padding-right: 5rem;} /* spazio per le icone a destra: gradimento + categoria */
   .full-badge{display: none;}
   .recipe-title{font-weight: var(--weight-medium);}
   .inv-name{ flex:1; min-width:0; text-align:left; font-weight:var(--weight-medium); font-size:var(--text-small); justify-content: left; }
