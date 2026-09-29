@@ -587,7 +587,7 @@ function renderContornoDetailBox(name, ratio, ctx){
       det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
     ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
   const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-  const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
+  const linkHtml = sourceLinkHtml(det);
   const addFormHtml = det ? '' : `
     <div class="add-ing-form">
       <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(name)}">
@@ -747,6 +747,15 @@ function getRecipeMeta(name){
   if(!base) return null;
   const edit = state.recipeEdits[name];
   return Object.assign({ stagioni:['tutto'], gradimento:'', attrezzatura:[], tipologia:'primo' }, base, edit);
+}
+// Fonte della ricetta: un indirizzo web diventa "Vedi ricetta" (si apre in
+// una nuova scheda); un testo qualsiasi (es. "ricettario", per le ricette
+// copiate da un quaderno) si mostra così com'è, senza link.
+function sourceLinkHtml(det){
+  const link = det && det.link ? String(det.link).trim() : '';
+  if(!link) return '';
+  if(!/^https?:\/\//i.test(link)) return `<span class="source-link source-text">Fonte: ${escapeHtml(link)}</span>`;
+  return `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>`;
 }
 function getRecipeDetails(name){
   const base = DATA.recipeDetails[name] || null;
@@ -3842,7 +3851,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
       det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
     ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
   const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-  const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
+  const linkHtml = sourceLinkHtml(det);
   const addFormHtml = (name && !det) ? `
     <div class="add-ing-form">
       <input type="text" placeholder="Ingrediente" data-ning="${mk}">
@@ -4974,7 +4983,7 @@ function renderRecipeDetailScreen(name){
       det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
     ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
   const noteBox = noteExtra ? `<div class="detail-section note-box"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Note</div>${noteExtra}</div>` : '';
-  const linkHtml = det && det.link ? `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>` : '';
+  const linkHtml = sourceLinkHtml(det);
   const addFormHtml = det ? '' : `
     <div class="add-ing-form">
       <input type="text" placeholder="Ingrediente" data-rning="${escapeAttr(name)}">
