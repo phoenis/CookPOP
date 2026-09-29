@@ -738,3 +738,9 @@
 .swipe-trash svg{ width:1.2em; height:1.2em; }
 .swipe-content{ position:relative; background:var(--bg); touch-action:pan-y; transition:transform .2s ease; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
 .swipe-content.swiping{ transition:none; }
+
+/* Backup dei dati in Impostazioni. */
+p.section-sub.backup-sub{ display:block; margin:0 0 var(--space-xsmall); }
+.backup-row{ display:flex; gap:var(--space-xsmall); }
+.backup-row .settings-item{ flex:1; justify-content:center; }
+.backup-restore-label{ cursor:pointer; }

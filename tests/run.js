@@ -496,6 +496,24 @@ test('dispensa: swipe a destra segna la voce come finita (quantità 0, in Spesa 
   eq(await page.evaluate(() => state.pantryItems['carciofi'] && state.pantryItems['carciofi'].qty), 3, 'annulla');
 });
 
+test('backup: scarica e ripristina i dati, con Annulla; un file sbagliato viene rifiutato', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    upsertPantryItem('Carciofi', 'frigo', 3);
+    state.shopExtras = { e1: { ingrediente: 'Asparagi', qta: '1' } };
+    const backup = JSON.parse(JSON.stringify(buildBackup()));
+    delete state.pantryItems['carciofi'];
+    state.shopExtras = {};
+    const bad = restoreBackup({ foo: 1 }, () => true);
+    const ok = restoreBackup(backup, () => true);
+    const restored = { carciofi: state.pantryItems['carciofi'] && state.pantryItems['carciofi'].qty, extra: !!state.shopExtras.e1 };
+    return { format: backup.format, bad, ok, restored, toast: state.undoToast && state.undoToast.message };
+  });
+  eq(r, { format: 'cookpop-backup', bad: 'Questo file non è un backup di CookPOP.', ok: null, restored: { carciofi: 3, extra: true }, toast: 'Backup ripristinato' });
+  await page.click('.undo-toast button');
+  eq(await page.evaluate(() => ({ carciofi: !!state.pantryItems['carciofi'], extra: !!state.shopExtras.e1 })), { carciofi: false, extra: false }, 'annulla');
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
