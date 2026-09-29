@@ -835,6 +835,97 @@ document.addEventListener('click', e=>{
   });
 });
 
+// Finestra "Unisci con…": prima si sceglie il nome da tenere (con ricerca),
+// poi un riepilogo di cosa cambia e la conferma. Vedi mergeIngredientInto.
+function closeMergeIngredient(){
+  state.mergeIngredientFrom = null;
+  state.mergeIngredientTarget = null;
+  state.mergeIngredientSearch = '';
+}
+function renderMergeIngredientModal(){
+  const from = state.mergeIngredientFrom;
+  if(!from) return '';
+  const fromKey = from.trim().toLowerCase();
+  const target = state.mergeIngredientTarget;
+  let body;
+  if(target){
+    const toKey = target.trim().toLowerCase();
+    const a = state.pantryItems[fromKey], b = state.pantryItems[toKey];
+    const qtyText = it => it && typeof it.qty === 'number' ? `${it.qty}${it.unit ? ' ' + it.unit : ''}` : '0';
+    const sameUnit = !a || !b || !a.unit || !b.unit || a.unit === b.unit;
+    const recipes = recipesUsingIngredient(from).length;
+    const lines = [
+      recipes ? `Le ${recipes === 1 ? 'ricetta che usa' : recipes + ' ricette che usano'} «${escapeHtml(from)}» useranno «${escapeHtml(target)}».` : `Nessuna ricetta usa «${escapeHtml(from)}».`,
+      a && typeof a.qty === 'number' && a.qty > 0
+        ? (sameUnit ? `In Dispensa le quantità si sommano: ${escapeHtml(qtyText(b))} + ${escapeHtml(qtyText(a))}.` : `In Dispensa resta la quantità di «${escapeHtml(target)}» (${escapeHtml(qtyText(b))}): le unità sono diverse, quella di «${escapeHtml(from)}» (${escapeHtml(qtyText(a))}) non si somma.`)
+        : '',
+      `Anche in Spesa e nelle note «${escapeHtml(from)}» diventa «${escapeHtml(target)}».`
+    ].filter(Boolean);
+    body = `
+      <p class="merge-summary"><b>${escapeHtml(from)}</b> → <b>${escapeHtml(target)}</b></p>
+      <ul class="merge-effects">${lines.map(l=>`<li>${l}</li>`).join('')}</ul>
+      <div class="filters-modal-footer">
+        <button type="button" class="btn is-outline" data-merge-back>Indietro</button>
+        <button type="button" class="btn is-solid mini-add-btn" data-merge-confirm>Unisci</button>
+      </div>`;
+  } else {
+    const search = (state.mergeIngredientSearch || '').trim().toLowerCase();
+    const names = allIngredientNamesForManager().filter(n => n.trim().toLowerCase() !== fromKey && (!search || n.toLowerCase().includes(search)));
+    body = `
+      <p class="section-sub">Scegli il nome da tenere: «${escapeHtml(from)}» sparirà e diventerà quello, nelle ricette, in Dispensa e in Spesa.</p>
+      <div class="search-field">
+        <input class="input-search" type="search" id="merge-search" placeholder="Cerca il nome da tenere…" value="${escapeAttr(state.mergeIngredientSearch || '')}">
+      </div>
+      <div class="ingredient-manager-list">
+        ${names.map(n=>`<button type="button" class="ingredient-manager-row" data-merge-pick="${escapeAttr(n)}"><span class="dept-icon">${DEPT_ICON[knownDept((state.pantryItems[n.trim().toLowerCase()]||{}).cat) || classifyDept(n)]}</span><span class="ingredient-manager-name">${escapeHtml(n)}</span></button>`).join('') || `<p class="ing-empty">Nessun ingrediente trovato.</p>`}
+      </div>`;
+  }
+  return `
+    <div class="filters-modal-backdrop is-second" data-close-merge>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Unisci «${escapeHtml(from)}»</h3>
+          <button class="btn is-icon filters-close-btn" data-close-merge>✕</button>
+        </div>
+        ${body}
+      </div>
+    </div>`;
+}
+// In fase di cattura: dentro Modifica ingrediente i click vengono fermati
+// (stopPropagation sul primo [data-stop-close] del pannello, vedi
+// attachHandlers) e non arriverebbero mai fin qui risalendo.
+document.addEventListener('click', e=>{
+  const t = e.target.closest ? e.target : null;
+  if(!t) return;
+  const open = t.closest('[data-open-merge]');
+  if(open){ state.mergeIngredientFrom = open.dataset.openMerge; state.mergeIngredientTarget = null; state.mergeIngredientSearch = ''; render(); return; }
+  // Chiude toccando lo sfondo o la ✕, non un punto qualsiasi dentro la finestra.
+  const close = t.closest('[data-close-merge]');
+  if(close && (t === close || close.tagName === 'BUTTON')){ closeMergeIngredient(); render(); return; }
+  const pick = t.closest('[data-merge-pick]');
+  if(pick){ state.mergeIngredientTarget = pick.dataset.mergePick; render(); return; }
+  if(t.closest('[data-merge-back]')){ state.mergeIngredientTarget = null; render(); return; }
+  if(t.closest('[data-merge-confirm]')){
+    const from = state.mergeIngredientFrom, to = state.mergeIngredientTarget;
+    if(!from || !to) return;
+    const snap = JSON.parse(JSON.stringify(MERGE_SNAPSHOT_FIELDS.reduce((o, f)=>{ o[f] = state[f]; return o; }, {})));
+    const prevEditKey = state.pantryEditKey;
+    mergeIngredientInto(from, to);
+    closeMergeIngredient();
+    const toKey = to.trim().toLowerCase();
+    state.pantryEditKey = state.pantryItems[toKey] ? toKey : null;
+    persist(); render();
+    showUndoToast(`«${from}» unito a «${to}»`, ()=>{
+      MERGE_SNAPSHOT_FIELDS.forEach(f=>{ state[f] = snap[f] || {}; });
+      state.pantryEditKey = prevEditKey && state.pantryItems[prevEditKey] ? prevEditKey : null;
+      persist(); render();
+    });
+  }
+}, true);
+document.addEventListener('input', e=>{
+  if(e.target && e.target.id === 'merge-search'){ state.mergeIngredientSearch = e.target.value; render(); }
+});
+
 // Fonte della ricetta: un indirizzo web diventa "Vedi ricetta" (si apre in
 // una nuova scheda); un testo qualsiasi (es. "ricettario", per le ricette
 // copiate da un quaderno) si mostra così com'è, senza link.
@@ -973,16 +1064,75 @@ function getIngredientsFor(name){
   });
   const renames = Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
   return list.map(it=>{
-    let displayName = it.ingrediente;
-    const seen = new Set();
-    let key = (displayName||'').trim().toLowerCase();
-    while(renames[key] && !seen.has(key)){
-      seen.add(key);
-      displayName = renames[key];
-      key = displayName.trim().toLowerCase();
-    }
+    const displayName = resolveIngredientName(it.ingrediente, renames);
     return displayName === it.ingrediente ? it : Object.assign({}, it, { ingrediente: displayName });
   });
+}
+// Nome finale di un ingrediente seguendo i sinonimi (quelli curati e quelli
+// creati dall'app, che hanno la precedenza), con protezione dai giri chiusi.
+function resolveIngredientName(name, renames){
+  renames = renames || Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
+  let displayName = name;
+  const seen = new Set();
+  let key = (displayName||'').trim().toLowerCase();
+  while(renames[key] && !seen.has(key)){
+    seen.add(key);
+    displayName = renames[key];
+    key = displayName.trim().toLowerCase();
+  }
+  return displayName;
+}
+
+// "Unisci con…" (da Modifica ingrediente, anche partendo da Gestisci
+// ingredienti): due nomi che sono la stessa cosa diventano uno solo, senza
+// dover chiedere di scriverlo nel codice (CURATED_INGREDIENT_RENAMES).
+// - ricette: il vecchio nome diventa un sinonimo del nuovo (ingredientRenames,
+//   condiviso con tutti gli spazi come il resto del catalogo); chi puntava già
+//   al vecchio nome viene rediretto al nuovo;
+// - Dispensa: una voce sola; quantità sommate se hanno la stessa unità (o
+//   nessuna), altrimenti resta quella del nome tenuto; unità, categoria,
+//   gruppo e luogo presi dal vecchio solo dove il nuovo non li ha;
+// - Spesa: "da comprare", righe aggiunte a mano e nota passano al nuovo nome.
+const MERGE_SNAPSHOT_FIELDS = ['ingredientRenames','pantryItems','pantryConfirmedShop','shopDismissed','shopExtras','ingredientNotes','pantrySelected'];
+function mergeIngredientInto(fromName, toName){
+  const fromKey = (fromName||'').trim().toLowerCase();
+  const to = (toName||'').trim();
+  const toKey = to.toLowerCase();
+  if(!fromKey || !toKey || fromKey === toKey) return;
+  // Se il nome tenuto era a sua volta un sinonimo che riporta al vecchio,
+  // lo si fissa su se stesso: altrimenti i due si rimanderebbero a vicenda.
+  if(resolveIngredientName(to).trim().toLowerCase() === fromKey) state.ingredientRenames[toKey] = to;
+  for(const k in state.ingredientRenames){
+    if(k !== toKey && (state.ingredientRenames[k]||'').trim().toLowerCase() === fromKey) state.ingredientRenames[k] = to;
+  }
+  state.ingredientRenames[fromKey] = to;
+
+  const old = state.pantryItems[fromKey];
+  if(old){
+    const cur = state.pantryItems[toKey];
+    if(cur){
+      const sameUnit = !old.unit || !cur.unit || old.unit === cur.unit;
+      if(sameUnit && typeof old.qty === 'number') cur.qty = (typeof cur.qty === 'number' ? cur.qty : 0) + old.qty;
+      ['unit','cat','group','luogo'].forEach(f=>{ if(!cur[f] && old[f]) cur[f] = old[f]; });
+    } else {
+      state.pantryItems[toKey] = Object.assign({}, old, { nome: to });
+    }
+    delete state.pantryItems[fromKey];
+  }
+  if(state.pantryConfirmedShop[fromKey]){ state.pantryConfirmedShop[toKey] = true; delete state.pantryConfirmedShop[fromKey]; }
+  if(state.shopDismissed['oos_'+fromKey]){ delete state.shopDismissed['oos_'+fromKey]; }
+  if(state.pantrySelected) delete state.pantrySelected[fromKey];
+  Object.values(state.shopExtras || {}).forEach(it=>{
+    if(it && (it.ingrediente||'').trim().toLowerCase() === fromKey) it.ingrediente = to;
+  });
+  if(state.ingredientNotes[fromKey]){
+    if(!state.ingredientNotes[toKey]) state.ingredientNotes[toKey] = state.ingredientNotes[fromKey];
+    delete state.ingredientNotes[fromKey];
+  }
+}
+function recipesUsingIngredient(name){
+  const key = (name||'').trim().toLowerCase();
+  return allRecipeMetas().filter(r => getIngredientsFor(r.nome).some(it => (it.ingrediente||'').trim().toLowerCase() === key));
 }
 
 // Vocabolario di nomi ingrediente noti, per il suggeritore di "Aggiungi" in
@@ -1147,6 +1297,9 @@ const state = {
   shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
+  mergeIngredientFrom: null, // non persistito: "Unisci con…" aperto per questo nome (vedi mergeIngredientInto)
+  mergeIngredientTarget: null, // non persistito: nome scelto con cui unire, in attesa di conferma
+  mergeIngredientSearch: '', // non persistito: ricerca nella scelta
   mealsModelMigrated: false, // una tantum: passaggio da "una ricetta al giorno" a due pasti (pranzo/cena), ognuno {principale, contorni[]} — vedi il blocco di migrazione più sotto
   mealsModelMigrated2: false, // una tantum: "chi cucina" da per giorno a per pasto
   tempoRulesMigrated: false, // una tantum: dayTempoCap (per giorno 0-6) -> weekTempoBase/weekTempoExceptions (base + eccezioni, pranzo/cena separati ven-dom)
@@ -3339,6 +3492,7 @@ const MODAL_CHECKS = [
   [()=> !!state.deptsModalOpen, ()=>{ state.deptsModalOpen = false; }],
   [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
+  [()=> !!state.mergeIngredientFrom, ()=>{ closeMergeIngredient(); }],
   [()=> !!state.pantryEditKey, ()=>{ state.pantryEditKey = null; }],
   [()=> !!state.pantryAddModalOpen, ()=>{ state.pantryAddModalOpen = false; }],
   [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
@@ -5415,6 +5569,10 @@ function renderDispensa(){
               ${editingHome ? homeUnitOptionsHtml(editItem.unit) : UNIT_ORDER.map(u=>`<option value="${u}" ${(editItem.unit||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
             </select>
           </div>
+          <div class="filter-group">
+            <div class="filter-group-label">È un doppione?</div>
+            <button type="button" class="btn is-chip merge-open-btn" data-open-merge="${escapeAttr(editItem.nome)}">🔗 Unisci con un altro ${editingHome ? 'prodotto' : 'ingrediente'}…</button>
+          </div>
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-outline color-delete" id="pantry-edit-delete"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina</button>
@@ -5422,6 +5580,8 @@ function renderDispensa(){
         </div>
       </div>
     </div>` : '';
+
+  const mergeModal = renderMergeIngredientModal();
 
   // Dalla vista Casa si aggiunge un prodotto, non un ingrediente: solo
   // categorie Casa, niente gruppo (servono alle ricette), unità solo
@@ -5603,7 +5763,7 @@ function renderDispensa(){
           <h3>Gestisci ingredienti</h3>
           <button class="btn is-icon filters-close-btn" data-close-ingredient-manager>✕</button>
         </div>
-        <p class="section-sub">Tutti gli ingredienti noti al sistema — in Dispensa, nelle ricette o aggiunti a mano in Spesa. Tocca per modificarne categoria, luogo o quantità.</p>
+        <p class="section-sub">Tutti gli ingredienti noti al sistema — in Dispensa, nelle ricette o aggiunti a mano in Spesa. Tocca per modificarne categoria, luogo o quantità, o per unirlo a un doppione.</p>
         <div class="search-field">
           <input class="input-search" type="search" id="ingredient-manager-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.ingredientManagerSearch||'')}">
           ${state.ingredientManagerSearch ? `<button type="button" class="search-clear" id="ingredient-manager-search-clear" aria-label="Cancella ricerca">${CLEAR_ICON_SVG}</button>` : ''}
@@ -5646,6 +5806,7 @@ function renderDispensa(){
     ${body}
     <div class="save-hint"></div>
     ${editModal}
+    ${mergeModal}
     ${addModal}
     ${groupsModal}
     ${deptsModal}
