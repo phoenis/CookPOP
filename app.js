@@ -5581,7 +5581,7 @@ function renderDispensa(){
       : LUOGO_ICON[it.luogo];
     return `
     <div class="swipe-wrap" data-swipe-id="pantry:${escapeAttr(it.key)}" data-swipe-pantry="${escapeAttr(it.key)}">
-    <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(it.nome)}">${TRASH_ICON_SVG}</button>
+    <button type="button" class="swipe-trash" tabindex="-1" aria-label="${escapeAttr(it.nome)}: finito">${TRASH_ICON_SVG}</button>
     <div class="inv-item swipe-content" data-pantry-row="${escapeAttr(it.key)}">
       <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${luogoIconContent}</button>
       ${state.pantryLuogoPicker === it.key ? `
@@ -7437,7 +7437,7 @@ function attachHandlers(){
     attachSwipeToDelete(wrap, ()=> removeShopRowWithUndo(wrap.dataset.swipeShop, wrap.dataset.swipeLabel));
   });
   document.querySelectorAll('.swipe-wrap[data-swipe-pantry]').forEach(wrap=>{
-    attachSwipeToDelete(wrap, ()=> removePantryItemWithUndo(wrap.dataset.swipePantry));
+    attachSwipeToDelete(wrap, ()=> finishPantryItemWithUndo(wrap.dataset.swipePantry));
   });
   document.querySelectorAll('[data-luogo-picker-close]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.pantryLuogoPicker = null; render(); });
@@ -8053,16 +8053,20 @@ function removeShopRowWithUndo(rowKey, label){
     persist(); render();
   });
 }
-// Elimina una voce di Dispensa (come "Elimina" in Modifica ingrediente), con Annulla.
-function removePantryItemWithUndo(key){
-  const prev = state.pantryItems[key];
-  if(!prev) return;
+// Swipe in Dispensa = "l'ho finito": quantità a 0, come arrivarci col "−".
+// La voce resta (unità, categoria, luogo, gruppo) e compare in Spesa tra i
+// "Finiti in Dispensa"; eliminarla del tutto resta in Modifica ingrediente.
+function finishPantryItemWithUndo(key){
+  const it = state.pantryItems[key];
+  if(!it) return;
+  const prevQty = it.qty;
   const wasSelected = !!state.pantrySelected[key];
-  delete state.pantryItems[key];
+  it.qty = 0;
   delete state.pantrySelected[key];
   persist(); render();
-  showUndoToast(`${prev.nome} eliminato dalla Dispensa`, ()=>{
-    state.pantryItems[key] = prev;
+  showUndoToast(`${it.nome} finito: è in Spesa tra i Finiti`, ()=>{
+    const cur = state.pantryItems[key];
+    if(cur) cur.qty = prevQty;
     if(wasSelected) state.pantrySelected[key] = true;
     persist(); render();
   });
