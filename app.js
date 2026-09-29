@@ -2816,7 +2816,67 @@ function weekPlanScore(picks, slots, seq){
   if(ogniTanto > 1) score += 20 * (ogniTanto - 1);
   return score;
 }
-function pickWeekRecipes(fixed){
+// La Dispensa nel generatore: a parità di equilibrio (weekPlanScore, a
+// punti interi) si preferisce la settimana che usa quello che scade — in un
+// pasto che cade prima della scadenza, più conta quanto più è vicina — e poi,
+// di poco, quella con più ingredienti già in casa (esclusi sale, olio e
+// spezie, reparto "base"). pantryPlanScore vale sempre meno di 1 punto:
+// non può mai far perdere equilibrio, sceglie solo tra settimane equivalenti.
+const PANTRY_EXPIRY_HORIZON = 7; // giorni: oltre, la scadenza non guida la scelta
+function buildPantryPlanContext(weekIdx, slots){
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dates = weekDatesFor(weekIdx || 0);
+  const slotOffset = slots.map(s=>{
+    const d = dates[WEEK_DISPLAY_ORDER.indexOf(s.day)];
+    return Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - today) / 86400000);
+  });
+  const expiring = {}; // chiave voce di Dispensa -> giorni alla scadenza
+  Object.entries(state.pantryItems).forEach(([key, it])=>{
+    const d = pantryExpiryDays(it);
+    if(d !== null && d >= 0 && d <= PANTRY_EXPIRY_HORIZON && !isNonFoodDept(knownDept(it.cat) || classifyDept(it.nome))) expiring[key] = d;
+  });
+  const expMax = Object.values(expiring).reduce((sum, d) => sum + 1 / (1 + d), 0);
+  const cache = new Map();
+  function recipeInfo(r){
+    if(cache.has(r.nome)) return cache.get(r.nome);
+    const ings = getIngredientsFor(r.nome).filter(it => it.ingrediente && classifyDept(it.ingrediente) !== 'base');
+    const inHouse = ings.filter(it => pantryStatusFor(it.ingrediente, it.qta) !== 'manca').length;
+    const exp = [];
+    ings.forEach(it=>{
+      const p = resolvePantryItem(it.ingrediente);
+      const key = p && (p.nome || '').trim().toLowerCase();
+      if(key && expiring[key] !== undefined && !exp.some(e => e.key === key)) exp.push({ key, d: expiring[key] });
+    });
+    const info = { cov: ings.length ? inHouse / ings.length : 0, exp };
+    cache.set(r.nome, info);
+    return info;
+  }
+  return { slotOffset, expiring, expMax, recipeInfo, active: expMax > 0 || Object.values(state.pantryItems).some(it => typeof it.qty === 'number' && it.qty > 0) };
+}
+function pantryPlanScore(picks, ctx){
+  if(!ctx || !ctx.active) return 0;
+  const covered = {};
+  let cov = 0;
+  picks.forEach((r, i)=>{
+    const info = ctx.recipeInfo(r);
+    cov += info.cov;
+    const off = ctx.slotOffset[i];
+    info.exp.forEach(e=>{
+      if(off >= 0 && off <= e.d) covered[e.key] = 1 / (1 + e.d);
+    });
+  });
+  const expScore = ctx.expMax ? Object.values(covered).reduce((a, b) => a + b, 0) / ctx.expMax : 0;
+  return -(0.6 * expScore + 0.35 * (picks.length ? cov / picks.length : 0));
+}
+// Ingredienti in scadenza usati da una settimana già scelta (per dirlo dopo
+// la generazione): nomi delle voci di Dispensa, dalla più urgente.
+function expiringUsedByPlan(picks, ctx){
+  const used = new Set();
+  picks.forEach((r, i)=> ctx.recipeInfo(r).exp.forEach(e=>{ if(ctx.slotOffset[i] >= 0 && ctx.slotOffset[i] <= e.d) used.add(e.key); }));
+  return [...used].sort((a, b) => ctx.expiring[a] - ctx.expiring[b]).map(k => state.pantryItems[k].nome);
+}
+function pickWeekRecipes(fixed, weekIdx){
   fixed = fixed || {};
   const season = currentSeasonKey();
   const inSeason = r => r.stagioni.includes(season) || r.stagioni.includes('tutto');
@@ -2835,6 +2895,8 @@ function pickWeekRecipes(fixed){
 
   const slots = weekPlanSlots();
   const seq = weekEatenSequence(slots);
+  const pantryCtx = buildPantryPlanContext(weekIdx, slots);
+  const totalScore = picks => weekPlanScore(picks, slots, seq) + pantryPlanScore(picks, pantryCtx);
   const fixedAt = slots.map(s => fixed[`${s.day}_${s.meal}`] || null);
   const fixedNames = new Set(fixedAt.filter(Boolean).map(r => r.nome));
   const candidates = slots.map((s, i) => fixedAt[i] ? [fixedAt[i]] : withinCap(pool.filter(r => !fixedNames.has(r.nome)), s.day, s.meal));
@@ -2851,8 +2913,12 @@ function pickWeekRecipes(fixed){
   }
   const free = slots.map((s, i) => i).filter(i => !fixedAt[i]);
   function improve(picks){
-    let score = weekPlanScore(picks, slots, seq);
-    for(let it = 0; it < 1500 && score > 0; it++){
+    let score = totalScore(picks);
+    // Senza Dispensa di mezzo ci si ferma all'equilibrio perfetto (0); con la
+    // Dispensa si continua a cercare, finché per un po' non migliora più.
+    let sinceBetter = 0;
+    for(let it = 0; it < 1500 && (pantryCtx.active ? sinceBetter < 400 || score >= 1 : score > 0); it++){
+      sinceBetter++;
       const next = picks.slice();
       const i = free[rand(free.length)];
       if(Math.random() < 0.3 && free.length > 1){
@@ -2866,7 +2932,8 @@ function pickWeekRecipes(fixed){
         if(used.has(r.nome)) continue;
         next[i] = r;
       }
-      const nextScore = weekPlanScore(next, slots, seq);
+      const nextScore = totalScore(next);
+      if(nextScore < score) sinceBetter = 0;
       if(nextScore <= score){ picks = next; score = nextScore; }
     }
     return { picks, score };
@@ -2875,7 +2942,7 @@ function pickWeekRecipes(fixed){
   for(let attempt = 0; attempt < 6; attempt++){
     const res = improve(randomWeek());
     if(!best || res.score < best.score) best = res;
-    if(best.score === 0) break;
+    if(best.score === 0 && !pantryCtx.active) break;
   }
   const picks = best.picks;
 
@@ -2886,15 +2953,20 @@ function pickWeekRecipes(fixed){
   // ripetere lo stesso contorno nella settimana, finché ce ne sono.
   const usedContorni = new Set();
   const shuffledContorni = shuffle(contorniPool);
-  slots.forEach(s=>{
+  slots.forEach((s, si)=>{
     const m = days[s.day][s.meal];
     if(recipeGivesVeg(m.principale)) return;
-    const fits = withinCap(shuffledContorni, s.day, s.meal);
+    // prima i contorni con una verdura che scade entro questo pasto
+    const urgent = r => pantryCtx.recipeInfo(r).exp.some(e => pantryCtx.slotOffset[si] >= 0 && pantryCtx.slotOffset[si] <= e.d) ? 1 : 0;
+    const fits = withinCap(shuffledContorni, s.day, s.meal).slice().sort((a, b) => urgent(b) - urgent(a));
     const contorno = fits.find(r => !usedContorni.has(r.nome)) || fits[0];
     if(!contorno) return; // nessun contorno di stagione: va bene comunque
     usedContorni.add(contorno.nome);
     m.contorni.push(contorno);
   });
+  const allPicks = slots.map(s => days[s.day][s.meal]).flatMap(m => [m.principale, ...m.contorni]);
+  const allOffsets = slots.flatMap(s => { const m = days[s.day][s.meal]; return Array(1 + m.contorni.length).fill(pantryCtx.slotOffset[slots.indexOf(s)]); });
+  days.expiringUsed = expiringUsedByPlan(allPicks, Object.assign({}, pantryCtx, { slotOffset: allOffsets }));
   return days;
 }
 
@@ -3176,7 +3248,7 @@ function generateWeek(weekIdx){
     const meta = !link && data.principale ? getRecipeMeta(data.principale) : null;
     if(meta && (meal === 'cena' || i >= 4)) fixed[`${i}_${meal}`] = meta;
   });
-  const days = pickWeekRecipes(fixed);
+  const days = pickWeekRecipes(fixed, weekIdx);
   const baseline = {};
   days.forEach((d, i) => {
     baseline[i] = {
@@ -3244,6 +3316,7 @@ function generateWeek(weekIdx){
   state.genSettingsOpen = null;
   persist();
   render();
+  return days.expiringUsed || [];
 }
 function addWeek(){
   generateWeek(state.extraWeeks.length + 1);
@@ -3358,13 +3431,13 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
-  version: '2026-09-28',
+  version: '2026-09-30',
   title: 'Novità',
   items: [
-    'Settimane più equilibrate: il generatore segue le Linee guida CREA — legumi 3-4 volte, pesce 2-3, carne bianca 2, carne rossa e salumi al massimo una, uova e formaggi con misura — e alterna pasta, riso, patate, polenta e pane. La pasta non va oltre 4 pasti.',
-    'Verdura a ogni pasto: se il piatto non ne ha, arriva un contorno (le patate non contano come verdura).',
-    'In "Modifica ricetta" puoi vedere e correggere base e fonte di proteine di ogni ricetta.',
-    'Ogni sabato la settimana passa da sola alla successiva, l\'app si apre anche senza rete, e ogni ricetta ha il suo link alla fonte.'
+    'Scadenze in Dispensa: in "Modifica ingrediente" segni quando scade (+3 giorni, +1 settimana, +1 mese o una data). Quello che scade a breve compare in cima, in "In scadenza".',
+    'Il generatore guarda la Dispensa: usa prima quello che sta per scadere, nei giorni giusti, e preferisce le ricette di cui hai già gli ingredienti — sempre senza perdere l\'equilibrio della settimana.',
+    'Ricette: gradimento con un tocco nella scheda ("Vi piace?"), foto del piatto, e le ricette del quaderno di casa.',
+    'Ingredienti doppi? In "Modifica ingrediente" c\'è "Unisci con…": ricette, Dispensa e Spesa si aggiornano da sole.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -6511,8 +6584,9 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const weekIdx = parseInt(e.currentTarget.dataset.generateWeek,10);
       const snap = snapshotPlanningState();
-      generateWeek(weekIdx);
-      showUndoToast('Menù rigenerato', ()=>{
+      const used = generateWeek(weekIdx);
+      const usedText = used.length ? ` · usa ${used.slice(0, 2).join(' e ')}${used.length > 2 ? ` e altri ${used.length - 2}` : ''} prima che scada${used.length > 1 ? 'no' : ''}` : '';
+      showUndoToast('Menù rigenerato' + usedText, ()=>{
         restorePlanningState(snap);
         persist(); render();
       });
