@@ -522,7 +522,7 @@ test('menù: riepilogo equilibrio della settimana, aggiornato dopo i cambi a man
     rosse.forEach((n, k) => writeMealPrincipale(weekOverridesRef(1), WEEK_DISPLAY_ORDER[4 + k], 'cena', n));
     const after = weekBalance(1);
     state.tab = 'menu'; render();
-    return { planned: before.planned, okBefore: before.items.every(it => it.status === 'ok'), rossaAfter: after.items.find(it => it.key === 'carne-rossa').status, html: document.querySelectorAll('.week-balance').length >= 1, warn: !!document.querySelector('.balance-verdict.is-warn') };
+    return { planned: before.planned, okBefore: before.items.every(it => it.status === 'ok'), rossaAfter: after.items.find(it => it.key === 'carne-rossa').status, html: document.querySelectorAll('.week-balance').length >= 1, warn: !!document.querySelector('.balance-pill.is-high') };
   });
   eq(r, { planned: 14, okBefore: true, rossaAfter: 'high', html: true, warn: true });
   eq(page.errors, [], 'errori JS');

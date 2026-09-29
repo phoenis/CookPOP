@@ -1299,6 +1299,7 @@ const state = {
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   expiryConfirm: [], // non persistito: chiavi di Dispensa con scadenza stimata da confermare (renderExpiryConfirmModal)
+  balanceDetailsOpen: false, // non persistito: spiegazione sotto la riga dell'equilibrio nel Menù
   prepPantryMode: false, // non persistito: Ricette in modalità "Con quello che ho"
   prepSearchOpen: false, // non persistito: campo di ricerca ricette (Prep) visibile o ridotto a icona
   pantrySearchOpen: false, // non persistito: campo di ricerca Dispensa visibile o ridotto a icona
@@ -4549,24 +4550,28 @@ function weekBalance(weekIdx){
   const pasta = { key:'pasta', count: base.pasta || 0, range: WEEK_BASE_TARGETS.pasta, status: status(base.pasta || 0, WEEK_BASE_TARGETS.pasta) };
   return { planned, checkLow, items, pasta };
 }
+// Una riga sola di iconcine col conteggio (🫘 3 · 🐟 2 ...), colorate se
+// troppe (rosso) o poche (giallo), e in fondo ✓ a settimana equilibrata o
+// "8/14" se mancano ancora pasti. Un tocco apre/chiude la spiegazione a parole.
+const PROTEINA_ICON = { legumi:'🫘', pesce:'🐟', 'carne-bianca':'🍗', 'carne-rossa':'🥩', salumi:'🥓', uova:'🥚', formaggi:'🧀' };
 function renderWeekBalance(weekIdx){
   const bal = weekBalance(weekIdx);
   if(!bal.planned) return '';
-  const rangeText = ([min, max]) => min === max ? `${min}` : (min ? `${min}-${max}` : `max ${max}`);
-  const pills = bal.items.map(it => `<span class="balance-pill is-${it.status}" title="Consigliati: ${rangeText(it.range)}">${escapeHtml(PROTEINA_LABEL[it.key])} <b>${it.count}</b></span>`).join('');
   const label = it => (PROTEINA_LABEL[it.key] || 'Pasta').toLowerCase();
+  const shown = bal.items.concat(bal.pasta.status === 'high' ? [bal.pasta] : []);
+  const pills = shown.map(it => `<span class="balance-pill is-${it.status}" aria-label="${escapeAttr(`${PROTEINA_LABEL[it.key] || 'Pasta'}: ${it.count}`)}">${it.key === 'pasta' ? '🍝' : PROTEINA_ICON[it.key]}<b>${it.count}</b></span>`).join('');
   const low = bal.items.filter(it => it.status === 'low').map(it => `${label(it)} ${it.count} (almeno ${it.range[0]})`);
-  const high = bal.items.concat([bal.pasta]).filter(it => it.status === 'high').map(it => `${label(it)} ${it.count} (massimo ${it.range[1]})`);
+  const high = shown.filter(it => it.status === 'high').map(it => `${label(it)} ${it.count} (massimo ${it.range[1]})`);
   const notes = [];
   if(low.length) notes.push(`Pochi: ${low.join(' · ')}`);
   if(high.length) notes.push(`Troppi: ${high.join(' · ')}`);
-  let verdict;
-  if(notes.length) verdict = `<p class="balance-verdict is-warn">${escapeHtml(notes.join('. '))}</p>`;
-  else if(bal.checkLow) verdict = `<p class="balance-verdict is-ok">✓ Settimana equilibrata</p>`;
-  else verdict = `<p class="balance-verdict">${bal.planned} pasti su 14 decisi: l'equilibrio si valuta a settimana quasi piena.</p>`;
-  return `<div class="week-balance" aria-label="Equilibrio della settimana">
-      <div class="balance-pills">${pills}</div>
-      ${verdict}
+  const warn = notes.length > 0;
+  const end = warn ? '' : (bal.checkLow ? '<span class="balance-end is-ok" aria-label="Settimana equilibrata">✓</span>' : `<span class="balance-end" aria-label="${bal.planned} pasti su 14 decisi">${bal.planned}/14</span>`);
+  const detail = warn ? notes.join('. ') : (bal.checkLow ? 'Settimana equilibrata.' : `${bal.planned} pasti su 14 decisi: quello che manca si valuta a settimana quasi piena.`);
+  const open = !!state.balanceDetailsOpen;
+  return `<div class="week-balance">
+      <button type="button" class="balance-pills" data-toggle-balance-details aria-expanded="${open}" aria-label="Equilibrio della settimana">${pills}${end}</button>
+      ${open ? `<p class="balance-verdict${warn ? ' is-warn' : ''}">${escapeHtml(detail)} <span class="balance-legend">${Object.keys(PROTEINA_ICON).map(k => `${PROTEINA_ICON[k]} ${escapeHtml(PROTEINA_LABEL[k].toLowerCase())}`).concat(['🍝 pasta (solo se è troppa)']).join(' · ')}</span></p>` : ''}
     </div>`;
 }
 
@@ -7488,6 +7493,10 @@ function attachHandlers(){
   // (nascosto mentre la ricerca è aperta, come in Dispensa).
   const prepFab = document.getElementById('prep-fab');
   if(prepFab) prepFab.addEventListener('click', ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; render(); });
+  document.querySelectorAll('[data-toggle-balance-details]').forEach(btn=> btn.addEventListener('click', ()=>{
+    state.balanceDetailsOpen = !state.balanceDetailsOpen;
+    render();
+  }));
   document.querySelectorAll('[data-toggle-pantry-mode]').forEach(btn=> btn.addEventListener('click', ()=>{
     state.prepPantryMode = !state.prepPantryMode;
     render();
