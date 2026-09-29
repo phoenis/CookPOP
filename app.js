@@ -4989,7 +4989,9 @@ function renderSpesa(){
       ? `<span class="ing-note-row"><input type="text" class="ing-note-input" placeholder="Nota per questo ingrediente…" value="${escapeAttr(ingNote)}" data-ing-note="${escapeAttr(ingNoteKey)}"></span>`
       : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">📝 ${escapeHtml(ingNote)}</span>` : `<button type="button" class="btn is-text ing-note-add" data-ing-note-show="${escapeAttr(ingNoteKey)}">+ nota</button>`}</span>`;
     return `
-    <div class="shop-item-row">
+    <div class="swipe-wrap" data-swipe-id="shop:${escapeAttr(rowKey)}" data-swipe-shop="${escapeAttr(rowKey)}" data-swipe-label="${escapeAttr(ingrediente)}">
+    <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(ingrediente)}">${TRASH_ICON_SVG}</button>
+    <div class="shop-item-row swipe-content">
       <label class="shop-item ${checked?'checked':''}">
         <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
         <span>
@@ -5007,7 +5009,7 @@ function renderSpesa(){
             : `<span class="qty-num qty-placeholder" data-shop-qty-show="${escapeAttr(rowKey)}" title="Quantità non indicata">–</span>`}
         <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Aumenta quantità">+</button>
       </span>
-      <button class="btn-remove" data-shop-remove="${rowKey}" type="button" aria-label="Elimina ${escapeAttr(ingrediente)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
+    </div>
     </div>`;
   }
 
@@ -5578,7 +5580,9 @@ function renderDispensa(){
       ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg>'
       : LUOGO_ICON[it.luogo];
     return `
-    <div class="inv-item" data-pantry-row="${escapeAttr(it.key)}">
+    <div class="swipe-wrap" data-swipe-id="pantry:${escapeAttr(it.key)}" data-swipe-pantry="${escapeAttr(it.key)}">
+    <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(it.nome)}">${TRASH_ICON_SVG}</button>
+    <div class="inv-item swipe-content" data-pantry-row="${escapeAttr(it.key)}">
       <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${luogoIconContent}</button>
       ${state.pantryLuogoPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-luogo-picker-close></div>
@@ -5594,6 +5598,7 @@ function renderDispensa(){
           ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">${it.unit ? `<span class="qty-unit">${escapeHtml(it.unit)}</span>` : ''}`
           : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>`}
       </span>`}
+    </div>
     </div>
     `;
   }
@@ -6129,15 +6134,6 @@ function attachHandlers(){
           if(k.startsWith('oos_')) state.pantryConfirmedShop[k.slice(4)] = true;
           delete state.shopChecked[k];
         });
-      });
-      persist(); render();
-    });
-  });
-  document.querySelectorAll('[data-shop-remove]').forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      e.currentTarget.dataset.shopRemove.split(',').forEach(k=>{
-        if(state.shopExtras[k]) delete state.shopExtras[k];
-        else state.shopDismissed[k] = true;
       });
       persist(); render();
     });
@@ -7424,6 +7420,7 @@ function attachHandlers(){
       }, 500);
     });
     const cancelPress = ()=> clearTimeout(pressTimer);
+    row.addEventListener('swipestart', cancelPress); // uno swipe non è una pressione lunga
     row.addEventListener('pointerup', cancelPress);
     row.addEventListener('pointerleave', cancelPress);
     row.addEventListener('pointercancel', cancelPress);
@@ -7435,6 +7432,12 @@ function attachHandlers(){
       toggleSelected();
       render();
     }, true);
+  });
+  document.querySelectorAll('.swipe-wrap[data-swipe-shop]').forEach(wrap=>{
+    attachSwipeToDelete(wrap, ()=> removeShopRowWithUndo(wrap.dataset.swipeShop, wrap.dataset.swipeLabel));
+  });
+  document.querySelectorAll('.swipe-wrap[data-swipe-pantry]').forEach(wrap=>{
+    attachSwipeToDelete(wrap, ()=> removePantryItemWithUndo(wrap.dataset.swipePantry));
   });
   document.querySelectorAll('[data-luogo-picker-close]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.pantryLuogoPicker = null; render(); });
@@ -7831,8 +7834,8 @@ function goToTab(delta){
 // Swipe orizzontale sulla barra in basso per cambiare tab, come in WhatsApp.
 // Solo touch (è un gesto mobile): non intercetta il mouse. Prima lo swipe per
 // cambiare tab funzionava su tutto il contenuto, ma così rubava il gesto a
-// chi voleva scorrere lateralmente dentro la pagina (vedi sotto) — ora vive
-// solo sulla barra, che altrimenti si usa solo a tap.
+// chi voleva scorrere lateralmente dentro la pagina — ora vive solo sulla
+// barra: nel contenuto lo swipe su una riga la elimina (Menù, Spesa, Dispensa).
 (function(){
   const nav = document.querySelector('nav.tabs');
   if(!nav) return;
@@ -7851,53 +7854,6 @@ function goToTab(delta){
     const dx = t.clientX - startX, dy = t.clientY - startY;
     if(Math.abs(dx) < THRESHOLD || Math.abs(dy) > MAX_VERTICAL) return;
     goToTab(dx < 0 ? 1 : -1);
-  }, { passive: true });
-})();
-
-// Swipe orizzontale sul contenuto, diviso per metà schermo (non per tab
-// coinvolta, come lo swipe sulla barra qui sopra): nella metà inferiore
-// cambia tab — così il gesto funziona ovunque, non solo sulla barra stretta
-// — nella metà superiore cambia sotto-vista dove ce n'è una (Per reparto/
-// Per giorno in Spesa, Per categoria/Per luogo in Dispensa). La metà è
-// quella di partenza del dito (clientY vs metà di window.innerHeight), non
-// ricalcolata durante il trascinamento. Stessa lista di elementi da
-// ignorare (campi, modali) per non interferire con gesti che hanno già un
-// loro significato.
-(function(){
-  const panel = document.getElementById('panel');
-  if(!panel) return;
-  const THRESHOLD = 60, MAX_VERTICAL = 60;
-  let startX = 0, startY = 0, tracking = false, startInBottomHalf = false;
-  function shouldIgnore(target){
-    // .meal-block-swipe-wrap ha il suo swipe-a-destra (svuota il pasto):
-    // senza escluderlo qui, una card nella metà inferiore dello schermo
-    // farebbe scattare ANCHE il cambio tab per lo stesso gesto.
-    return !!target.closest('.balance-strip, input, textarea, select, .filters-modal-backdrop, .settings-backdrop, .luogo-picker, .luogo-picker-backdrop, .meal-block-swipe-wrap');
-  }
-  panel.addEventListener('touchstart', e=>{
-    if(e.touches.length !== 1 || shouldIgnore(e.target)){ tracking = false; return; }
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    startInBottomHalf = startY > window.innerHeight / 2;
-    tracking = true;
-  }, { passive: true });
-  panel.addEventListener('touchend', e=>{
-    if(!tracking) return;
-    tracking = false;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - startX, dy = t.clientY - startY;
-    if(Math.abs(dx) < THRESHOLD || Math.abs(dy) > MAX_VERTICAL) return;
-    if(startInBottomHalf){
-      goToTab(dx < 0 ? 1 : -1);
-      return;
-    }
-    if(state.tab === 'spesa'){
-      state.shopView = state.shopView === 'reparto' ? 'giorno' : 'reparto';
-      render();
-    } else if(state.tab === 'dispensa'){
-      state.pantryView = state.pantryView === 'casa' ? 'cibo' : 'casa';
-      render();
-    }
   }, { passive: true });
 })();
 
@@ -8024,6 +7980,93 @@ let dragState = null;
 // mealKey del blocco con il cestino "rivelato" dallo swipe (o null): vive
 // fuori da attachHandlers per sopravvivere ai render, come dragState —
 // altrimenti ogni render (anche per un motivo scollegato) lo dimenticherebbe.
+// Swipe verso destra per eliminare una riga (Spesa, Dispensa), come le card
+// del Menù: uno swipe breve rivela il cestino sotto (un tocco lì elimina),
+// uno lungo elimina subito; sempre con "Annulla". Struttura:
+// .swipe-wrap[data-swipe-id] > button.swipe-trash + .swipe-content (la riga).
+// Non parte da campi, stepper e icona del luogo, che hanno i loro gesti; a
+// swipe iniziato avvisa la riga (evento "swipestart") così la pressione lunga
+// di Dispensa non scatta, e il tocco finale non spunta/apre nulla.
+const TRASH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg>';
+const SWIPE_REVEAL = 80, SWIPE_AUTO = 170;
+let revealedSwipeId = null; // riga col cestino rivelato: sopravvive ai render
+function attachSwipeToDelete(wrap, onDelete){
+  const content = wrap.querySelector('.swipe-content');
+  const id = wrap.dataset.swipeId;
+  if(!content) return;
+  let tracking = false, swiping = false, justSwiped = false, startX = 0, startY = 0;
+  const setTx = px=>{ content.style.transform = px ? `translateX(${px}px)` : ''; };
+  if(revealedSwipeId === id) setTx(SWIPE_REVEAL);
+  const doDelete = ()=>{ revealedSwipeId = null; onDelete(); };
+  wrap.querySelector('.swipe-trash').addEventListener('click', doDelete);
+  content.addEventListener('pointerdown', e=>{
+    tracking = !e.target.closest('input, select, textarea, .qty-stepper, [data-luogo-toggle], .luogo-picker, .luogo-picker-backdrop, .ing-note-row');
+    swiping = false;
+    startX = e.clientX; startY = e.clientY;
+  });
+  content.addEventListener('pointermove', e=>{
+    if(!tracking) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if(!swiping){
+      if(Math.hypot(dx, dy) < 10) return;
+      if(dx > 0 && Math.abs(dx) > Math.abs(dy)){
+        swiping = true;
+        content.classList.add('swiping');
+        content.dispatchEvent(new CustomEvent('swipestart'));
+        try{ content.setPointerCapture(e.pointerId); }catch(err){}
+      } else { tracking = false; return; }
+    }
+    setTx(Math.max(0, Math.min(dx, SWIPE_AUTO + 40)));
+  });
+  const end = dx=>{
+    content.classList.remove('swiping');
+    justSwiped = true;
+    setTimeout(()=>{ justSwiped = false; }, 400);
+    if(dx >= SWIPE_AUTO){ doDelete(); return; }
+    if(dx >= SWIPE_REVEAL){ setTx(SWIPE_REVEAL); revealedSwipeId = id; }
+    else { setTx(0); if(revealedSwipeId === id) revealedSwipeId = null; }
+  };
+  content.addEventListener('pointerup', e=>{ if(swiping){ swiping = false; end(e.clientX - startX); } tracking = false; });
+  content.addEventListener('pointercancel', ()=>{ if(swiping){ swiping = false; end(0); } tracking = false; });
+  // Il tocco che chiude uno swipe (o che tocca una riga col cestino aperto,
+  // per richiuderla) non deve anche spuntare la voce o aprirne la modifica.
+  content.addEventListener('click', e=>{
+    if(justSwiped){ e.preventDefault(); e.stopPropagation(); return; }
+    if(revealedSwipeId === id){ e.preventDefault(); e.stopPropagation(); setTx(0); revealedSwipeId = null; }
+  }, true);
+}
+// Toglie una riga di Spesa (anche unita da più giorni: chiavi separate da
+// virgola), con Annulla. Prima era il cestino sulla riga, senza Annulla.
+function removeShopRowWithUndo(rowKey, label){
+  const keys = rowKey.split(',');
+  const prev = keys.map(k => ({ k, extra: state.shopExtras[k], dismissed: state.shopDismissed[k] }));
+  keys.forEach(k=>{
+    if(state.shopExtras[k]) delete state.shopExtras[k];
+    else state.shopDismissed[k] = true;
+  });
+  persist(); render();
+  showUndoToast(`${label || 'Voce'} tolto dalla lista`, ()=>{
+    prev.forEach(({ k, extra, dismissed })=>{
+      if(extra) state.shopExtras[k] = extra;
+      if(dismissed === undefined) delete state.shopDismissed[k]; else state.shopDismissed[k] = dismissed;
+    });
+    persist(); render();
+  });
+}
+// Elimina una voce di Dispensa (come "Elimina" in Modifica ingrediente), con Annulla.
+function removePantryItemWithUndo(key){
+  const prev = state.pantryItems[key];
+  if(!prev) return;
+  const wasSelected = !!state.pantrySelected[key];
+  delete state.pantryItems[key];
+  delete state.pantrySelected[key];
+  persist(); render();
+  showUndoToast(`${prev.nome} eliminato dalla Dispensa`, ()=>{
+    state.pantryItems[key] = prev;
+    if(wasSelected) state.pantrySelected[key] = true;
+    persist(); render();
+  });
+}
 let revealedMealKey = null;
 // card è già il .meal-block (niente più maniglia dedicata da cui risalire
 // con .closest): chiamata dal timer di pressione lunga in attachHandlers(),

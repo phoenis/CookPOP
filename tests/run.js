@@ -458,6 +458,43 @@ test('generatore: usa gli ingredienti in scadenza in tempo, senza perdere equili
   assert(r.con.ms < 300, `generazione lenta: ${r.con.ms} ms`);
 });
 
+async function swipeRight(page, selector, dx){
+  const box = await page.locator(selector).first().boundingBox();
+  const y = box.y + box.height / 2, x = box.x + 40;
+  await page.mouse.move(x, y); await page.mouse.down();
+  for(let i = 1; i <= 8; i++) await page.mouse.move(x + dx * i / 8, y + 1);
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+}
+
+test('spesa: swipe a destra toglie la riga (lungo subito, breve col cestino), con Annulla; il tocco spunta ancora', async ({ page }) => {
+  await page.evaluate(() => {
+    state.shopExtras = { e1: { ingrediente: 'Carciofi', qta: '4' }, e2: { ingrediente: 'Asparagi', qta: '1' }, e3: { ingrediente: 'Radicchio', qta: '1' } };
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+  });
+  const row = name => `.swipe-wrap[data-swipe-label="${name}"] .swipe-content`;
+  await swipeRight(page, row('Carciofi'), 220);
+  const r1 = await page.evaluate(() => ({ gone: !state.shopExtras.e1, checked: !!state.shopChecked.e1, toast: state.undoToast && state.undoToast.message }));
+  eq(r1, { gone: true, checked: false, toast: 'Carciofi tolto dalla lista' });
+  await page.click('.undo-toast button');
+  eq(await page.evaluate(() => !!state.shopExtras.e1), true, 'annulla');
+  await swipeRight(page, row('Asparagi'), 100);
+  eq(await page.evaluate(() => revealedSwipeId), 'shop:e2', 'cestino rivelato');
+  await page.click('.swipe-wrap[data-swipe-label="Asparagi"] .swipe-trash');
+  eq(await page.evaluate(() => !!state.shopExtras.e2), false, 'tolto col cestino');
+  await page.click(row('Radicchio') + ' .item-name');
+  eq(await page.evaluate(() => !!state.shopChecked.e3), true, 'il tocco spunta ancora');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('dispensa: swipe a destra elimina la voce con Annulla, senza entrare in selezione', async ({ page }) => {
+  await page.evaluate(() => { upsertPantryItem('Carciofi', 'frigo', 3); state.tab = 'dispensa'; state.pantryView = 'cibo'; render(); });
+  await swipeRight(page, '.swipe-wrap[data-swipe-pantry="carciofi"] .swipe-content', 220);
+  eq(await page.evaluate(() => ({ gone: !state.pantryItems['carciofi'], select: !!state.pantrySelectMode, edit: state.pantryEditKey })), { gone: true, select: false, edit: null });
+  await page.click('.undo-toast button');
+  eq(await page.evaluate(() => state.pantryItems['carciofi'] && state.pantryItems['carciofi'].qty), 3, 'annulla');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

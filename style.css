@@ -730,3 +730,11 @@
 .exp-badge.is-later{ background:var(--surface-2); color:inherit; }
 .scadenza-quick{ margin-top:var(--space-xsmall); gap:var(--space-xsmall); }
 .scadenza-quick .btn.is-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); }
+
+/* Swipe per eliminare una riga di Spesa o Dispensa (vedi attachSwipeToDelete):
+   stesso gesto delle card del Menù — il cestino sta fermo sotto, la riga scorre. */
+.swipe-wrap{ position:relative; overflow:hidden; background:var(--tomato); }
+.swipe-trash{ position:absolute; left:0; top:0; bottom:0; width:5rem; background:transparent; color:#fff; border:0; padding:0; display:flex; align-items:center; justify-content:center; font-size:1.375rem; }
+.swipe-trash svg{ width:1.2em; height:1.2em; }
+.swipe-content{ position:relative; background:var(--bg); touch-action:pan-y; transition:transform .2s ease; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.swipe-content.swiping{ transition:none; }
