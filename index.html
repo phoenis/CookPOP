@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=54">
+<link rel="stylesheet" href="style.css?v=55">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -103,6 +103,19 @@
         <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
       </section>
       <section class="settings-section">
+        <h3 class="settings-section-title">Pane</h3>
+        <div class="settings-card">
+          <div class="settings-field">
+            <div class="settings-field-label">Panini a pasto</div>
+            <div class="theme-toggle-row" id="bread-toggle-row">
+              <button type="button" class="btn is-outline theme-btn" data-bread-choice="1">1 panino</button>
+              <button type="button" class="btn is-outline theme-btn" data-bread-choice="2">2 panini</button>
+            </div>
+          </div>
+          <p class="settings-card-text">A cena ogni giorno, e anche a pranzo sabato e domenica. Quando segni il pasto come mangiato li tolgo dalla voce "Pane" in Dispensa (in pezzi), così vedi quando sta finendo.</p>
+        </div>
+      </section>
+      <section class="settings-section">
         <h3 class="settings-section-title">Backup dei dati</h3>
         <div class="settings-card">
           <p class="settings-card-text">Salva sul telefono una copia di Dispensa, menù, spesa e ricette, da ripristinare se qualcosa va storto. Le foto dei piatti non sono incluse.</p>
@@ -131,6 +144,6 @@
 });
 </script>
 <script src="catalog.js?v=7"></script>
-<script src="app.js?v=95"></script>
+<script src="app.js?v=96"></script>
 </body>
 </html>
