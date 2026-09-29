@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=51">
+<link rel="stylesheet" href="style.css?v=52">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -74,29 +74,54 @@
   <button data-tab="dispensa"><span class="bn-icon"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M220 151.67V216a12 12 0 0 1-12 12H48a12 12 0 0 1-12-12v-64.33a12 12 0 1 1 24 0v52.23h136v-52.23a12 12 0 1 1 24 0M88 183.81h80a12.06 12.06 0 0 0 0-24.11H88a12.06 12.06 0 0 0 0 24.11M96.2 113l75.17 27.49a12.05 12.05 0 0 0 8.21-22.66l-75.17-27.48A12 12 0 0 0 96.2 113M128 49.29l61.29 51.64a12 12 0 0 0 16.9-1.48a12.09 12.09 0 0 0-1.48-17l-61.27-51.63a12 12 0 0 0-16.91 1.49A12.1 12.1 0 0 0 128 49.29"></path></svg></span><span class="bn-label">Dispensa</span></button>
 </nav>
 <div class="settings-backdrop" id="settings-backdrop">
-  <div class="settings-sheet filters-modal">
-    <div class="filters-modal-header">
-      <h3>Impostazioni</h3>
-      <button class="btn is-icon filters-close-btn" id="settings-close">✕</button>
+  <div class="settings-page">
+    <header class="settings-header">
+      <button class="btn is-icon settings-back" id="settings-close" type="button" aria-label="Indietro"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="100%" height="100%"><path fill="currentColor" d="M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z"></path></svg></button>
+      <h2 class="settings-title">Impostazioni</h2>
+    </header>
+    <div class="settings-body">
+      <section class="settings-section" id="profile-section">
+        <h3 class="settings-section-title">Profilo</h3>
+        <div class="settings-card" id="profile-panel"></div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Aspetto</h3>
+        <div class="settings-card">
+          <div class="settings-field">
+            <div class="settings-field-label">Tema</div>
+            <div class="theme-toggle-row" id="theme-toggle-row">
+              <button type="button" class="btn is-outline theme-btn" data-theme-choice="system">Sistema</button>
+              <button type="button" class="btn is-outline theme-btn" data-theme-choice="light">Chiaro</button>
+              <button type="button" class="btn is-outline theme-btn" data-theme-choice="dark">Scuro</button>
+            </div>
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Colore d'accento</div>
+            <div class="color-swatch-row" id="accent-swatch-row"></div>
+          </div>
+        </div>
+        <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Backup dei dati</h3>
+        <div class="settings-card">
+          <p class="settings-card-text">Salva sul telefono una copia di Dispensa, menù, spesa e ricette, da ripristinare se qualcosa va storto. Le foto dei piatti non sono incluse.</p>
+          <div class="backup-row">
+            <button class="btn is-outline" id="backup-download" type="button">⬇ Scarica backup</button>
+            <label class="btn is-outline backup-restore-label">⬆ Ripristina<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">App</h3>
+        <div class="settings-card">
+          <p class="settings-card-text">Se qualcosa non si vede come dovrebbe, scarica l'ultima versione.</p>
+          <button class="btn is-outline is-block" id="refresh-btn" type="button">↻ Aggiorna app</button>
+          <button class="btn is-outline is-block settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>
+        </div>
+      </section>
+      <p class="settings-credit">AGGIORNATO A MANO, CUCINATO CON CURA</p>
     </div>
-    <div id="profile-panel"></div>
-    <div class="filter-group-label">Tema (solo su questo dispositivo)</div>
-    <div class="theme-toggle-row" id="theme-toggle-row">
-      <button type="button" class="btn is-outline theme-btn" data-theme-choice="system">Sistema</button>
-      <button type="button" class="btn is-outline theme-btn" data-theme-choice="light">Chiaro</button>
-      <button type="button" class="btn is-outline theme-btn" data-theme-choice="dark">Scuro</button>
-    </div>
-    <div class="filter-group-label">Colore d'accento (solo su questo dispositivo)</div>
-    <div class="color-swatch-row settings-accent-row" id="accent-swatch-row"></div>
-    <div class="filter-group-label">Backup dei dati</div>
-    <p class="section-sub backup-sub">Salva sul telefono una copia di Dispensa, menù, spesa e ricette, da ripristinare se qualcosa va storto.</p>
-    <div class="backup-row">
-      <button class="btn is-outline settings-item" id="backup-download" type="button">⬇ Scarica backup</button>
-      <label class="btn is-outline settings-item backup-restore-label">⬆ Ripristina<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
-    </div>
-    <button class="btn is-outline settings-item" id="refresh-btn" type="button" title="Ricarica la pagina scaricando l'ultima versione, ignorando la cache del browser">↻ Aggiorna app</button>
-    <button class="btn is-outline settings-item settings-item-danger" id="logout-btn" type="button" style="display:none;">⏻ Esci</button>
-    <p class="settings-credit">AGGIORNATO A MANO, CUCINATO CON CURA</p>
   </div>
 </div>
 
@@ -106,6 +131,6 @@
 });
 </script>
 <script src="catalog.js?v=7"></script>
-<script src="app.js?v=92"></script>
+<script src="app.js?v=93"></script>
 </body>
 </html>

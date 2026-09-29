@@ -228,21 +228,38 @@
   nav.tabs button.active{ color:var(--gold); border-top-color:var(--gold); }
   nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
 
-  /* settings sheet: stessa modale bottom-sheet usata altrove, con id fissi per riusare la logica di refresh/logout già esistente */
-  .settings-backdrop{ display:none; position:fixed; inset:0; background:var(--overlay); z-index:200; align-items:center; justify-content:center; padding:1.25rem;  backdrop-filter: blur(var(--blur-modal));}
-  .settings-backdrop.open{ display:flex; }
-  .settings-item{ width:100%; margin-bottom:var(--space-small); }
-  .settings-item.settings-item-danger{ color:var(--delete); }
-  .settings-credit{ text-align:center; color:var(--ink-light); font-family:var(--font-family); font-size:var(--text-xsmall); margin:0.875rem 0 0; }
-  .profile-panel{ margin-bottom:var(--space-large); padding-bottom:var(--space-medium); border-bottom:1px solid var(--line); }
+  /* Impostazioni: pagina a tutto schermo (sopra tab e topbar) con intestazione
+     fissa, freccia Indietro e sezioni a schede. L'id resta settings-backdrop
+     e si apre con la classe "open", come prima (Indietro/Esc via MODAL_CHECKS). */
+  .settings-backdrop{ display:none; position:fixed; inset:0; z-index:200; background:var(--bg); overflow-y:auto; overscroll-behavior:contain; }
+  .settings-backdrop.open{ display:block; animation:settings-in 0.18s ease-out; }
+  @keyframes settings-in{ from{ opacity:0; transform:translateX(1.5rem); } to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce){ .settings-backdrop.open{ animation:none; } }
+  .settings-page{ min-height:100%; outline:none; }
+  .settings-header{ position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:var(--space-xsmall); background:var(--bg); border-bottom:1px solid var(--line); padding:var(--space-small) var(--space-medium); padding-top:calc(0.75rem + env(safe-area-inset-top)); }
+  .settings-back{ width:2.25rem; height:2.25rem; margin-left:calc(-1 * var(--space-xsmall)); color:var(--ink); }
+  .settings-back svg{ width:1.4rem; height:1.4rem; }
+  .settings-title{ font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-medium); margin:0; }
+  .settings-body{ max-width:40rem; margin:0 auto; padding:var(--space-medium) var(--space-medium) calc(var(--space-large) + env(safe-area-inset-bottom)); }
+  .settings-section{ margin-bottom:var(--space-large); }
+  .settings-section-title{ font-family:var(--font-family); font-size:var(--text-xsmall); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-light); margin:0 0 var(--space-xsmall) var(--space-xxsmall); }
+  .settings-card{ background:var(--surface); border-radius:var(--radius-modal); padding:var(--space-medium); display:flex; flex-direction:column; gap:var(--space-small); }
+  .settings-card:empty{ display:none; }
+  .settings-card-text, .settings-note{ font-family:var(--font-family); font-size:var(--text-small); color:var(--ink-light); margin:0; }
+  .settings-note{ margin:var(--space-xsmall) var(--space-xxsmall) 0; font-size:var(--text-xsmall); }
+  .settings-field + .settings-field{ border-top:1px solid var(--line); padding-top:var(--space-small); }
+  .settings-field-label{ font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-bold); margin-bottom:var(--space-xsmall); }
+  .settings-card .btn{ margin:0; }
+  .settings-item-danger{ color:var(--delete); }
+  .settings-credit{ text-align:center; color:var(--ink-light); font-family:var(--font-family); font-size:var(--text-xsmall); margin:var(--space-large) 0 0; }
+  .profile-panel .settings-field-label{ margin-top:var(--space-medium); }
   .profile-name{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-large); }
-  .profile-next-cook{ font-family:var(--font-family); font-size:var(--text-small); color:var(--ink-light); margin:0.125rem 0 0.875rem; }
+  .profile-next-cook{ font-family:var(--font-family); font-size:var(--text-small); color:var(--ink-light); margin:0.125rem 0 0; }
   .color-swatch-row{ display:flex; flex-wrap:wrap; gap:0.5rem; }
   .color-swatch{ width:1.75rem; height:1.75rem; border-radius:50%; border:var(--border-strong) solid transparent; padding:0; cursor:pointer; }
   .color-swatch.active{ border-color:var(--ink); }
-  .theme-toggle-row{ display:flex; gap:var(--space-xsmall); margin-bottom:var(--space-large); }
+  .theme-toggle-row{ display:flex; gap:var(--space-xsmall); }
   .theme-toggle-row .btn{ flex:1; }
-  .settings-accent-row{ margin-bottom:var(--space-large); }
   .cook-reminder-banner{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); background:var(--green-soft); color:var(--green-dark); font-family:var(--font-family); font-size:var(--text-small); padding:var(--space-xsmall) var(--space-small); margin: var(--space-medium); border-radius:var(--radius-modal);  }
   .cook-reminder-banner .btn{ flex-shrink:0; }
   .eaten-reminder-banner{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); flex-wrap:wrap; background:rgba(var(--honey-rgb),0.15); color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); padding:var(--space-xsmall) var(--space-small); border-radius:var(--radius-modal); margin-bottom:var(--space-medium); }
@@ -740,7 +757,6 @@
 .swipe-content.swiping{ transition:none; }
 
 /* Backup dei dati in Impostazioni. */
-p.section-sub.backup-sub{ display:block; margin:0 0 var(--space-xsmall); }
 .backup-row{ display:flex; gap:var(--space-xsmall); }
-.backup-row .settings-item{ flex:1; justify-content:center; }
+.backup-row .btn{ flex:1; justify-content:center; }
 .backup-restore-label{ cursor:pointer; }
