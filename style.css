@@ -467,6 +467,7 @@
   .full-badge{ font-size:var(--text-xsmall); }
   .source-link{ font-size:var(--text-xsmall); color:var(--steel); text-decoration:none; font-weight:var(--weight-medium); margin-left: auto;}
   .source-link:hover{ text-decoration:underline; }
+  .source-link.source-text:hover{ text-decoration:none; }
   .add-ing-form{ display:grid; grid-template-columns:1fr 1fr; gap:0.375rem; margin-top:0.375rem; }
   .add-ing-form input{ font-family:var(--font-family); font-size:var(--text-xsmall); padding:var(--space-xxsmall) var(--space-xsmall); border-radius:0; border:1px solid var(--line); background:var(--surface); }
   .add-ing-form .btn{ grid-column:1 / -1; font-size:var(--text-xsmall); letter-spacing:0.04em; }
