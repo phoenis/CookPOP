@@ -1373,7 +1373,6 @@ const state = {
   doneModalLeftoverLuogo: 'frigo', // ephemeral: luogo scelto per l'avanzo (icona con luogo-picker, come in Dispensa)
   doneModalLeftoverCat: 'avanzi', // ephemeral: reparto scelto per l'avanzo; di default "Avanzi", ma modificabile (es. un sugo che ricongeli va in "Legumi e conserve")
   doneModalBread: 0, // ephemeral: panini da togliere dalla Dispensa alla conferma di "Ricetta fatta!" (vedi mealHasBread)
-  breadPerMeal: 1, // panini a pasto, per tutta la casa (Impostazioni → Pane); 1 o 2 a seconda del pane che si compra
   doneModalLeftoverChecked: false, // ephemeral: se spuntato, l'avanzo va in Dispensa alla conferma; sempre deselezionato al caricamento
   doneModalLeftoverPickerOpen: false, // ephemeral: luogo-picker dell'avanzo aperto/chiuso
   doneModalLeftoverCatPickerOpen: false, // ephemeral: cat-picker (reparto) dell'avanzo aperto/chiuso
@@ -2240,8 +2239,7 @@ function buildPersonalPayload(){
     pantryItems: state.pantryItems,
     week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
-    whatsNewSeenBy: state.whatsNewSeenBy,
-    breadPerMeal: state.breadPerMeal
+    whatsNewSeenBy: state.whatsNewSeenBy
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
   return payload;
@@ -3467,7 +3465,7 @@ const WHATS_NEW = {
   version: '2026-10-03',
   title: 'Novità',
   items: [
-    'Pane: a cena ogni giorno (e a pranzo nel weekend) quando segni il pasto come mangiato tolgo 1 o 2 panini dalla voce "Pane" in Dispensa. Quanti panini lo scegli in Impostazioni, e puoi cambiarlo pasto per pasto.',
+    'Pane: quando segni come mangiata una cena (o un pranzo nel weekend), nella finestra c\'è anche il pane: 1 panino, con + se sono 2. Si toglie dalla voce "Pane" in Dispensa, così vedi quando sta finendo.',
     'Spesa: quando sposti in Dispensa frutta, verdura, carne, pesce, latticini o uova, la scadenza è già stimata. Confermi con "Va bene" o la sistemi subito con − e +.',
     'Menù: sotto il titolo della settimana vedi quante volte ci sono legumi, pesce, carne, uova e formaggi, con quello che manca o è di troppo. Si aggiorna anche quando cambi i pasti a mano.',
     'Ricette: "🧺 Con quello che ho" mostra le ricette che puoi fare con la Dispensa, prima quelle che usano cose in scadenza, e dice cosa manca.',
@@ -5683,12 +5681,13 @@ function pantryExpiryDays(it){
 // da confermare o correggere subito (vedi renderExpiryConfirmModal). Niente
 // stima per il resto (pasta, conserve, surgelati...) né per ciò che sta in freezer.
 // Pane: a cena ogni giorno e anche a pranzo sabato e domenica si mangia
-// pane (state.breadPerMeal panini, 1 o 2 a seconda di quello che si compra);
+// pane (BREAD_PER_MEAL panini, nella finestra si cambia con + e −);
 // un pasto non impostato non conta. Si toglie dalla Dispensa quando il pasto
 // si segna come mangiato, così la voce "Pane" dice quando sta finendo (a 0
 // finisce in Spesa tra i Finiti, come il resto). Conta solo una voce a pezzi:
 // in grammi o "solo presenza" non si saprebbe quanto togliere.
 const BREAD_NAMES = ['Pane', 'Panini', 'Panino'];
+const BREAD_PER_MEAL = 1;
 function mealHasBread(i, meal){
   return meal === 'cena' || (meal === 'pranzo' && (Number(i) === 5 || Number(i) === 6));
 }
@@ -7000,7 +6999,7 @@ function attachHandlers(){
         // l'avanzo: si toglie qui, con Annulla.
         if(!mealsDone[i]) mealsDone[i] = {};
         mealsDone[i][meal] = true;
-        const took = mealHasBread(i, meal) ? takeBread(state.breadPerMeal) : null;
+        const took = mealHasBread(i, meal) ? takeBread(BREAD_PER_MEAL) : null;
         persist(); render();
         if(took) showUndoToast(`Tolto il pane: ${took.it.qty ? `ne restano ${took.it.qty}` : 'è finito'}`, ()=>{
           took.it.qty = took.prev;
@@ -7028,7 +7027,7 @@ function attachHandlers(){
           }
         });
         state.doneModalDay = key;
-        state.doneModalBread = mealHasBread(i, meal) ? state.breadPerMeal : 0;
+        state.doneModalBread = mealHasBread(i, meal) ? BREAD_PER_MEAL : 0;
         state.doneModalQty = qtyMap;
         state.doneQtyEditingKey = null;
         state.doneModalFinished = {};
@@ -8143,21 +8142,7 @@ const TAB_MENU_ITEMS = {
   const profilePanel = document.getElementById('profile-panel');
   const themeRow = document.getElementById('theme-toggle-row');
   const accentRow = document.getElementById('accent-swatch-row');
-  const breadRow = document.getElementById('bread-toggle-row');
   if(!topbarMenuBtn || !settingsBackdrop) return;
-  const refreshBreadRow = ()=>{
-    if(!breadRow) return;
-    breadRow.querySelectorAll('[data-bread-choice]').forEach(btn=>{
-      btn.classList.toggle('active', Number(btn.dataset.breadChoice) === state.breadPerMeal);
-    });
-  };
-  if(breadRow) breadRow.addEventListener('click', e=>{
-    const btn = e.target.closest('[data-bread-choice]');
-    if(!btn) return;
-    state.breadPerMeal = Number(btn.dataset.breadChoice);
-    persist();
-    refreshBreadRow();
-  });
   const refreshThemeRow = ()=>{
     if(!themeRow) return;
     const active = currentTheme();
@@ -8178,7 +8163,6 @@ const TAB_MENU_ITEMS = {
     }
     refreshThemeRow();
     refreshAccentRow();
-    refreshBreadRow();
     settingsBackdrop.classList.add('open');
     settingsBackdrop.scrollTop = 0;
     reconcileModalHistory();
