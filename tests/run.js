@@ -514,6 +514,36 @@ test('backup: scarica e ripristina i dati, con Annulla; un file sbagliato viene 
   eq(page.errors, [], 'errori JS');
 });
 
+test('menù: riepilogo equilibrio della settimana, aggiornato dopo i cambi a mano', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1);
+    const before = weekBalance(1);
+    const rosse = allRecipeMetas().filter(isMainDish).filter(x => recipeProteina(x) === 'carne-rossa').slice(0, 3).map(x => x.nome);
+    rosse.forEach((n, k) => writeMealPrincipale(weekOverridesRef(1), WEEK_DISPLAY_ORDER[4 + k], 'cena', n));
+    const after = weekBalance(1);
+    state.tab = 'menu'; render();
+    return { planned: before.planned, okBefore: before.items.every(it => it.status === 'ok'), rossaAfter: after.items.find(it => it.key === 'carne-rossa').status, html: document.querySelectorAll('.week-balance').length >= 1, warn: !!document.querySelector('.balance-verdict.is-warn') };
+  });
+  eq(r, { planned: 14, okBefore: true, rossaAfter: 'high', html: true, warn: true });
+  eq(page.errors, [], 'errori JS');
+});
+
+test('ricette: "Con quello che ho" mostra ciò che si fa con la Dispensa, prima chi usa le cose in scadenza', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {};
+    upsertPantryItem('Zucchine', 'frigo', 4); state.pantryItems['zucchine'].scadenza = addDaysIso(1);
+    upsertPantryItem('Uova', 'frigo', 6);
+    state.tab = 'prep'; state.prepPantryMode = false; render();
+    const all = document.querySelectorAll('.recipe-card').length;
+    document.querySelector('[data-toggle-pantry-mode]').click();
+    const cards = [...document.querySelectorAll('.recipe-card')];
+    const first = cards[0];
+    return { all, fewer: cards.length > 0 && cards.length < all, firstExp: !!first.querySelector('.pantry-match-exp'), noWater: !document.body.textContent.includes('manca Acqua'), on: state.prepPantryMode };
+  });
+  eq(r, { all: r.all, fewer: true, firstExp: true, noWater: true, on: true });
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
