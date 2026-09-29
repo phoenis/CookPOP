@@ -566,7 +566,6 @@ test('pane: segnando il pasto come mangiato si tolgono i panini (cena sempre, pr
     state.extraWeeks = []; generateWeek(1);
     Object.keys(state.pantryItems).filter(k => ['pane','panini','panino'].includes(k)).forEach(k => delete state.pantryItems[k]);
     upsertPantryItem('Pane', 'dispensa', 6);
-    state.breadPerMeal = 1;
     state.tab = 'menu'; render();
     const click = sel => document.querySelector(sel).click();
     const out = { lunchMon: mealHasBread(0, 'pranzo'), lunchSat: mealHasBread(5, 'pranzo'), dinnerTue: mealHasBread(1, 'cena') };
