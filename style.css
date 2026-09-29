@@ -722,3 +722,11 @@
 .merge-summary{ font-size:var(--text-medium, 1rem); margin:var(--space-small) 0; }
 .merge-effects{ margin:0 0 var(--space-medium, 1rem); padding-left:1.2rem; display:flex; flex-direction:column; gap:var(--space-xxsmall, 0.25rem); font-size:var(--text-small); }
 .btn.is-chip.merge-open-btn{ padding:var(--space-xxsmall, 0.25rem) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); }
+
+/* Scadenze in Dispensa (vedi expiryBadgeHtml). */
+.exp-badge{ display:inline-block; margin-left:var(--space-xsmall); padding:0 var(--space-xsmall); border-radius:var(--radius-pill); font-size:var(--text-xxsmall, 0.7rem); font-weight:var(--weight-medium); vertical-align:middle; white-space:nowrap; }
+.exp-badge.is-expired{ background:var(--delete); color:var(--white, #fff); }
+.exp-badge.is-soon{ background:var(--amber); color:var(--on-amber); }
+.exp-badge.is-later{ background:var(--surface-2); color:inherit; }
+.scadenza-quick{ margin-top:var(--space-xsmall); gap:var(--space-xsmall); }
+.scadenza-quick .btn.is-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); }

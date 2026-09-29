@@ -410,6 +410,29 @@ test('ingredienti: unire A in B dopo B in A non crea un giro', async ({ page }) 
   eq(r, ['Pomodorini', 'Pomodorini']);
 });
 
+test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finché c\'è scorta', async ({ page }) => {
+  await page.evaluate(() => { upsertPantryItem('Mozzarella', 'frigo', 1); upsertPantryItem('Ricotta', 'frigo', 1); state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryEditKey = 'mozzarella'; render(); });
+  await page.click('[data-scadenza-quick="3"]');
+  const r1 = await page.evaluate(() => ({ iso: state.pantryItems['mozzarella'].scadenza, want: addDaysIso(3) }));
+  eq(r1.iso, r1.want, '+3 giorni');
+  await page.fill('#pantry-edit-scadenza', await page.evaluate(() => addDaysIso(20)));
+  await page.dispatchEvent('#pantry-edit-scadenza', 'change');
+  eq(await page.evaluate(() => daysUntilDate(state.pantryItems['mozzarella'].scadenza)), 20, 'data scelta');
+  const r2 = await page.evaluate(() => {
+    state.pantryItems['mozzarella'].scadenza = addDaysIso(1);
+    state.pantryItems['ricotta'].scadenza = addDaysIso(-1);
+    state.pantryEditKey = null; render();
+    const names = [...document.querySelectorAll('.expiring-group .inv-name')].map(b => b.childNodes[0].textContent.trim());
+    const badges = [...document.querySelectorAll('.expiring-group .exp-badge')].map(b => b.textContent);
+    upsertPantryItem('Mozzarella', 'frigo', 1);            // ne compro un'altra: resta la scadenza vicina
+    const kept = state.pantryItems['mozzarella'].scadenza === addDaysIso(1);
+    state.pantryItems['ricotta'].qty = 0; upsertPantryItem('Ricotta', 'frigo', 1); // era finita: confezione nuova
+    return { names, badges, kept, ricotta: state.pantryItems['ricotta'].scadenza || null };
+  });
+  eq(r2, { names: ['Ricotta', 'Mozzarella'], badges: ['Scaduto ieri', 'Scade domani'], kept: true, ricotta: null });
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

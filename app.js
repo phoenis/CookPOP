@@ -631,7 +631,10 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
     luogo: (existing && existing.luogo) || luogo || 'dispensa',
     ...(finalCat ? { cat: finalCat } : {}),
     ...(finalUnit ? { unit: finalUnit } : {}),
-    ...(finalGroup ? { group: finalGroup } : {})
+    ...(finalGroup ? { group: finalGroup } : {}),
+    // La scadenza resta finché c'è ancora scorta (vale quella della confezione
+    // già in casa, la più vicina); se era finita, quella nuova non si conosce.
+    ...(currentQty > 0 && existing && existing.scadenza ? { scadenza: existing.scadenza } : {})
   };
   // Torna in scorta: una volta rifinito serve una nuova conferma esplicita da Spesa.
   if(newQty > 0) delete state.pantryConfirmedShop[key];
@@ -1114,6 +1117,7 @@ function mergeIngredientInto(fromName, toName){
       const sameUnit = !old.unit || !cur.unit || old.unit === cur.unit;
       if(sameUnit && typeof old.qty === 'number') cur.qty = (typeof cur.qty === 'number' ? cur.qty : 0) + old.qty;
       ['unit','cat','group','luogo'].forEach(f=>{ if(!cur[f] && old[f]) cur[f] = old[f]; });
+      if(old.scadenza && (!cur.scadenza || old.scadenza < cur.scadenza)) cur.scadenza = old.scadenza; // vale la più vicina
     } else {
       state.pantryItems[toKey] = Object.assign({}, old, { nome: to });
     }
@@ -5444,6 +5448,39 @@ function renderPrep(){
   `;
 }
 
+// Scadenze in Dispensa: data facoltativa per voce (pantryItems[key].scadenza,
+// "AAAA-MM-GG"). Conta solo finché la voce ha scorta. Entro EXPIRY_SOON_DAYS
+// la voce compare anche in "In scadenza" in cima alla Dispensa.
+const EXPIRY_SOON_DAYS = 3;
+function daysUntilDate(iso){
+  if(!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  if(!y || !m || !d) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((new Date(y, m - 1, d) - today) / 86400000);
+}
+function addDaysIso(days){
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return isoLocalDate(d);
+}
+function pantryExpiryDays(it){
+  return it && typeof it.qty === 'number' && it.qty > 0 ? daysUntilDate(it.scadenza) : null;
+}
+function expiryBadgeHtml(days, iso){
+  if(days === null) return '';
+  const [y, m, d] = iso.split('-');
+  let text, level;
+  if(days < 0){ text = days === -1 ? 'Scaduto ieri' : 'Scaduto'; level = 'is-expired'; }
+  else if(days === 0){ text = 'Scade oggi'; level = 'is-expired'; }
+  else if(days === 1){ text = 'Scade domani'; level = 'is-soon'; }
+  else if(days <= EXPIRY_SOON_DAYS){ text = `Scade tra ${days} giorni`; level = 'is-soon'; }
+  else if(days <= 7){ text = `Scade tra ${days} giorni`; level = 'is-later'; }
+  else { text = `Scad. ${d}/${m}`; level = 'is-later'; }
+  return `<span class="exp-badge ${level}">${text}</span>`;
+}
+
 function renderDispensa(){
   // Un'unica lista per dispensa/ripostiglio/frigo/freezer, distinti solo
   // dall'icona del luogo (si cambia toccandola). Si riempie da sola quando
@@ -5452,7 +5489,7 @@ function renderDispensa(){
   // vede solo una volta impostato.
   const searchTerm = state.pantrySearch.trim().toLowerCase();
   const items = Object.entries(state.pantryItems)
-    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat }))
+    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat, scadenza: it.scadenza || '' }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0)
     .filter(it => !searchTerm || it.nome.toLowerCase().includes(searchTerm));
 
@@ -5475,7 +5512,7 @@ function renderDispensa(){
       <div class="luogo-picker">
         ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===it.luogo?' active':''}" data-luogo-set="${escapeAttr(it.key)}" data-luogo-value="${l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
       </div>` : ''}
-      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
+      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}</button>
       ${it.unit === 'none'
         ? `<label class="presence-toggle"><input type="checkbox" ${it.qty > 0 ? 'checked' : ''} data-presence-toggle="${escapeAttr(it.key)}"></label>`
         : `<span class="qty-stepper">
@@ -5502,7 +5539,19 @@ function renderDispensa(){
     const byDept = {};
     items.forEach(it=>{ const d = knownDept(it.cat) || classifyDept(it.nome); (byDept[d] = byDept[d] || []).push(it); });
     const depts = DEPT_ORDER.filter(d=>byDept[d] && byDept[d].length && isNonFoodDept(d) === wantNonFood);
-    body = !depts.length
+    // In cima, solo in Cibo: quello che scade a breve (o è già scaduto),
+    // dal più urgente. Le voci restano anche nella loro categoria.
+    const expiring = wantNonFood ? [] : items
+      .filter(it => it.scadenza && !isNonFoodDept(knownDept(it.cat) || classifyDept(it.nome)))
+      .map(it => ({ it, days: daysUntilDate(it.scadenza) }))
+      .filter(x => x.days !== null && x.days <= EXPIRY_SOON_DAYS)
+      .sort((a, b) => a.days - b.days || IT_COLLATOR.compare(a.it.nome, b.it.nome));
+    const expiringHtml = expiring.length ? `
+      <div class="shop-day-group expiring-group">
+        <div class="dept-title"><span class="dept-icon">⏰</span>In scadenza</div>
+        <div class="accordion-body">${expiring.map(x => itemRow(x.it)).join('')}</div>
+      </div>` : '';
+    body = expiringHtml + (!depts.length
       ? `<p class="ing-empty">${searchTerm ? `Nessun prodotto trovato per "${escapeHtml(state.pantrySearch.trim())}" in ${wantNonFood ? 'Casa' : 'Cibo'}.` : (wantNonFood ? 'Nessun prodotto per la casa, per ora — tocca il + per aggiungerne uno (detersivi, igiene, carta forno...).' : 'Nessun alimento, per ora.')}</p>`
       : depts.map(d=>{
       const sectionId = `cat_${d}`;
@@ -5517,7 +5566,7 @@ function renderDispensa(){
           ${byDept[d].sort((a,b)=>IT_COLLATOR.compare(a.nome, b.nome)).map(itemRow).join('')}
         </div>
       </div>`;
-    }).join('');
+    }).join(''));
   }
 
   const editItem = state.pantryEditKey ? state.pantryItems[state.pantryEditKey] : null;
@@ -5563,6 +5612,16 @@ function renderDispensa(){
             <div class="filter-group-label">Quantità</div>
             <input type="number" min="0" step="${qtyStepFor(editItem.unit)}" id="pantry-edit-qty" value="${editItem.qty}">
           </div>
+          ${editingHome ? '' : `<div class="filter-group">
+            <div class="filter-group-label">Scadenza ${editItem.scadenza ? expiryBadgeHtml(daysUntilDate(editItem.scadenza), editItem.scadenza) : ''}</div>
+            <input type="date" id="pantry-edit-scadenza" value="${escapeAttr(editItem.scadenza || '')}">
+            <div class="chip-row scadenza-quick">
+              <button type="button" class="btn is-chip" data-scadenza-quick="3">+3 giorni</button>
+              <button type="button" class="btn is-chip" data-scadenza-quick="7">+1 settimana</button>
+              <button type="button" class="btn is-chip" data-scadenza-quick="30">+1 mese</button>
+              ${editItem.scadenza ? '<button type="button" class="btn is-chip" data-scadenza-clear>Nessuna</button>' : ''}
+            </div>
+          </div>`}
           <div class="filter-group">
             <div class="filter-group-label">${editingHome ? 'Unità' : 'Unità (per confrontare con quanto serve in ricetta)'}</div>
             <select id="pantry-edit-unit">
@@ -7642,6 +7701,20 @@ function attachHandlers(){
       }
     });
   }
+  const setEditScadenza = iso=>{
+    const it = state.pantryItems[state.pantryEditKey];
+    if(!it) return;
+    if(iso) it.scadenza = iso; else delete it.scadenza;
+    persist(); render();
+  };
+  const editScadenzaInput = document.getElementById('pantry-edit-scadenza');
+  if(editScadenzaInput) editScadenzaInput.addEventListener('change', e=> setEditScadenza(e.target.value));
+  document.querySelectorAll('[data-scadenza-quick]').forEach(btn=>{
+    btn.addEventListener('click', e=> setEditScadenza(addDaysIso(parseInt(e.currentTarget.dataset.scadenzaQuick, 10))));
+  });
+  document.querySelectorAll('[data-scadenza-clear]').forEach(btn=>{
+    btn.addEventListener('click', ()=> setEditScadenza(''));
+  });
   const editUnitSelect = document.getElementById('pantry-edit-unit');
   if(editUnitSelect){
     editUnitSelect.addEventListener('change', e=>{
