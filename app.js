@@ -655,8 +655,19 @@ function moveShopRowToPantry(cb){
   // di sale, es.) non deve poterla resettare a un'unità tracciabile.
   const existingUnit = (state.pantryItems[(cb.dataset.shopName||'').trim().toLowerCase()] || {}).unit;
   const unit = existingUnit === 'none' ? 'none' : (cb.dataset.shopUnit || undefined);
+  const pantryKey = (cb.dataset.shopName||'').trim().toLowerCase();
+  const before = state.pantryItems[pantryKey];
+  const hadStock = !!(before && typeof before.qty === 'number' && before.qty > 0);
   upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
   rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+  // Fresco appena comprato (senza scorta prima): scadenza stimata dal reparto,
+  // da confermare o sistemare subito (renderExpiryConfirmModal).
+  const it = state.pantryItems[pantryKey];
+  const est = hadStock ? null : estimateExpiryDays(it);
+  if(it && !it.scadenza && est !== null){
+    it.scadenza = addDaysIso(est);
+    if(!state.expiryConfirm.includes(pantryKey)) state.expiryConfirm.push(pantryKey);
+  }
 }
 
 // Cattura lo stato di Dispensa/Spesa toccato da moveShopRowToPantry prima di
@@ -1287,6 +1298,7 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  expiryConfirm: [], // non persistito: chiavi di Dispensa con scadenza stimata da confermare (renderExpiryConfirmModal)
   prepPantryMode: false, // non persistito: Ricette in modalità "Con quello che ho"
   prepSearchOpen: false, // non persistito: campo di ricerca ricette (Prep) visibile o ridotto a icona
   pantrySearchOpen: false, // non persistito: campo di ricerca Dispensa visibile o ridotto a icona
@@ -3449,9 +3461,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
-  version: '2026-10-01',
+  version: '2026-10-02',
   title: 'Novità',
   items: [
+    'Spesa: quando sposti in Dispensa frutta, verdura, carne, pesce, latticini o uova, la scadenza è già stimata. Confermi con "Va bene" o la sistemi subito con − e +.',
     'Menù: sotto il titolo della settimana vedi quante volte ci sono legumi, pesce, carne, uova e formaggi, con quello che manca o è di troppo. Si aggiorna anche quando cambi i pasti a mano.',
     'Ricette: "🧺 Con quello che ho" mostra le ricette che puoi fare con la Dispensa, prima quelle che usano cose in scadenza, e dice cosa manca.',
     'Impostazioni ora è una pagina, con il backup dei dati (Scarica backup e Ripristina).',
@@ -3580,6 +3593,7 @@ function closeTopbarMenu(){
   if(el) el.classList.remove('open');
 }
 const MODAL_CHECKS = [
+  [()=> expiryConfirmKeys().length > 0, ()=>{ closeExpiryConfirm(); }],
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> !!state.doneModalLeftoverPickerOpen, ()=>{ state.doneModalLeftoverPickerOpen = false; }],
   [()=> !!state.doneModalLeftoverCatPickerOpen, ()=>{ state.doneModalLeftoverCatPickerOpen = false; }],
@@ -5368,6 +5382,7 @@ function renderSpesa(){
     </div>
     
   ${addIngModal}
+  ${renderExpiryConfirmModal()}
     <div class="buttons-fixed">
       ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
       <button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
@@ -5643,6 +5658,61 @@ function addDaysIso(days){
 }
 function pantryExpiryDays(it){
   return it && typeof it.qty === 'number' && it.qty > 0 ? daysUntilDate(it.scadenza) : null;
+}
+// Scadenza stimata per i freschi che entrano in Dispensa dalla Spesa, in
+// giorni da oggi, per reparto: una stima prudente per la confezione tipica,
+// da confermare o correggere subito (vedi renderExpiryConfirmModal). Niente
+// stima per il resto (pasta, conserve, surgelati...) né per ciò che sta in freezer.
+const EXPIRY_ESTIMATE_DAYS = { verdura:5, carne:2, pesce:2, latticini:5, uova:21 };
+function estimateExpiryDays(it){
+  if(!it || it.luogo === 'freezer') return null;
+  const dept = knownDept(it.cat) || classifyDept(it.nome);
+  return EXPIRY_ESTIMATE_DAYS[dept] ?? null;
+}
+// Finestra "Scadenze stimate": una riga per fresco appena spostato in
+// Dispensa, con la data stimata già salvata. − e + la spostano di un giorno,
+// "Nessuna" la toglie (e "Stima" la rimette); "Va bene" chiude e basta.
+function expiryConfirmKeys(){
+  // Dopo "Annulla" la voce sparisce o torna senza scorta: non c'è più niente da confermare.
+  return state.expiryConfirm.filter(k => state.pantryItems[k] && state.pantryItems[k].qty > 0);
+}
+function closeExpiryConfirm(){ state.expiryConfirm = []; }
+function renderExpiryConfirmModal(){
+  const keys = expiryConfirmKeys();
+  if(!keys.length) return '';
+  const rows = keys.map(k=>{
+    const it = state.pantryItems[k];
+    const days = it.scadenza ? daysUntilDate(it.scadenza) : null;
+    const [y, m, d] = (it.scadenza || '').split('-').map(Number);
+    const dateLabel = it.scadenza ? new Date(y, m - 1, d).toLocaleDateString('it-IT', { weekday:'short', day:'numeric', month:'short' }) : '';
+    const when = days === null ? 'Nessuna scadenza' : days <= 0 ? 'Oggi' : days === 1 ? 'Domani' : `Tra ${days} giorni`;
+    return `<div class="exp-confirm-row">
+      <div class="exp-confirm-info">
+        <div class="exp-confirm-name">${escapeHtml(it.nome)}</div>
+        <div class="exp-confirm-when">${when}${dateLabel ? ` · ${escapeHtml(dateLabel)}` : ''}</div>
+      </div>
+      ${it.scadenza ? `<div class="qty-stepper exp-confirm-stepper">
+        <button type="button" class="btn is-icon" data-exp-confirm-shift="${escapeAttr(k)}" data-exp-shift="-1" aria-label="Un giorno prima"${days !== null && days <= 0 ? ' disabled' : ''}>−</button>
+        <button type="button" class="btn is-icon" data-exp-confirm-shift="${escapeAttr(k)}" data-exp-shift="1" aria-label="Un giorno dopo">+</button>
+      </div>
+      <button type="button" class="btn is-text exp-confirm-toggle" data-exp-confirm-toggle="${escapeAttr(k)}">Nessuna</button>`
+      : `<button type="button" class="btn is-text exp-confirm-toggle" data-exp-confirm-toggle="${escapeAttr(k)}">Stima</button>`}
+    </div>`;
+  }).join('');
+  return `
+    <div class="filters-modal-backdrop is-second" data-exp-confirm-close>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header">
+          <h3>Scadenze stimate</h3>
+          <button class="btn is-icon filters-close-btn" data-exp-confirm-close>✕</button>
+        </div>
+        <p class="exp-confirm-sub">${keys.length > 1 ? 'Ho stimato le scadenze di quello che hai appena comprato. Vanno bene o le sistemi?' : 'Ho stimato la scadenza di quello che hai appena comprato. Va bene o la sistemi?'}</p>
+        <div class="exp-confirm-list">${rows}</div>
+        <div class="filters-modal-footer">
+          <button class="btn is-solid" type="button" data-exp-confirm-close>Va bene</button>
+        </div>
+      </div>
+    </div>`;
 }
 function expiryBadgeHtml(days, iso){
   if(days === null) return '';
@@ -6104,6 +6174,24 @@ function attachHandlers(){
       }
     });
   });
+  document.querySelectorAll('[data-exp-confirm-close]').forEach(el=> el.addEventListener('click', e=>{
+    if(e.target !== el) return; // tocco dentro la finestra (sfondo = el solo se toccato lui)
+    closeExpiryConfirm(); render();
+  }));
+  document.querySelectorAll('[data-exp-confirm-shift]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = state.pantryItems[btn.dataset.expConfirmShift];
+    if(!it || !it.scadenza) return;
+    const days = daysUntilDate(it.scadenza) + parseInt(btn.dataset.expShift, 10);
+    it.scadenza = addDaysIso(Math.max(0, days));
+    persist(); render();
+  }));
+  document.querySelectorAll('[data-exp-confirm-toggle]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = state.pantryItems[btn.dataset.expConfirmToggle];
+    if(!it) return;
+    if(it.scadenza) delete it.scadenza;
+    else { const est = estimateExpiryDays(it); it.scadenza = addDaysIso(est ?? 3); }
+    persist(); render();
+  }));
   const shopModeToggle = document.getElementById('shop-mode-toggle');
   if(shopModeToggle) shopModeToggle.addEventListener('click', ()=>{
     state.shopMode = !state.shopMode;
