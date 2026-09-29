@@ -206,7 +206,7 @@
   .buttons-fixed.is-checked, .input_wrapper{ bottom:calc(4.5rem + env(safe-area-inset-bottom) - calc(0.5 * var(--padding-page))); height: calc(3rem + (2 * var(--space-xsmall))); align-items: stretch;  /* margin-right: calc(3rem + var(--padding-page) + var(--padding-page)); margin-left: var(--padding-page); */ display: flex; gap: var(--gap-btn); flex-direction: row; background-color: var(--surface); border-radius: var(--radius-pill); border: var(--border) solid var(--line-light); padding: var(--padding-xsmall); z-index: 78; left: calc(0.5 * var(--padding-page)); right: calc(0.5 * var(--padding-page)); padding-right: calc(3rem + var(--space-xsmall) + var(--gap-btn));}
   .buttons-fixed.is-checked .color-delete{flex: 1;}
   .buttons-fixed.is-checked .is-empty{flex-grow: 2;}
-  .undo-toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(4.5rem + env(safe-area-inset-bottom) + 0.75rem); z-index:95; background:var(--ink); color:var(--bg); display:flex; align-items:center; gap:var(--space-medium); padding:var(--space-small) var(--space-medium); border-radius:var(--radius-pill); box-shadow:var(--shadow-dropdown); font-family:var(--font-family); font-size:var(--text-small); max-width:calc(100% - 2rem); }
+  .undo-toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(4.5rem + env(safe-area-inset-bottom) + 0.75rem); z-index:300; /* sopra anche finestre e schermate a tutto schermo (200-220) */ background:var(--ink); color:var(--bg); display:flex; align-items:center; gap:var(--space-medium); padding:var(--space-small) var(--space-medium); border-radius:var(--radius-pill); box-shadow:var(--shadow-dropdown); font-family:var(--font-family); font-size:var(--text-small); max-width:calc(100% - 2rem); }
   .undo-toast-message{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .undo-toast-btn{ color:var(--gold); font-weight:var(--weight-bold); flex-shrink:0; }
   .is-fixed{ width:3rem; height: 3rem; padding: 0; box-shadow:var(--shadow-fab); font-size: 1.2rem; background-color: var(--gold); color: white; border: var(--border) solid var(--gold); z-index: 80;}
@@ -703,3 +703,10 @@
 
 /* Il fuoco va sulla finestra stessa all'apertura (vedi syncDialogs): niente riquadro attorno. */
 [role="dialog"]:focus{ outline:none; }
+
+/* Foto del piatto nella scheda ricetta (vedi recipePhotoHtml). */
+.recipe-photo{ margin:0 0 var(--space-small); border-radius:var(--radius-medium, 12px); overflow:hidden; background:var(--surface-2); }
+.recipe-photo img{ display:block; width:100%; max-height:22rem; object-fit:cover; }
+.recipe-photo-actions{ display:flex; flex-wrap:wrap; gap:var(--space-xsmall, 0.5rem); margin-bottom:var(--space-small); }
+.recipe-photo-btn{ cursor:pointer; }
+.recipe-photo-error{ color:var(--delete); font-size:var(--text-xsmall); margin-bottom:var(--space-small); }
