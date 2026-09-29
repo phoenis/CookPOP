@@ -433,6 +433,31 @@ test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finchÃ
   eq(page.errors, [], 'errori JS');
 });
 
+test('generatore: usa gli ingredienti in scadenza in tempo, senza perdere equilibrio', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const slots = weekPlanSlots(), seq = weekEatenSequence(slots);
+    const run = withExpiry => {
+      state.pantryItems = {};
+      upsertPantryItem('Mozzarella', 'frigo', 2);
+      if(withExpiry) state.pantryItems['mozzarella'].scadenza = addDaysIso(3);
+      let inTime = 0, balanced = 0;
+      const t0 = performance.now();
+      for(let n = 0; n < 15; n++){
+        const days = pickWeekRecipes({}, 0);
+        const picks = slots.map(s => days[s.day][s.meal].principale);
+        if(weekPlanScore(picks, slots, seq) === 0) balanced++;
+        if((days.expiringUsed || []).includes('Mozzarella')) inTime++;
+      }
+      return { inTime, balanced, ms: Math.round((performance.now() - t0) / 15) };
+    };
+    return { con: run(true), senza: run(false) };
+  });
+  assert(r.con.inTime >= 12, `mozzarella usata in tempo solo ${r.con.inTime}/15 volte`);
+  eq(r.con.balanced, 15, 'settimane equilibrate con la scadenza');
+  eq(r.senza.balanced, 15, 'settimane equilibrate senza');
+  assert(r.con.ms < 300, `generazione lenta: ${r.con.ms} ms`);
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
