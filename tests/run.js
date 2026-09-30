@@ -796,6 +796,28 @@ test('ricette: 18 nuove di uova, pesce e legumi, complete e in ogni stagione', a
   eq(r, { problems: [], seasons: { primavera: true, estate: true, autunno: true, inverno: true } });
 });
 
+test('generatore: evita le ricette delle ultime settimane e delle altre settimane in Menù', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = [];
+    generateWeek(0);
+    const names = w => { const out = new Set(); WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => { const n = effectiveMeal(w, i, meal).principale; if(n) out.add(n); })); return out; };
+    const week0 = names(0);
+    // Il passaggio di settimana ricorda i piatti della settimana finita.
+    rememberWeekRecipes(isoLocalDate(weekDatesFor(0)[0]));
+    const remembered = [...week0].every(n => state.recipeHistory.some(h => h.nome === n));
+    generateWeek(1);
+    const week1 = names(1);
+    const overlap = [...week1].filter(n => week0.has(n)).length;
+    // La storia più vecchia di RECENT_WEEKS settimane non conta più.
+    const outside = allRecipeMetas().map(x => x.nome).find(n => !week0.has(n));
+    state.recipeHistory = [{ nome: outside, dal: '2000-01-01' }];
+    state.extraWeeks = [];
+    const old = recentRecipeNames(1).has(outside);
+    return { remembered, overlap, old };
+  });
+  eq(r, { remembered: true, overlap: 0, old: false });
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
