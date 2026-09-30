@@ -3476,24 +3476,13 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // già chiuso (state.whatsNewSeenBy), poi resta chiusa finché non si cambia di nuovo
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
+// Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
+// aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
   version: '2026-10-05',
   title: 'Novità',
   items: [
-    'Dispensa: nuova scheda ingrediente, a pagina intera. In cima quantità con − e +, dove sta e scadenza; categoria e gruppo si scelgono da un elenco; unità, "Unisci" ed Elimina sono sotto "Altro". Aggiungere un ingrediente usa la stessa scheda.',
-    'Gradimento azzerato su tutte le ricette: da ora lo date voi quando segnate una ricetta come cucinata ("Vi piace?" nella finestra "Ricetta fatta!").',
-    'Spesa: il pane si aggiunge da solo, 1 panino per ogni cena (e pranzo nel weekend) in menù, meno quelli che hai già.',
-    'Menù: in cima un avviso con quello che scade presto, e "Cosa cucino" per vedere le ricette che lo usano.',
-    'Impostazioni: vedi quando hai fatto l\'ultimo backup; dopo un mese te lo ricorda anche nel menu ⋮.',
-    'Pane: quando segni come mangiata una cena (o un pranzo nel weekend), nella finestra c\'è anche il pane: 1 panino, con + se sono 2. Si toglie dalla voce "Pane" in Dispensa, così vedi quando sta finendo.',
-    'Spesa: quando sposti in Dispensa frutta, verdura, carne, pesce, latticini o uova, la scadenza è già stimata. Confermi con "Va bene" o la sistemi subito con − e +.',
-    'Menù: sotto il titolo della settimana vedi quante volte ci sono legumi, pesce, carne, uova e formaggi, con quello che manca o è di troppo. Si aggiorna anche quando cambi i pasti a mano.',
-    'Ricette: "🧺 Con quello che ho" mostra le ricette che puoi fare con la Dispensa, prima quelle che usano cose in scadenza, e dice cosa manca.',
-    'Impostazioni ora è una pagina, con il backup dei dati (Scarica backup e Ripristina).',
-    'Scadenze in Dispensa: in "Modifica ingrediente" segni quando scade (+3 giorni, +1 settimana, +1 mese o una data). Quello che scade a breve compare in cima, in "In scadenza".',
-    'Il generatore guarda la Dispensa: usa prima quello che sta per scadere, nei giorni giusti, e preferisce le ricette di cui hai già gli ingredienti — sempre senza perdere l\'equilibrio della settimana.',
-    'Ricette: gradimento con un tocco nella scheda ("Vi piace?"), foto del piatto, e le ricette del quaderno di casa.',
-    'Ingredienti doppi? In "Modifica ingrediente" c\'è "Unisci con…": ricette, Dispensa e Spesa si aggiornano da sole.'
+    'Dispensa: nuova scheda ingrediente, a pagina intera. In cima quantità con − e +, dove sta e scadenza; categoria e gruppo si scelgono da un elenco; unità, "Unisci" ed Elimina sono sotto "Altro". Aggiungere un ingrediente usa la stessa scheda.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
