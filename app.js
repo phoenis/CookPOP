@@ -1321,6 +1321,7 @@ const state = {
   shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
+  recipeHistory: [], // [{ nome, dal: 'AAAA-MM-GG' }]: ricette delle settimane finite, per non ripeterle subito (vedi recentRecipeNames)
   pantryDraft: null, // non persistito: bozza della scheda "Nuovo ingrediente"
   pantrySheetPicker: null, // non persistito: 'cat' | 'group', elenco aperto nella scheda ingrediente
   pantrySheetMore: false, // non persistito: sezione "Altro" della scheda aperta
@@ -2260,7 +2261,8 @@ function buildPersonalPayload(){
     pantryItems: state.pantryItems,
     week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
-    whatsNewSeenBy: state.whatsNewSeenBy
+    whatsNewSeenBy: state.whatsNewSeenBy,
+    recipeHistory: state.recipeHistory
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
   return payload;
@@ -2948,9 +2950,11 @@ function pickWeekRecipes(fixed, weekIdx){
   const slots = weekPlanSlots();
   const seq = weekEatenSequence(slots);
   const pantryCtx = buildPantryPlanContext(weekIdx, slots);
-  const totalScore = picks => weekPlanScore(picks, slots, seq) + pantryPlanScore(picks, pantryCtx);
   const fixedAt = slots.map(s => fixed[`${s.day}_${s.meal}`] || null);
   const fixedNames = new Set(fixedAt.filter(Boolean).map(r => r.nome));
+  const recent = recentRecipeNames(weekIdx);
+  const recentScore = picks => picks.reduce((sum, r) => sum + (recent.has(r.nome) && !fixedNames.has(r.nome) ? RECENT_PENALTY : 0), 0);
+  const totalScore = picks => weekPlanScore(picks, slots, seq) + recentScore(picks) + pantryPlanScore(picks, pantryCtx);
   const candidates = slots.map((s, i) => fixedAt[i] ? [fixedAt[i]] : withinCap(pool.filter(r => !fixedNames.has(r.nome)), s.day, s.meal));
 
   function randomWeek(){
@@ -3228,6 +3232,7 @@ function rolloverWeeksIfNeeded(){
   const [y, m, d] = state.week0Start.split('-').map(Number);
   const weeks = Math.round((new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()) - new Date(y, m-1, d)) / (7 * 86400000));
   for(let k = 0; k < weeks; k++){
+    rememberWeekRecipes(isoLocalDate(new Date(y, m-1, d + 7 * k)));
     const next = state.extraWeeks.shift();
     state.weekBaseline = (next && next.baseline) || {};
     state.weekOverrides = (next && next.overrides) || {};
@@ -3240,6 +3245,34 @@ function rolloverWeeksIfNeeded(){
   state.swapOpenDay = null;
   persist();
   return weeks > 0;
+}
+// Varietà tra settimane: il generatore evita (con una penalità, non un
+// divieto) le ricette delle altre settimane già in Menù e quelle mangiate
+// nelle ultime RECENT_WEEKS settimane. Prima non aveva memoria e, a parità di
+// equilibrio, sceglieva sempre le ricette con gli ingredienti già in casa:
+// poche decine di piatti, sempre quelli. La penalità (3) pesa meno di un
+// punto di equilibrio mancato (10): meglio ripetere che sbilanciare.
+const RECENT_WEEKS = 3;
+const RECENT_PENALTY = 3;
+function rememberWeekRecipes(weekStartIso){
+  const names = new Set();
+  WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => { const n = effectiveMeal(0, i, meal).principale; if(n) names.add(n); }));
+  const kept = (state.recipeHistory || []).filter(h => !names.has(h.nome));
+  names.forEach(nome => kept.push({ nome, dal: weekStartIso }));
+  // Oltre le settimane che contano non serve ricordarle.
+  const [y, m, d] = weekStartIso.split('-').map(Number);
+  const limit = isoLocalDate(new Date(y, m - 1, d - 7 * (RECENT_WEEKS + 1)));
+  state.recipeHistory = kept.filter(h => h.dal >= limit);
+}
+function recentRecipeNames(weekIdx){
+  const target = weekIdx || 0;
+  const names = new Set();
+  [0, ...state.extraWeeks.map((_, n) => n + 1)].filter(w => w !== target).forEach(w =>
+    WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => { const n = effectiveMeal(w, i, meal).principale; if(n) names.add(n); })));
+  const start = weekDatesFor(target)[0];
+  const limit = isoLocalDate(new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7 * RECENT_WEEKS));
+  (state.recipeHistory || []).forEach(h => { if(h.dal >= limit) names.add(h.nome); });
+  return names;
 }
 // Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
 // state, come sempre), weekIdx>=1 crea/sostituisce state.extraWeeks[weekIdx-1].
@@ -3485,10 +3518,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-07',
+  version: '2026-10-08',
   title: 'Novità',
   items: [
-    '18 ricette nuove di uova, pesce e legumi, per dare più varietà al menù: tra le altre frittata di spinaci, shakshuka, platessa alla mugnaia, sgombro al forno, cozze alla marinara, seppie con piselli, dahl di lenticchie, burger di ceci e purè di fave e cicoria. Le trovi in Ricette, senza gradimento: votatele quando le cucinate.'
+    'Menù più vario: generando una settimana l\'app evita le ricette delle altre settimane in Menù e di quelle mangiate nelle ultime 3 settimane (a meno che servano per l\'equilibrio). Da provare con "Genera" sulla prossima settimana.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
