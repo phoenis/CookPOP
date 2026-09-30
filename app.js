@@ -4506,6 +4506,15 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   </div>`;
 }
 
+// Un elemento [data-close-*] chiude la sua finestra: un bottone (✕, Fatto,
+// Annulla) sempre, lo sfondo solo se il tocco è proprio sullo sfondo, fuori
+// dalla finestra. Prima si contava sullo stopPropagation del primo
+// [data-stop-close] del pannello, che vale per una finestra sola: con una
+// finestra aperta sopra un'altra (es. "Gestisci categorie" da "Aggiungi
+// ingrediente") ogni tocco dentro quella di sopra la chiudeva.
+function isCloseTap(e, el){
+  return el.tagName === 'BUTTON' || e.target === el;
+}
 // Bottone icona "impostazioni generazione" (giorni veloci): riusato ovunque
 // si possa generare/rigenerare/aggiungere una settimana, così apre sempre
 // lo stesso modale (renderMenu -> genSettingsModal).
@@ -6568,7 +6577,7 @@ function attachHandlers(){
   if(spesaFab) spesaFab.addEventListener('click', ()=>{ state.addIngModalOpen = true; render(); });
   document.querySelectorAll('[data-close-add-ing-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.addIngModalOpen = false;
       state.addIngDraft = null;
       state.addIngName = '';
@@ -6579,7 +6588,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-whats-new]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       markWhatsNewSeen();
       persist(); render();
     });
@@ -6931,7 +6940,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-gen-settings]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.genSettingsOpen = null;
       state.tempoExceptionAdding = null;
       render();
@@ -7148,7 +7157,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-meal-overflow]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.mealOverflowOpen = null;
       render();
     });
@@ -7163,7 +7172,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-done-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.doneModalDay = null;
       state.doneModalQty = {};
       state.doneQtyEditingKey = null;
@@ -7415,7 +7424,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-recipe-edit]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.recipeEditName = null;
       render();
     });
@@ -7519,7 +7528,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-filters]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.filtersOpen = false; render();
     });
   });
@@ -7539,7 +7548,7 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-close-new-recipe-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.newRecipeModalOpen = false;
       state.newRecipeError = '';
       render();
@@ -7893,7 +7902,7 @@ function attachHandlers(){
   }
   document.querySelectorAll('[data-close-pantry-add-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.pantryAddModalOpen = false;
       render();
     });
@@ -7914,14 +7923,14 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-pantry-groups]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.pantryGroupsModalOpen = false;
       render();
     });
   });
   document.querySelectorAll('[data-close-ingredient-manager]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.ingredientManagerOpen = false;
       render();
     });
@@ -8002,7 +8011,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-depts]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.deptsModalOpen = false;
       render();
     });
@@ -8087,7 +8096,7 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-close-pantry-edit]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.hasAttribute('data-stop-close')) return;
+      if(!isCloseTap(e, el)) return;
       state.pantryEditKey = null; render();
     });
   });
