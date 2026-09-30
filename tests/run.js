@@ -380,6 +380,7 @@ test('ingredienti: "Unisci con…" unisce due nomi in ricette, Dispensa e note, 
   });
   const { n: before, a: qtyOld, b: qtyNew } = before0;
   assert(before > 5, 'ricette con la passata');
+  await page.click('[data-sheet-more]');
   await page.click('[data-open-merge]');
   await page.fill('#merge-search', 'passata');
   await page.click('[data-merge-pick="Passata"]');
@@ -663,6 +664,7 @@ test('dispensa: il menu dei luoghi si vede (non tagliato dalla riga) e cambia lu
 
 test('finestre: toccare un campo dentro "Gestisci categorie" (aperta da Aggiungi ingrediente) non la chiude', async ({ page }) => {
   await page.evaluate(() => { state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryAddModalOpen = true; render(); });
+  await page.click('[data-sheet-picker="cat"]');
   await page.click('[data-open-depts]');
   await page.click('#new-dept-label');
   await page.click('#new-dept-icon');
@@ -673,6 +675,38 @@ test('finestre: toccare un campo dentro "Gestisci categorie" (aperta da Aggiungi
   eq(await page.evaluate(() => ({ open: state.deptsModalOpen, added: Object.values(state.customDepts || {}).some(d => d && d.label === 'Animali') })), { open: true, added: true }, 'aggiunta');
   await page.click('[data-close-depts].filters-modal-backdrop', { position: { x: 5, y: 5 } });
   eq(await page.evaluate(() => ({ depts: state.deptsModalOpen, add: state.pantryAddModalOpen })), { depts: false, add: true }, 'il tocco fuori chiude solo quella sopra');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('scheda ingrediente: modifica (quantità, luogo, categoria, gruppo, unità) e aggiunta con bozza e Annulla', async ({ page }) => {
+  await page.evaluate(() => { upsertPantryItem('Carciofi', 'frigo', 3); state.tab = 'dispensa'; state.pantryView = 'cibo'; render(); });
+  await page.click('[data-pantry-edit="carciofi"]');
+  eq(await page.evaluate(() => !!document.querySelector('.sheet-page[role="dialog"]')), true, 'pagina aperta come dialog');
+  await page.click('[data-sheet-qty="1"]');
+  await page.click('[data-sheet-luogo="freezer"]');
+  await page.click('[data-sheet-picker="cat"]');
+  await page.click('[data-sheet-cat="surgelati"]');
+  await page.click('[data-sheet-more]');
+  await page.click('[data-sheet-unit="g"]');
+  const it = await page.evaluate(() => state.pantryItems['carciofi']);
+  eq({ qty: it.qty, luogo: it.luogo, cat: it.cat, unit: it.unit }, { qty: 4, luogo: 'freezer', cat: 'surgelati', unit: 'g' }, 'modifiche salvate subito');
+  await page.click('[data-sheet-picker="cat"]');
+  await page.keyboard.press('Escape');
+  eq(await page.evaluate(() => ({ picker: state.pantrySheetPicker, open: state.pantryEditKey })), { picker: null, open: 'carciofi' }, 'Esc chiude prima l\'elenco');
+  await page.click('.sheet-footer [data-close-pantry-edit]');
+  eq(await page.evaluate(() => state.pantryEditKey), null, 'Fatto chiude');
+  // Aggiunta: la bozza non tocca la Dispensa finché non si preme Aggiungi.
+  await page.evaluate(() => { delete state.pantryItems['burrata']; state.pantryAddModalOpen = true; render(); });
+  await page.fill('#pantry-add-name', 'Burrata');
+  eq(await page.$eval('#sheet-cat-value', el => el.textContent.includes('Latticini')), true, 'categoria automatica dal nome');
+  await page.click('[data-sheet-luogo="frigo"]');
+  await page.click('[data-scadenza-quick="3"]');
+  eq(await page.evaluate(() => ({ inPantry: !!state.pantryItems['burrata'], name: document.getElementById('pantry-add-name').value })), { inPantry: false, name: 'Burrata' }, 'bozza, nome tenuto');
+  await page.click('#pantry-add-btn');
+  const added = await page.evaluate(() => { const b = state.pantryItems['burrata']; return { qty: b.qty, luogo: b.luogo, exp: daysUntilDate(b.scadenza), open: state.pantryAddModalOpen, draft: state.pantryDraft }; });
+  eq(added, { qty: 1, luogo: 'frigo', exp: 3, open: false, draft: null }, 'aggiunta');
+  await page.click('.undo-toast button');
+  eq(await page.evaluate(() => !!state.pantryItems['burrata']), false, 'annulla');
   eq(page.errors, [], 'errori JS');
 });
 

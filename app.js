@@ -1315,6 +1315,9 @@ const state = {
   shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
   pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
+  pantryDraft: null, // non persistito: bozza della scheda "Nuovo ingrediente"
+  pantrySheetPicker: null, // non persistito: 'cat' | 'group', elenco aperto nella scheda ingrediente
+  pantrySheetMore: false, // non persistito: sezione "Altro" della scheda aperta
   mergeIngredientFrom: null, // non persistito: "Unisci con…" aperto per questo nome (vedi mergeIngredientInto)
   mergeIngredientTarget: null, // non persistito: nome scelto con cui unire, in attesa di conferma
   mergeIngredientSearch: '', // non persistito: ricerca nella scelta
@@ -3474,9 +3477,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // `version`. NON è automatica a ogni deploy — resta `null` di default, e va
 // valorizzata a mano solo quando si vuole davvero annunciare qualcosa.
 const WHATS_NEW = {
-  version: '2026-10-04',
+  version: '2026-10-05',
   title: 'Novità',
   items: [
+    'Dispensa: nuova scheda ingrediente, a pagina intera. In cima quantità con − e +, dove sta e scadenza; categoria e gruppo si scelgono da un elenco; unità, "Unisci" ed Elimina sono sotto "Altro". Aggiungere un ingrediente usa la stessa scheda.',
     'Gradimento azzerato su tutte le ricette: da ora lo date voi quando segnate una ricetta come cucinata ("Vi piace?" nella finestra "Ricetta fatta!").',
     'Spesa: il pane si aggiunge da solo, 1 panino per ogni cena (e pranzo nel weekend) in menù, meno quelli che hai già.',
     'Menù: in cima un avviso con quello che scade presto, e "Cosa cucino" per vedere le ricette che lo usano.',
@@ -3623,8 +3627,9 @@ const MODAL_CHECKS = [
   [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
   [()=> !!state.mergeIngredientFrom, ()=>{ closeMergeIngredient(); }],
-  [()=> !!state.pantryEditKey, ()=>{ state.pantryEditKey = null; }],
-  [()=> !!state.pantryAddModalOpen, ()=>{ state.pantryAddModalOpen = false; }],
+  [()=> !!state.pantrySheetPicker && !!(state.pantryEditKey || state.pantryAddModalOpen), ()=>{ state.pantrySheetPicker = null; }],
+  [()=> !!state.pantryEditKey, ()=>{ closeIngredientSheet(); }],
+  [()=> !!state.pantryAddModalOpen, ()=>{ closeIngredientSheet(); }],
   [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
   [()=> !!state.newRecipeModalOpen, ()=>{ state.newRecipeModalOpen = false; }],
   [()=> !!state.filtersOpen, ()=>{ state.filtersOpen = false; }],
@@ -3649,7 +3654,7 @@ function countOpenModals(){
 // inerte tutto ciò che sta sotto (lettori di schermo e Tab non ci arrivano),
 // e alla chiusura riporta il fuoco sul bottone da cui era stata aperta.
 // Esc chiude la finestra in cima, Tab gira solo al suo interno.
-const DIALOG_LAYER_SELECTOR = '.filters-modal-backdrop, .meal-detail-screen, #settings-backdrop.open, #topbar-menu-backdrop.open';
+const DIALOG_LAYER_SELECTOR = '.filters-modal-backdrop, .meal-detail-screen, .sheet-page, #settings-backdrop.open, #topbar-menu-backdrop.open';
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 let dialogOpenerBeforeRender = null;
 let dialogStack = []; // [{ sig, opener }] dal basso verso l'alto
@@ -4512,6 +4517,13 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
 // [data-stop-close] del pannello, che vale per una finestra sola: con una
 // finestra aperta sopra un'altra (es. "Gestisci categorie" da "Aggiungi
 // ingrediente") ogni tocco dentro quella di sopra la chiudeva.
+function closeIngredientSheet(){
+  state.pantryEditKey = null;
+  state.pantryAddModalOpen = false;
+  state.pantryDraft = null;
+  state.pantrySheetPicker = null;
+  state.pantrySheetMore = false;
+}
 function isCloseTap(e, el){
   return el.tagName === 'BUTTON' || e.target === el;
 }
@@ -5872,6 +5884,136 @@ function expiryBadgeHtml(days, iso){
   return `<span class="exp-badge ${level}">${text}</span>`;
 }
 
+// --- Scheda ingrediente ------------------------------------------------------
+// Una pagina sola per aggiungere e modificare un ingrediente (o un prodotto
+// di casa): in cima nome, quantità, luogo e scadenza, che si usano di più;
+// categoria e gruppo come righe che si aprono in un elenco; unità, "Unisci
+// con…" ed Elimina sotto "Altro". Il pulsante in fondo resta sempre visibile.
+const UNIT_SHORT = { '':'pezzi', g:'g', kg:'kg', ml:'ml', l:'l', none:"solo c'è / non c'è" };
+function newPantryDraft(home){
+  return { nome:'', qty:1, luogo:'dispensa', unit:'', cat:'', group:'', scadenza:'', home: !!home };
+}
+function sheetIsHome(it, isNew){
+  return isNew ? !!it.home : isNonFoodDept(knownDept(it.cat) || classifyDept(it.nome));
+}
+// Categoria mostrata: quella scelta, o quella automatica dal nome (un
+// prodotto di casa non riconosciuto va in Casa › Altro, come alla conferma).
+function sheetDept(it, home){
+  const auto = classifyDept(it.nome || '');
+  return knownDept(it.cat) || (home && !isNonFoodDept(auto) ? 'altro-casa' : auto);
+}
+function sheetDeptLabelHtml(it, home){
+  const d = sheetDept(it, home);
+  return `${DEPT_ICON[d] || ''} ${escapeHtml(DEPT_LABEL[d] || '')}${knownDept(it.cat) ? '' : ' <span class="sheet-hint-inline">automatica</span>'}`;
+}
+function renderIngredientSheet(it, isNew){
+  const home = sheetIsHome(it, isNew);
+  const noun = home ? 'prodotto' : 'ingrediente';
+  const unit = it.unit || '';
+  const picker = state.pantrySheetPicker;
+  const closeAttr = isNew ? 'data-close-pantry-add-modal' : 'data-close-pantry-edit';
+  const qtyHtml = unit === 'none'
+    ? `<label class="sheet-presence"><input type="checkbox" data-sheet-presence ${it.qty > 0 ? 'checked' : ''}> In casa</label>`
+    : `<span class="qty-stepper sheet-stepper">
+        <button class="qty-btn" type="button" data-sheet-qty="-1" aria-label="Diminuisci">−</button>
+        <input type="number" inputmode="decimal" min="0" step="${qtyStepFor(unit)}" class="qty-input" id="pantry-edit-qty" value="${it.qty}" aria-label="Quantità">
+        <button class="qty-btn" type="button" data-sheet-qty="1" aria-label="Aumenta">+</button>
+        <span class="sheet-unit">${escapeHtml(UNIT_SHORT[unit] || unit)}</span>
+      </span>`;
+  const luoghi = LUOGO_ORDER.map(l=>`<button type="button" class="sheet-luogo${(it.luogo||'dispensa')===l?' active':''}" data-sheet-luogo="${l}" aria-pressed="${(it.luogo||'dispensa')===l}"><span class="sheet-luogo-icon">${LUOGO_ICON[l]}</span><span>${escapeHtml(LUOGO_LABEL[l])}</span></button>`).join('');
+  const days = it.scadenza ? daysUntilDate(it.scadenza) : null;
+  const scadenzaHtml = home ? '' : `
+        <div class="settings-field">
+          <div class="settings-field-label">Scadenza ${it.scadenza ? expiryBadgeHtml(days, it.scadenza) : '<span class="sheet-hint-inline">nessuna</span>'}</div>
+          <div class="chip-row scadenza-quick">
+            <button type="button" class="btn is-chip${it.scadenza ? '' : ' active'}" data-scadenza-clear>Nessuna</button>
+            <button type="button" class="btn is-chip" data-scadenza-quick="3">+3 giorni</button>
+            <button type="button" class="btn is-chip" data-scadenza-quick="7">+1 settimana</button>
+            <button type="button" class="btn is-chip" data-scadenza-quick="30">+1 mese</button>
+            <label class="btn is-chip sheet-date-chip">📅 Data…<input type="date" id="pantry-edit-scadenza" value="${escapeAttr(it.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
+          </div>
+        </div>`;
+  // Righe che si aprono in un elenco (categoria, gruppo), una alla volta.
+  const pickRow = (key, label, valueHtml) => `
+        <button type="button" class="sheet-row" data-sheet-picker="${key}" aria-expanded="${picker === key}">
+          <span class="sheet-row-label">${label}</span>
+          <span class="sheet-row-value" ${key === 'cat' ? 'id="sheet-cat-value"' : ''}>${valueHtml}</span>
+          <span class="sheet-row-chevron" aria-hidden="true">${picker === key ? '▴' : '▾'}</span>
+        </button>`;
+  const deptList = DEPT_ORDER.filter(d => d !== 'finiti' && d !== 'avanzi' && (home ? isNonFoodDept(d) : !isNonFoodDept(d)))
+    .sort((a, b) => IT_COLLATOR.compare(DEPT_LABEL[a], DEPT_LABEL[b]));
+  const autoDept = classifyDept(it.nome || '');
+  const catPicker = picker !== 'cat' ? '' : `
+        <div class="sheet-options" role="listbox" aria-label="Categoria">
+          <button type="button" class="sheet-option${it.cat ? '' : ' active'}" data-sheet-cat="">✨ Automatica <span class="sheet-hint-inline">(${escapeHtml(DEPT_LABEL[home && !isNonFoodDept(autoDept) ? 'altro-casa' : autoDept])})</span></button>
+          ${deptList.map(d => `<button type="button" class="sheet-option${it.cat === d ? ' active' : ''}" data-sheet-cat="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</button>`).join('')}
+          <button type="button" class="sheet-option is-muted" data-sheet-cat="${home ? 'altro' : 'altro-casa'}">↔ ${home ? 'È un alimento (sposta in Cibo)' : 'È un prodotto per la casa (sposta in Casa)'}</button>
+          <button type="button" class="sheet-option is-link" data-open-depts>🏷️ Gestisci categorie…</button>
+        </div>`;
+  const groups = Object.entries(state.pantryGroups);
+  const groupPicker = picker !== 'group' ? '' : `
+        <div class="sheet-options" role="listbox" aria-label="Gruppo">
+          <button type="button" class="sheet-option${it.group ? '' : ' active'}" data-sheet-group="">Nessuno</button>
+          ${groups.map(([id, g]) => `<button type="button" class="sheet-option${it.group === id ? ' active' : ''}" data-sheet-group="${escapeAttr(id)}">${escapeHtml(g.label)}</button>`).join('')}
+          <button type="button" class="sheet-option is-link" data-open-pantry-groups>🗂️ Gestisci gruppi…</button>
+        </div>`;
+  const units = home ? HOME_UNITS.concat(unit && !HOME_UNITS.includes(unit) ? [unit] : []) : UNIT_ORDER;
+  const more = !!state.pantrySheetMore;
+  return `
+  <div class="sheet-page" data-sheet-page>
+    <header class="settings-header">
+      <button class="btn is-icon settings-back" type="button" ${closeAttr} aria-label="Indietro"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="100%" height="100%"><path fill="currentColor" d="M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z"></path></svg></button>
+      <h2 class="settings-title">${isNew ? `Nuovo ${noun}` : `Modifica ${noun}`}</h2>
+    </header>
+    <div class="settings-body sheet-body">
+      <section class="settings-section">
+        <div class="settings-card">
+          <input type="text" class="sheet-name" id="${isNew ? 'pantry-add-name' : 'pantry-edit-name'}" value="${escapeAttr(it.nome)}" placeholder="${home ? 'Es. Detersivo piatti' : 'Es. Zucchine'}" aria-label="Nome" autocomplete="off">
+          <div class="settings-field sheet-qty-row">
+            <div class="settings-field-label">${unit === 'none' ? 'Ce l\'hai?' : 'Quantità'}</div>
+            ${qtyHtml}
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Dove sta</div>
+            <div class="sheet-luoghi">${luoghi}</div>
+          </div>
+          ${scadenzaHtml}
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="settings-card sheet-rows">
+          ${pickRow('cat', 'Categoria', sheetDeptLabelHtml(it, home))}
+          ${catPicker}
+          ${home ? '' : pickRow('group', 'Gruppo', it.group && state.pantryGroups[it.group] ? escapeHtml(state.pantryGroups[it.group].label) : '<span class="sheet-hint-inline">nessuno</span>')}
+          ${groupPicker}
+        </div>
+        ${home ? '' : '<p class="settings-note">Il gruppo unisce più formati (es. Fusilli e Penne in "Pasta corta"): una ricetta che chiede pasta corta li trova tutti.</p>'}
+      </section>
+      <section class="settings-section">
+        <button type="button" class="sheet-more-toggle" data-sheet-more aria-expanded="${more}">Altro ${more ? '▴' : '▾'}</button>
+        ${more ? `
+        <div class="settings-card">
+          <div class="settings-field">
+            <div class="settings-field-label">Unità</div>
+            <div class="chip-row">${units.map(u => `<button type="button" class="btn is-chip${unit === u ? ' active' : ''}" data-sheet-unit="${u}">${escapeHtml(UNIT_SHORT[u] || u)}</button>`).join('')}</div>
+            <p class="settings-card-text">${home ? 'Pezzi per contarli, oppure solo se ce l\'hai o no.' : 'Serve a capire se ne hai abbastanza per una ricetta (es. 500 g di pasta).'}</p>
+          </div>
+          ${isNew ? '' : `
+          <div class="settings-field">
+            <button type="button" class="btn is-outline is-block" data-open-merge="${escapeAttr(it.nome)}">🔗 Unisci con un doppione…</button>
+            <button type="button" class="btn is-outline is-block color-delete" id="pantry-edit-delete">Elimina dalla Dispensa</button>
+          </div>`}
+        </div>` : ''}
+      </section>
+    </div>
+    <div class="sheet-footer">
+      ${isNew
+        ? `<button class="btn is-solid is-block" id="pantry-add-btn" type="button">Aggiungi</button>`
+        : `<button class="btn is-solid is-block" type="button" data-close-pantry-edit>Fatto</button>`}
+    </div>
+  </div>`;
+}
+
 function renderDispensa(){
   // Un'unica lista per dispensa/ripostiglio/frigo/freezer, distinti solo
   // dall'icona del luogo (si cambia toccandola). Si riempie da sola quando
@@ -5963,127 +6105,16 @@ function renderDispensa(){
     }).join(''));
   }
 
+  // Scheda ingrediente: Modifica e Aggiungi sono la stessa pagina (vedi
+  // renderIngredientSheet). In Modifica ogni cambio si salva subito; in
+  // Aggiungi si lavora su una bozza (state.pantryDraft) che entra in Dispensa
+  // solo con "Aggiungi".
   const editItem = state.pantryEditKey ? state.pantryItems[state.pantryEditKey] : null;
-  // Prodotto di casa: niente gruppo e solo unità pezzi/"Non mostrare", come
-  // in "Aggiungi prodotto". Le categorie sono solo quelle della sua parte
-  // (Cibo o Casa), più un'unica voce "↔" per spostarlo nell'altra se è stato
-  // riconosciuto male (finisce nel suo "Altro", poi si sceglie la categoria).
-  const editingHome = !!editItem && isNonFoodDept(knownDept(editItem.cat) || classifyDept(editItem.nome));
-  const editModal = editItem ? `
-    <div class="filters-modal-backdrop" data-close-pantry-edit>
-      <div class="filters-modal" data-stop-close>
-        <div class="filters-modal-header">
-          <h3>${editingHome ? 'Modifica prodotto' : 'Modifica ingrediente'}</h3>
-          <button class="btn is-icon filters-close-btn" data-close-pantry-edit>✕</button>
-        </div>
-        <div class="filter-groups">
-          <div class="filter-group">
-            <div class="filter-group-label">Nome</div>
-            <input type="text" id="pantry-edit-name" value="${escapeAttr(editItem.nome)}">
-          </div>
-          <div class="filter-group">
-            <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
-            <select id="pantry-edit-cat">
-              <option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(editItem.nome)])})</option>
-              ${deptOptionsHtml(editItem.cat, editingHome ? 'casa' : 'cibo')}
-              <option value="${editingHome ? 'altro' : 'altro-casa'}">${editingHome ? '↔ È un alimento (sposta in Cibo)' : '↔ È un prodotto per la casa (sposta in Casa)'}</option>
-            </select>
-          </div>
-          ${editingHome ? '' : `<div class="filter-group">
-            <div class="filter-group-label">Gruppo (es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
-            <select id="pantry-edit-group">
-              <option value="">Nessuno</option>
-              ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${editItem.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}
-            </select>
-          </div>`}
-          <div class="filter-group">
-            <div class="filter-group-label">Luogo</div>
-            <select id="pantry-edit-luogo">
-              ${LUOGO_ORDER.map(l=>`<option value="${l}" ${(editItem.luogo||'dispensa')===l?'selected':''}>${LUOGO_ICON[l]} ${escapeHtml(LUOGO_LABEL[l])}</option>`).join('')}
-            </select>
-          </div>
-          <div class="filter-group">
-            <div class="filter-group-label">Quantità</div>
-            <input type="number" min="0" step="${qtyStepFor(editItem.unit)}" id="pantry-edit-qty" value="${editItem.qty}">
-          </div>
-          ${editingHome ? '' : `<div class="filter-group">
-            <div class="filter-group-label">Scadenza ${editItem.scadenza ? expiryBadgeHtml(daysUntilDate(editItem.scadenza), editItem.scadenza) : ''}</div>
-            <input type="date" id="pantry-edit-scadenza" value="${escapeAttr(editItem.scadenza || '')}">
-            <div class="chip-row scadenza-quick">
-              <button type="button" class="btn is-chip" data-scadenza-quick="3">+3 giorni</button>
-              <button type="button" class="btn is-chip" data-scadenza-quick="7">+1 settimana</button>
-              <button type="button" class="btn is-chip" data-scadenza-quick="30">+1 mese</button>
-              ${editItem.scadenza ? '<button type="button" class="btn is-chip" data-scadenza-clear>Nessuna</button>' : ''}
-            </div>
-          </div>`}
-          <div class="filter-group">
-            <div class="filter-group-label">${editingHome ? 'Unità' : 'Unità (per confrontare con quanto serve in ricetta)'}</div>
-            <select id="pantry-edit-unit">
-              ${editingHome ? homeUnitOptionsHtml(editItem.unit) : UNIT_ORDER.map(u=>`<option value="${u}" ${(editItem.unit||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
-            </select>
-          </div>
-          <div class="filter-group">
-            <div class="filter-group-label">È un doppione?</div>
-            <button type="button" class="btn is-chip merge-open-btn" data-open-merge="${escapeAttr(editItem.nome)}">🔗 Unisci con un altro ${editingHome ? 'prodotto' : 'ingrediente'}…</button>
-          </div>
-        </div>
-        <div class="filters-modal-footer">
-          <button class="btn is-outline color-delete" id="pantry-edit-delete"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina</button>
-          <button class="btn is-solid mini-add-btn" data-close-pantry-edit>Salva</button>
-        </div>
-      </div>
-    </div>` : '';
-
+  if(!editItem && state.pantryAddModalOpen && !state.pantryDraft) state.pantryDraft = newPantryDraft(state.pantryView === 'casa');
+  const sheetItem = editItem || (state.pantryAddModalOpen ? state.pantryDraft : null);
+  const editModal = sheetItem ? renderIngredientSheet(sheetItem, !editItem) : '';
   const mergeModal = renderMergeIngredientModal();
-
-  // Dalla vista Casa si aggiunge un prodotto, non un ingrediente: solo
-  // categorie Casa, niente gruppo (servono alle ricette), unità solo
-  // pezzi/generico o "Non mostrare".
-  const addingHome = state.pantryView === 'casa';
-  const addModal = state.pantryAddModalOpen ? `
-    <div class="filters-modal-backdrop" data-close-pantry-add-modal>
-      <div class="filters-modal" data-stop-close>
-        <div class="filters-modal-header">
-          <h3>${state.pantryView === 'casa' ? 'Aggiungi prodotto' : 'Aggiungi ingrediente'}</h3>
-          <button class="btn is-icon filters-close-btn" data-close-pantry-add-modal>✕</button>
-        </div>
-        <div class="filter-groups">
-          <div class="filter-group">
-            <div class="filter-group-label">${addingHome ? 'Prodotto' : 'Ingrediente'}</div>
-            <input type="text" id="pantry-add-name" placeholder="${state.pantryView === 'casa' ? 'Es. Detersivo piatti' : 'Nuovo ingrediente'}">
-          </div>
-          <div class="filter-group">
-            <div class="filter-group-label">Categoria <button type="button" class="btn is-text" data-open-depts>Gestisci</button></div>
-            <select id="pantry-add-cat">
-              <option value="">Automatica (dal nome)</option>
-              ${deptOptionsHtml('', addingHome ? 'casa' : 'cibo')}
-            </select>
-          </div>
-          ${addingHome ? '' : `<div class="filter-group">
-            <div class="filter-group-label">Gruppo (es. un formato di pasta) <button type="button" class="btn is-text" data-open-pantry-groups>Gestisci</button></div>
-            <select id="pantry-add-group">
-              <option value="">Nessuno</option>
-              ${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}">${escapeHtml(g.label)}</option>`).join('')}
-            </select>
-          </div>`}
-          <div class="filter-group">
-            <div class="filter-group-label">Luogo</div>
-            <select id="pantry-add-luogo">
-              ${LUOGO_ORDER.map(l=>`<option value="${l}">${LUOGO_ICON[l]} ${LUOGO_LABEL[l]}</option>`).join('')}
-            </select>
-          </div>
-          <div class="filter-group">
-            <div class="filter-group-label">${addingHome ? 'Unità' : 'Unità (per confrontare con quanto serve in ricetta)'}</div>
-            <select id="pantry-add-unit">
-              ${addingHome ? homeUnitOptionsHtml('') : UNIT_ORDER.map(u=>`<option value="${u}">${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="filters-modal-footer">
-          <button class="btn is-solid mini-add-btn" id="pantry-add-btn" type="button">Aggiungi</button>
-        </div>
-      </div>
-    </div>` : '';
+  const addModal = '';
 /*           <button class="btn is-ghost reset-btn" data-close-pantry-add-modal>Annulla</button>
  */
   // Gestione gruppi (Pasta corta/lunga e quelli che l'utente crea): "matchName"
@@ -7876,48 +7907,13 @@ function attachHandlers(){
       persist(); render();
     });
   });
-  const pantryAddBtn = document.getElementById('pantry-add-btn');
-  if(pantryAddBtn){
-    const nameInput = document.getElementById('pantry-add-name');
-    const catSelect = document.getElementById('pantry-add-cat');
-    const groupSelect = document.getElementById('pantry-add-group');
-    const luogoSelect = document.getElementById('pantry-add-luogo');
-    const unitSelect = document.getElementById('pantry-add-unit');
-    const doAdd = ()=>{
-      if(!nameInput.value.trim()) return;
-      // Dalla vista Casa, un prodotto che la categoria automatica non
-      // riconosce come "di casa" finisce in Casa › Altro invece che nel cibo.
-      let cat = catSelect ? catSelect.value : '';
-      if(!cat && state.pantryView === 'casa' && !isNonFoodDept(classifyDept(nameInput.value))) cat = 'altro-casa';
-      upsertPantryItem(nameInput.value, luogoSelect.value, undefined, unitSelect ? unitSelect.value : '', cat, groupSelect ? groupSelect.value : '');
-      // Se è finito nell'altra vista (es. "Detersivo" aggiunto da Cibo), ci
-      // si sposta lì: altrimenti sembrerebbe non essere stato aggiunto.
-      const addedIsHome = isNonFoodDept(knownDept(cat) || classifyDept(nameInput.value));
-      state.pantryView = addedIsHome ? 'casa' : 'cibo';
-      state.pantryAddModalOpen = false;
-      persist(); render();
-    };
-    pantryAddBtn.addEventListener('click', doAdd);
-    nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doAdd(); });
-  }
   document.querySelectorAll('[data-close-pantry-add-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
-      state.pantryAddModalOpen = false;
+      closeIngredientSheet();
       render();
     });
   });
-  // Se scegli un gruppo mentre la Categoria è ancora su "Automatica", la
-  // precompiliamo dal gruppo — ma senza toccarla se l'hai già scelta a mano,
-  // e senza chiamare render() (altrimenti il nome già digitato andrebbe perso).
-  const addGroupSelect = document.getElementById('pantry-add-group');
-  if(addGroupSelect){
-    addGroupSelect.addEventListener('change', e=>{
-      const catSelect = document.getElementById('pantry-add-cat');
-      const group = state.pantryGroups[e.target.value];
-      if(catSelect && !catSelect.value && group && group.cat) catSelect.value = group.cat;
-    });
-  }
   document.querySelectorAll('[data-open-pantry-groups]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.pantryGroupsModalOpen = true; render(); });
   });
@@ -8097,9 +8093,13 @@ function attachHandlers(){
   document.querySelectorAll('[data-close-pantry-edit]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
-      state.pantryEditKey = null; render();
+      closeIngredientSheet(); render();
     });
   });
+  // Scheda ingrediente: in Modifica ogni cambio va subito in Dispensa (e si
+  // salva), in Aggiungi cambia solo la bozza finché non si preme "Aggiungi".
+  const sheetTarget = ()=> state.pantryEditKey ? state.pantryItems[state.pantryEditKey] : (state.pantryAddModalOpen ? state.pantryDraft : null);
+  const sheetChanged = ()=>{ if(state.pantryEditKey) persist(); render(); };
   const editNameInput = document.getElementById('pantry-edit-name');
   if(editNameInput){
     editNameInput.addEventListener('change', e=>{
@@ -8107,53 +8107,46 @@ function attachHandlers(){
       persist(); render();
     });
   }
-  const editCatSelect = document.getElementById('pantry-edit-cat');
-  if(editCatSelect){
-    editCatSelect.addEventListener('change', e=>{
-      const it = state.pantryItems[state.pantryEditKey];
-      if(it){
-        if(e.target.value) it.cat = e.target.value; else delete it.cat;
-        persist(); render();
-      }
+  // Nome della bozza: niente render a ogni tasto (la tastiera resta aperta),
+  // si aggiorna solo la categoria automatica mostrata.
+  const addNameInput = document.getElementById('pantry-add-name');
+  if(addNameInput && state.pantryDraft){
+    addNameInput.addEventListener('input', e=>{
+      state.pantryDraft.nome = e.target.value;
+      const v = document.getElementById('sheet-cat-value');
+      if(v) v.innerHTML = sheetDeptLabelHtml(state.pantryDraft, !!state.pantryDraft.home);
     });
+    addNameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') addNameInput.blur(); });
   }
-  const editGroupSelect = document.getElementById('pantry-edit-group');
-  if(editGroupSelect){
-    editGroupSelect.addEventListener('change', e=>{
-      const it = state.pantryItems[state.pantryEditKey];
-      if(it){
-        if(e.target.value) it.group = e.target.value; else delete it.group;
-        // Precompila la categoria dal gruppo solo se non l'avevi già scelta a
-        // mano — una scelta manuale esistente vince sempre.
-        const group = state.pantryGroups[e.target.value];
-        if(!it.cat && group && group.cat) it.cat = group.cat;
-        persist(); render();
-      }
-    });
-  }
-  const editLuogoSelect = document.getElementById('pantry-edit-luogo');
-  if(editLuogoSelect){
-    editLuogoSelect.addEventListener('change', e=>{
-      const it = state.pantryItems[state.pantryEditKey];
-      if(it){ it.luogo = e.target.value; persist(); render(); }
-    });
-  }
+  document.querySelectorAll('[data-sheet-qty]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    const step = qtyStepFor(it.unit) * parseInt(btn.dataset.sheetQty, 10);
+    it.qty = Math.max(0, Math.round(((typeof it.qty === 'number' ? it.qty : 0) + step) * 100) / 100);
+    sheetChanged();
+  }));
   const editQtyInput = document.getElementById('pantry-edit-qty');
   if(editQtyInput){
     editQtyInput.addEventListener('change', e=>{
-      const it = state.pantryItems[state.pantryEditKey];
-      if(it){
-        const n = parseFloat(e.target.value);
-        it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
-        persist(); render();
-      }
+      const it = sheetTarget(); if(!it) return;
+      const n = parseFloat(String(e.target.value).replace(',', '.'));
+      it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+      sheetChanged();
     });
   }
+  document.querySelectorAll('[data-sheet-presence]').forEach(cb=> cb.addEventListener('change', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    it.qty = cb.checked ? 1 : 0;
+    sheetChanged();
+  }));
+  document.querySelectorAll('[data-sheet-luogo]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    it.luogo = btn.dataset.sheetLuogo;
+    sheetChanged();
+  }));
   const setEditScadenza = iso=>{
-    const it = state.pantryItems[state.pantryEditKey];
-    if(!it) return;
+    const it = sheetTarget(); if(!it) return;
     if(iso) it.scadenza = iso; else delete it.scadenza;
-    persist(); render();
+    sheetChanged();
   };
   const editScadenzaInput = document.getElementById('pantry-edit-scadenza');
   if(editScadenzaInput) editScadenzaInput.addEventListener('change', e=> setEditScadenza(e.target.value));
@@ -8163,22 +8156,66 @@ function attachHandlers(){
   document.querySelectorAll('[data-scadenza-clear]').forEach(btn=>{
     btn.addEventListener('click', ()=> setEditScadenza(''));
   });
-  const editUnitSelect = document.getElementById('pantry-edit-unit');
-  if(editUnitSelect){
-    editUnitSelect.addEventListener('change', e=>{
-      const it = state.pantryItems[state.pantryEditKey];
-      if(it){
-        if(e.target.value) it.unit = e.target.value; else delete it.unit;
-        persist(); render();
-      }
-    });
-  }
+  document.querySelectorAll('[data-sheet-picker]').forEach(btn=> btn.addEventListener('click', ()=>{
+    state.pantrySheetPicker = state.pantrySheetPicker === btn.dataset.sheetPicker ? null : btn.dataset.sheetPicker;
+    render();
+  }));
+  document.querySelectorAll('[data-sheet-cat]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    const v = btn.dataset.sheetCat;
+    if(v) it.cat = v; else delete it.cat;
+    if(it === state.pantryDraft) it.home = isNonFoodDept(sheetDept(it, it.home));
+    state.pantrySheetPicker = null;
+    sheetChanged();
+  }));
+  document.querySelectorAll('[data-sheet-group]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    const v = btn.dataset.sheetGroup;
+    if(v) it.group = v; else delete it.group;
+    // Categoria precompilata dal gruppo solo se non era già scelta a mano.
+    const group = state.pantryGroups[v];
+    if(!it.cat && group && group.cat) it.cat = group.cat;
+    state.pantrySheetPicker = null;
+    sheetChanged();
+  }));
+  document.querySelectorAll('[data-sheet-unit]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    const v = btn.dataset.sheetUnit;
+    if(v) it.unit = v; else delete it.unit;
+    sheetChanged();
+  }));
+  document.querySelectorAll('[data-sheet-more]').forEach(btn=> btn.addEventListener('click', ()=>{
+    state.pantrySheetMore = !state.pantrySheetMore;
+    render();
+  }));
+  const pantryAddBtn = document.getElementById('pantry-add-btn');
+  if(pantryAddBtn) pantryAddBtn.addEventListener('click', ()=>{
+    const d = state.pantryDraft; if(!d) return;
+    const nome = (d.nome || '').trim();
+    if(!nome){ const inp = document.getElementById('pantry-add-name'); if(inp) inp.focus(); return; }
+    // Dalla vista Casa, un prodotto che la categoria automatica non
+    // riconosce come "di casa" finisce in Casa › Altro invece che nel cibo.
+    let cat = d.cat || '';
+    if(!cat && d.home && !isNonFoodDept(classifyDept(nome))) cat = 'altro-casa';
+    const key = nome.toLowerCase();
+    upsertPantryItem(nome, d.luogo, d.unit === 'none' ? (d.qty > 0 ? 1 : 0) : d.qty, d.unit || '', cat, d.group || '');
+    if(d.scadenza && state.pantryItems[key] && !state.pantryItems[key].scadenza) state.pantryItems[key].scadenza = d.scadenza;
+    // Se è finito nell'altra vista (es. "Detersivo" aggiunto da Cibo), ci
+    // si sposta lì: altrimenti sembrerebbe non essere stato aggiunto.
+    state.pantryView = isNonFoodDept(knownDept(cat) || classifyDept(nome)) ? 'casa' : 'cibo';
+    closeIngredientSheet();
+    persist(); render();
+    showUndoToast(`${nome} aggiunto`, ()=>{ delete state.pantryItems[key]; persist(); render(); });
+  });
   const editDeleteBtn = document.getElementById('pantry-edit-delete');
   if(editDeleteBtn){
     editDeleteBtn.addEventListener('click', ()=>{
-      delete state.pantryItems[state.pantryEditKey];
-      state.pantryEditKey = null;
+      const key = state.pantryEditKey;
+      const prev = state.pantryItems[key];
+      delete state.pantryItems[key];
+      closeIngredientSheet();
       persist(); render();
+      if(prev) showUndoToast(`${prev.nome} eliminato`, ()=>{ state.pantryItems[key] = prev; persist(); render(); });
     });
   }
 }
