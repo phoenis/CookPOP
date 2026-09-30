@@ -810,3 +810,46 @@
 .menu-badge{ margin-left:auto; padding:0 var(--space-xsmall); border-radius:var(--radius-pill); background:var(--amber); color:var(--on-amber); font-size:var(--text-xxsmall, 0.7rem); font-weight:var(--weight-bold); }
 /* "Vi piace?" nella finestra "Ricetta fatta!". */
 .done-grad{ margin-bottom:var(--space-small); }
+
+/* Scheda ingrediente (renderIngredientSheet): pagina intera sopra Dispensa,
+   sotto le finestre che apre (categorie, gruppi, unisci: z-index 200). */
+.sheet-page{ position:fixed; inset:0; z-index:190; background:var(--bg); overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; outline:none; animation:settings-in 0.18s ease-out; }
+@media (prefers-reduced-motion: reduce){ .sheet-page{ animation:none; } }
+.sheet-body{ flex:1; width:100%; }
+.sheet-footer{ position:sticky; bottom:0; padding:var(--space-small) var(--space-medium) calc(var(--space-small) + env(safe-area-inset-bottom)); background:var(--bg); border-top:1px solid var(--line); }
+.sheet-footer .btn{ display:block; max-width:40rem; margin:0 auto; }
+.sheet-name{ width:100%; font-family:var(--font-family); font-size:var(--text-large); font-weight:var(--weight-strong); color:var(--ink); background:transparent; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:0 0 var(--space-xsmall); }
+.sheet-name:focus{ outline:none; border-bottom-color:var(--gold); }
+.sheet-qty-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); }
+.sheet-qty-row .settings-field-label{ margin:0; }
+.sheet-stepper{ gap:0.375rem; }
+.sheet-stepper .qty-btn{ width:2.25rem; height:2.25rem; border-radius:50%; border:0; background:var(--surface-2); color:var(--ink); font-size:var(--text-medium); line-height:1; cursor:pointer; }
+.sheet-stepper .qty-input{ width:4rem; height:2.25rem; text-align:center; border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); font-family:var(--font-family); font-size:var(--text-body, 1rem); padding:0; }
+.sheet-stepper .qty-input:focus{ outline:none; border-color:var(--gold); }
+.sheet-unit{ font-family:var(--font-family); font-size:var(--text-small); color:var(--ink-light); margin-left:0.25rem; }
+.sheet-presence{ display:flex; align-items:center; gap:0.4rem; font-family:var(--font-family); font-size:var(--text-small); }
+.sheet-luoghi{ display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:0.375rem; }
+.sheet-luogo{ display:flex; flex-direction:column; align-items:center; gap:0.2rem; padding:0.5rem 0.1rem; border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); font-family:var(--font-family); font-size:0.68rem; letter-spacing:-0.01em; cursor:pointer; min-width:0; }
+.sheet-luogo span:last-child{ max-width:100%; overflow-wrap:anywhere; text-align:center; }
+.sheet-luogo-icon svg{ width:1.4rem; height:1.4rem; }
+.sheet-luogo.active{ border-color:var(--gold); background:rgba(var(--gold-rgb),0.12); color:var(--gold-dark); }
+.sheet-page .chip-row{ display:flex; flex-wrap:wrap; gap:0.375rem; }
+.sheet-page .chip-row .btn.is-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-small); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-xsmall); }
+.sheet-page .chip-row .btn.is-chip.active{ background:var(--ink); color:var(--bg); }
+.sheet-date-chip{ position:relative; overflow:hidden; cursor:pointer; }
+.sheet-date-chip input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.sheet-rows{ gap:0; padding-top:0; padding-bottom:0; }
+.sheet-rows > * + .sheet-row{ border-top:1px solid var(--line); }
+.sheet-row{ display:flex; align-items:center; gap:var(--space-xsmall); width:100%; padding:var(--space-small) 0; border:0; background:none; color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); text-align:left; cursor:pointer; }
+.sheet-row-label{ font-weight:var(--weight-bold); flex:0 0 auto; }
+.sheet-row-value{ flex:1; min-width:0; text-align:right; }
+.sheet-row-chevron{ color:var(--ink-light); font-size:var(--text-xsmall); }
+.sheet-hint-inline{ color:var(--ink-light); font-weight:normal; font-size:var(--text-xsmall); }
+.sheet-options{ display:flex; flex-direction:column; padding-bottom:var(--space-small); }
+.sheet-option{ text-align:left; padding:0.6rem 0.5rem; border:0; background:none; border-radius:var(--radius-modal); color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); cursor:pointer; }
+.sheet-option.active{ background:rgba(var(--gold-rgb),0.14); font-weight:var(--weight-bold); }
+.sheet-option.is-muted{ color:var(--ink-light); }
+.sheet-option.is-link{ color:var(--gold-dark); font-weight:var(--weight-bold); }
+.sheet-more-toggle{ border:0; background:none; font-family:var(--font-family); font-size:var(--text-xsmall); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-light); padding:0 0 var(--space-xsmall) var(--space-xxsmall); cursor:pointer; }
+.sheet-page .settings-card .btn.is-block + .btn.is-block{ margin-top:var(--space-xsmall); }
+.sheet-page .settings-card .btn.is-block{ white-space:normal; }
