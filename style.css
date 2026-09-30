@@ -854,3 +854,36 @@
 .sheet-more-toggle{ border:0; background:none; font-family:var(--font-family); font-size:var(--text-xsmall); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-light); padding:0 0 var(--space-xsmall) var(--space-xxsmall); cursor:pointer; }
 .sheet-page .settings-card .btn.is-block + .btn.is-block{ margin-top:var(--space-xsmall); }
 .sheet-page .settings-card .btn.is-block{ white-space:normal; }
+
+/* Pagine "Categorie", "Gruppi", "Ingredienti" (renderDeptsPage, renderGroupsPage,
+   renderIngredientManagerPage): elenco da leggere, modifica dentro la riga. */
+.manage-intro{ margin:0 var(--space-xxsmall) var(--space-medium); }
+.manage-list{ gap:0; padding-top:var(--space-xxsmall); padding-bottom:var(--space-xxsmall); }
+.manage-list > * + *{ border-top:1px solid var(--line); }
+.manage-row{ display:flex; align-items:center; gap:var(--space-small); width:100%; padding:var(--space-small) 0; border:0; background:none; color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); text-align:left; cursor:pointer; }
+.manage-row-icon{ flex:0 0 1.5rem; text-align:center; font-size:var(--text-medium); }
+.manage-row-main{ flex:1; min-width:0; }
+.manage-row-sub{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.manage-row-side{ flex:0 0 auto; font-size:var(--text-xsmall); color:var(--ink-light); }
+.manage-row-chevron{ color:var(--ink-light); font-size:var(--text-medium); line-height:1; }
+.manage-tag{ font-size:var(--text-xxsmall, 0.7rem); padding:0 0.4rem; border-radius:var(--radius-pill); background:var(--surface-2); color:var(--ink-light); vertical-align:middle; }
+.manage-count{ font-weight:normal; letter-spacing:0; color:var(--ink-light); }
+.manage-edit{ display:flex; flex-direction:column; gap:var(--space-small); padding:var(--space-small) 0; }
+.manage-edit-row{ display:flex; gap:var(--space-xsmall); }
+.manage-edit input[type=text], .manage-edit input[type=search], .manage-edit select{ width:100%; min-width:0; font-family:var(--font-family); font-size:var(--text-body, 1rem); padding:var(--space-xsmall); border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); }
+.manage-edit .dept-icon-input{ flex:0 0 3.25rem; width:3.25rem; text-align:center; }
+.manage-field{ display:flex; flex-direction:column; gap:0.3rem; font-family:var(--font-family); font-size:var(--text-xsmall); font-weight:var(--weight-bold); color:var(--ink-light); }
+.manage-edit-actions{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); }
+.manage-edit-buttons{ display:flex; gap:var(--space-xsmall); }
+.manage-edit-buttons .btn{ margin:0; }
+.manage-members{ display:flex; flex-wrap:wrap; gap:0.375rem; font-weight:normal; }
+.manage-member{ display:inline-flex; align-items:center; gap:0.25rem; padding:0.2rem 0.3rem 0.2rem 0.6rem; border-radius:var(--radius-pill); background:rgba(var(--gold-rgb),0.14); color:var(--ink); font-size:var(--text-xsmall); }
+.manage-member button{ border:0; background:none; color:var(--ink-light); cursor:pointer; font-size:var(--text-xsmall); padding:0 0.2rem; }
+.manage-suggestions{ display:flex; flex-wrap:wrap; gap:0.375rem; }
+.manage-suggestions .btn.is-chip, .manage-edit .chip-row .btn.is-chip, .manage-toolbar .chip-row .btn.is-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-small); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-xsmall); }
+.manage-edit .chip-row .btn.is-chip.active, .manage-toolbar .chip-row .btn.is-chip.active{ background:var(--ink); color:var(--bg); }
+.manage-toolbar{ display:flex; flex-direction:column; gap:var(--space-xsmall); padding:0 0 var(--space-small); background:var(--bg); margin-bottom:var(--space-small); }
+.manage-list .manage-edit{ padding-left:0; padding-right:0; }
+.manage-edit input[type=text], .manage-edit input[type=search], .manage-edit select{ font-weight:normal; }
+.manage-toolbar .search-field{ position:relative; }
+.manage-toolbar .input-search{ width:100%; box-sizing:border-box; padding:var(--space-xsmall) var(--space-small); border:1px solid var(--line); border-radius:var(--radius-pill); background:var(--surface); color:var(--ink); font-family:var(--font-family); font-size:var(--text-body, 1rem); }

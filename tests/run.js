@@ -662,19 +662,65 @@ test('dispensa: il menu dei luoghi si vede (non tagliato dalla riga) e cambia lu
   eq(page.errors, [], 'errori JS');
 });
 
-test('finestre: toccare un campo dentro "Gestisci categorie" (aperta da Aggiungi ingrediente) non la chiude', async ({ page }) => {
+test('categorie: dalla scheda "Nuovo ingrediente", modifica dentro la riga; i campi non chiudono la pagina', async ({ page }) => {
   await page.evaluate(() => { state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryAddModalOpen = true; render(); });
   await page.click('[data-sheet-picker="cat"]');
   await page.click('[data-open-depts]');
-  await page.click('#new-dept-label');
-  await page.click('#new-dept-icon');
-  await page.click('[data-close-depts] .filters-modal h3');
-  eq(await page.evaluate(() => state.deptsModalOpen), true, 'resta aperta');
-  await page.fill('#new-dept-label', 'Animali');
-  await page.click('#add-dept-btn');
-  eq(await page.evaluate(() => ({ open: state.deptsModalOpen, added: Object.values(state.customDepts || {}).some(d => d && d.label === 'Animali') })), { open: true, added: true }, 'aggiunta');
-  await page.click('[data-close-depts].filters-modal-backdrop', { position: { x: 5, y: 5 } });
-  eq(await page.evaluate(() => ({ depts: state.deptsModalOpen, add: state.pantryAddModalOpen })), { depts: false, add: true }, 'il tocco fuori chiude solo quella sopra');
+  eq(await page.evaluate(() => ({ depts: state.deptsModalOpen, top: [...document.querySelectorAll('.sheet-page')].pop().dataset.page })), { depts: true, top: 'depts' }, 'categorie sopra la scheda');
+  await page.click('[data-dept-edit="new"]');
+  await page.click('#dept-edit-label');
+  await page.click('#dept-edit-icon');
+  await page.fill('#dept-edit-label', 'Animali');
+  await page.click('[data-dept-draft-type="casa"]');
+  eq(await page.evaluate(() => ({ open: state.deptsModalOpen, label: document.getElementById('dept-edit-label').value })), { open: true, label: 'Animali' }, 'il testo resta dopo il cambio tipo');
+  await page.click('#dept-edit-save');
+  eq(await page.evaluate(() => Object.values(state.customDepts || {}).some(d => d && d.label === 'Animali' && d.nonFood)), true, 'aggiunta in Casa');
+  // Rinomina una categoria di base e ripristina.
+  await page.click('[data-dept-edit="verdura"]');
+  await page.fill('#dept-edit-label', 'Ortofrutta');
+  await page.click('#dept-edit-save');
+  eq(await page.evaluate(() => DEPT_LABEL.verdura), 'Ortofrutta', 'rinominata');
+  await page.click('[data-dept-edit="verdura"]');
+  await page.click('[data-dept-reset="verdura"]');
+  eq(await page.evaluate(() => DEPT_LABEL.verdura), 'Frutta e verdura', 'ripristinata');
+  await page.keyboard.press('Escape');
+  eq(await page.evaluate(() => ({ depts: state.deptsModalOpen, add: state.pantryAddModalOpen })), { depts: false, add: true }, 'Esc chiude solo le categorie');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('gruppi: formati nel gruppo, aggiunta e rimozione dalla riga, nuovo gruppo col nome nelle ricette automatico', async ({ page }) => {
+  await page.evaluate(() => {
+    ['Fusilli', 'Penne'].forEach(n => { upsertPantryItem(n, 'dispensa', 1); state.pantryItems[n.toLowerCase()].group = 'pasta-corta'; });
+    upsertPantryItem('Farfalle', 'dispensa', 1);
+    state.tab = 'dispensa'; state.pantryGroupsModalOpen = true; render();
+  });
+  eq(await page.$eval('[data-group-edit="pasta-corta"] .manage-row-sub', el => el.textContent), 'Fusilli, Penne', 'formati mostrati');
+  await page.click('[data-group-edit="pasta-corta"]');
+  await page.fill('#group-member-search', 'farf');
+  await page.click('[data-group-member-add="farfalle"]');
+  await page.click('[data-group-member-remove="penne"]');
+  eq(await page.evaluate(() => ({ farfalle: state.pantryItems['farfalle'].group, penne: state.pantryItems['penne'].group || null })), { farfalle: 'pasta-corta', penne: null }, 'aggiunto e tolto');
+  await page.click('[data-group-edit-cancel]');
+  await page.click('[data-group-edit="new"]');
+  await page.fill('#group-edit-label', 'Formaggi da grattugiare');
+  eq(await page.$eval('#group-edit-match', el => el.value), 'formaggi da grattugiare', 'nome nelle ricette automatico');
+  await page.click('#group-edit-save');
+  eq(await page.evaluate(() => ({ g: Object.values(state.pantryGroups).find(g => g.label === 'Formaggi da grattugiare'), editing: !!state.groupEditId })), { g: { label: 'Formaggi da grattugiare', matchName: 'formaggi da grattugiare', cat: '' }, editing: true }, 'creato e aperto');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('ingredienti: filtro In Dispensa, divisi per categoria; la scheda si apre sopra e Indietro torna all\'elenco', async ({ page }) => {
+  await page.evaluate(() => { upsertPantryItem('Carciofi', 'frigo', 3); state.tab = 'dispensa'; state.ingredientManagerOpen = true; render(); });
+  await page.click('[data-ingredient-filter="casa"]');
+  const r = await page.evaluate(() => {
+    const names = [...document.querySelectorAll('[data-manage-ingredient]')].map(b => b.dataset.manageIngredient);
+    return { hasCarciofi: names.includes('Carciofi'), allInStock: names.every(n => { const it = state.pantryItems[n.toLowerCase()]; return it && it.qty > 0; }), sections: document.querySelectorAll('[data-page="ingredients"] .settings-section-title').length > 0 };
+  });
+  eq(r, { hasCarciofi: true, allInStock: true, sections: true });
+  await page.click('[data-manage-ingredient="Carciofi"]');
+  eq(await page.evaluate(() => ({ edit: state.pantryEditKey, mgr: state.ingredientManagerOpen })), { edit: 'carciofi', mgr: true }, 'scheda sopra l\'elenco');
+  await page.keyboard.press('Escape');
+  eq(await page.evaluate(() => ({ edit: state.pantryEditKey, mgr: state.ingredientManagerOpen })), { edit: null, mgr: true }, 'Indietro torna all\'elenco');
   eq(page.errors, [], 'errori JS');
 });
 
