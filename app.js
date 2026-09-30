@@ -210,10 +210,10 @@ const DEPT_RULES = [
   // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
   // "Gnocchi di patate"/"Concentrato di pomodoro" non sono verdura fresca.
   ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','base'], ['aranciata','bibite'],
-  ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'], ['farro','pane'], ['tahina','dispensa'], ['robiola','latticini'], ['bagoss','latticini'], ['cioccolato','dispensa'],
+  ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'], ['farro','pane'], ['tahina','dispensa'], ['latte di cocco','dispensa'], ['robiola','latticini'], ['bagoss','latticini'], ['cioccolato','dispensa'],
   ['concentrato','legumi'], ['polpa di pomodoro','legumi'],
-  ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'],
-  ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['pesce','pesce'],
+  ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'], ['fave secche','legumi'],
+  ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['alici','pesce'], ['platessa','pesce'], ['sgombro','pesce'], ['seppi','pesce'], ['vongole','pesce'], ['cozze','pesce'], ['pesce','pesce'],
   ['manzo','carne'], ['pollo','carne'], ['maiale','carne'], ['salsiccia','carne'], ['tacchino','carne'], ['vitello','carne'], ['agnello','carne'], ['straccetti','carne'], ['macinato','carne'], ['prosciutto','carne'], ['pancetta','carne'], ['guanciale','carne'], ['coniglio','carne'],
   ['mozzarella','latticini'], ['ricotta','latticini'], ['parmigiano','latticini'], ['formaggio','latticini'], ['grana','latticini'], ['latte','latticini'], ['burro','latticini'], ['yogurt','latticini'], ['stracchino','latticini'], ['provola','latticini'],
   ['uova','uova'], ['uovo','uova'],
@@ -224,7 +224,7 @@ const DEPT_RULES = [
   // condimenti di base, separati da sughi/conserve di "Dispensa e condimenti".
   ['peperoncino','base'], ['peperon','verdura'],
   ['sale','base'], ['olio','base'], ['pepe','base'], ['aceto','base'], ['zucchero','dispensa'], ['spezie','base'],
-  ['origano','base'], ['rosmarino','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'],
+  ['origano','base'], ['rosmarino','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'], ['curry','base'], ['curcuma','base'], ['cumino','base'],
   ['senape','dispensa'], ['miele','dispensa'], ['pangrattato','dispensa'],
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
@@ -233,7 +233,7 @@ const DEPT_RULES = [
   // regola sopra riconosceva).
   ['cipoll','verdura'], ['borettan','verdura'], ['scalogno','verdura'], ['porr','verdura'], ['sedano','verdura'], ['finocchi','verdura'],
   ['carciof','verdura'], ['funghi','verdura'], ['broccol','verdura'], ['cavolfior','verdura'], ['verza','verdura'], ['cime di rapa','verdura'],
-  ['friariell','verdura'], ['spinaci','verdura'], ['bietol','verdura'], ['asparag','verdura'], ['cetriol','verdura'], ['radicchio','verdura'],
+  ['friariell','verdura'], ['spinaci','verdura'], ['bietol','verdura'], ['asparag','verdura'], ['cetriol','verdura'], ['radicchio','verdura'], ['cicoria','verdura'], ['zenzero','verdura'],
   ['rucola','verdura'], ['zucca','verdura'], ['piselli','verdura'], ['verdur','verdura'], ['prezzemolo','verdura'], ['salvia','verdura'],
   ['menta','verdura'], ['aneto','verdura'], ['aranc','verdura'], ['mele','verdura'], ['pere','verdura'],
   ['ragù','legumi'], ['carne','carne'], ['arista','carne'], ['controfiletto','carne'], ['scamone','carne'], ['cappello del prete','carne'], ['muscolo','carne'],
@@ -3485,10 +3485,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-06',
+  version: '2026-10-07',
   title: 'Novità',
   items: [
-    'Categorie, Gruppi e Ingredienti (dal menu ⋮ in Dispensa) ora sono pagine intere e più semplici: tocchi una riga e la modifichi lì dentro. I gruppi mostrano i formati che contengono e li aggiungi o togli con un tocco; gli ingredienti sono divisi per categoria, con i filtri In Dispensa / Non in Dispensa.'
+    '18 ricette nuove di uova, pesce e legumi, per dare più varietà al menù: tra le altre frittata di spinaci, shakshuka, platessa alla mugnaia, sgombro al forno, cozze alla marinara, seppie con piselli, dahl di lenticchie, burger di ceci e purè di fave e cicoria. Le trovi in Ricette, senza gradimento: votatele quando le cucinate.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
