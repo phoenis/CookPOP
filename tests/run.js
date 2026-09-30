@@ -646,6 +646,21 @@ test('backup: promemoria se non c\'è un backup recente, sparisce dopo averlo sc
   eq(r, { before: true, old: true, now: false, html: true });
 });
 
+test('dispensa: il menu dei luoghi si vede (non tagliato dalla riga) e cambia luogo', async ({ page }) => {
+  await page.evaluate(() => { upsertPantryItem('Carciofi', 'frigo', 3); state.tab = 'dispensa'; state.pantryView = 'cibo'; render(); });
+  await page.click('[data-luogo-toggle="carciofi"]');
+  const visible = await page.evaluate(() => {
+    const pk = document.querySelector('.luogo-picker');
+    if(!pk) return false;
+    const r = pk.getBoundingClientRect();
+    return pk.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  });
+  eq(visible, true, 'menu visibile');
+  await page.click('[data-luogo-set="carciofi"][data-luogo-value="freezer"]');
+  eq(await page.evaluate(() => ({ luogo: state.pantryItems['carciofi'].luogo, open: !!document.querySelector('.luogo-picker') })), { luogo: 'freezer', open: false });
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
