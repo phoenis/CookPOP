@@ -501,7 +501,7 @@
   .detail-section:first-child{ padding-top:0; margin-top:0; border-top:none; }
   .detail-section-title{ font-family:var(--font-family); font-weight:var(--weight-medium); /* font-size:var(--text-small); */ text-transform:uppercase; /* padding-bottom:0.375rem; */ margin-bottom:var(--space-xsmall);/*  border-bottom:var(--border) solid var(--line-light); */ gap:var(--gap-icon); display: flex; align-items: center;}
   .detail-section-title svg, .filter-group-label svg{height: 1.3em; width: 1.3em;}
-  .note-box{ background:rgba(var(--honey-rgb),0.09); border:1px solid rgba(var(--honey-rgb),0.25); border-radius:var(--radius-modal); padding:var(--space-xsmall) var(--space-xsmall); border-top:1px solid rgba(var(--honey-rgb),0.25); }
+  .note-box{ background:rgba(var(--honey-rgb),0.09); border:1px solid rgba(var(--honey-rgb),0.25); border-radius:var(--radius-modal); padding:var(--space-small) var(--space-medium); border-top:1px solid rgba(var(--honey-rgb),0.25); }
   /* .detail-extra-note{ font-size:var(--text-xsmall); margin-bottom:var(--space-xxsmall); line-height:1.4; } */
   .detail-extra-note:last-child{ margin-bottom:0; }
   .steps-list{ margin:0; padding-left:1.125rem;}
@@ -930,3 +930,5 @@
 .dish-acc-body .button-wrapper > *{ white-space:nowrap; }
 .dish-acc-actions{ padding-top:var(--space-small); border-top:1px solid var(--line); }
 .dish-acc-actions{ column-gap:var(--space-large); }
+.dish-acc-body .detail-section.note-box{ padding:var(--space-small) var(--space-medium); margin-top:var(--space-medium); }
+.note-box .detail-extra-note + .detail-extra-note{ margin-top:var(--space-xxsmall, 0.25rem); }
