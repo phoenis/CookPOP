@@ -710,6 +710,19 @@ test('scheda ingrediente: modifica (quantità, luogo, categoria, gruppo, unità)
   eq(page.errors, [], 'errori JS');
 });
 
+test('scheda ingrediente: aprire un elenco o "Altro" non la riporta in cima né rifà l\'animazione', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 600 });
+  await page.evaluate(() => { upsertPantryItem('Carciofi', 'frigo', 3); state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryEditKey = 'carciofi'; render(); });
+  eq(await page.evaluate(() => document.querySelector('.sheet-page').classList.contains('is-entering')), true, 'animazione alla prima apertura');
+  await page.evaluate(() => { document.querySelector('.sheet-page').scrollTop = 250; });
+  const before = await page.evaluate(() => document.querySelector('.sheet-page').scrollTop);
+  assert(before > 100, `la scheda scorre (${before})`);
+  await page.click('[data-sheet-more]');
+  const r = await page.evaluate(() => ({ top: document.querySelector('.sheet-page').scrollTop, entering: document.querySelector('.sheet-page').classList.contains('is-entering'), more: !!document.querySelector('[data-sheet-unit]') }));
+  eq(r, { top: before, entering: false, more: true });
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

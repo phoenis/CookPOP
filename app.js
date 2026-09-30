@@ -3529,6 +3529,7 @@ function render(){
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
   const panel = document.getElementById('panel');
   const focus = captureFocus(panel);
+  const scrolls = captureInnerScroll(panel);
   dialogOpenerBeforeRender = describeElement(document.activeElement);
   let html = '';
   if(state.tab === 'menu') html = renderMenu();
@@ -3539,8 +3540,29 @@ function render(){
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
   panel.innerHTML = html + renderUndoToast() + renderWhatsNewModal();
   attachHandlers();
+  restoreInnerScroll(panel, scrolls);
   restoreFocus(panel, focus);
   reconcileModalHistory();
+}
+// Le pagine e finestre che scorrono per conto loro (scheda ingrediente,
+// schermate a tutto schermo, finestre lunghe) vengono ricreate a ogni render:
+// senza questo, aprire un elenco o una sezione al loro interno le riportava
+// in cima, come se si fosse cambiato pagina.
+const INNER_SCROLL_SELECTOR = '.sheet-page, .meal-detail-screen, .filters-modal-backdrop';
+function innerScrollKey(el){
+  const attrs = [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name).join(',');
+  return el.className.split(' ')[0] + '|' + attrs;
+}
+function captureInnerScroll(panel){
+  const out = {};
+  panel.querySelectorAll(INNER_SCROLL_SELECTOR).forEach(el=>{ if(el.scrollTop) out[innerScrollKey(el)] = el.scrollTop; });
+  return out;
+}
+function restoreInnerScroll(panel, scrolls){
+  panel.querySelectorAll(INNER_SCROLL_SELECTOR).forEach(el=>{
+    const top = scrolls[innerScrollKey(el)];
+    if(top) el.scrollTop = top;
+  });
 }
 // Il render sostituisce tutto il pannello, compreso il campo in cui si sta
 // scrivendo: prima ne ricordo l'identità (id o attributi data-*) e la
@@ -5895,7 +5917,13 @@ function sheetDeptLabelHtml(it, home){
   const d = sheetDept(it, home);
   return `${DEPT_ICON[d] || ''} ${escapeHtml(DEPT_LABEL[d] || '')}${knownDept(it.cat) ? '' : ' <span class="sheet-hint-inline">automatica</span>'}`;
 }
+// L'animazione di apertura solo la prima volta che la scheda compare, non a
+// ogni render (aprire un elenco al suo interno la faceva ripartire).
+let lastSheetShown = null;
 function renderIngredientSheet(it, isNew){
+  const sheetKey = isNew ? 'new' : state.pantryEditKey;
+  const entering = sheetKey !== lastSheetShown;
+  lastSheetShown = sheetKey;
   const home = sheetIsHome(it, isNew);
   const noun = home ? 'prodotto' : 'ingrediente';
   const unit = it.unit || '';
@@ -5949,7 +5977,7 @@ function renderIngredientSheet(it, isNew){
   const units = home ? HOME_UNITS.concat(unit && !HOME_UNITS.includes(unit) ? [unit] : []) : UNIT_ORDER;
   const more = !!state.pantrySheetMore;
   return `
-  <div class="sheet-page" data-sheet-page>
+  <div class="sheet-page${entering ? ' is-entering' : ''}" data-sheet-page>
     <header class="settings-header">
       <button class="btn is-icon settings-back" type="button" ${closeAttr} aria-label="Indietro"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="100%" height="100%"><path fill="currentColor" d="M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z"></path></svg></button>
       <h2 class="settings-title">${isNew ? `Nuovo ${noun}` : `Modifica ${noun}`}</h2>
@@ -6102,6 +6130,7 @@ function renderDispensa(){
   if(!editItem && state.pantryAddModalOpen && !state.pantryDraft) state.pantryDraft = newPantryDraft(state.pantryView === 'casa');
   const sheetItem = editItem || (state.pantryAddModalOpen ? state.pantryDraft : null);
   const editModal = sheetItem ? renderIngredientSheet(sheetItem, !editItem) : '';
+  if(!sheetItem) lastSheetShown = null;
   const mergeModal = renderMergeIngredientModal();
   const addModal = '';
 /*           <button class="btn is-ghost reset-btn" data-close-pantry-add-modal>Annulla</button>
