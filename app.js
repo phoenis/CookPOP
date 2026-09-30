@@ -604,7 +604,8 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed){
   const dishBtns = fixed ? '' : `
       <button type="button" class="btn is-chip" data-open-dish-picker="${mk}" data-dish-replace="${escapeAttr(name)}">${ICON_SWAP} Cambia piatto</button>
       <button type="button" class="btn is-chip" data-dish-remove="${mk}" data-dish-name="${escapeAttr(name)}">✕ Togli</button>`;
-  const sourceEditBox = (linkHtml || editRecipeBtn || dishBtns) ? `<div class="button-wrapper">${editRecipeBtn}${linkHtml}${dishBtns}</div>` : '';
+  const sourceEditBox = (linkHtml || editRecipeBtn) ? `<div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>` : '';
+  const dishBtnsRow = dishBtns ? `<div class="button-wrapper dish-acc-actions">${dishBtns}</div>` : '';
   return `
   <div class="dish-acc${isOpen ? ' open' : ''}">
     <button type="button" class="dish-acc-head" data-dish-toggle="${mk}" data-dish-toggle-name="${escapeAttr(name)}" aria-expanded="${isOpen}">
@@ -615,12 +616,13 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed){
     ${isOpen ? `<div class="dish-acc-body">
       ${rec ? recipePhotoHtml(name) : ''}
       ${tagsHtml}
-      ${rec ? gradimentoPickerHtml(name) : ''}
       ${ingHtml}
       ${stepsHtml}
       ${noteBox}
       ${addFormHtml}
+      ${rec ? gradimentoPickerHtml(name) : ''}
       ${sourceEditBox}
+      ${dishBtnsRow}
     </div>` : ''}
   </div>`;
 }
@@ -3628,11 +3630,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-09',
+  version: '2026-10-10',
   title: 'Novità',
   items: [
-    'Pasti a più piatti: nella card del Menù i piatti sono tutti uguali e in ordine (antipasto, primo, secondo, contorno, dolce), ognuno con il suo "Cambia" e la sua ✕. "+ piatto" chiede prima la portata. "Cambia pasto" rifà tutto il pasto.',
-    'Aprendo il pasto i piatti sono uno sotto l\'altro e si aprono e chiudono. Porzioni e "Aggiungi ingredienti" valgono per tutto il pasto.'
+    'Scheda del pasto più ordinata: il tempo sta accanto a Pranzo/Cena, "Cambia" e ✕ dei piatti sono più discreti, e nel dettaglio porzioni e spesa stanno in un riquadro in alto, con le azioni di ogni piatto in fondo al piatto.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4269,7 +4270,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   let metaLines = [];
   if(isChanged){
     if(rec){
-      if(rec.prep && rec.prep !== 'No') metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
+      if(rec.prep && !/^(no\b|variabile|dipende)/i.test(rec.prep)) metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
       if(rec.freezer === 'Sì') metaLines.push(`<b>Nota:</b> congela bene — valuta doppia dose per il freezer`);
     } else if(name) {
       metaLines.push(`<b>Nota:</b> ricetta non presente nel catalogo, dettagli non disponibili`);
@@ -4315,7 +4316,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   const mealBlockHtml = `
   <div class="meal-block${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}" data-meal="${meal}">
     <div class="day-meal">
-      <div class="meal-block-label">${escapeHtml(MEAL_LABEL[meal])}</div>
+      <div class="meal-block-label">${escapeHtml(MEAL_LABEL[meal])}${timeDisplay ? `<span class="meal-block-time"> · ${escapeHtml(timeDisplay)}</span>` : ''}</div>
       ${name ? cookPill : ''}
       <div class="day-row-side display-none">
         ${currentCat ? `<span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>` : ''}
@@ -4323,11 +4324,10 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     </div>
     ${name ? dishesHtml : `
     <button type="button" class="day-menu-row day-menu-empty" data-open-swap="${mk}">+</button>`}
-    <div class="recipe-info">
-      <span class="day-time">${escapeHtml(timeDisplay)}</span>
+    ${(doneTag || statusBadges.trim()) ? `<div class="recipe-info">
       ${doneTag}
       ${statusBadges}
-    </div>
+    </div>` : ''}
     ${swapControls}
   </div>`;
   // Swipe da sinistra a destra sulla card per svuotare il pasto (come una
@@ -4369,8 +4369,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
   let metaLines = [];
   if(isChanged){
     if(rec){
-      if(rec.prep && rec.prep !== 'No') metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
-      if(rec.freezer === 'Sì') metaLines.push(`<b>Nota:</b> congela bene — valuta doppia dose per il freezer`);
+      if(rec.prep && !/^(no\b|variabile|dipende)/i.test(rec.prep)) metaLines.push(`<b>Preparazione anticipata:</b> ${escapeHtml(rec.prep)}`);
     } else if(name) {
       metaLines.push(`<b>Nota:</b> ricetta non presente nel catalogo, dettagli non disponibili`);
     }

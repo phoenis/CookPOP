@@ -334,27 +334,36 @@
 .meal-block.dragging{ opacity:0.4; }
 .meal-block.drag-over{ box-shadow:var(--shadow-drag-over); }
 /* Linea del pasto: i piatti in ordine di portata, uniti da una linea puntinata. */
-.dish-line{ display:flex; flex-direction:column; margin-top:var(--space-xsmall); min-width:0; }
-.dish-item{ position:relative; display:flex; align-items:flex-start; gap:var(--space-xsmall); padding-bottom:var(--space-xsmall); min-width:0; }
-.dish-item::before{ content:""; position:absolute; left:0.6875rem; top:1.625rem; bottom:0.125rem; border-left:2px dotted var(--line); }
-.dish-ic{ flex:0 0 1.375rem; width:1.375rem; height:1.375rem; border-radius:50%; background:var(--gold-soft); display:grid; place-items:center; font-size:0.75rem; line-height:1; margin-top:0.125rem; }
-.dish-text{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; }
-.dish-course{ font-size:0.6875rem; font-weight:var(--weight-bold); letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-light); line-height:1.3; }
-.dish-text .day-menu{ overflow-wrap:anywhere; }
-.dish-actions{ display:flex; flex-shrink:0; gap:0.125rem; }
-.dish-act{ color:var(--ink-light); font-size:0.875rem; width:2rem; height:2rem; }
-.dish-add{ align-self:flex-start; background:transparent; border:0; padding:0.125rem 0 0 calc(1.375rem + var(--space-xsmall)); color:var(--ink-light); font-weight:var(--weight-bold); font-size:var(--text-small); cursor:pointer; }
+.meal-block-time{ font-weight:var(--weight-medium); text-transform:none; letter-spacing:0; opacity:0.8; }
+.dish-line{ display:flex; flex-direction:column; margin-top:var(--space-small); min-width:0; }
+.dish-item{ position:relative; display:flex; align-items:flex-start; gap:var(--space-small); padding-bottom:var(--space-small); min-width:0; }
+.dish-item::before{ content:""; position:absolute; left:0.75rem; top:1.875rem; bottom:0.25rem; border-left:2px dotted var(--line); }
+.dish-ic{ flex:0 0 1.5rem; width:1.5rem; height:1.5rem; border-radius:50%; background:var(--gold-soft); display:grid; place-items:center; font-size:0.8125rem; line-height:1; margin-top:0.0625rem; }
+.dish-text{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:0.0625rem; }
+.dish-course{ font-size:0.6875rem; font-weight:var(--weight-bold); letter-spacing:0.06em; text-transform:uppercase; color:var(--gold); line-height:1.3; }
+.dish-text .day-menu{ border-bottom:0; overflow-wrap:anywhere; }
+.dish-actions{ display:flex; flex-shrink:0; margin-top:0.25rem; margin-right:calc(-1 * var(--space-xsmall)); }
+.dish-act{ color:var(--ink-light); opacity:0.55; font-size:0.8125rem; width:1.875rem; height:1.875rem; }
+.dish-act:hover, .dish-act:focus-visible{ opacity:1; color:var(--gold-dark); }
+.dish-add{ align-self:flex-start; background:transparent; border:0; padding:0 0 0 calc(1.5rem + var(--space-small)); color:var(--ink-light); font-weight:var(--weight-medium); font-size:var(--text-small); cursor:pointer; }
 .dish-add:hover{ color:var(--gold-dark); }
+.meal-block.done .dish-ic{ filter:grayscale(1); opacity:0.6; }
 /* Dettaglio del pasto: un piatto sotto l'altro, tutti uguali, ognuno si apre e si chiude. */
-.meal-detail-top{ display:flex; flex-direction:column; gap:var(--space-xsmall); }
+.meal-detail-top{ display:flex; flex-direction:column; gap:var(--space-small); background:var(--surface-2); border-radius:var(--radius-modal); padding:var(--space-small) var(--space-medium); }
+.meal-detail-top .day-meta{ margin:0; }
+.meal-detail-top .portions-row{ margin:0; }
 .meal-detail-top .button-wrapper{ margin:0; }
-.dish-acc-list{ display:flex; flex-direction:column; gap:var(--space-small); }
+.meal-detail-top .button-wrapper .btn{ width:100%; justify-content:center; }
+.dish-acc-list{ display:flex; flex-direction:column; gap:var(--space-xsmall); }
 .dish-acc{ background:var(--surface); border-radius:var(--radius-modal); border:var(--border) solid var(--line); overflow:hidden; }
-.dish-acc-head{ width:100%; display:flex; align-items:center; gap:var(--space-xsmall); background:transparent; border:0; padding:var(--space-small); text-align:left; font-family:var(--font-family); color:var(--ink); cursor:pointer; }
+.dish-acc.open{ border-color:color-mix(in srgb, var(--gold) 35%, var(--line)); }
+.dish-acc-head{ width:100%; display:flex; align-items:center; gap:var(--space-small); background:transparent; border:0; padding:var(--space-small) var(--space-medium); text-align:left; font-family:var(--font-family); color:var(--ink); cursor:pointer; }
 .dish-acc-name{ font-size:var(--text-medium); font-weight:var(--weight-bold); line-height:1.25; overflow-wrap:anywhere; }
-.dish-acc.open .dish-course{ color:var(--gold); }
-.dish-acc-chev{ flex-shrink:0; color:var(--ink-light); }
-.dish-acc-body{ padding:0 var(--space-small) var(--space-small); font-size:var(--text-small); display:flex; flex-direction:column; gap:var(--space-xsmall); }
+.dish-acc-chev{ flex-shrink:0; color:var(--ink-light); font-size:0.75rem; }
+.dish-acc-body{ padding:0 var(--space-medium) var(--space-medium); font-size:var(--text-small); display:flex; flex-direction:column; gap:var(--space-xsmall); }
+.dish-acc-body .detail-section{ padding:var(--space-medium) 0 0; }
+.dish-acc-body .detail-tags{ margin:0; }
+.dish-acc-body .grad-picker{ padding-top:var(--space-medium); border-top:1px solid var(--line); }
 .dish-add-wide{ align-self:stretch; }
 
 /* Dettaglio pasto a tutto schermo (sostituisce il vecchio accordion inline):
@@ -915,3 +924,9 @@
 .dish-course-chips .btn.is-chip.active{ background:var(--ink); color:var(--bg); }
 .meal-block .section-footer-row{ gap:var(--space-medium); }
 .meal-block .section-footer-row > .btn{ white-space:nowrap; }
+.dish-add-wide{ border-style:dashed; color:var(--ink-light); }
+.meal-block .avanzo-note-text{ font-size:var(--text-small); color:var(--ink-light); }
+.dish-acc-body .button-wrapper{ flex-wrap:wrap; row-gap:var(--space-xsmall); margin:0; }
+.dish-acc-body .button-wrapper > *{ white-space:nowrap; }
+.dish-acc-actions{ padding-top:var(--space-small); border-top:1px solid var(--line); }
+.dish-acc-actions{ column-gap:var(--space-large); }
