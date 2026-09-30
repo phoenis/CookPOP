@@ -661,6 +661,21 @@ test('dispensa: il menu dei luoghi si vede (non tagliato dalla riga) e cambia lu
   eq(page.errors, [], 'errori JS');
 });
 
+test('finestre: toccare un campo dentro "Gestisci categorie" (aperta da Aggiungi ingrediente) non la chiude', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryAddModalOpen = true; render(); });
+  await page.click('[data-open-depts]');
+  await page.click('#new-dept-label');
+  await page.click('#new-dept-icon');
+  await page.click('[data-close-depts] .filters-modal h3');
+  eq(await page.evaluate(() => state.deptsModalOpen), true, 'resta aperta');
+  await page.fill('#new-dept-label', 'Animali');
+  await page.click('#add-dept-btn');
+  eq(await page.evaluate(() => ({ open: state.deptsModalOpen, added: Object.values(state.customDepts || {}).some(d => d && d.label === 'Animali') })), { open: true, added: true }, 'aggiunta');
+  await page.click('[data-close-depts].filters-modal-backdrop', { position: { x: 5, y: 5 } });
+  eq(await page.evaluate(() => ({ depts: state.deptsModalOpen, add: state.pantryAddModalOpen })), { depts: false, add: true }, 'il tocco fuori chiude solo quella sopra');
+  eq(page.errors, [], 'errori JS');
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {
