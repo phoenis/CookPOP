@@ -769,6 +769,33 @@ test('scheda ingrediente: aprire un elenco o "Altro" non la riporta in cima né 
   eq(page.errors, [], 'errori JS');
 });
 
+test('ricette: 18 nuove di uova, pesce e legumi, complete e in ogni stagione', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const nuove = ['Frittata di spinaci','Frittata di cipolle','Frittata di pasta','Shakshuka (uova nel sugo di pomodoro e peperoni)','Uova e spinaci (alla fiorentina)','Omelette al formaggio',
+      'Platessa alla mugnaia','Sgombro al forno con pomodorini e limone','Alici in tortiera gratinate','Cozze alla marinara','Seppie con piselli','Spaghetti al tonno e pomodoro',
+      'Dahl di lenticchie rosse con riso','Burger di ceci al forno','Crema di fagioli cannellini con crostini','Chili vegetariano di fagioli e peperoni','Insalata di lenticchie estiva','Purè di fave e cicoria'];
+    const problems = [];
+    nuove.forEach(n => {
+      const m = getRecipeMeta(n), d = getRecipeDetails(n);
+      if(!m || !d) return problems.push(`manca ${n}`);
+      if(!/^https:\/\//.test(d.link)) problems.push(`link ${n}`);
+      if(!d.procedimento.length || !getIngredientsFor(n).length) problems.push(`vuota ${n}`);
+      if(!isMainDish(m)) problems.push(`non è un piatto ${n}`);
+      if(!['uova','pesce','legumi'].includes(recipeProteina(m))) problems.push(`proteina ${n}`);
+      if(m.gradimento) problems.push(`gradimento ${n}`);
+      getIngredientsFor(n).forEach(it => { if(classifyDept(it.ingrediente) === 'altro') problems.push(`reparto ${it.ingrediente}`); });
+    });
+    // Ogni stagione ha almeno una ricetta nuova per ciascuna proteina.
+    const seasons = {};
+    ['primavera','estate','autunno','inverno'].forEach(season => {
+      const inSeason = nuove.map(getRecipeMeta).filter(m => m.stagioni.includes(season) || m.stagioni.includes('tutto'));
+      seasons[season] = ['uova','pesce','legumi'].every(p => inSeason.some(m => recipeProteina(m) === p));
+    });
+    return { problems, seasons };
+  });
+  eq(r, { problems: [], seasons: { primavera: true, estate: true, autunno: true, inverno: true } });
+});
+
 // ---------------------------------------------------------------- runner
 
 (async () => {

@@ -10,7 +10,7 @@ come JSON compatto), la logica dell'app in `app.js`, lo stile in `style.css`;
 `index.html` li carica in quest'ordine (`catalog.js` prima di `app.js`). Tenere
 il catalogo separato permette al browser di non riscaricarlo quando cambia
 solo la logica: se modifichi `catalog.js` alza il suo `?v=` in `index.html`.
-- Un oggetto `DATA` con **249 ricette** (vedi `DATA.recipeDetails`): la
+- Un oggetto `DATA` con **267 ricette** (vedi `DATA.recipeDetails`): la
   maggior parte "curate" con ingredienti reali, procedimento e tempi; tutte
   hanno un `link` a una ricetta di riferimento online; 48 importate più di recente hanno ingredienti e
   metadati completi ma `procedimento: []` ancora da scrivere (vedi Curatela
