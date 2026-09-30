@@ -333,6 +333,29 @@
 .meal-block.done .day-menu{ text-decoration:line-through; opacity:0.6; }
 .meal-block.dragging{ opacity:0.4; }
 .meal-block.drag-over{ box-shadow:var(--shadow-drag-over); }
+/* Linea del pasto: i piatti in ordine di portata, uniti da una linea puntinata. */
+.dish-line{ display:flex; flex-direction:column; margin-top:var(--space-xsmall); min-width:0; }
+.dish-item{ position:relative; display:flex; align-items:flex-start; gap:var(--space-xsmall); padding-bottom:var(--space-xsmall); min-width:0; }
+.dish-item::before{ content:""; position:absolute; left:0.6875rem; top:1.625rem; bottom:0.125rem; border-left:2px dotted var(--line); }
+.dish-ic{ flex:0 0 1.375rem; width:1.375rem; height:1.375rem; border-radius:50%; background:var(--gold-soft); display:grid; place-items:center; font-size:0.75rem; line-height:1; margin-top:0.125rem; }
+.dish-text{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; }
+.dish-course{ font-size:0.6875rem; font-weight:var(--weight-bold); letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-light); line-height:1.3; }
+.dish-text .day-menu{ overflow-wrap:anywhere; }
+.dish-actions{ display:flex; flex-shrink:0; gap:0.125rem; }
+.dish-act{ color:var(--ink-light); font-size:0.875rem; width:2rem; height:2rem; }
+.dish-add{ align-self:flex-start; background:transparent; border:0; padding:0.125rem 0 0 calc(1.375rem + var(--space-xsmall)); color:var(--ink-light); font-weight:var(--weight-bold); font-size:var(--text-small); cursor:pointer; }
+.dish-add:hover{ color:var(--gold-dark); }
+/* Dettaglio del pasto: un piatto sotto l'altro, tutti uguali, ognuno si apre e si chiude. */
+.meal-detail-top{ display:flex; flex-direction:column; gap:var(--space-xsmall); }
+.meal-detail-top .button-wrapper{ margin:0; }
+.dish-acc-list{ display:flex; flex-direction:column; gap:var(--space-small); }
+.dish-acc{ background:var(--surface); border-radius:var(--radius-modal); border:var(--border) solid var(--line); overflow:hidden; }
+.dish-acc-head{ width:100%; display:flex; align-items:center; gap:var(--space-xsmall); background:transparent; border:0; padding:var(--space-small); text-align:left; font-family:var(--font-family); color:var(--ink); cursor:pointer; }
+.dish-acc-name{ font-size:var(--text-medium); font-weight:var(--weight-bold); line-height:1.25; overflow-wrap:anywhere; }
+.dish-acc.open .dish-course{ color:var(--gold); }
+.dish-acc-chev{ flex-shrink:0; color:var(--ink-light); }
+.dish-acc-body{ padding:0 var(--space-small) var(--space-small); font-size:var(--text-small); display:flex; flex-direction:column; gap:var(--space-xsmall); }
+.dish-add-wide{ align-self:stretch; }
 
 /* Dettaglio pasto a tutto schermo (sostituisce il vecchio accordion inline):
    sopra la topbar/barra tab (z-index 90) ma sotto gli altri modali (200) —
@@ -887,3 +910,8 @@
 .manage-edit input[type=text], .manage-edit input[type=search], .manage-edit select{ font-weight:normal; }
 .manage-toolbar .search-field{ position:relative; }
 .manage-toolbar .input-search{ width:100%; box-sizing:border-box; padding:var(--space-xsmall) var(--space-small); border:1px solid var(--line); border-radius:var(--radius-pill); background:var(--surface); color:var(--ink); font-family:var(--font-family); font-size:var(--text-body, 1rem); }
+/* Scelta del piatto: chip della portata. */
+.dish-course-chips .btn.is-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-small); border-radius:var(--radius-pill); background:var(--surface); font-size:var(--text-xsmall); }
+.dish-course-chips .btn.is-chip.active{ background:var(--ink); color:var(--bg); }
+.meal-block .section-footer-row{ gap:var(--space-medium); }
+.meal-block .section-footer-row > .btn{ white-space:nowrap; }

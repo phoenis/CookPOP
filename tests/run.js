@@ -182,14 +182,14 @@ test('offline: dopo la prima apertura l\'app si apre anche senza rete', async ({
   await page.context().setOffline(false);
 });
 
-test('layout: ricette aggiuntive dal nome lungo vanno a capo senza allargare la pagina', async ({ page }) => {
+test('layout: piatti dal nome lungo vanno a capo senza allargare la pagina', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const r = await page.evaluate(() => {
     const long = Object.keys(DATA.recipeDetails).sort((a, b) => b.length - a.length);
     const i = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1; // oggi, così il pasto è visibile
     state.tab = 'menu'; writeMealPrincipale(state.weekOverrides, i, 'cena', 'Pasta al pesto');
     setMealContorni(0, i, 'cena', [long[0], long[1]]); render();
-    return { page: document.documentElement.scrollWidth, chips: document.querySelectorAll('.contorni-row .status-badge').length };
+    return { page: document.documentElement.scrollWidth, chips: document.querySelectorAll(`.meal-block[data-day-index="${i}"][data-meal="cena"] .dish-item`).length - 1 };
   });
   eq(r.chips, 2, 'chip visibili');
   assert(r.page <= 390, `pagina larga ${r.page}px`);
@@ -819,6 +819,63 @@ test('generatore: evita le ricette delle ultime settimane e delle altre settiman
 });
 
 // ---------------------------------------------------------------- runner
+
+test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del singolo piatto, dettaglio a fisarmonica', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1);
+    const byTipo = t => allRecipeMetas().filter(x => x.tipologia === t).map(x => x.nome);
+    const [primo] = byTipo('primo'), [contorno, contorno2] = byTipo('contorno'), [antipasto] = byTipo('antipasto'), [dolce] = byTipo('dolce');
+    // principale "primo", poi aggiunti a caso: la card li mette in ordine di portata
+    writeMealDishes(1, 1, 'cena', primo, [dolce, contorno, antipasto]);
+    state.tab = 'menu'; render();
+    const courses = () => [...document.querySelectorAll('.meal-block[data-week-idx="1"][data-day-index="1"][data-meal="cena"] .dish-course')].map(e => e.textContent);
+    const out = { names: { primo, contorno, contorno2, antipasto, dolce }, order: courses() };
+    // + piatto: la portata di partenza è una che manca, si sceglie dai chip
+    document.querySelector('[data-open-dish-picker="1_1_cena"]:not([data-dish-replace])').click();
+    out.pickerTipo = state.dishPicker.tipo;
+    document.querySelector('[data-dish-course="contorno"]').click();
+    out.onlyContorni = [...document.querySelectorAll('[data-dish-pick]')].every(e => getRecipeMeta(e.dataset.dishPick).tipologia === 'contorno');
+    out.noDuplicate = !document.querySelector(`[data-dish-pick="${CSS.escape(contorno)}"]`);
+    document.querySelector(`[data-dish-pick="${CSS.escape(contorno2)}"]`).click();
+    out.afterAdd = effectiveMeal(1, 1, 'cena');
+    // Cambia del solo dolce: gli altri restano
+    document.querySelector(`[data-dish-replace="${CSS.escape(dolce)}"]`).click();
+    out.replaceTipo = state.dishPicker.tipo;
+    const other = document.querySelector('[data-dish-pick]').dataset.dishPick;
+    document.querySelector('[data-dish-pick]').click();
+    out.afterReplace = effectiveMeal(1, 1, 'cena');
+    out.other = other;
+    // ✕ del principale: il primo degli altri prende il suo posto
+    document.querySelector(`[data-dish-remove="1_1_cena"][data-dish-name="${CSS.escape(primo)}"]`).click();
+    out.afterRemove = effectiveMeal(1, 1, 'cena');
+    out.toast = state.undoToast && state.undoToast.message;
+    return out;
+  });
+  const n = r.names;
+  eq(r.order, ['Antipasto', 'Primo', 'Contorno', 'Dolce'], 'ordine di portata');
+  eq(r.pickerTipo, 'dolce', 'portata di partenza');
+  assert(r.onlyContorni && r.noDuplicate, 'solo contorni, senza quelli già nel pasto');
+  eq(r.afterAdd, { principale: n.primo, contorni: [n.dolce, n.contorno, n.antipasto, n.contorno2] }, 'aggiunto');
+  eq(r.replaceTipo, 'dolce', 'Cambia parte dalla portata del piatto');
+  eq(r.afterReplace, { principale: n.primo, contorni: [r.other, n.contorno, n.antipasto, n.contorno2] }, 'cambiato solo il dolce');
+  eq(r.afterRemove, { principale: r.other, contorni: [n.contorno, n.antipasto, n.contorno2] }, 'tolto il principale');
+  eq(r.toast, 'Piatto tolto', 'annulla');
+  await page.click('.undo-toast button');
+  eq(await page.evaluate(() => effectiveMeal(1, 1, 'cena').principale), n.primo, 'annullato');
+  // Dettaglio: un piatto sotto l'altro, aperto solo il primo; un tocco apre gli altri.
+  const d = await page.evaluate(() => {
+    state.expandedDay = '1_1_cena'; render();
+    const heads = () => [...document.querySelectorAll('.meal-detail-screen .dish-acc')].map(e => e.classList.contains('open'));
+    const out = { before: heads(), buttons: document.querySelectorAll('.meal-detail-screen [data-mancanti-in-spesa]').length };
+    document.querySelectorAll('.meal-detail-screen .dish-acc-head')[2].click();
+    out.after = heads();
+    return out;
+  });
+  eq(d.before, [true, false, false, false, false], 'aperto solo il primo');
+  eq(d.after, [true, false, true, false, false], 'aperto anche il terzo');
+  assert(d.buttons <= 1, 'un solo "Aggiungi ingredienti" per tutto il pasto');
+  eq(page.errors, [], 'errori JS');
+});
 
 (async () => {
   const filter = process.argv[2] || '';
