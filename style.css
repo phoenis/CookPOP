@@ -1060,7 +1060,9 @@
 .card-view-inner .card-view-edit:hover{ background:#f3f3f3; color:#111; border-color:#999; }
 .card-form .is-block{ width:100%; }
 
-.aisle-row{ gap:var(--space-xsmall); }
+.aisle-row{ gap:var(--space-xsmall); padding:0.125rem 0; cursor:default; }
 .aisle-row .manage-row-main{ flex:1; }
-.aisle-move{ font-size:1.125rem; width:2.25rem; height:2.25rem; }
+.aisle-move{ font-size:1rem; width:2rem; height:2rem; }
+.aisle-handle{ flex:0 0 1.75rem; height:2rem; display:flex; align-items:center; justify-content:center; color:var(--ink-light); font-size:1.125rem; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+.aisle-row.is-dragging{ background:var(--surface); box-shadow:0 4px 14px rgba(0,0,0,0.25); border-radius:0.5rem; position:relative; z-index:1; }
 .aisle-move:disabled{ opacity:0.25; }
