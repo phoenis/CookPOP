@@ -9607,7 +9607,11 @@ function cardTileHtml(card, attr){
   return `<button type="button" class="card-tile${card.logo ? ' has-logo' : ''}" ${attr} style="${cardStyle(cardColor(card))}" aria-label="${escapeAttr(card.name)}">${inner}</button>`;
 }
 function sortedCards(){ return (state.loyaltyCards || []).slice().sort((a, b) => IT_COLLATOR.compare(a.name, b.name)); }
-function renderCardsPages(){
+// La pagina (elenco/gestione) resta sotto anche con una carta aperta o
+// l'import da confermare: sono finestre sopra, non un cambio di pagina, così
+// chiudendole l'elenco non rifà l'animazione d'ingresso.
+function renderCardsPages(){ return cardsPageHtml() + cardsOverlayHtml(); }
+function cardsOverlayHtml(){
   const cards = state.loyaltyCards || [];
   if(state.cardsImport && state.cardsImport.length){
     const have = new Set(cards.map(c => c.number));
@@ -9643,6 +9647,10 @@ function renderCardsPages(){
     </div>
   </div>`;
   }
+  return '';
+}
+function cardsPageHtml(){
+  const cards = state.loyaltyCards || [];
   if(state.cardsOpen === 'list'){
     const q = (state.cardsSearch || '').trim().toLowerCase();
     const shown = sortedCards().filter(c => !q || c.name.toLowerCase().includes(q));
