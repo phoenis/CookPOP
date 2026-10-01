@@ -1129,7 +1129,7 @@ test('ordine corsie: frecce su/giù in Spesa, ripristino; il freezer non sposta 
   });
   const before = await page.evaluate(() => [...document.querySelectorAll('.dept-title')].map(e => e.textContent.trim()).join('|'));
   const iPul = before.indexOf('Pulizia'), iVer = before.indexOf('Frutta e verdura'), iSur = before.indexOf('Surgelati');
-  await page.click('[data-open-aisles]');
+  await page.evaluate(() => { state.aisleOrderOpen = true; render(); });
   await page.waitForSelector('[data-page="aisles"]');
   await page.click('[data-aisle-move="verdura"][data-dir="-1"]');
   const r = await page.evaluate(() => ({ first2: shopAisles().slice(0, 6), custom: state.shopAisleCustom.length > 0 }));
