@@ -997,3 +997,10 @@
 .inv-q-luogo svg{ width:1.1rem; height:1.1rem; }
 .inv-q-row{ padding:var(--space-xsmall) var(--space-medium); gap:0.25rem; }
 .inv-q-btn{ padding:0.25rem var(--space-small); min-width:2.75rem; }
+.inv-q-details{ justify-content:flex-start; row-gap:var(--space-xsmall); }
+.inv-q-stepper .inv-q-qty{ width:4.25rem; text-align:center; }
+.inv-q-unit{ font:inherit; font-size:var(--text-small); padding:0.25rem 0.5rem; border-radius:var(--radius-pill); border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+.inv-q-luoghi{ flex-basis:100%; display:flex; align-items:center; gap:0.25rem; }
+.inv-q-luogo-name{ font-size:var(--text-xsmall); color:var(--ink-light); }
+.inv-q-ok{ margin-left:auto; padding:0.375rem var(--space-medium); border-radius:var(--radius-pill); }
+.inv-q-row.is-open{ background:color-mix(in srgb, var(--gold) 5%, var(--surface)); }
