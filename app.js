@@ -1323,7 +1323,7 @@ const state = {
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
-  cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', // non persistiti: pagine Carte
+  cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, // non persistiti: pagine Carte
   inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
   inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e righe col Sì ancora aperte (in attesa di OK)
   inventoryAnswered: null, // risposte dell'inventario (in localStorage, vedi inventoryAnswers)
@@ -1433,8 +1433,25 @@ function tabFromHash(){
   const h = window.location.hash.replace('#', '');
   return TAB_KEYS.includes(h) ? h : 'menu';
 }
+// Link "#carte=…" (dati in base64url: [[negozio, numero, formato, colore], …]):
+// importa delle carte fedeltà dopo una conferma (vedi renderCardsPages). Il
+// frammento dopo # non arriva a nessun server; tolto subito dall'indirizzo.
+function readCardsImportFromHash(){
+  const m = /^#carte=([A-Za-z0-9_-]+)/.exec(window.location.hash);
+  if(!m) return false;
+  try{
+    const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+    const list = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+    state.cardsImport = list.filter(c => Array.isArray(c) && c[0] && c[1]).map(c => ({ name: String(c[0]), number: String(c[1]), format: c[2] || undefined, color: c[3] || undefined }));
+  }catch(e){ state.cardsImport = null; }
+  history.replaceState(null, '', location.pathname + location.search + '#spesa');
+  return true;
+}
+if(readCardsImportFromHash()) state.tab = 'spesa';
 state.tab = tabFromHash();
 window.addEventListener('hashchange', ()=>{
+  if(readCardsImportFromHash()){ state.tab = 'spesa'; render(); return; }
   const next = tabFromHash();
   if(next !== state.tab){ state.tab = next; render(); }
 });
@@ -3664,10 +3681,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-15',
+  version: '2026-10-16',
   title: 'Novità',
   items: [
-    'Carte fedeltà, come Stocard: le aggiungi da Impostazioni → Carte fedeltà (nome del negozio e numero, oppure 📷 Scansiona per leggerlo dalla foto del codice), poi in Spesa tocchi "💳 Carte" e mostri in cassa il codice a barre.'
+    'Carte fedeltà: ora si vedono anche le carte col QR (come IKEA) e quelle in "Code 39" (come Intimissimi), sempre nel formato originale letto dalla foto. E si possono importare tutte insieme da un link.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3829,6 +3846,7 @@ const MODAL_CHECKS = [
   [()=> !!state.pantryEditKey, ()=>{ closeIngredientSheet(); }],
   [()=> !!state.pantryAddModalOpen, ()=>{ closeIngredientSheet(); }],
   // Sotto la scheda ingrediente (che si apre da qui): si chiude dopo di lei.
+  [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardDraft = null; }],
   [()=> !!state.inventoryOpen, ()=>{ state.inventoryOpen = false; }],
@@ -9383,21 +9401,136 @@ const EAN_G = ['0100111','0110011','0011011','0100001','0011101','0111001','0000
 const EAN_R = ['1110010','1100110','1101100','1000010','1011100','1001110','1010000','1000100','1001000','1110100'];
 const EAN_PARITY = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
 const CODE128 = ['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+// Code 39 (n = stretto, w = largo; barra/spazio alternati, 9 elementi).
+const CODE39 = { '0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','A':'wnnnnwnnw','B':'nnwnnwnnw','C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn','F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn','I':'nnwnnwwnn','J':'nnnnwwwnn','K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww','O':'wnnnwnnwn','P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn','U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn','Z':'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','*':'nwnnwnwnn','$':'nwnwnwnnn','/':'nwnwnnnwn','+':'nwnnnwnwn','%':'nnnwnwnwn' };
+function code39Modules(text){
+  const chars = ('*' + text.toUpperCase().replace(/[^0-9A-Z\-. $/+%]/g, '') + '*').split('');
+  return chars.map(ch => CODE39[ch].split('').map((w, idx) => (idx % 2 === 0 ? '1' : '0').repeat(w === 'w' ? 3 : 1)).join('')).join('0');
+}
+// QR (modo byte, correzione M, versioni 1–10): abbastanza per i numeri e i
+// codici delle carte. Segue lo standard ISO 18004 (come la libreria di
+// riferimento di Nayuki), maschera scelta col punteggio di penalità.
+const QR_M = [null, [10,[[1,16]]], [16,[[1,28]]], [26,[[1,44]]], [18,[[2,32]]], [24,[[2,43]]], [16,[[4,27]]], [18,[[4,31]]], [22,[[2,38],[2,39]]], [22,[[3,36],[2,37]]], [26,[[4,43],[1,44]]]];
+const QR_ALIGN = [null, [], [6,18], [6,22], [6,26], [6,30], [6,34], [6,22,38], [6,24,42], [6,26,46], [6,28,50]];
+function gfMul(a, b){ let r = 0; for(let i = 7; i >= 0; i--){ r = (r << 1) ^ ((r >>> 7) * 0x11D); r ^= ((b >>> i) & 1) * a; } return r & 0xFF; }
+function rsDivisor(degree){
+  const res = new Array(degree).fill(0); res[degree - 1] = 1; let root = 1;
+  for(let i = 0; i < degree; i++){
+    for(let j = 0; j < degree; j++){ res[j] = gfMul(res[j], root); if(j + 1 < degree) res[j] ^= res[j + 1]; }
+    root = gfMul(root, 0x02);
+  }
+  return res;
+}
+function rsRemainder(data, div){
+  const res = new Array(div.length).fill(0);
+  data.forEach(b => { const f = b ^ res.shift(); res.push(0); div.forEach((d, i) => { res[i] ^= gfMul(d, f); }); });
+  return res;
+}
+function qrMatrix(text){
+  const bytes = Array.from(new TextEncoder().encode(text));
+  let ver = 1;
+  const dataCap = v => QR_M[v][1].reduce((a, [n, k]) => a + n * k, 0);
+  while(ver <= 10 && 4 + (ver < 10 ? 8 : 16) + bytes.length * 8 > dataCap(ver) * 8) ver++;
+  if(ver > 10) return null;
+  const bits = [];
+  const put = (val, len) => { for(let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+  put(4, 4); put(bytes.length, ver < 10 ? 8 : 16); bytes.forEach(b => put(b, 8));
+  const capBits = dataCap(ver) * 8;
+  put(0, Math.min(4, capBits - bits.length));
+  put(0, (8 - bits.length % 8) % 8);
+  const data = [];
+  for(let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+  for(let pad = 0xEC; data.length < dataCap(ver); pad ^= 0xEC ^ 0x11) data.push(pad);
+  const [ecLen, groups] = QR_M[ver];
+  const div = rsDivisor(ecLen);
+  const blocks = []; let off = 0;
+  groups.forEach(([n, k]) => { for(let b = 0; b < n; b++){ const d = data.slice(off, off + k); off += k; blocks.push({ d, e: rsRemainder(d, div) }); } });
+  const out = [];
+  const maxK = Math.max(...blocks.map(b => b.d.length));
+  for(let i = 0; i < maxK; i++) blocks.forEach(b => { if(i < b.d.length) out.push(b.d[i]); });
+  for(let i = 0; i < ecLen; i++) blocks.forEach(b => out.push(b.e[i]));
+  const size = ver * 4 + 17;
+  const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+  const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+  const set = (x, y, dark) => { mod[y][x] = dark; fn[y][x] = true; };
+  for(let i = 0; i < size; i++){ set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+  const finder = (cx, cy) => { for(let dy = -4; dy <= 4; dy++) for(let dx = -4; dx <= 4; dx++){ const x = cx + dx, y = cy + dy; if(x < 0 || y < 0 || x >= size || y >= size) continue; const d = Math.max(Math.abs(dx), Math.abs(dy)); set(x, y, d !== 2 && d !== 4); } };
+  finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+  const al = QR_ALIGN[ver];
+  al.forEach((ay, i) => al.forEach((ax, j) => {
+    if((i === 0 && j === 0) || (i === 0 && j === al.length - 1) || (i === al.length - 1 && j === 0)) return;
+    for(let dy = -2; dy <= 2; dy++) for(let dx = -2; dx <= 2; dx++) set(ax + dx, ay + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+  }));
+  const drawFormat = mask => {
+    const d = (0 << 3) | mask; let rem = d;
+    for(let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const b = ((d << 10) | rem) ^ 0x5412;
+    const bit = i => ((b >>> i) & 1) === 1;
+    for(let i = 0; i <= 5; i++) set(8, i, bit(i));
+    set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+    for(let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+    for(let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+    for(let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+    set(8, size - 8, true);
+  };
+  drawFormat(0);
+  if(ver >= 7){
+    let rem = ver; for(let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+    const b = (ver << 12) | rem;
+    for(let i = 0; i < 18; i++){ const dark = ((b >>> i) & 1) === 1; const a = size - 11 + i % 3, c = Math.floor(i / 3); set(a, c, dark); set(c, a, dark); }
+  }
+  let k = 0;
+  for(let right = size - 1; right >= 1; right -= 2){
+    if(right === 6) right = 5;
+    for(let v = 0; v < size; v++) for(let j = 0; j < 2; j++){
+      const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - v : v;
+      if(!fn[y][x] && k < out.length * 8){ mod[y][x] = ((out[k >>> 3] >>> (7 - (k & 7))) & 1) === 1; k++; }
+    }
+  }
+  const maskFn = [(x,y)=>(x+y)%2===0,(x,y)=>y%2===0,(x,y)=>x%3===0,(x,y)=>(x+y)%3===0,(x,y)=>(Math.floor(x/3)+Math.floor(y/2))%2===0,(x,y)=>x*y%2+x*y%3===0,(x,y)=>(x*y%2+x*y%3)%2===0,(x,y)=>((x+y)%2+x*y%3)%2===0];
+  const applyMask = m => { for(let y = 0; y < size; y++) for(let x = 0; x < size; x++) if(!fn[y][x] && maskFn[m](x, y)) mod[y][x] = !mod[y][x]; };
+  const penalty = () => {
+    let p = 0, dark = 0;
+    for(let y = 0; y < size; y++){ let run = 1; for(let x = 1; x < size; x++){ if(mod[y][x] === mod[y][x-1]){ run++; if(run === 5) p += 3; else if(run > 5) p++; } else run = 1; } }
+    for(let x = 0; x < size; x++){ let run = 1; for(let y = 1; y < size; y++){ if(mod[y][x] === mod[y-1][x]){ run++; if(run === 5) p += 3; else if(run > 5) p++; } else run = 1; } }
+    for(let y = 0; y < size - 1; y++) for(let x = 0; x < size - 1; x++){ const c = mod[y][x]; if(c === mod[y][x+1] && c === mod[y+1][x] && c === mod[y+1][x+1]) p += 3; }
+    mod.forEach(r => r.forEach(c => { if(c) dark++; }));
+    return p + Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size)) * 10;
+  };
+  let best = 0, bestP = Infinity;
+  for(let m = 0; m < 8; m++){ applyMask(m); drawFormat(m); const p = penalty(); if(p < bestP){ bestP = p; best = m; } applyMask(m); }
+  applyMask(best); drawFormat(best);
+  return mod;
+}
+function qrSvg(text){
+  const m = qrMatrix(text);
+  if(!m) return '';
+  const q = 4, n = m.length + q * 2;
+  let rects = '';
+  m.forEach((row, y) => row.forEach((c, x) => { if(c) rects += `<rect x="${x + q}" y="${y + q}" width="1" height="1"/>`; }));
+  return `<svg class="card-qr" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="QR ${escapeAttr(text)}"><rect width="${n}" height="${n}" fill="#fff"/><g fill="#000">${rects}</g></svg>`;
+}
 function eanCheckDigit(digits){
   const sum = digits.split('').reverse().reduce((acc, d, idx) => acc + Number(d) * (idx % 2 === 0 ? 3 : 1), 0);
   return String((10 - sum % 10) % 10);
 }
 // Il codice da disegnare per un numero: EAN se ha la forma (e la cifra di
 // controllo) giusta, altrimenti Code 128, che va bene per qualsiasi testo.
-function cardBarcodeKind(number){
+// format = quello letto dalla foto (BarcodeDetector: 'code_128', 'ean_13',
+// 'code_39', 'qr_code'...) quando c'è: la cassa si aspetta quel codice lì.
+function cardBarcodeKind(number, format){
+  if(format === 'qr_code') return 'qr';
+  if(format === 'code_39') return 'code39';
+  if(format === 'code_128') return 'code128';
   if(/^\d{13}$/.test(number) && eanCheckDigit(number.slice(0, 12)) === number[12]) return 'ean13';
   if(/^\d{12}$/.test(number) && eanCheckDigit(number.slice(0, 11)) === number[11]) return 'upca';
   if(/^\d{8}$/.test(number) && eanCheckDigit(number.slice(0, 7)) === number[7]) return 'ean8';
   return 'code128';
 }
 // Moduli (1 = barra, 0 = spazio) del codice.
-function barcodeModules(number){
-  const kind = cardBarcodeKind(number);
+function barcodeModules(number, format){
+  const kind = cardBarcodeKind(number, format);
+  if(kind === 'code39') return code39Modules(number);
   if(kind === 'ean13' || kind === 'upca'){
     const n = kind === 'upca' ? '0' + number : number;
     const parity = EAN_PARITY[Number(n[0])];
@@ -9434,8 +9567,9 @@ function barcodeModules(number){
   codes.forEach(c => { CODE128[c].split('').forEach((w, idx) => { m += (idx % 2 === 0 ? '1' : '0').repeat(Number(w)); }); });
   return m;
 }
-function barcodeSvg(number){
-  const m = barcodeModules(number);
+function barcodeSvg(number, format){
+  if(format === 'qr_code') return qrSvg(number);
+  const m = barcodeModules(number, format);
   const quiet = 10, w = m.length + quiet * 2, h = 60;
   let x = quiet, rects = '';
   for(let k = 0; k < m.length; k++){
@@ -9454,6 +9588,22 @@ function cardTileHtml(card, attr){
 }
 function renderCardsPages(){
   const cards = state.loyaltyCards || [];
+  if(state.cardsImport && state.cardsImport.length){
+    const have = new Set(cards.map(c => c.number));
+    const fresh = state.cardsImport.filter(c => !have.has(c.number));
+    return `
+  <div class="filters-modal-backdrop" data-cards-import-cancel>
+    <div class="filters-modal" data-stop-close role="dialog" aria-label="Importa carte">
+      <div class="filters-modal-header"><h3>Importa carte fedeltà</h3><button class="btn is-icon filters-close-btn" data-cards-import-cancel>✕</button></div>
+      <p class="settings-note">${fresh.length ? `${fresh.length} carte da aggiungere${fresh.length < state.cardsImport.length ? ` (${state.cardsImport.length - fresh.length} le hai già)` : ''}:` : 'Hai già tutte queste carte.'}</p>
+      <div class="card-import-list">${fresh.map(c => `<span class="card-import-chip" style="--card-color:${escapeAttr(c.color || CARD_COLORS[0])}">${escapeHtml(c.name)}</span>`).join('')}</div>
+      <div class="filters-modal-footer">
+        <button class="btn is-ghost" data-cards-import-cancel>Annulla</button>
+        ${fresh.length ? '<button class="btn is-solid" data-cards-import-ok>Importa</button>' : ''}
+      </div>
+    </div>
+  </div>`;
+  }
   if(state.cardViewId){
     const card = cards.find(c => c.id === state.cardViewId);
     if(card) return `
@@ -9463,7 +9613,7 @@ function renderCardsPages(){
         <span>${escapeHtml(card.name)}</span>
         <button type="button" class="btn is-icon card-view-close" data-close-card-view aria-label="Chiudi">✕</button>
       </div>
-      <div class="card-view-code">${card.format === 'qr_code' ? '<p class="card-view-qr">Questa carta usa un QR: mostra il numero in cassa.</p>' : barcodeSvg(card.number)}</div>
+      <div class="card-view-code">${barcodeSvg(card.number, card.format)}</div>
       <div class="card-view-number">${escapeHtml(card.number)}</div>
       <p class="settings-note">Alza la luminosità se il lettore non lo legge.</p>
     </div>
@@ -9502,7 +9652,7 @@ function renderCardsPages(){
           ${state.cardScanMsg ? `<p class="settings-note">${escapeHtml(state.cardScanMsg)}</p>` : ''}
           <div class="settings-field-label">Colore</div>
           <div class="card-colors">${CARD_COLORS.map(col => `<button type="button" class="card-color${d.color === col ? ' active' : ''}" data-card-color="${col}" style="background:${col}" aria-label="Colore" aria-pressed="${d.color === col}"></button>`).join('')}</div>
-          ${d.number.trim() ? `<div class="card-preview">${d.format === 'qr_code' ? '' : barcodeSvg(d.number.trim())}</div>` : ''}
+          ${d.number.trim() ? `<div class="card-preview">${barcodeSvg(d.number.trim(), d.format)}</div>` : ''}
           <div class="backup-row">
             ${d.id ? '<button type="button" class="btn is-ghost" data-card-cancel>Annulla</button>' : ''}
             <button type="button" class="btn is-solid" data-card-save ${d.name.trim() && d.number.trim() ? '' : 'disabled'}>${d.id ? 'Salva' : 'Aggiungi'}</button>
@@ -9539,6 +9689,18 @@ document.addEventListener('click', e=>{
   }
   const viewClose = t.closest('[data-close-card-view]');
   if(viewClose && (viewClose.tagName === 'BUTTON' || e.target === viewClose)){ state.cardViewId = null; render(); return; }
+  const impCancel = t.closest('[data-cards-import-cancel]');
+  if(impCancel && (impCancel.tagName === 'BUTTON' || e.target === impCancel)){ state.cardsImport = null; render(); return; }
+  if(t.closest('[data-cards-import-ok]') && state.cardsImport){
+    const have = new Set((state.loyaltyCards || []).map(c => c.number));
+    const added = state.cardsImport.filter(c => !have.has(c.number)).map((c, idx) => Object.assign({ id: 'c' + Date.now().toString(36) + idx, name: c.name, number: c.number, color: c.color || CARD_COLORS[idx % CARD_COLORS.length] }, c.format ? { format: c.format } : {}));
+    state.loyaltyCards = (state.loyaltyCards || []).concat(added);
+    state.cardsImport = null;
+    state.cardsOpen = 'list';
+    persist(); render();
+    showUndoToast(`${added.length} carte importate`, ()=>{ const ids = new Set(added.map(c => c.id)); state.loyaltyCards = state.loyaltyCards.filter(c => !ids.has(c.id)); persist(); render(); });
+    return;
+  }
   const open = t.closest('[data-open-cards]');
   if(open){ state.cardsOpen = 'list'; render(); return; }
   const manage = t.closest('[data-cards-manage]');
@@ -9577,7 +9739,7 @@ document.addEventListener('click', e=>{
     state.cardScanMsg = '';
     persist(); render();
   }
-});
+}, true); // in cattura: dentro le finestre il primo [data-stop-close] ferma la risalita
 document.addEventListener('input', e=>{
   const f = e.target.dataset && e.target.dataset.cardField;
   if(!f || !state.cardDraft) return;
