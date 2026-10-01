@@ -983,6 +983,34 @@ test('inventario veloce: Sì apre quantità/unità/luogo e OK la toglie da "Da f
   assert(r.doneText.startsWith('2 su'), r.doneText);
   eq(page.errors, [], 'errori JS');
 });
+test('carte fedeltà: si aggiungono da Impostazioni, si aprono da Spesa col codice a barre; EAN-13 e Code 128 corretti', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.loyaltyCards = []; state.tab = 'spesa'; render();
+    document.querySelector('#settings-backdrop [data-cards-manage]').click();
+    const name = document.getElementById('card-name'), num = document.getElementById('card-number');
+    name.value = 'Esselunga'; name.dispatchEvent(new Event('input', { bubbles: true }));
+    num.value = '4006381333931'; num.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-card-save]').click();
+    const saved = state.loyaltyCards.map(c => [c.name, c.number]);
+    document.querySelector('[data-close-cards]').click();
+    document.querySelector('[data-open-cards]').click();
+    document.querySelector('[data-card-view]').click();
+    const view = document.querySelector('.card-view');
+    // EAN-13 4006381333931: 95 moduli, guardie giuste; Code 128 di "ABC-12": start B (211214), stop (2331112)
+    const ean = barcodeModules('4006381333931');
+    const c128 = barcodeModules('ABC-12');
+    return { saved, view: !!view && view.textContent.includes('4006381333931') && !!view.querySelector('svg rect'), kinds: [cardBarcodeKind('4006381333931'), cardBarcodeKind('12345678'), cardBarcodeKind('ABC-12')],
+      eanLen: ean.length, eanGuards: ean.slice(0,3) + ean.slice(45,50) + ean.slice(-3), eanFirst: ean.slice(3,10),
+      c128Start: c128.slice(0, 11), c128Stop: c128.slice(-13), c128Len: c128.length, sums: CODE128.every((p, i) => p.split('').reduce((a, b) => a + Number(b), 0) === (i === 106 ? 13 : 11)) };
+  });
+  eq(r.saved, [['Esselunga', '4006381333931']], 'salvata');
+  assert(r.view, 'carta a tutto schermo col codice e il numero');
+  eq(r.kinds, ['ean13', 'code128', 'code128'], 'tipo di codice');
+  eq([r.eanLen, r.eanGuards, r.eanFirst], [95, '10101010101', '0001101'], 'EAN-13');
+  eq([r.c128Start, r.c128Stop, r.c128Len, r.sums], ['11010010000', '1100011101011', 11 * 8 + 13, true], 'Code 128');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

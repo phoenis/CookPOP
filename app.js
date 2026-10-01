@@ -1322,6 +1322,8 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
+  cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', // non persistiti: pagine Carte
   inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
   inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e righe col Sì ancora aperte (in attesa di OK)
   inventoryAnswered: null, // risposte dell'inventario (in localStorage, vedi inventoryAnswers)
@@ -2297,7 +2299,8 @@ function buildPersonalPayload(){
     recipeHistory: state.recipeHistory,
     prepDay: state.prepDay,
     dishPlan: state.dishPlan,
-    freezerDishes: state.freezerDishes
+    freezerDishes: state.freezerDishes,
+    loyaltyCards: state.loyaltyCards
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
   return payload;
@@ -3661,10 +3664,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-14',
+  version: '2026-10-15',
   title: 'Novità',
   items: [
-    'Inventario veloce (Dispensa → menu ⋮): col Sì scrivi la quantità, scegli l\'unità e il luogo (tutti), poi OK e la riga sparisce da "Da fare". Quello che hai già in Dispensa parte coi suoi dati: controlli e dai OK.'
+    'Carte fedeltà, come Stocard: le aggiungi da Impostazioni → Carte fedeltà (nome del negozio e numero, oppure 📷 Scansiona per leggerlo dalla foto del codice), poi in Spesa tocchi "💳 Carte" e mostri in cassa il codice a barre.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3720,7 +3723,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
   endPageRender();
   attachHandlers();
   restoreInnerScroll(panel, scrolls);
@@ -3826,6 +3829,8 @@ const MODAL_CHECKS = [
   [()=> !!state.pantryEditKey, ()=>{ closeIngredientSheet(); }],
   [()=> !!state.pantryAddModalOpen, ()=>{ closeIngredientSheet(); }],
   // Sotto la scheda ingrediente (che si apre da qui): si chiude dopo di lei.
+  [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
+  [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardDraft = null; }],
   [()=> !!state.inventoryOpen, ()=>{ state.inventoryOpen = false; }],
   [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
@@ -3852,7 +3857,7 @@ function countOpenModals(){
 // inerte tutto ciò che sta sotto (lettori di schermo e Tab non ci arrivano),
 // e alla chiusura riporta il fuoco sul bottone da cui era stata aperta.
 // Esc chiude la finestra in cima, Tab gira solo al suo interno.
-const DIALOG_LAYER_SELECTOR = '.filters-modal-backdrop, .meal-detail-screen, .sheet-page, #settings-backdrop.open, #topbar-menu-backdrop.open';
+const DIALOG_LAYER_SELECTOR = '.filters-modal-backdrop, .meal-detail-screen, .sheet-page, .card-view, #settings-backdrop.open, #topbar-menu-backdrop.open';
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 let dialogOpenerBeforeRender = null;
 let dialogStack = []; // [{ sig, opener }] dal basso verso l'alto
@@ -5852,6 +5857,7 @@ function renderSpesa(){
     </div>
     <div class="shop-checks">
     <div class="shop-progress">${displayDone} / ${displayTotal} presi</div>
+    <button type="button" class="btn is-chip shop-cards-btn" data-open-cards>💳 Carte</button>
     </div>
     ${body}
           
@@ -9362,6 +9368,228 @@ document.addEventListener('click', e=>{
     state.dishOpen[k] = toggleEl.getAttribute('aria-expanded') !== 'true';
     render();
   }
+});
+
+// --- Carte fedeltà -------------------------------------------------------------
+// Come Stocard: le tessere dei negozi (nome, numero, colore) salvate nello
+// spazio, da mostrare in cassa col codice a barre a tutto schermo. Si
+// gestiscono da Impostazioni → Carte fedeltà e si aprono da Spesa → Carte.
+// Il codice si disegna qui (EAN-13/EAN-8 se il numero lo è, altrimenti
+// Code 128); il numero si può scrivere o leggere con la fotocamera
+// (BarcodeDetector, su Android con Chrome).
+const CARD_COLORS = ['#e03c1e', '#1e88e5', '#43a047', '#f9a825', '#8e24aa', '#ef6c00', '#00897b', '#5d4037', '#37474f'];
+const EAN_L = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+const EAN_G = ['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
+const EAN_R = ['1110010','1100110','1101100','1000010','1011100','1001110','1010000','1000100','1001000','1110100'];
+const EAN_PARITY = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+const CODE128 = ['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+function eanCheckDigit(digits){
+  const sum = digits.split('').reverse().reduce((acc, d, idx) => acc + Number(d) * (idx % 2 === 0 ? 3 : 1), 0);
+  return String((10 - sum % 10) % 10);
+}
+// Il codice da disegnare per un numero: EAN se ha la forma (e la cifra di
+// controllo) giusta, altrimenti Code 128, che va bene per qualsiasi testo.
+function cardBarcodeKind(number){
+  if(/^\d{13}$/.test(number) && eanCheckDigit(number.slice(0, 12)) === number[12]) return 'ean13';
+  if(/^\d{12}$/.test(number) && eanCheckDigit(number.slice(0, 11)) === number[11]) return 'upca';
+  if(/^\d{8}$/.test(number) && eanCheckDigit(number.slice(0, 7)) === number[7]) return 'ean8';
+  return 'code128';
+}
+// Moduli (1 = barra, 0 = spazio) del codice.
+function barcodeModules(number){
+  const kind = cardBarcodeKind(number);
+  if(kind === 'ean13' || kind === 'upca'){
+    const n = kind === 'upca' ? '0' + number : number;
+    const parity = EAN_PARITY[Number(n[0])];
+    let m = '101';
+    for(let k = 1; k <= 6; k++) m += (parity[k - 1] === 'L' ? EAN_L : EAN_G)[Number(n[k])];
+    m += '01010';
+    for(let k = 7; k <= 12; k++) m += EAN_R[Number(n[k])];
+    return m + '101';
+  }
+  if(kind === 'ean8'){
+    let m = '101';
+    for(let k = 0; k < 4; k++) m += EAN_L[Number(number[k])];
+    m += '01010';
+    for(let k = 4; k < 8; k++) m += EAN_R[Number(number[k])];
+    return m + '101';
+  }
+  // Code 128: set C per le coppie di cifre (numeri lunghi, più compatto),
+  // set B per tutto il resto.
+  const codes = [];
+  const allDigits = /^\d+$/.test(number) && number.length % 2 === 0;
+  if(allDigits){
+    codes.push(105);
+    for(let k = 0; k < number.length; k += 2) codes.push(Number(number.slice(k, k + 2)));
+  } else {
+    codes.push(104);
+    for(const ch of number){
+      const c = ch.charCodeAt(0);
+      codes.push(c >= 32 && c <= 127 ? c - 32 : 0);
+    }
+  }
+  const check = codes.reduce((acc, c, idx) => acc + c * (idx === 0 ? 1 : idx), 0) % 103;
+  codes.push(check, 106);
+  let m = '';
+  codes.forEach(c => { CODE128[c].split('').forEach((w, idx) => { m += (idx % 2 === 0 ? '1' : '0').repeat(Number(w)); }); });
+  return m;
+}
+function barcodeSvg(number){
+  const m = barcodeModules(number);
+  const quiet = 10, w = m.length + quiet * 2, h = 60;
+  let x = quiet, rects = '';
+  for(let k = 0; k < m.length; k++){
+    if(m[k] !== '1') continue;
+    let run = 1;
+    while(m[k + run] === '1') run++;
+    rects += `<rect x="${k + quiet}" y="0" width="${run}" height="${h}"/>`;
+    k += run - 1;
+  }
+  return `<svg class="card-barcode" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Codice a barre ${escapeAttr(number)}"><rect width="${w}" height="${h}" fill="#fff"/><g fill="#000">${rects}</g></svg>`;
+}
+function cardColor(card){ return card.color || CARD_COLORS[0]; }
+function newCardDraft(){ return { id: null, name: '', number: '', color: CARD_COLORS[(state.loyaltyCards || []).length % CARD_COLORS.length] }; }
+function cardTileHtml(card, attr){
+  return `<button type="button" class="card-tile" ${attr} style="--card-color:${escapeAttr(cardColor(card))}"><span class="card-tile-name">${escapeHtml(card.name)}</span></button>`;
+}
+function renderCardsPages(){
+  const cards = state.loyaltyCards || [];
+  if(state.cardViewId){
+    const card = cards.find(c => c.id === state.cardViewId);
+    if(card) return `
+  <div class="card-view" data-close-card-view role="dialog" aria-label="${escapeAttr(card.name)}">
+    <div class="card-view-inner" data-stop-close>
+      <div class="card-view-head" style="--card-color:${escapeAttr(cardColor(card))}">
+        <span>${escapeHtml(card.name)}</span>
+        <button type="button" class="btn is-icon card-view-close" data-close-card-view aria-label="Chiudi">✕</button>
+      </div>
+      <div class="card-view-code">${card.format === 'qr_code' ? '<p class="card-view-qr">Questa carta usa un QR: mostra il numero in cassa.</p>' : barcodeSvg(card.number)}</div>
+      <div class="card-view-number">${escapeHtml(card.number)}</div>
+      <p class="settings-note">Alza la luminosità se il lettore non lo legge.</p>
+    </div>
+  </div>`;
+  }
+  if(state.cardsOpen === 'list'){
+    const body = cards.length ? `
+      <div class="card-grid">${cards.map(c => cardTileHtml(c, `data-card-view="${escapeAttr(c.id)}"`)).join('')}</div>
+      <button type="button" class="btn is-outline is-block" data-cards-manage>Gestisci carte</button>` : `
+      <p class="settings-note">Nessuna carta salvata. Aggiungi le tessere dei negozi che usi, poi le mostri in cassa da qui.</p>
+      <button type="button" class="btn is-solid is-block" data-cards-manage>+ Aggiungi carta</button>`;
+    return managePageHtml({ key: 'cards', title: 'Carte fedeltà', closeAttr: 'data-close-cards', body });
+  }
+  if(state.cardsOpen === 'manage'){
+    const d = state.cardDraft || (state.cardDraft = newCardDraft());
+    const canScan = 'BarcodeDetector' in window;
+    const rows = cards.map(c => `
+        <div class="card-manage-row">
+          <span class="card-dot" style="background:${escapeAttr(cardColor(c))}"></span>
+          <span class="card-manage-text"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.number)}</span></span>
+          <button type="button" class="btn is-icon dish-act" data-card-edit="${escapeAttr(c.id)}" aria-label="Modifica ${escapeAttr(c.name)}">✎</button>
+          <button type="button" class="btn is-icon dish-act" data-card-delete="${escapeAttr(c.id)}" aria-label="Elimina ${escapeAttr(c.name)}">✕</button>
+        </div>`).join('');
+    const body = `
+      ${cards.length ? `<section class="settings-section"><h3 class="settings-section-title">Le tue carte</h3><div class="settings-card">${rows}</div></section>` : ''}
+      <section class="settings-section">
+        <h3 class="settings-section-title">${d.id ? 'Modifica carta' : 'Aggiungi carta'}</h3>
+        <div class="settings-card card-form">
+          <label class="settings-field-label" for="card-name">Negozio</label>
+          <input type="text" id="card-name" class="input-search" placeholder="Es. Esselunga" value="${escapeAttr(d.name)}" data-card-field="name" autocomplete="off">
+          <label class="settings-field-label" for="card-number">Numero della carta</label>
+          <div class="card-number-row">
+            <input type="text" id="card-number" class="input-search" inputmode="text" placeholder="Il numero sotto il codice a barre" value="${escapeAttr(d.number)}" data-card-field="number" autocomplete="off">
+            ${canScan ? `<label class="btn is-outline card-scan">📷 Scansiona<input type="file" accept="image/*" capture="environment" id="card-scan-input" hidden></label>` : ''}
+          </div>
+          ${state.cardScanMsg ? `<p class="settings-note">${escapeHtml(state.cardScanMsg)}</p>` : ''}
+          <div class="settings-field-label">Colore</div>
+          <div class="card-colors">${CARD_COLORS.map(col => `<button type="button" class="card-color${d.color === col ? ' active' : ''}" data-card-color="${col}" style="background:${col}" aria-label="Colore" aria-pressed="${d.color === col}"></button>`).join('')}</div>
+          ${d.number.trim() ? `<div class="card-preview">${d.format === 'qr_code' ? '' : barcodeSvg(d.number.trim())}</div>` : ''}
+          <div class="backup-row">
+            ${d.id ? '<button type="button" class="btn is-ghost" data-card-cancel>Annulla</button>' : ''}
+            <button type="button" class="btn is-solid" data-card-save ${d.name.trim() && d.number.trim() ? '' : 'disabled'}>${d.id ? 'Salva' : 'Aggiungi'}</button>
+          </div>
+        </div>
+      </section>`;
+    return managePageHtml({ key: 'cards-manage', title: 'Gestisci carte', closeAttr: 'data-close-cards', body });
+  }
+  return '';
+}
+async function scanCardImage(file){
+  if(!file || !('BarcodeDetector' in window)) return;
+  try{
+    const detector = new BarcodeDetector();
+    const bitmap = await createImageBitmap(file);
+    const found = await detector.detect(bitmap);
+    if(!found.length){ state.cardScanMsg = 'Codice non trovato: riprova più vicino, o scrivi il numero.'; render(); return; }
+    const d = state.cardDraft || (state.cardDraft = newCardDraft());
+    d.number = found[0].rawValue;
+    d.format = found[0].format;
+    state.cardScanMsg = 'Letto! Controlla il numero.';
+  }catch(e){
+    state.cardScanMsg = 'Non riesco a leggere la foto: scrivi il numero.';
+  }
+  render();
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  const closeEl = t.closest('[data-close-cards]');
+  if(closeEl){
+    if(!isCloseTap(e, closeEl)) return;
+    state.cardsOpen = null; state.cardDraft = null; state.cardScanMsg = '';
+    render(); return;
+  }
+  const viewClose = t.closest('[data-close-card-view]');
+  if(viewClose && (viewClose.tagName === 'BUTTON' || e.target === viewClose)){ state.cardViewId = null; render(); return; }
+  const open = t.closest('[data-open-cards]');
+  if(open){ state.cardsOpen = 'list'; render(); return; }
+  const manage = t.closest('[data-cards-manage]');
+  if(manage){ closeSettingsBackdrop(); state.cardsOpen = 'manage'; state.cardDraft = newCardDraft(); render(); return; }
+  const view = t.closest('[data-card-view]');
+  if(view){ state.cardViewId = view.dataset.cardView; render(); return; }
+  const color = t.closest('[data-card-color]');
+  if(color && state.cardDraft){ state.cardDraft.color = color.dataset.cardColor; render(); return; }
+  const edit = t.closest('[data-card-edit]');
+  if(edit){
+    const c = (state.loyaltyCards || []).find(x => x.id === edit.dataset.cardEdit);
+    if(c){ state.cardDraft = Object.assign({}, c); state.cardScanMsg = ''; render(); }
+    return;
+  }
+  if(t.closest('[data-card-cancel]')){ state.cardDraft = newCardDraft(); state.cardScanMsg = ''; render(); return; }
+  const del = t.closest('[data-card-delete]');
+  if(del){
+    const prev = (state.loyaltyCards || []).slice();
+    const c = prev.find(x => x.id === del.dataset.cardDelete);
+    state.loyaltyCards = prev.filter(x => x.id !== del.dataset.cardDelete);
+    persist(); render();
+    if(c) showUndoToast(`Carta ${c.name} eliminata`, ()=>{ state.loyaltyCards = prev; persist(); render(); });
+    return;
+  }
+  if(t.closest('[data-card-save]') && state.cardDraft){
+    const d = state.cardDraft;
+    const name = d.name.trim(), number = d.number.trim().replace(/\s+/g, '');
+    if(!name || !number) return;
+    const card = { id: d.id || ('c' + Date.now().toString(36)), name, number, color: d.color || CARD_COLORS[0] };
+    if(d.format && d.number.trim().replace(/\s+/g, '') === number) card.format = d.format;
+    const list = (state.loyaltyCards || []).filter(x => x.id !== card.id);
+    const idx = (state.loyaltyCards || []).findIndex(x => x.id === card.id);
+    if(idx >= 0) list.splice(idx, 0, card); else list.push(card);
+    state.loyaltyCards = list;
+    state.cardDraft = newCardDraft();
+    state.cardScanMsg = '';
+    persist(); render();
+  }
+});
+document.addEventListener('input', e=>{
+  const f = e.target.dataset && e.target.dataset.cardField;
+  if(!f || !state.cardDraft) return;
+  state.cardDraft[f] = e.target.value;
+  if(f === 'number') delete state.cardDraft.format;
+  // Il bottone Aggiungi si attiva da solo, senza ridisegnare (il campo resta com'è).
+  const save = document.querySelector('[data-card-save]');
+  if(save) save.disabled = !(state.cardDraft.name.trim() && state.cardDraft.number.trim());
+});
+document.addEventListener('change', e=>{
+  if(e.target.id === 'card-number' || e.target.id === 'card-name') render();
+  if(e.target.id === 'card-scan-input') scanCardImage(e.target.files && e.target.files[0]);
 });
 
 (async function init(){
