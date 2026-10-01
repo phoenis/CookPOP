@@ -1035,3 +1035,7 @@
 .shop-checks .shop-progress{ margin-bottom:0; }
 .shop-cards-btn{ order:-1; margin-right:auto; padding:var(--space-xxsmall, 0.25rem) var(--space-small); border-radius:var(--radius-pill); background:var(--surface); border:1px solid var(--line); font-size:var(--text-small); font-weight:var(--weight-bold); }
 .card-form .input-search{ border:1px solid var(--line); border-radius:var(--radius-pill); padding:0.5rem var(--space-medium); background:var(--surface); width:100%; }
+.card-qr{ display:block; width:min(70%, 16rem); height:auto; margin:0 auto; }
+.card-preview .card-qr{ width:8rem; }
+.card-import-list{ display:flex; flex-wrap:wrap; gap:0.375rem; margin:var(--space-xsmall) 0 var(--space-small); }
+.card-import-chip{ background:var(--card-color); color:#fff; border-radius:var(--radius-pill); padding:0.25rem 0.625rem; font-size:var(--text-xsmall); font-weight:var(--weight-bold); }

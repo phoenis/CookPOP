@@ -1011,6 +1011,30 @@ test('carte fedeltà: si aggiungono da Impostazioni, si aprono da Spesa col codi
   eq(page.errors, [], 'errori JS');
 });
 
+test('carte fedeltà: Code 39 e QR, import da link #carte= con conferma, senza doppioni', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    state.loyaltyCards = [{ id: 'x', name: 'Già qui', number: '0402008090593', color: '#000' }];
+    const data = [['Famila', '0402008090593', 'ean_13', '#e5512f'], ['IKEA', '6275980414616639489', 'qr_code', '#0058a3'], ['Intimissimi', '000100022162361', 'code_39', '#000000']];
+    const json = new TextEncoder().encode(JSON.stringify(data));
+    const b64 = btoa(String.fromCharCode(...json)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    location.hash = '#carte=' + b64;
+    await new Promise(res => setTimeout(res, 100));
+    const modal = document.querySelector('[data-cards-import-ok]') ? document.querySelector('.card-import-list').textContent : null;
+    document.querySelector('[data-cards-import-ok]').click();
+    const names = state.loyaltyCards.map(c => c.name);
+    state.cardViewId = state.loyaltyCards.find(c => c.name === 'IKEA').id; render();
+    const qr = !!document.querySelector('.card-view .card-qr');
+    const c39 = code39Modules('A1');
+    return { hash: location.hash, modal, names, qr, c39Start: c39.slice(0, 12), qrSize: qrMatrix('6275980414616639489').length };
+  });
+  eq(r.hash, '#spesa', 'link tolto dall\'indirizzo');
+  assert(r.modal && r.modal.includes('IKEA') && !r.modal.includes('Famila'), `conferma: ${r.modal}`);
+  eq(r.names, ['Già qui', 'IKEA', 'Intimissimi'], 'importate senza doppioni');
+  assert(r.qr, 'IKEA mostra il QR');
+  eq([r.c39Start, r.qrSize], ['100010111011', 25], 'Code 39 inizia con *, QR versione 2');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
