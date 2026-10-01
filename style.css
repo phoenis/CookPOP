@@ -974,3 +974,26 @@
 /* "Stasera, per domani": più righe (ammollo, freezer, marinatura). */
 .soak-note{ flex-direction:column; gap:0.25rem; }
 .soak-note-line{ display:flex; gap:var(--space-xsmall); align-items:baseline; }
+/* Inventario veloce: Sì/No per ingrediente, e col sì quanto e dove. */
+.inv-q-progress{ display:flex; flex-direction:column; gap:var(--space-xsmall); }
+.inv-q-progress-text{ font-size:var(--text-small); }
+.inv-q-bar{ height:0.5rem; border-radius:var(--radius-pill); background:var(--surface-2); overflow:hidden; }
+.inv-q-bar span{ display:block; height:100%; background:var(--gold); border-radius:inherit; }
+.inv-q-list{ padding:0; }
+.inv-q-row{ display:flex; flex-direction:column; gap:var(--space-xsmall); padding:var(--space-small) var(--space-medium); border-top:1px solid var(--line); }
+.inv-q-list .inv-q-row:first-child{ border-top:0; }
+.inv-q-top{ display:flex; align-items:center; gap:var(--space-small); }
+.inv-q-name{ flex:1; min-width:0; font-size:var(--text-small); font-weight:var(--weight-medium); overflow-wrap:anywhere; }
+.inv-q-answers{ display:flex; gap:0.375rem; flex-shrink:0; }
+.inv-q-btn{ min-width:3rem; padding:0.375rem var(--space-small); border-radius:var(--radius-pill); background:var(--surface-2); border:1.5px solid transparent; font-size:var(--text-small); font-weight:var(--weight-bold); }
+.inv-q-btn.is-yes{ background:color-mix(in srgb, var(--green-mid, #4a8a3a) 18%, var(--surface)); border-color:var(--green-mid, #4a8a3a); color:var(--ink); }
+.inv-q-btn.is-no{ background:var(--surface-2); border-color:var(--ink-light); color:var(--ink); }
+.inv-q-row.is-answered .inv-q-btn:not(.active){ opacity:0.5; }
+.inv-q-details{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); flex-wrap:wrap; }
+.inv-q-presence{ font-size:var(--text-xsmall); color:var(--ink-light); }
+.inv-q-luoghi{ display:flex; gap:0.25rem; }
+.inv-q-luogo{ width:2rem; height:2rem; border-radius:50%; color:var(--ink-light); background:transparent; }
+.inv-q-luogo.active{ background:var(--ink); color:var(--bg); }
+.inv-q-luogo svg{ width:1.1rem; height:1.1rem; }
+.inv-q-row{ padding:var(--space-xsmall) var(--space-medium); gap:0.25rem; }
+.inv-q-btn{ padding:0.25rem var(--space-small); min-width:2.75rem; }

@@ -950,6 +950,33 @@ test('meal prep: lista nel giorno di prep (sabato di default), doppia dose in Sp
   eq(page.errors, [], 'errori JS');
 });
 
+test('inventario veloce: Sì crea la voce con quantità e luogo, No la azzera senza mandarla in Spesa, "Da fare" scala', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    try{ localStorage.removeItem('cookpop-inventory-answers'); }catch(e){}
+    state.inventoryAnswered = null;
+    upsertPantryItem('Pecorino romano', 'frigo', 1, '', 'latticini');
+    delete state.pantryItems['tonno in scatola'];
+    state.tab = 'dispensa'; state.inventoryOpen = true; render();
+    const todo0 = inventoryNames().length;
+    const click = sel => document.querySelector(sel).click();
+    click('[data-inv-has="1"][data-inv-name="Tonno in scatola"], [data-inv-has="1"][data-inv-name="tonno in scatola"]');
+    const tonno = Object.assign({}, state.pantryItems['tonno in scatola']);
+    click('[data-inv-qty="1"][data-inv-name="Tonno in scatola"], [data-inv-qty="1"][data-inv-name="tonno in scatola"]');
+    const tonnoQty = state.pantryItems['tonno in scatola'].qty;
+    const pec = document.querySelector('[data-inv-has="0"][data-inv-name="Pecorino romano"], [data-inv-has="0"][data-inv-name="pecorino romano"]');
+    pec.click();
+    const inShop = buildShopFlat().some(x => x.ingrediente.toLowerCase() === 'pecorino romano' && x.context === 'Finiti in Dispensa');
+    const doneText = document.querySelector('.inv-q-progress-text').textContent;
+    return { todo0, tonno, tonnoQty, pecQty: state.pantryItems['pecorino romano'].qty, inShop, doneText, saved: JSON.parse(localStorage.getItem('cookpop-inventory-answers') || '{}') };
+  });
+  assert(r.todo0 > 100, `ingredienti: ${r.todo0}`);
+  eq([r.tonno.qty > 0, r.tonno.luogo, r.tonnoQty], [true, 'dispensa', r.tonno.qty + 1], 'tonno');
+  eq([r.pecQty, r.inShop], [0, false], 'pecorino: a 0 ma non in Spesa');
+  assert(r.doneText.startsWith('2 su'), r.doneText);
+  eq(r.saved['tonno in scatola'] + r.saved['pecorino romano'], 'sino', 'risposte salvate');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
