@@ -3661,7 +3661,7 @@ const WHATS_NEW = {
   version: '2026-10-12',
   title: 'Novità',
   items: [
-    'Meal prep: nel Menù, in cima a domenica (o sabato, si sceglie settimana per settimana), c\'è la lista "🔪 Prep" di cosa preparare per i giorni dopo. I piatti "Meal prep" ci sono già, gli altri si aggiungono con "+ prep". Si spuntano man mano.',
+    'Meal prep: nel Menù, in cima a sabato (o domenica, si sceglie settimana per settimana), c\'è la lista "🔪 Prep" di cosa preparare per i giorni dopo. I piatti "Meal prep" ci sono già, gli altri si aggiungono con "+ prep". Si spuntano man mano.',
     '"❄️ ×2" (nel prep o nel dettaglio del piatto) fa la doppia dose: in Spesa compri il doppio e metà va nel freezer, in Dispensa. Poi con "+ piatto" → "Dal freezer" la rimetti in un pasto: niente spesa, e la sera prima ti ricorda di tirarla fuori.'
   ]
 };
@@ -4684,7 +4684,7 @@ function renderDishPickerScreen(){
 // state.freezerDishes[mealKey] = [nomi dei piatti presi dal freezer].
 const PREP_DAYS = { sab: 5, dom: 6 };
 function weekStartIso(weekIdx){ return isoLocalDate(weekDatesFor(weekIdx)[0]); }
-function prepDayOf(weekIdx){ return (state.prepDay && state.prepDay[weekStartIso(weekIdx)]) || 'dom'; }
+function prepDayOf(weekIdx){ return (state.prepDay && state.prepDay[weekStartIso(weekIdx)]) || 'sab'; }
 function dishPlanList(mk){ return (state.dishPlan && state.dishPlan[mk]) || []; }
 function getDishPlan(mk, name){ return dishPlanList(mk).find(p => p.name === name) || {}; }
 function setDishPlan(mk, name, patch){
