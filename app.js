@@ -72,9 +72,9 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 // "Gestisci ingredienti". Come ogni reparto, la sezione compare in Dispensa/
 // Spesa solo quando contiene almeno una voce (stesso filtro presenza già
 // usato per tutti gli altri, vedi DEPT_ORDER.filter più sotto).
-const DEPT_ORDER = ['avanzi', 'verdura','carne','pesce','latticini','uova','pane','legumi','base','dispensa','surgelati','bibite','altro','pulizia','igiene','cucina-casa','altro-casa','finiti'];
-const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', pesce:'Pesce', latticini:'Latticini e formaggi', uova:'Uova', pane:'Pane, pasta e farine', legumi:'Legumi e conserve', dispensa:'Dispensa e condimenti', surgelati:'Surgelati', base:'Base', bibite:'Bibite', finiti:'Finiti', altro:'Altro', pulizia:'Pulizia', igiene:'Igiene e cura', 'cucina-casa':'Cucina', 'altro-casa':'Altro' };
-const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', pesce:'🐟', latticini:'🧀', uova:'🥚', pane:'🍞', legumi:'🥫', dispensa:'🫙', surgelati:'❄️', base:'⚙️', bibite:'🥤', finiti:'🗑️', altro:'🛒', pulizia:'🧽', igiene:'🧴', 'cucina-casa':'🧻', 'altro-casa':'📦' };
+const DEPT_ORDER = ['avanzi', 'verdura','carne','salumi','pesce','latticini','pane','pasta','legumi','conserve','base','salse','dolci','surgelati','bibite','altro','pulizia','igiene','cucina-casa','altro-casa','finiti'];
+const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', salumi:'Salumi', pesce:'Pesce', latticini:'Latticini e uova', pane:'Pane e sostituti', pasta:'Pasta, riso e cereali', legumi:'Legumi', conserve:'Pomodoro e conserve', base:'Olio, aceto e spezie', salse:'Salse e brodi', dolci:'Dolci e forno', surgelati:'Surgelati', bibite:'Bevande', finiti:'Finiti', altro:'Altro', pulizia:'Pulizia', igiene:'Igiene e cura', 'cucina-casa':'Cucina', 'altro-casa':'Altro' };
+const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', salumi:'🥓', pesce:'🐟', latticini:'🧀', pane:'🍞', pasta:'🍝', legumi:'🫘', conserve:'🥫', base:'🫒', salse:'🥣', dolci:'🍰', surgelati:'❄️', bibite:'🍷', finiti:'🗑️', altro:'🛒', pulizia:'🧽', igiene:'🧴', 'cucina-casa':'🧻', 'altro-casa':'📦' };
 // Categorie create dall'utente (state.customDepts, nel catalogo condiviso:
 // { id: { label, icon } }, vedi "Gestisci categorie" in Dispensa): si
 // aggiungono a quelle di base, prima di "Altro". DEPT_ORDER/LABEL/ICON sono
@@ -205,49 +205,58 @@ const DEPT_RULES = [
   ['dischetti struccanti','igiene'], ['rasoi','igiene'], ['collutorio','igiene'], ['fazzoletti','igiene'], ['balsamo per capelli','igiene'],
   ['carta forno','cucina-casa'], ['pellicola','cucina-casa'], ['alluminio','cucina-casa'], ['sacchetti','cucina-casa'], ['scottex','cucina-casa'],
   ['carta assorbente','cucina-casa'], ['tovaglioli','cucina-casa'], ['stuzzicadenti','cucina-casa'], ['stuzzicaden','cucina-casa'],
-  // Prima di tutto i nomi che contengono la parola chiave di un altro reparto
-  // (vince la prima regola che corrisponde): "Colla di pesce" non è pesce,
-  // "Farina di ceci" non è un legume, "Fagiolini" non sono fagioli secchi,
-  // "Gnocchi di patate"/"Concentrato di pomodoro" non sono verdura fresca.
-  ['colla di pesce','dispensa'], ['brodo','dispensa'], ['aglio in polvere','base'], ['aranciata','bibite'],
-  ['farina di ceci','pane'], ['gnocchi','pane'], ['fagiolini','verdura'], ['farro','pane'], ['tahina','dispensa'], ['latte di cocco','dispensa'], ['robiola','latticini'], ['bagoss','latticini'], ['cioccolato','dispensa'],
-  ['concentrato','legumi'], ['polpa di pomodoro','legumi'],
-  ['passata','legumi'], ['pelati','legumi'], ['conserva','legumi'], ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'], ['fave secche','legumi'],
-  ['salmone','pesce'], ['tonno','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['acciughe','pesce'], ['alici','pesce'], ['platessa','pesce'], ['sgombro','pesce'], ['seppi','pesce'], ['vongole','pesce'], ['cozze','pesce'], ['pesce','pesce'],
-  ['manzo','carne'], ['pollo','carne'], ['maiale','carne'], ['salsiccia','carne'], ['tacchino','carne'], ['vitello','carne'], ['agnello','carne'], ['straccetti','carne'], ['macinato','carne'], ['prosciutto','carne'], ['pancetta','carne'], ['guanciale','carne'], ['coniglio','carne'],
-  ['mozzarella','latticini'], ['ricotta','latticini'], ['parmigiano','latticini'], ['formaggio','latticini'], ['grana','latticini'], ['latte','latticini'], ['burro','latticini'], ['yogurt','latticini'], ['stracchino','latticini'], ['provola','latticini'],
-  ['uova','uova'], ['uovo','uova'],
-  ['pane','pane'], ['farina','pane'], ['pasta','pane'], ['riso','pane'], ['lievito','pane'],
-  // Le voci "peperoncino" e "peperon" (stem di peperone/peperoni) vanno controllate
-  // prima di "pepe", altrimenti "pepe" le intercetta per prima essendo una sua sottostringa.
-  // "Base": sale, pepe, olio, aceto, spezie ed erbe aromatiche secche — i
-  // condimenti di base, separati da sughi/conserve di "Dispensa e condimenti".
+  // Reparti alimentari come le corsie del supermercato (ottobre 2026). Vince
+  // la prima regola che corrisponde, quindi prima i nomi che contengono la
+  // parola chiave di un altro reparto: "Colla di pesce" non è pesce, "Farina
+  // di ceci" non è un legume, "Fagiolini" non sono fagioli, "Pasta sfoglia"
+  // non è pasta, "Tonno sott'olio" non è olio, "Ragù di carne" non è carne.
+  ['colla di pesce','dolci'], ['brodo','salse'], ['dado','salse'], ['dadi','salse'], ['aglio in polvere','base'], ['aranciata','bibite'],
+  ['latte di cocco','salse'], ['tahina','salse'], ['robiola','latticini'], ['bagoss','latticini'], ['fagiolini','verdura'],
+  ['fette biscottate','pane'], ['pangrattato','pane'], ['lievito','dolci'], ['olive','conserve'], // "denocciolate" contiene "nocciol"
+  // Dolci e forno: farine, zucchero, lievito, cacao, frutta secca...
+  ['pasta sfoglia','dolci'], ['pasta frolla','dolci'], ['pasta brisé','dolci'],
+  ['farina di mais','pasta'], ['polenta','pasta'], ['farina','dolci'], ['zucchero','dolci'], ['cacao','dolci'], ['cioccolat','dolci'],
+  ['vaniglia','dolci'], ['savoiardi','dolci'], ['canditi','dolci'], ['uvetta','dolci'], ['pinoli','dolci'], ['noci','dolci'],
+  ['nocciol','dolci'], ['mandorl','dolci'], ['pistacch','dolci'], ['miele','dolci'], ['marmellat','dolci'], ['confettur','dolci'], ['biscott','dolci'],
+  // Pasta, riso e cereali.
+  ['gnocchi','pasta'], ['farro','pasta'], ['orzo','pasta'], ['cous cous','pasta'], ['couscous','pasta'], ['quinoa','pasta'], ['semol','pasta'],
+  ['cereali','pasta'], ['riso','pasta'], ['pasta','pasta'], ['spaghetti','pasta'], ['rigatoni','pasta'], ['orecchiette','pasta'], ['trenette','pasta'],
+  ['trofie','pasta'], ['cannelloni','pasta'], ['sfoglie','pasta'], ['lasagn','pasta'], ['tortellini','pasta'], ['ravioli','pasta'], ['tagliatelle','pasta'], ['vialone','pasta'],
+  // Pomodoro e conserve (anche pesce e verdure in scatola o sott'olio).
+  ['concentrato','conserve'], ['polpa di pomodoro','conserve'], ['passata','conserve'], ['pelati','conserve'], ['conserva','conserve'],
+  ["sott'olio",'conserve'], ['sottaceti','conserve'], ['in scatola','conserve'], ['tonno','conserve'], ['acciugh','conserve'],
+  ['capperi','conserve'], ['mais','conserve'], ['carciofini','conserve'],
+  // Salse e brodi.
+  ['ragù','salse'], ['sugo','salse'], ['pesto','salse'], ['maionese','salse'], ['senape','salse'], ['besciamella','salse'], ['ketchup','salse'], ['salsa','salse'],
+  // Legumi, secchi o già cotti.
+  ['ceci','legumi'], ['fagioli','legumi'], ['lenticchie','legumi'], ['fave','legumi'], ['legumi','legumi'], ['cannellini','legumi'], ['borlotti','legumi'], ['già cotti','legumi'],
+  ['salmone','pesce'], ['gamber','pesce'], ['merluzzo','pesce'], ['branzino','pesce'], ['alici','pesce'], ['platessa','pesce'], ['sgombro','pesce'], ['seppi','pesce'],
+  ['vongole','pesce'], ['cozze','pesce'], ['pesce','pesce'], ['baccal','pesce'], ['orata','pesce'], ['polpo','pesce'], ['calamar','pesce'],
+  ['prosciutto','salumi'], ['pancetta','salumi'], ['guanciale','salumi'], ['speck','salumi'], ['salame','salumi'], ['mortadella','salumi'], ['bresaola','salumi'], ['lardo','salumi'], ['wurstel','salumi'],
+  ['manzo','carne'], ['pollo','carne'], ['maiale','carne'], ['salsiccia','carne'], ['tacchino','carne'], ['vitello','carne'], ['agnello','carne'], ['straccetti','carne'],
+  ['macinat','carne'], ['coniglio','carne'], ['carne','carne'], ['arista','carne'], ['controfiletto','carne'], ['scamone','carne'], ['cappello del prete','carne'], ['muscolo','carne'],
+  ['cappone','carne'], ['cosce','carne'], ['petto','carne'], ['cotenna','carne'], ['spiedini','carne'], ['bistecc','carne'], ['spezzatino','carne'],
+  ['mozzarella','latticini'], ['ricotta','latticini'], ['parmigiano','latticini'], ['formaggio','latticini'], ['grana','latticini'], ['latte','latticini'], ['burro','latticini'],
+  ['yogurt','latticini'], ['stracchino','latticini'], ['provola','latticini'], ['burrata','latticini'], ['brie','latticini'], ['caciocavallo','latticini'], ['fontina','latticini'],
+  ['gorgonzola','latticini'], ['taleggio','latticini'], ['mascarpone','latticini'], ['pecorino','latticini'], ['provolone','latticini'], ['scamorza','latticini'],
+  ['panna','latticini'], ['latticello','latticini'], ['uova','latticini'], ['uovo','latticini'],
+  ['pane','pane'], ['panini','pane'], ['piadin','pane'], ['cracker','pane'], ['grissini','pane'],
+  // Olio, aceto e spezie. "peperoncino" e "peperon" (peperone/peperoni) prima
+  // di "pepe", che altrimenti li intercetterebbe essendo una loro sottostringa.
   ['peperoncino','base'], ['peperon','verdura'],
-  ['sale','base'], ['olio','base'], ['pepe','base'], ['aceto','base'], ['zucchero','dispensa'], ['spezie','base'],
-  ['origano','base'], ['rosmarino','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'], ['curry','base'], ['curcuma','base'], ['cumino','base'],
-  ['senape','dispensa'], ['miele','dispensa'], ['pangrattato','dispensa'],
+  ['sale','base'], ['olio','base'], ['pepe','base'], ['aceto','base'], ['spezie','base'],
+  ['origano','base'], ['rosmarino','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'], ['curry','base'],
+  ['curcuma','base'], ['cumino','base'], ['zafferano','base'], ['chiodi di garofano','base'],
   ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
   ['melone','verdura'], ['anguria','verdura'], ['mela','verdura'], ['pera','verdura'], ['limone','verdura'], ['arancia','verdura'], ['banana','verdura'], ['fragol','verdura'], ['uva','verdura'],
-  // Aggiunte per svuotare "Altro" (ingredienti delle ricette che nessuna
-  // regola sopra riconosceva).
   ['cipoll','verdura'], ['borettan','verdura'], ['scalogno','verdura'], ['porr','verdura'], ['sedano','verdura'], ['finocchi','verdura'],
   ['carciof','verdura'], ['funghi','verdura'], ['broccol','verdura'], ['cavolfior','verdura'], ['verza','verdura'], ['cime di rapa','verdura'],
   ['friariell','verdura'], ['spinaci','verdura'], ['bietol','verdura'], ['asparag','verdura'], ['cetriol','verdura'], ['radicchio','verdura'], ['cicoria','verdura'], ['zenzero','verdura'],
   ['rucola','verdura'], ['zucca','verdura'], ['piselli','verdura'], ['verdur','verdura'], ['prezzemolo','verdura'], ['salvia','verdura'],
   ['menta','verdura'], ['aneto','verdura'], ['aranc','verdura'], ['mele','verdura'], ['pere','verdura'],
-  ['ragù','legumi'], ['carne','carne'], ['arista','carne'], ['controfiletto','carne'], ['scamone','carne'], ['cappello del prete','carne'], ['muscolo','carne'],
-  ['cappone','carne'], ['cosce','carne'], ['petto','carne'], ['cotenna','carne'], ['speck','carne'], ['spiedini','carne'],
-  ['baccal','pesce'], ['cozze','pesce'], ['vongole','pesce'], ['orata','pesce'], ['polpo','pesce'],
-  ['burrata','latticini'], ['brie','latticini'], ['caciocavallo','latticini'], ['fontina','latticini'], ['gorgonzola','latticini'], ['taleggio','latticini'],
-  ['mascarpone','latticini'], ['pecorino','latticini'], ['provolone','latticini'], ['scamorza','latticini'], ['panna','latticini'], ['latticello','latticini'],
-  ['spaghetti','pane'], ['rigatoni','pane'], ['orecchiette','pane'], ['trenette','pane'], ['trofie','pane'], ['cannelloni','pane'],
-  ['sfoglie','pane'], ['tortellini','pane'], ['semol','pane'], ['cereali','pane'], ['panini','pane'], ['savoiardi','pane'], ['vialone','pane'],
-  ['legumi','legumi'], ['cannellini','legumi'], ['mais','legumi'],
-  ['olive','dispensa'], ['capperi','dispensa'], ['pesto','dispensa'], ['maionese','dispensa'], ['besciamella','dispensa'], ['dadi','dispensa'],
-  ['vino','dispensa'], ['cacao','dispensa'], ['caffè','dispensa'], ['vaniglia','dispensa'], ['zafferano','base'], ['chiodi di garofano','base'],
-  ['pinoli','dispensa'], ['noci','dispensa'], ['mandorle','dispensa'], ['uvetta','dispensa'], ['marmellat','dispensa'],
-  ['acqua','bibite'], ['bibit','bibite'], ['birra','bibite'], ['succo di frutta','bibite'], ['tè freddo','bibite'],
+  ['acqua','bibite'], ['bibit','bibite'], ['birra','bibite'], ['succo di frutta','bibite'], ['tè freddo','bibite'], ['vino','bibite'], ['liquor','bibite'],
+  [/\brum\b/,'bibite'], ['caffè','bibite'], ['spumante','bibite'], ['prosecco','bibite'],
 ];
 
 // Un nome ingrediente tipo "Scalogno o cipolla" o "Pasta corta (ditalini o
@@ -758,7 +767,7 @@ function pantryCatFor(ingrediente){
 }
 function classifyDept(ingrediente){
   const s = (ingrediente||'').toLowerCase();
-  for(const [kw, dept] of DEPT_RULES){ if(s.includes(kw)) return dept; }
+  for(const [kw, dept] of DEPT_RULES){ if(typeof kw === 'string' ? s.includes(kw) : kw.test(s)) return dept; }
   return 'altro';
 }
 
@@ -1050,9 +1059,9 @@ const CURATED_INGREDIENT_RENAMES = {
 // ricette (matchName) e i nomi delle voci di Dispensa che ne fanno parte
 // (assegnati una tantum alle voci già presenti, vedi pantryGroupMigrated3).
 const CURATED_PANTRY_GROUPS = {
-  'pasta-corta': { group:{ label:'Pasta corta', matchName:'pasta corta', cat:'pane' }, members:['fusilli','penne','pennette','rigatoni','mezze maniche','farfalle','sedani','sedanini','ditalini','tubetti','tortiglioni','pipe','conchiglie','conchiglioni','orecchiette','gomiti','caserecce','gemelli','pasta mista'] },
-  'pasta-lunga': { group:{ label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' }, members:['spaghetti','spaghettoni','linguine','tagliatelle','bucatini','tonnarelli','fettuccine','vermicelli','capellini','trenette','pappardelle','trofie'] },
-  'farina': { group:{ label:'Farina', matchName:'farina', cat:'pane' }, members:['farina 00','farina 0','manitoba','farina manitoba','farina di grano tenero'] },
+  'pasta-corta': { group:{ label:'Pasta corta', matchName:'pasta corta', cat:'pasta' }, members:['fusilli','penne','pennette','rigatoni','mezze maniche','farfalle','sedani','sedanini','ditalini','tubetti','tortiglioni','pipe','conchiglie','conchiglioni','orecchiette','gomiti','caserecce','gemelli','pasta mista'] },
+  'pasta-lunga': { group:{ label:'Pasta lunga', matchName:'pasta lunga', cat:'pasta' }, members:['spaghetti','spaghettoni','linguine','tagliatelle','bucatini','tonnarelli','fettuccine','vermicelli','capellini','trenette','pappardelle','trofie'] },
+  'farina': { group:{ label:'Farina', matchName:'farina', cat:'dolci' }, members:['farina 00','farina 0','manitoba','farina manitoba','farina di grano tenero'] },
   'formaggio-grattugiato': { group:{ label:'Formaggio grattugiato', matchName:'formaggio grattugiato', cat:'latticini' }, members:['parmigiano','parmigiano grattugiato','parmigiano reggiano','grana','grana padano','pecorino','pecorino grattugiato','pecorino romano'] },
   'olive': { group:{ label:'Olive', matchName:'olive', cat:'dispensa' }, members:['olive nere','olive verdi','olive taggiasche','olive taggiasche denocciolate','olive nere di gaeta'] },
   'aceto': { group:{ label:'Aceto', matchName:'aceto', cat:'dispensa' }, members:['aceto balsamico','aceto di vino','aceto di vino bianco','aceto di vino rosso','aceto di mele'] },
@@ -1304,13 +1313,13 @@ const state = {
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
-    'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pane' },
-    'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pane' },
-    'riso-carnaroli-vialone': { label:'Riso Carnaroli o Vialone Nano', matchName:'riso carnaroli o vialone nano', cat:'pane' },
+    'pasta-corta': { label:'Pasta corta', matchName:'pasta corta', cat:'pasta' },
+    'pasta-lunga': { label:'Pasta lunga', matchName:'pasta lunga', cat:'pasta' },
+    'riso-carnaroli-vialone': { label:'Riso Carnaroli o Vialone Nano', matchName:'riso carnaroli o vialone nano', cat:'pasta' },
     'provolone-brie': { label:'Provolone o brie', matchName:'provolone o brie', cat:'latticini' },
     'zucchero-miele': { label:'Zucchero o miele', matchName:'zucchero o miele', cat:'dispensa' },
     'rosmarino-alloro': { label:'Rosmarino o alloro', matchName:'rosmarino o alloro', cat:'dispensa' },
-    'guanciale-pancetta': { label:'Guanciale o pancetta', matchName:'guanciale o pancetta', cat:'carne' },
+    'guanciale-pancetta': { label:'Guanciale o pancetta', matchName:'guanciale o pancetta', cat:'salumi' },
     'basilico-menta': { label:'Basilico o menta', matchName:'basilico o menta', cat:'verdura' },
     'olio-burro': { label:'Olio EVO o burro', matchName:'olio evo o burro', cat:'dispensa' },
     'grana-parmigiano': { label:'Grana o parmigiano a scaglie', matchName:'grana o parmigiano a scaglie', cat:'latticini' }
@@ -1778,11 +1787,11 @@ const MIGRATIONS = [
   // e assegna il gruppo alle voci di Dispensa già presenti che li riguardano.
   { flag: 'pantryGroupMigrated2', run(){
     const NEW_GROUPS = {
-      'riso-carnaroli-vialone': { label:'Riso Carnaroli o Vialone Nano', matchName:'riso carnaroli o vialone nano', cat:'pane' },
+      'riso-carnaroli-vialone': { label:'Riso Carnaroli o Vialone Nano', matchName:'riso carnaroli o vialone nano', cat:'pasta' },
       'provolone-brie': { label:'Provolone o brie', matchName:'provolone o brie', cat:'latticini' },
       'zucchero-miele': { label:'Zucchero o miele', matchName:'zucchero o miele', cat:'dispensa' },
       'rosmarino-alloro': { label:'Rosmarino o alloro', matchName:'rosmarino o alloro', cat:'dispensa' },
-      'guanciale-pancetta': { label:'Guanciale o pancetta', matchName:'guanciale o pancetta', cat:'carne' },
+      'guanciale-pancetta': { label:'Guanciale o pancetta', matchName:'guanciale o pancetta', cat:'salumi' },
       'basilico-menta': { label:'Basilico o menta', matchName:'basilico o menta', cat:'verdura' },
       'olio-burro': { label:'Olio EVO o burro', matchName:'olio evo o burro', cat:'dispensa' },
       'grana-parmigiano': { label:'Grana o parmigiano a scaglie', matchName:'grana o parmigiano a scaglie', cat:'latticini' }
@@ -2012,6 +2021,29 @@ const MIGRATIONS = [
     if(getSpaceRoute().id !== 'default') return;
     Object.values(state.recipeEdits || {}).forEach(edit=>{ if(edit && 'gradimento' in edit) edit.gradimento = ''; });
     Object.values(state.customRecipes || {}).forEach(r=>{ if(r && 'gradimento' in r) r.gradimento = ''; });
+  }},
+  // 22. Una tantum: nuove categorie alimentari, come le corsie del
+  // supermercato (ottobre 2026). "Uova" confluisce in "Latticini e uova",
+  // "Dispensa e condimenti" sparisce, nascono Salumi, Pasta, Conserve, Salse
+  // e Dolci. Le voci nelle categorie rimescolate si riclassificano dal nome
+  // (se il nome non dice niente restano dov'erano, o finiscono in Altro se
+  // la loro categoria non esiste più); verdura, surgelati, avanzi, casa e le
+  // categorie create a mano non si toccano. I nomi/emoji personalizzati delle
+  // categorie rimescolate si tolgono, altrimenti coprirebbero quelli nuovi.
+  { flag: 'deptsRegrouped1', run(){
+    const RESHUFFLED = ['carne','pesce','latticini','uova','pane','legumi','base','dispensa','bibite','altro'];
+    const GONE = { uova:'latticini', dispensa:'' };
+    const recat = (cat, name) => {
+      if(!RESHUFFLED.includes(cat)) return cat;
+      const auto = classifyDept(name || '');
+      if(auto !== 'altro') return auto;
+      return cat in GONE ? GONE[cat] : cat;
+    };
+    Object.values(state.pantryItems || {}).forEach(it=>{ if(it && it.cat) it.cat = recat(it.cat, it.nome); });
+    Object.values(state.shopExtras || {}).forEach(it=>{ if(it && it.cat) it.cat = recat(it.cat, it.ingrediente); });
+    Object.values(state.pantryGroups || {}).forEach(g=>{ if(g && g.cat) g.cat = recat(g.cat, g.matchName || g.label); });
+    const custom = state.customDepts || {};
+    RESHUFFLED.forEach(id=>{ if(custom[id]) delete custom[id]; });
   }}
 ];
 function runMigrations(){
@@ -3688,10 +3720,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-18',
+  version: '2026-10-19',
   title: 'Novità',
   items: [
-    'Carte fedeltà: per aggiungerne una tocca + in alto a destra; per cambiarla aprila e tocca ✎ Modifica. Chiudendo una carta l\'elenco resta dov\'era.'
+    'Nuove categorie, come le corsie del supermercato: Salumi, Pasta riso e cereali, Legumi, Pomodoro e conserve, Olio aceto e spezie, Salse e brodi, Dolci e forno, Bevande. Le uova ora stanno con i latticini. Gli ingredienti che avevi sono già stati spostati.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -6666,7 +6698,7 @@ function inventoryAnswers(){
 function saveInventoryAnswers(){
   try{ localStorage.setItem(INVENTORY_KEY, JSON.stringify(state.inventoryAnswered || {})); }catch(e){}
 }
-const LUOGO_BY_DEPT = { verdura:'frigo', carne:'frigo', pesce:'frigo', latticini:'frigo', uova:'frigo', surgelati:'freezer' };
+const LUOGO_BY_DEPT = { verdura:'frigo', carne:'frigo', salumi:'frigo', pesce:'frigo', latticini:'frigo', surgelati:'freezer' };
 // Dove sta di solito: conserve e secchi in dispensa anche se di pesce o
 // legumi (tonno in scatola, ceci secchi), il fresco in frigo, i surgelati in freezer.
 function inventoryGuessLuogo(name, dept){

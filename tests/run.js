@@ -1085,6 +1085,27 @@ test('carte fedeltà: + in alto apre la scheda nuova, Modifica dalla carta apert
   eq(page.errors, [], 'errori JS');
 });
 
+test('categorie come le corsie del supermercato: regole dal nome e riclassificazione delle voci già salvate', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const auto = ['Tonno sott\'olio', 'Prosciutto crudo', 'Farina 00', 'Spaghetti', 'Passata di pomodoro', 'Ragù di carne', 'Olive taggiasche denocciolate', 'Uova', 'Rum', 'Pangrattato', 'Ceci già cotti', 'Olio EVO'].map(classifyDept);
+    state.pantryItems['spaghetti'] = { nome: 'Spaghetti', cat: 'pane', luogo: 'dispensa', qty: 1 };
+    state.pantryItems['uova'] = { nome: 'Uova', cat: 'uova', luogo: 'frigo', qty: 6 };
+    state.pantryItems['tonno sott\'olio'] = { nome: 'Tonno sott\'olio', cat: 'pesce', luogo: 'dispensa', qty: 2 };
+    state.pantryItems['robetta'] = { nome: 'Robetta', cat: 'dispensa', luogo: 'dispensa', qty: 1 };
+    state.pantryItems['zucchine'] = { nome: 'Zucchine', cat: 'avanzi', luogo: 'frigo', qty: 1 };
+    state.customDepts = Object.assign({}, state.customDepts, { pane: { label: 'Pane, pasta e farine', icon: '🍞' } });
+    state.deptsRegrouped1 = false;
+    runMigrations();
+    applyCustomDepts();
+    const c = k => state.pantryItems[k].cat;
+    return { auto, cats: [c('spaghetti'), c('uova'), c('tonno sott\'olio'), c('robetta'), c('zucchine')], pane: DEPT_LABEL.pane, uovaGone: !DEPT_LABEL.uova && !DEPT_LABEL.dispensa };
+  });
+  eq(r.auto, ['conserve', 'salumi', 'dolci', 'pasta', 'conserve', 'salse', 'conserve', 'latticini', 'bibite', 'pane', 'legumi', 'base'], 'regole dal nome');
+  eq(r.cats, ['pasta', 'latticini', 'conserve', '', 'avanzi'], 'voci salvate riclassificate');
+  eq([r.pane, r.uovaGone], ['Pane e sostituti', true], 'nuovi nomi, vecchie categorie sparite');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
