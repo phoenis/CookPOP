@@ -1322,6 +1322,9 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
+  inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e risposte appena date che restano in vista
+  inventoryAnswered: null, // risposte dell'inventario (in localStorage, vedi inventoryAnswers)
   ingredientManagerFilter: 'tutti', // non persistito: 'tutti' | 'casa' (in Dispensa) | 'no'
   deptEditId: null, // non persistito: categoria aperta in modifica ('new' per una nuova)
   deptDraft: null, // non persistito: { icon, label, nonFood } della categoria in modifica
@@ -3658,11 +3661,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-12',
+  version: '2026-10-13',
   title: 'Novità',
   items: [
-    'Meal prep: nel Menù, in cima a sabato (o domenica, si sceglie settimana per settimana), c\'è la lista "🔪 Prep" di cosa preparare per i giorni dopo. I piatti "Meal prep" ci sono già, gli altri si aggiungono con "+ prep". Si spuntano man mano.',
-    '"❄️ ×2" (nel prep o nel dettaglio del piatto) fa la doppia dose: in Spesa compri il doppio e metà va nel freezer, in Dispensa. Poi con "+ piatto" → "Dal freezer" la rimetti in un pasto: niente spesa, e la sera prima ti ricorda di tirarla fuori.'
+    'Inventario veloce (Dispensa → menu ⋮): tutti gli ingredienti divisi per categoria, per ognuno "Sì" o "No"; col Sì scegli quanto e dove (frigo, freezer…). Si salva da solo: puoi fermarti e riprendere da "Da fare".'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3824,6 +3826,7 @@ const MODAL_CHECKS = [
   [()=> !!state.pantryEditKey, ()=>{ closeIngredientSheet(); }],
   [()=> !!state.pantryAddModalOpen, ()=>{ closeIngredientSheet(); }],
   // Sotto la scheda ingrediente (che si apre da qui): si chiude dopo di lei.
+  [()=> !!state.inventoryOpen, ()=>{ state.inventoryOpen = false; }],
   [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
   [()=> !!state.newRecipeModalOpen, ()=>{ state.newRecipeModalOpen = false; }],
@@ -6609,6 +6612,134 @@ function renderIngredientManagerPage(){
   return managePageHtml({ key: 'ingredients', title: 'Ingredienti', closeAttr: 'data-close-ingredient-manager', body });
 }
 
+// --- Inventario veloce -------------------------------------------------------
+// Il "giro della casa" per riempire la Dispensa in una volta: tutti gli
+// ingredienti noti (ricette, Dispensa, spesa di ogni settimana), divisi per
+// categoria, con "Sì / No" e, per il sì, quantità e luogo sulla stessa riga.
+// Ogni risposta si applica subito alla Dispensa, quindi si può smettere e
+// riprendere quando si vuole: le risposte date (solo per sapere cosa resta
+// "da fare") restano in questo telefono, in localStorage.
+const INVENTORY_KEY = 'cookpop-inventory-answers';
+function inventoryAnswers(){
+  if(!state.inventoryAnswered){
+    try{ state.inventoryAnswered = JSON.parse(localStorage.getItem(INVENTORY_KEY) || '{}') || {}; }
+    catch(e){ state.inventoryAnswered = {}; }
+  }
+  return state.inventoryAnswered;
+}
+function saveInventoryAnswers(){
+  try{ localStorage.setItem(INVENTORY_KEY, JSON.stringify(state.inventoryAnswered || {})); }catch(e){}
+}
+const LUOGO_BY_DEPT = { verdura:'frigo', carne:'frigo', pesce:'frigo', latticini:'frigo', uova:'frigo', surgelati:'freezer' };
+// Dove sta di solito: conserve e secchi in dispensa anche se di pesce o
+// legumi (tonno in scatola, ceci secchi), il fresco in frigo, i surgelati in freezer.
+function inventoryGuessLuogo(name, dept){
+  if(/scatol|secch|barattol|vasett|sott'?olio|conserv|in brick|uht|polvere|liofilizz/i.test(name)) return 'dispensa';
+  if(/surgelat|congelat/i.test(name)) return 'freezer';
+  return LUOGO_BY_DEPT[dept] || 'dispensa';
+}
+function inventoryDept(name){
+  const it = state.pantryItems[name.trim().toLowerCase()];
+  return knownDept(it && it.cat) || classifyDept(name);
+}
+function inventoryNames(){
+  return allIngredientNamesForManager().filter(n => !isNonFoodDept(inventoryDept(n)));
+}
+// Quantità proposta al primo "Sì": un pacco tipico per chi si misura in
+// grammi/millilitri, uno per il resto. Si corregge subito con − e +.
+function inventoryDefaultQty(unit){
+  if(unit === 'g') return 500;
+  if(unit === 'ml') return 1000;
+  if(unit === 'kg' || unit === 'l') return 1;
+  return 1;
+}
+function inventorySetHas(name, has){
+  const key = name.trim().toLowerCase();
+  const answers = inventoryAnswers();
+  const it = state.pantryItems[key];
+  if(has){
+    const dept = inventoryDept(name);
+    const unit = it ? (it.unit || '') : (PANTRY_UNIT_BY_NAME[key] || '');
+    if(!(it && typeof it.qty === 'number' && it.qty > 0)){
+      upsertPantryItem(name, (it && it.luogo) || inventoryGuessLuogo(name, dept), unit === 'none' ? 1 : inventoryDefaultQty(unit), unit, (it && it.cat) || dept);
+    }
+    delete state.shopDismissed['oos_' + key];
+  } else if(it && typeof it.qty === 'number' && it.qty > 0){
+    // Era in Dispensa e non c'è più: a 0, senza farlo comparire tra i
+    // "Finiti" in Spesa (è un inventario, non una lista della spesa).
+    it.qty = 0;
+    state.shopDismissed['oos_' + key] = true;
+  }
+  answers[key] = has ? 'si' : 'no';
+  state.inventoryKeep[key] = true;
+  saveInventoryAnswers();
+}
+function renderInventoryPage(){
+  const answers = inventoryAnswers();
+  const names = inventoryNames();
+  const search = (state.inventorySearch || '').trim().toLowerCase();
+  const filter = state.inventoryFilter || 'todo';
+  const answerOf = n => answers[n.trim().toLowerCase()];
+  const done = names.filter(n => answerOf(n)).length;
+  const shown = names
+    .filter(n => !search || n.toLowerCase().includes(search))
+    .filter(n => filter === 'tutti' || (filter === 'si' ? answerOf(n) === 'si' : (!answerOf(n) || state.inventoryKeep[n.trim().toLowerCase()])));
+  const byDept = {};
+  shown.forEach(n => { const d = inventoryDept(n); (byDept[d] = byDept[d] || []).push(n); });
+  const depts = DEPT_ORDER.filter(d => byDept[d]).concat(Object.keys(byDept).filter(d => !DEPT_ORDER.includes(d)));
+  const rowHtml = name => {
+    const key = name.trim().toLowerCase();
+    const it = state.pantryItems[key];
+    const ans = answerOf(name);
+    const has = ans === 'si' && it && typeof it.qty === 'number' && it.qty > 0;
+    const unit = it ? (it.unit || '') : '';
+    const attr = `data-inv-name="${escapeAttr(name)}"`;
+    const details = has ? `
+        <div class="inv-q-details">
+          ${unit === 'none' ? '<span class="inv-q-presence">In casa</span>' : `
+          <span class="qty-stepper">
+            <button class="qty-btn" type="button" data-inv-qty="-1" ${attr} aria-label="Diminuisci">−</button>
+            <span class="qty-num">${it.qty}${unit ? ' ' + escapeHtml(unit) : ''}</span>
+            <button class="qty-btn" type="button" data-inv-qty="1" ${attr} aria-label="Aumenta">+</button>
+          </span>`}
+          <span class="inv-q-luoghi" role="group" aria-label="Dove">
+            ${LUOGO_ORDER.filter(l => l !== 'giardino' || it.luogo === 'giardino').map(l => `<button type="button" class="btn is-icon inv-q-luogo${(it.luogo || 'dispensa') === l ? ' active' : ''}" data-inv-luogo="${l}" ${attr} aria-label="${escapeAttr(LUOGO_LABEL[l])}" aria-pressed="${(it.luogo || 'dispensa') === l}">${LUOGO_ICON[l]}</button>`).join('')}
+          </span>
+        </div>` : '';
+    return `
+      <div class="inv-q-row${ans ? ' is-answered' : ''}">
+        <div class="inv-q-top">
+          <span class="inv-q-name">${escapeHtml(name.charAt(0).toUpperCase() + name.slice(1))}</span>
+          <span class="inv-q-answers">
+            <button type="button" class="btn inv-q-btn${ans === 'si' ? ' active is-yes' : ''}" data-inv-has="1" ${attr} aria-pressed="${ans === 'si'}">Sì</button>
+            <button type="button" class="btn inv-q-btn${ans === 'no' ? ' active is-no' : ''}" data-inv-has="0" ${attr} aria-pressed="${ans === 'no'}">No</button>
+          </span>
+        </div>
+        ${details}
+      </div>`;
+  };
+  const filters = [['todo', `Da fare (${names.length - done})`], ['si', 'Ce l\'ho'], ['tutti', 'Tutti']];
+  const pct = names.length ? Math.round(done / names.length * 100) : 0;
+  const body = `
+      <div class="inv-q-progress">
+        <div class="inv-q-progress-text"><b>${done}</b> su ${names.length} ingredienti · ${pct}%</div>
+        <div class="inv-q-bar"><span style="width:${pct}%"></span></div>
+        <p class="settings-note">Per ogni ingrediente: Sì o No. Col Sì scegli quanto e dove. Si salva da solo: puoi fermarti e riprendere quando vuoi.</p>
+      </div>
+      <div class="manage-toolbar">
+        <div class="search-field">
+          <input class="input-search" type="search" id="inventory-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.inventorySearch || '')}" autocomplete="off">
+        </div>
+        <div class="chip-row">${filters.map(([v, l]) => `<button type="button" class="btn is-chip${filter === v ? ' active' : ''}" data-inv-filter="${v}">${escapeHtml(l)}</button>`).join('')}</div>
+      </div>
+      ${depts.length ? depts.map(d => `
+      <section class="settings-section">
+        <h3 class="settings-section-title">${DEPT_ICON[d] || ''} ${escapeHtml(DEPT_LABEL[d] || d)} <span class="manage-count">${byDept[d].length}</span></h3>
+        <div class="settings-card inv-q-list">${byDept[d].sort((a, b) => IT_COLLATOR.compare(a, b)).map(rowHtml).join('')}</div>
+      </section>`).join('') : `<p class="settings-note">${filter === 'todo' && !search ? 'Fatto! Hai risposto per tutti gli ingredienti.' : 'Nessun ingrediente trovato.'}</p>`}`;
+  return managePageHtml({ key: 'inventory', title: 'Inventario veloce', closeAttr: 'data-close-inventory', body });
+}
+
 function renderDispensa(){
   // Un'unica lista per dispensa/ripostiglio/frigo/freezer, distinti solo
   // dall'icona del luogo (si cambia toccandola). Si riempie da sola quando
@@ -6715,6 +6846,7 @@ function renderDispensa(){
   const groupsModal = state.pantryGroupsModalOpen ? renderGroupsPage() : '';
   const deptsModal = state.deptsModalOpen ? renderDeptsPage() : '';
   const ingredientManagerModal = state.ingredientManagerOpen ? renderIngredientManagerPage() : '';
+  const inventoryPage = state.inventoryOpen ? renderInventoryPage() : '';
 
   // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
   // in Dispensa non compaiono proprio — niente sezione "Finiti" a parte (tolta
@@ -6747,6 +6879,7 @@ function renderDispensa(){
     ${body}
     <div class="save-hint"></div>
     ${ingredientManagerModal}
+    ${inventoryPage}
     ${editModal}
     ${addModal}
     ${groupsModal}
@@ -8378,6 +8511,23 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-close-inventory]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(!isCloseTap(e, el)) return;
+      state.inventoryOpen = false;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-inv-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
+    state.inventoryFilter = btn.dataset.invFilter;
+    state.inventoryKeep = {};
+    render();
+  }));
+  const inventorySearch = document.getElementById('inventory-search');
+  if(inventorySearch) inventorySearch.addEventListener('input', e=>{
+    state.inventorySearch = e.target.value;
+    render(); // fuoco e cursore: vedi restoreFocus
+  });
   document.querySelectorAll('[data-close-ingredient-manager]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
@@ -8781,6 +8931,7 @@ function goToTab(delta){
 // testa, indipendentemente dalla tab.
 const TAB_MENU_ITEMS = {
   dispensa: [
+    { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } },
     { label: '🗂️ Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
     { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } },
     { label: '+ Aggiungi ingrediente', action: ()=>{ state.pantryAddModalOpen = true; } }
@@ -9117,6 +9268,19 @@ document.addEventListener('click', e=>{
   if(removeEl){
     const { weekIdx, i, meal } = parseMealKey(removeEl.dataset.dishRemove);
     removeMealDish(weekIdx, i, meal, removeEl.dataset.dishName);
+    return;
+  }
+  const invEl = e.target.closest('[data-inv-has],[data-inv-qty],[data-inv-luogo]');
+  if(invEl){
+    const name = invEl.dataset.invName;
+    const it = state.pantryItems[name.trim().toLowerCase()];
+    if(invEl.hasAttribute('data-inv-has')) inventorySetHas(name, invEl.dataset.invHas === '1');
+    else if(it && invEl.hasAttribute('data-inv-qty')){
+      const step = qtyStepFor(it.unit || '');
+      it.qty = Math.max(0, Math.round(((it.qty || 0) + step * Number(invEl.dataset.invQty)) * 100) / 100);
+      if(it.qty === 0) inventorySetHas(name, false);
+    } else if(it) it.luogo = invEl.dataset.invLuogo;
+    persist(); render();
     return;
   }
   const prepEl = e.target.closest('[data-prep-done],[data-prep-double],[data-prep-toggle]');
