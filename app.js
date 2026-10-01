@@ -6838,7 +6838,7 @@ function renderDispensa(){
         <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
           ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">${it.unit ? `<span class="qty-unit">${escapeHtml(it.unit)}</span>` : ''}`
-          : `<span class="qty-num${it.qty <= 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>`}
+          : `<span class="qty-num${it.qty < 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>`}
       </span>`}
     </div>
     </div>
