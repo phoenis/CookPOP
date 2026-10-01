@@ -4186,7 +4186,10 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       <button type="button" class="btn dish-add" data-open-dish-picker="${mk}">+ piatto</button>
     </div>` : '';
 
-  const isDone = !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i][meal]);
+  // Un pasto vuoto non è mai "cucinato", anche se è rimasta la spunta di una
+  // ricetta che prima c'era (prima la nascondeva per caso il CSS della riga
+  // del tempo, che a pasto vuoto spariva insieme alla spunta).
+  const isDone = !!name && !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i][meal]);
   // Un pasto bloccato non viene toccato da "Rigenera settimana" (vedi
   // generateWeek). Solo sui pasti normali: un pranzo-avanzo segue sempre il
   // principale del collegamento, bloccarlo non avrebbe un effetto chiaro.
