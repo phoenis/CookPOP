@@ -987,6 +987,7 @@ test('carte fedeltà: si aggiungono da Impostazioni, si aprono da Spesa col codi
   const r = await page.evaluate(() => {
     state.loyaltyCards = []; state.tab = 'spesa'; render();
     document.querySelector('#settings-backdrop [data-cards-manage]').click();
+    document.querySelector('[data-card-add]').click();
     const name = document.getElementById('card-name'), num = document.getElementById('card-number');
     name.value = 'Esselunga'; name.dispatchEvent(new Event('input', { bubbles: true }));
     num.value = '4006381333931'; num.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1039,7 +1040,8 @@ test('carte fedeltà: in ordine alfabetico, ricerca per nome che tiene il fuoco,
   const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
   await page.evaluate(() => {
     state.loyaltyCards = [{ id: 'a', name: 'Penny', number: '2095057969316', color: '#123456' }, { id: 'b', name: 'Famila', number: '0402008090593', color: '#e5512f' }];
-    state.tab = 'spesa'; state.cardsOpen = 'manage'; render();
+    state.tab = 'spesa'; state.cardsOpen = 'list'; render();
+    document.querySelector('[data-card-add]').click();
   });
   await page.setInputFiles('#cards-import-file', { name: 'carte.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([['Penny', '2095057969316', 'ean_13', '#e52d21', logo], ['IKEA', '6275980414616639489', 'qr_code', '#0057a4', logo]])) });
   await page.waitForSelector('[data-cards-import-ok]');
@@ -1055,6 +1057,32 @@ test('carte fedeltà: in ordine alfabetico, ricerca per nome che tiene il fuoco,
   eq(r1.order, ['Famila', 'IKEA', 'Penny'], 'ordine alfabetico');
   eq([!!r1.penny.logo, r1.penny.color, r1.ikeaLogo, r1.logos], [true, '#e52d21', true, 2], 'logo e colore aggiunti a Penny, IKEA nuova col logo');
   eq(r2, { shown: ['Famila'], focus: 'cards-search' }, 'ricerca');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('carte fedeltà: + in alto apre la scheda nuova, Modifica dalla carta aperta, chiudendo si torna all\'elenco senza che salti in cima', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.loyaltyCards = Array.from({ length: 14 }, (_, k) => ({ id: 'k' + k, name: 'Negozio ' + String.fromCharCode(65 + k), number: String(100000 + k), color: '#e52d21' }));
+    state.tab = 'spesa'; state.cardsOpen = 'list'; state.cardsListUnder = false; render();
+    const sp = () => document.querySelector('.sheet-page[data-page="cards"]');
+    sp().scrollTop = 250;
+    const out = { noManageBtn: !document.querySelector('[data-cards-manage]:not(#settings-backdrop *)'), plus: !!document.querySelector('.sheet-page[data-page="cards"] [data-card-add]') };
+    document.querySelector('[data-card-view="k12"]').click();
+    document.querySelector('.card-view [data-card-edit]').click();
+    out.form = document.querySelector('.sheet-page[data-page="cards-form"] .settings-title').textContent;
+    const name = document.getElementById('card-name');
+    name.value = 'Zeta'; name.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-card-save]').click();
+    out.saved = state.loyaltyCards.find(c => c.id === 'k12').name;
+    out.backToList = state.cardsOpen === 'list' && !document.querySelector('[data-page="cards-form"]');
+    document.querySelector('[data-card-view="k3"]').click();
+    document.querySelector('.card-view-close').click();
+    out.scroll = sp().scrollTop;
+    out.listEntering = sp().classList.contains('is-entering');
+    return out;
+  });
+  eq([r.noManageBtn, r.plus, r.form, r.saved, r.backToList], [true, true, 'Modifica carta', 'Zeta', true], 'flusso');
+  eq([r.scroll, r.listEntering], [250, false], 'l\'elenco resta dov\'era');
   eq(page.errors, [], 'errori JS');
 });
 

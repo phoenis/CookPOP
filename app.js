@@ -1323,7 +1323,7 @@ const state = {
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
-  cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', // non persistiti: pagine Carte
+  cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
   inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
   inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e righe col Sì ancora aperte (in attesa di OK)
   inventoryAnswered: null, // risposte dell'inventario (in localStorage, vedi inventoryAnswers)
@@ -3688,10 +3688,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-17',
+  version: '2026-10-18',
   title: 'Novità',
   items: [
-    'Carte fedeltà in ordine alfabetico, con una ricerca per nome in alto e il logo di ogni negozio. Il logo si può mettere anche a mano da Gestisci carte → Logo, e da lì c\'è "Importa da file".'
+    'Carte fedeltà: per aggiungerne una tocca + in alto a destra; per cambiarla aprila e tocca ✎ Modifica. Chiudendo una carta l\'elenco resta dov\'era.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3760,7 +3760,10 @@ function render(){
 // in cima, come se si fosse cambiato pagina.
 const INNER_SCROLL_SELECTOR = '.sheet-page, .meal-detail-screen, .filters-modal-backdrop';
 function innerScrollKey(el){
-  const attrs = [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name + '=' + a.value).join(',');
+  // data-dialog-inert va e viene con le finestre sopra (vedi reconcileModalHistory):
+  // non deve cambiare la chiave, se no chiudendo una finestra la pagina sotto
+  // tornava in cima.
+  const attrs = [...el.attributes].filter(a => a.name.startsWith('data-') && a.name !== 'data-dialog-inert').map(a => a.name + '=' + a.value).join(',');
   return el.className.split(' ')[0] + '|' + attrs;
 }
 function captureInnerScroll(panel){
@@ -3855,7 +3858,8 @@ const MODAL_CHECKS = [
   // Sotto la scheda ingrediente (che si apre da qui): si chiude dopo di lei.
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
-  [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardDraft = null; }],
+  [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
+  [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
   [()=> !!state.inventoryOpen, ()=>{ state.inventoryOpen = false; }],
   [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
@@ -6351,12 +6355,13 @@ function endPageRender(){
 }
 const BACK_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="100%" height="100%"><path fill="currentColor" d="M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z"></path></svg>';
 // Guscio comune: intestazione con freccia Indietro, corpo, piede opzionale.
-function managePageHtml({ key, title, closeAttr, body, footer }){
+function managePageHtml({ key, title, closeAttr, body, footer, action }){
   return `
   <div class="sheet-page${pageEntering(key) ? ' is-entering' : ''}" data-page="${key}">
     <header class="settings-header">
       <button class="btn is-icon settings-back" type="button" ${closeAttr} aria-label="Indietro">${BACK_ICON_SVG}</button>
       <h2 class="settings-title">${title}</h2>
+      ${action || ''}
     </header>
     <div class="settings-body sheet-body">${body}</div>
     ${footer ? `<div class="sheet-footer">${footer}</div>` : ''}
@@ -9644,40 +9649,36 @@ function cardsOverlayHtml(){
       <div class="card-view-code">${barcodeSvg(card.number, card.format)}</div>
       <div class="card-view-number">${escapeHtml(card.number)}</div>
       <p class="settings-note">Alza la luminosità se il lettore non lo legge.</p>
+      <button type="button" class="btn is-outline card-view-edit" data-card-edit="${escapeAttr(card.id)}">✎ Modifica</button>
     </div>
   </div>`;
   }
   return '';
 }
+// Elenco (con "+" in alto per aggiungerne una) e, sopra, la scheda della
+// carta da aggiungere o modificare (dal "+" o da "Modifica" nella carta
+// aperta): l'elenco resta disegnato sotto, così tornando indietro non rientra.
 function cardsPageHtml(){
   const cards = state.loyaltyCards || [];
-  if(state.cardsOpen === 'list'){
+  if(!state.cardsOpen) return '';
+  let html = '';
+  if(state.cardsOpen === 'list' || state.cardsListUnder){
     const q = (state.cardsSearch || '').trim().toLowerCase();
     const shown = sortedCards().filter(c => !q || c.name.toLowerCase().includes(q));
     const body = cards.length ? `
       <div class="search-field card-search">
         <input class="input-search" type="search" id="cards-search" placeholder="Cerca una carta…" value="${escapeAttr(state.cardsSearch || '')}" autocomplete="off">
       </div>
-      ${shown.length ? `<div class="card-grid">${shown.map(c => cardTileHtml(c, `data-card-view="${escapeAttr(c.id)}"`)).join('')}</div>` : '<p class="settings-note">Nessuna carta con questo nome.</p>'}
-      <button type="button" class="btn is-outline is-block" data-cards-manage>Gestisci carte</button>` : `
-      <p class="settings-note">Nessuna carta salvata. Aggiungi le tessere dei negozi che usi, poi le mostri in cassa da qui.</p>
-      <button type="button" class="btn is-solid is-block" data-cards-manage>+ Aggiungi carta</button>`;
-    return managePageHtml({ key: 'cards', title: 'Carte fedeltà', closeAttr: 'data-close-cards', body });
+      ${shown.length ? `<div class="card-grid">${shown.map(c => cardTileHtml(c, `data-card-view="${escapeAttr(c.id)}"`)).join('')}</div>` : '<p class="settings-note">Nessuna carta con questo nome.</p>'}` : `
+      <p class="settings-note">Nessuna carta salvata. Tocca + in alto per aggiungere le tessere dei negozi che usi, poi le mostri in cassa da qui.</p>`;
+    html += managePageHtml({ key: 'cards', title: 'Carte fedeltà', closeAttr: 'data-close-cards', body,
+      action: '<button type="button" class="btn is-icon settings-action" data-card-add aria-label="Aggiungi carta">+</button>' });
   }
-  if(state.cardsOpen === 'manage'){
+  if(state.cardsOpen === 'form'){
     const d = state.cardDraft || (state.cardDraft = newCardDraft());
     const canScan = 'BarcodeDetector' in window;
-    const rows = sortedCards().map(c => `
-        <div class="card-manage-row">
-          ${c.logo ? `<img class="card-manage-logo" src="${escapeAttr(c.logo)}" alt="" style="background:${escapeAttr(cardColor(c))}">` : `<span class="card-dot" style="background:${escapeAttr(cardColor(c))}"></span>`}
-          <span class="card-manage-text"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.number)}</span></span>
-          <button type="button" class="btn is-icon dish-act" data-card-edit="${escapeAttr(c.id)}" aria-label="Modifica ${escapeAttr(c.name)}">✎</button>
-          <button type="button" class="btn is-icon dish-act" data-card-delete="${escapeAttr(c.id)}" aria-label="Elimina ${escapeAttr(c.name)}">✕</button>
-        </div>`).join('');
     const body = `
-      ${cards.length ? `<section class="settings-section"><h3 class="settings-section-title">Le tue carte</h3><div class="settings-card">${rows}</div></section>` : ''}
       <section class="settings-section">
-        <h3 class="settings-section-title">${d.id ? 'Modifica carta' : 'Aggiungi carta'}</h3>
         <div class="settings-card card-form">
           <label class="settings-field-label" for="card-name">Negozio</label>
           <input type="text" id="card-name" class="input-search" placeholder="Es. Esselunga" value="${escapeAttr(d.name)}" data-card-field="name" autocomplete="off">
@@ -9694,24 +9695,37 @@ function cardsPageHtml(){
             ${d.logo ? '<button type="button" class="btn is-ghost" data-card-logo-remove>Togli</button>' : ''}
           </div>
           <div class="settings-field-label">Colore</div>
-          <div class="card-colors">${CARD_COLORS.map(col => `<button type="button" class="card-color${d.color === col ? ' active' : ''}" data-card-color="${col}" style="background:${col}" aria-label="Colore" aria-pressed="${d.color === col}"></button>`).join('')}</div>
+          <div class="card-colors">${CARD_COLORS.concat(d.color && !CARD_COLORS.includes(d.color) ? [d.color] : []).map(col => `<button type="button" class="card-color${d.color === col ? ' active' : ''}" data-card-color="${col}" style="background:${col}" aria-label="Colore" aria-pressed="${d.color === col}"></button>`).join('')}</div>
           ${d.number.trim() ? `<div class="card-preview">${barcodeSvg(d.number.trim(), d.format)}</div>` : ''}
-          <div class="backup-row">
-            ${d.id ? '<button type="button" class="btn is-ghost" data-card-cancel>Annulla</button>' : ''}
-            <button type="button" class="btn is-solid" data-card-save ${d.name.trim() && d.number.trim() ? '' : 'disabled'}>${d.id ? 'Salva' : 'Aggiungi'}</button>
-          </div>
+          <button type="button" class="btn is-solid is-block" data-card-save ${d.name.trim() && d.number.trim() ? '' : 'disabled'}>${d.id ? 'Salva' : 'Aggiungi'}</button>
+          ${d.id ? `<button type="button" class="btn is-outline is-block settings-item-danger" data-card-delete="${escapeAttr(d.id)}">Elimina carta</button>` : ''}
         </div>
       </section>
+      ${d.id ? '' : `
       <section class="settings-section">
-        <h3 class="settings-section-title">Importa</h3>
+        <h3 class="settings-section-title">Oppure importa</h3>
         <div class="settings-card">
           <p class="settings-card-text">Da un file di carte (.json): aggiunge quelle nuove e i loghi che mancano.</p>
           <label class="btn is-outline is-block">⬆ Importa da file<input type="file" accept="application/json,.json" id="cards-import-file" hidden></label>
         </div>
-      </section>`;
-    return managePageHtml({ key: 'cards-manage', title: 'Gestisci carte', closeAttr: 'data-close-cards', body });
+      </section>`}`;
+    html += managePageHtml({ key: 'cards-form', title: d.id ? 'Modifica carta' : 'Nuova carta', closeAttr: 'data-close-card-form', body });
   }
-  return '';
+  return html;
+}
+// Chiude la scheda carta: si torna all'elenco se c'era sotto, altrimenti si esce.
+function closeCardForm(){
+  state.cardsOpen = state.cardsListUnder ? 'list' : null;
+  state.cardsListUnder = false;
+  state.cardDraft = null;
+  state.cardScanMsg = '';
+}
+function openCardForm(draft){
+  state.cardsListUnder = state.cardsOpen === 'list' || !!state.cardViewId || state.cardsListUnder;
+  state.cardsOpen = 'form';
+  state.cardViewId = null;
+  state.cardDraft = draft;
+  state.cardScanMsg = '';
 }
 // Logo: ridotto sul telefono (max 360×160) prima di salvarlo con la carta.
 async function loadCardLogo(file){
@@ -9749,9 +9763,15 @@ document.addEventListener('click', e=>{
   const closeEl = t.closest('[data-close-cards]');
   if(closeEl){
     if(!isCloseTap(e, closeEl)) return;
-    state.cardsOpen = null; state.cardDraft = null; state.cardScanMsg = '';
+    state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; state.cardScanMsg = '';
     render(); return;
   }
+  const formClose = t.closest('[data-close-card-form]');
+  if(formClose){
+    if(!isCloseTap(e, formClose)) return;
+    closeCardForm(); render(); return;
+  }
+  if(t.closest('[data-card-add]')){ openCardForm(newCardDraft()); render(); return; }
   const viewClose = t.closest('[data-close-card-view]');
   if(viewClose && (viewClose.tagName === 'BUTTON' || e.target === viewClose)){ state.cardViewId = null; render(); return; }
   const impCancel = t.closest('[data-cards-import-cancel]');
@@ -9769,6 +9789,8 @@ document.addEventListener('click', e=>{
     state.loyaltyCards = withLogos.concat(added);
     state.cardsImport = null;
     state.cardsOpen = 'list';
+    state.cardsListUnder = false;
+    state.cardDraft = null;
     persist(); render();
     showUndoToast(added.length ? `${added.length} carte importate` : 'Loghi aggiunti', ()=>{ state.loyaltyCards = before; persist(); render(); });
     return;
@@ -9776,7 +9798,7 @@ document.addEventListener('click', e=>{
   const open = t.closest('[data-open-cards]');
   if(open){ state.cardsOpen = 'list'; render(); return; }
   const manage = t.closest('[data-cards-manage]');
-  if(manage){ closeSettingsBackdrop(); state.cardsOpen = 'manage'; state.cardDraft = newCardDraft(); render(); return; }
+  if(manage){ closeSettingsBackdrop(); state.cardsOpen = 'list'; state.cardsListUnder = false; render(); return; }
   const view = t.closest('[data-card-view]');
   if(view){ state.cardViewId = view.dataset.cardView; render(); return; }
   const color = t.closest('[data-card-color]');
@@ -9784,16 +9806,16 @@ document.addEventListener('click', e=>{
   const edit = t.closest('[data-card-edit]');
   if(edit){
     const c = (state.loyaltyCards || []).find(x => x.id === edit.dataset.cardEdit);
-    if(c){ state.cardDraft = Object.assign({}, c); state.cardScanMsg = ''; render(); }
+    if(c){ openCardForm(Object.assign({}, c)); render(); }
     return;
   }
   if(t.closest('[data-card-logo-remove]') && state.cardDraft){ delete state.cardDraft.logo; render(); return; }
-  if(t.closest('[data-card-cancel]')){ state.cardDraft = newCardDraft(); state.cardScanMsg = ''; render(); return; }
   const del = t.closest('[data-card-delete]');
   if(del){
     const prev = (state.loyaltyCards || []).slice();
     const c = prev.find(x => x.id === del.dataset.cardDelete);
     state.loyaltyCards = prev.filter(x => x.id !== del.dataset.cardDelete);
+    if(state.cardsOpen === 'form') closeCardForm();
     persist(); render();
     if(c) showUndoToast(`Carta ${c.name} eliminata`, ()=>{ state.loyaltyCards = prev; persist(); render(); });
     return;
@@ -9809,8 +9831,8 @@ document.addEventListener('click', e=>{
     const idx = (state.loyaltyCards || []).findIndex(x => x.id === card.id);
     if(idx >= 0) list.splice(idx, 0, card); else list.push(card);
     state.loyaltyCards = list;
-    state.cardDraft = newCardDraft();
-    state.cardScanMsg = '';
+    closeCardForm();
+    if(!state.cardsOpen) state.cardsOpen = 'list';
     persist(); render();
   }
 }, true); // in cattura: dentro le finestre il primo [data-stop-close] ferma la risalita
