@@ -1106,6 +1106,20 @@ test('categorie come le corsie del supermercato: regole dal nome e riclassificaz
   eq(page.errors, [], 'errori JS');
 });
 
+test('spesa in ordine di corsia: casa in cima, surgelati in fondo; rosmarino con la verdura', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const order = shopAisleOrder();
+    const pos = d => order.indexOf(d);
+    return {
+      casaFirst: pos('pulizia') < pos('verdura') && pos('igiene') < pos('verdura'),
+      frozenLast: order.slice(-2).join(','),
+      auto: ['Rosmarino', 'Rosmarino secco', 'Salvia', 'Piselli surgelati', 'Merluzzo surgelato', 'Origano'].map(classifyDept)
+    };
+  });
+  eq(r, { casaFirst: true, frozenLast: 'surgelati,finiti', auto: ['verdura', 'base', 'verdura', 'surgelati', 'surgelati', 'base'] });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
