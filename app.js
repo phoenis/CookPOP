@@ -3758,11 +3758,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-21',
+  version: '2026-10-22',
   title: 'Novità',
   items: [
-    'Spesa: con "↕️ Corsie" (accanto a Carte) metti i reparti nell\'ordine del tuo supermercato.',
-    'Quello che in Dispensa sta nel freezer, in Spesa va in Surgelati.'
+    'Ordine corsie: ora puoi anche trascinare le categorie dalla maniglia ⠿.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -9691,19 +9690,21 @@ function sortedCards(){ return (state.loyaltyCards || []).slice().sort((a, b) =>
 // chiudendole l'elenco non rifà l'animazione d'ingresso.
 // --- Ordine corsie (Spesa) ---------------------------------------------------
 // I reparti della Spesa nell'ordine in cui si gira il proprio supermercato:
-// frecce su/giù per spostarli (più sicure del trascinamento col pollice).
+// si trascinano dalla maniglia ⠿ (la riga si sposta nel DOM mentre il dito
+// scorre, l'ordine si salva al rilascio) oppure con le frecce su/giù.
 function renderAislesPage(){
   if(!state.aisleOrderOpen) return '';
   const list = shopAisles();
   const rows = list.map((d, i) => `
-      <div class="manage-row aisle-row">
+      <div class="manage-row aisle-row" data-aisle-row="${escapeAttr(d)}">
+        <span class="aisle-handle" data-aisle-handle aria-hidden="true">⠿</span>
         <span class="manage-row-icon">${DEPT_ICON[d] || ''}</span>
         <span class="manage-row-main">${escapeHtml(DEPT_LABEL[d])}${d === 'altro-casa' ? ' (casa)' : ''}</span>
         <button type="button" class="btn is-icon aisle-move" data-aisle-move="${escapeAttr(d)}" data-dir="-1" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button>
         <button type="button" class="btn is-icon aisle-move" data-aisle-move="${escapeAttr(d)}" data-dir="1" aria-label="Sposta giù" ${i === list.length - 1 ? 'disabled' : ''}>↓</button>
       </div>`).join('');
   const body = `
-      <p class="settings-note manage-intro">L'ordine dei reparti nella lista della Spesa: mettili come li trovi girando il tuo supermercato.</p>
+      <p class="settings-note manage-intro">L'ordine dei reparti nella lista della Spesa: mettili come li trovi girando il tuo supermercato. Trascinali dalla maniglia ⠿ o usa le frecce.</p>
       <section class="settings-section"><div class="settings-card manage-list">${rows}</div></section>
       ${(state.shopAisleCustom || []).length ? '<button type="button" class="btn is-outline is-block" data-aisle-reset>Ripristina ordine originale</button>' : ''}`;
   return managePageHtml({ key: 'aisles', title: 'Ordine corsie', closeAttr: 'data-close-aisles', body });
@@ -9727,6 +9728,48 @@ document.addEventListener('click', e=>{
   }
   if(t.closest('[data-aisle-reset]')){ state.shopAisleCustom = []; persist(); render(); }
 }, true);
+(function(){
+  let drag = null; // { row, list, scroller, pointerId, lastY, raf }
+  const autoScroll = () => {
+    if(!drag) return;
+    const r = drag.scroller.getBoundingClientRect(), edge = 48;
+    const dy = drag.lastY < r.top + edge ? -8 : drag.lastY > r.bottom - edge ? 8 : 0;
+    if(dy){ drag.scroller.scrollTop += dy; reorder(); }
+    drag.raf = requestAnimationFrame(autoScroll);
+  };
+  const reorder = () => {
+    const rows = [...drag.list.querySelectorAll('[data-aisle-row]')].filter(r => r !== drag.row);
+    const next = rows.find(r => { const b = r.getBoundingClientRect(); return drag.lastY < b.top + b.height / 2; });
+    if(next){ if(drag.row.nextElementSibling !== next) drag.list.insertBefore(drag.row, next); }
+    else if(drag.list.lastElementChild !== drag.row) drag.list.appendChild(drag.row);
+  };
+  document.addEventListener('pointerdown', e=>{
+    const handle = e.target.closest('[data-aisle-handle]');
+    if(!handle) return;
+    const row = handle.closest('[data-aisle-row]');
+    e.preventDefault();
+    drag = { row, list: row.parentElement, scroller: row.closest('.sheet-body') || document.scrollingElement, pointerId: e.pointerId, lastY: e.clientY };
+    row.classList.add('is-dragging');
+    drag.raf = requestAnimationFrame(autoScroll);
+  });
+  document.addEventListener('pointermove', e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    e.preventDefault();
+    drag.lastY = e.clientY;
+    reorder();
+  }, { passive: false });
+  const end = e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    cancelAnimationFrame(drag.raf);
+    const order = [...drag.list.querySelectorAll('[data-aisle-row]')].map(r => r.dataset.aisleRow);
+    drag.row.classList.remove('is-dragging');
+    drag = null;
+    if(order.join() !== shopAisles().join()){ state.shopAisleCustom = order; persist(); }
+    render();
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
 
 function renderCardsPages(){ return cardsPageHtml() + cardsOverlayHtml(); }
 function cardsOverlayHtml(){

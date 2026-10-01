@@ -1141,6 +1141,20 @@ test('ordine corsie: frecce su/giù in Spesa, ripristino; quello che sta nel fre
   eq(page.errors, [], 'errori JS');
 });
 
+test('ordine corsie: trascinando dalla maniglia la categoria si sposta e l\'ordine si salva', async ({ page }) => {
+  await page.evaluate(() => { state.shopAisleCustom = []; state.tab = 'spesa'; state.aisleOrderOpen = true; render(); });
+  await page.waitForSelector('[data-page="aisles"]');
+  const h = await page.locator('[data-aisle-row="verdura"] [data-aisle-handle]').boundingBox();
+  const top = await page.locator('[data-aisle-row]').first().boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, top.y + 4, { steps: 8 });
+  await page.mouse.up();
+  const r = await page.evaluate(() => ({ first: shopAisles()[0], saved: state.shopAisleCustom[0], dom: document.querySelector('[data-aisle-row]').dataset.aisleRow }));
+  eq(r, { first: 'verdura', saved: 'verdura', dom: 'verdura' });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
