@@ -601,6 +601,11 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed){
       <button class="btn is-solid" data-add-ing-recipe="${escapeAttr(name)}">+ aggiungi ingrediente</button>
     </div>`;
   const editRecipeBtn = rec ? `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>` : '';
+  const fromFreezer = isFreezerDish(mk, name);
+  const plan = getDishPlan(mk, name);
+  const freezerInfo = fromFreezer
+    ? `<div class="dish-freezer-note">❄️ Dal freezer: niente da comprare. In freezer: ${freezerPortionsOf(name)} porzioni. La sera prima ricordati di tirarlo fuori.</div>`
+    : (canFreeze(name) ? `<button type="button" class="btn is-chip dish-double${plan.double ? ' active' : ''}" data-prep-double data-prep-key="${mk}" data-prep-name="${escapeAttr(name)}" aria-pressed="${!!plan.double}">❄️ ${plan.double ? 'Doppia dose: metà in freezer' : 'Fai doppia dose e congela metà'}</button>` : '');
   const dishBtns = fixed ? '' : `
       <button type="button" class="btn is-chip" data-open-dish-picker="${mk}" data-dish-replace="${escapeAttr(name)}">${ICON_SWAP} Cambia piatto</button>
       <button type="button" class="btn is-chip" data-dish-remove="${mk}" data-dish-name="${escapeAttr(name)}">✕ Togli</button>`;
@@ -616,6 +621,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed){
     ${isOpen ? `<div class="dish-acc-body">
       ${rec ? recipePhotoHtml(name) : ''}
       ${tagsHtml}
+      ${freezerInfo}
       ${ingHtml}
       ${stepsHtml}
       ${noteBox}
@@ -1378,6 +1384,10 @@ const state = {
   mealOverflowOpen: null, // mealKey del pasto per cui è aperto il foglio "⋯" (azioni rare)
   tempoExceptionAdding: null, // null | 'pickingDay' | {day, meal} — stadio del flusso "+ aggiungi un'eccezione" nelle regole della settimana
   avanzoDiPickerOpenDay: null,
+  prepDay: {}, // { 'AAAA-MM-GG' (sabato d'inizio settimana): 'sab'|'dom' } giorno di prep di quella settimana
+  dishPlan: {}, // { mealKey: [{ name, prep, double, done, frozen }] } meal prep e doppia dose per piatto (vedi renderPrepBox)
+  freezerDishes: {}, // { mealKey: [nomi] } piatti presi dal freezer: niente Spesa, porzioni scalate a pasto cucinato
+  prepSuggOpen: {}, // ephemeral: settimana -> suggerimenti di prep aperti
   dishPicker: null, // ephemeral: {key: mealKey, replace: nome del piatto da cambiare o null, tipo, search} per "+ piatto"/"Cambia" del singolo piatto
   dishOpen: {}, // ephemeral: "mealKey|piatto" -> aperto/chiuso nel dettaglio del pasto
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
@@ -2128,7 +2138,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors'];
+const PERSONAL_DICT_FIELDS = ['whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -2281,7 +2291,10 @@ function buildPersonalPayload(){
     week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy,
-    recipeHistory: state.recipeHistory
+    recipeHistory: state.recipeHistory,
+    prepDay: state.prepDay,
+    dishPlan: state.dishPlan,
+    freezerDishes: state.freezerDishes
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
   return payload;
@@ -3127,7 +3140,9 @@ function snapshotMealDishes(weekIdx, i, meal){
   return {
     slot: om[i] && om[i][meal] ? JSON.parse(JSON.stringify(om[i][meal])) : undefined,
     picked: pm[i] ? pm[i][meal] : undefined,
-    links: snapshotMealLinks(key)
+    links: snapshotMealLinks(key),
+    plan: state.dishPlan && state.dishPlan[key] ? JSON.parse(JSON.stringify(state.dishPlan[key])) : undefined,
+    freezer: state.freezerDishes && state.freezerDishes[key] ? state.freezerDishes[key].slice() : undefined
   };
 }
 function restoreMealDishes(weekIdx, i, meal, snap){
@@ -3137,6 +3152,16 @@ function restoreMealDishes(weekIdx, i, meal, snap){
   if(snap.picked !== undefined){ if(!pm[i]) pm[i] = {}; pm[i][meal] = snap.picked; }
   else if(pm[i]) delete pm[i][meal];
   restoreMealLinks(snap.links);
+  const key = mealKey(weekIdx, i, meal);
+  if(snap.plan) state.dishPlan[key] = snap.plan; else if(state.dishPlan) delete state.dishPlan[key];
+  if(snap.freezer) state.freezerDishes[key] = snap.freezer; else if(state.freezerDishes) delete state.freezerDishes[key];
+}
+// Un piatto tolto o sostituito si porta via il suo prep/doppia dose e il
+// segno "dal freezer".
+function forgetDish(weekIdx, i, meal, name){
+  const key = mealKey(weekIdx, i, meal);
+  dropDishPlan(key, name);
+  setFreezerDish(key, name, false);
 }
 function addMealDish(weekIdx, i, meal, name){
   const m = effectiveMeal(weekIdx, i, meal);
@@ -3148,8 +3173,9 @@ function addMealDish(weekIdx, i, meal, name){
 function replaceMealDish(weekIdx, i, meal, oldName, newName){
   const m = effectiveMeal(weekIdx, i, meal);
   if(oldName === newName) return;
+  if(m.principale === oldName && linkedSourceMealKey(weekIdx, i, meal)) return; // l'avanzo segue la sua fonte
+  forgetDish(weekIdx, i, meal, oldName);
   if(m.principale === oldName){
-    if(linkedSourceMealKey(weekIdx, i, meal)) return; // l'avanzo segue la sua fonte
     writeMealDishes(weekIdx, i, meal, newName, m.contorni.filter(c => c !== newName));
     return;
   }
@@ -3166,12 +3192,14 @@ function removeMealDish(weekIdx, i, meal, name){
     if(linkedSourceMealKey(weekIdx, i, meal)) return;
     if(!m.contorni.length){ performClearMeal(key); return; }
     const snap = snapshotMealDishes(weekIdx, i, meal);
+    forgetDish(weekIdx, i, meal, name);
     writeMealDishes(weekIdx, i, meal, m.contorni[0], m.contorni.slice(1));
     persist(); render();
     showUndoToast('Piatto tolto', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
     return;
   }
   const snap = snapshotMealDishes(weekIdx, i, meal);
+  forgetDish(weekIdx, i, meal, name);
   setMealContorni(weekIdx, i, meal, m.contorni.filter(c => c !== name));
   persist(); render();
   showUndoToast('Piatto tolto', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
@@ -3273,7 +3301,7 @@ function toggleShopAssignee(store){
 // altro pasto). Le righe di Spesa di una settimana extra hanno la forma
 // "d<settimana>_<giorno>_<pasto>_..." (quelle della settimana corrente
 // "d<giorno>_<pasto>_...", vedi dayIngKey).
-const WEEK_KEYED_FIELDS = ['mealLocked','dayLinks','dayLinkNotes','dayPortions','cooks'];
+const WEEK_KEYED_FIELDS = ['mealLocked','dayLinks','dayLinkNotes','dayPortions','cooks','dishPlan','freezerDishes'];
 const WEEK_SHOP_FIELDS = ['shopChecked','shopDismissed','shopQty'];
 // Riscrive ogni chiave legata a una settimana secondo mapWeek(weekIdx):
 // un numero = nuova settimana, null = da cancellare. Usata quando si
@@ -3630,10 +3658,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-11',
+  version: '2026-10-12',
   title: 'Novità',
   items: [
-    'Promemoria ammollo: se domani c\'è un piatto con legumi da mettere a bagno, sotto la cena di oggi compare un riquadro giallo, senza dover aprire il dettaglio. Con i legumi già cotti non compare.'
+    'Meal prep: nel Menù, in cima a domenica (o sabato, si sceglie settimana per settimana), c\'è la lista "🔪 Prep" di cosa preparare per i giorni dopo. I piatti "Meal prep" ci sono già, gli altri si aggiungono con "+ prep". Si spuntano man mano.',
+    '"❄️ ×2" (nel prep o nel dettaglio del piatto) fa la doppia dose: in Spesa compri il doppio e metà va nel freezer, in Dispensa. Poi con "+ piatto" → "Dal freezer" la rimetti in un pasto: niente spesa, e la sera prima ti ricorda di tirarla fuori.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4166,6 +4195,15 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // scollega con la ✕ del badge "Avanzo di". Le schermate di scelta sono a
   // tutto schermo (render*Screen() più sotto, invocate da renderMenu()).
   const dishes = name ? mealDishes(weekIdx, i, meal) : [];
+  const prepChosen = name ? new Set(prepCandidates(weekIdx).filter(c => c.chosen && c.mk === mk).map(c => c.name)) : new Set();
+  const dishTag = n => {
+    if(isFreezerDish(mk, n)) return ' · ❄️ dal freezer';
+    const plan = getDishPlan(mk, n);
+    const bits = [];
+    if(prepChosen.has(n)) bits.push(plan.done ? '🔪 pronto' : '🔪 prep');
+    if(plan.double) bits.push('×2');
+    return bits.length ? ' · ' + bits.join(' ') : '';
+  };
   const dishesHtml = name ? `
     <div class="dish-line">
       ${dishes.map(dsh=>{
@@ -4174,7 +4212,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       <div class="dish-item">
         <span class="dish-ic" aria-hidden="true">${tipoIcon(dsh.tipo)}</span>
         <div class="dish-text">
-          <div class="dish-course">${escapeHtml(courseLabel(dsh.tipo))}</div>
+          <div class="dish-course">${escapeHtml(courseLabel(dsh.tipo))}<span class="dish-tag">${escapeHtml(dishTag(dsh.name))}</span></div>
           <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>
         </div>
         ${fixed ? '' : `<div class="dish-actions">
@@ -4586,16 +4624,20 @@ function renderDishPickerScreen(){
   const inMeal = new Set(dishes.map(x => x.name));
   if(!dp.tipo) dp.tipo = dp.replace ? (dishCourse(dp.replace) || 'all') : defaultDishCourse(dishes);
   const search = dp.search || '';
+  const frozen = freezerMeals();
+  if(dp.tipo === 'freezer' && !frozen.length) dp.tipo = 'all';
+  const frozenNames = new Set(frozen.map(it => it.nome));
   let results = allRecipeMetas().filter(r => !inMeal.has(r.nome));
-  if(dp.tipo !== 'all') results = results.filter(r => r.tipologia === dp.tipo);
+  if(dp.tipo === 'freezer') results = results.filter(r => frozenNames.has(r.nome));
+  else if(dp.tipo !== 'all') results = results.filter(r => r.tipologia === dp.tipo);
   if(search) results = results.filter(r => r.nome.toLowerCase().includes(search.toLowerCase()));
   const resultsHtml = results.slice(0, 60).map(r=>`
     <div class="swap-result" data-dish-pick="${escapeAttr(r.nome)}" data-dish-key="${mk}">
       <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
       <span class="swap-result-name">${escapeHtml(r.nome)}</span>
-      <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
+      <span class="swap-result-time">${dp.tipo === 'freezer' ? `❄️ ${freezerPortionsOf(r.nome)} porz.` : escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
     </div>`).join('');
-  const chips = COURSE_ORDER.map(t => `<button type="button" class="btn is-chip ${dp.tipo===t?'active':''}" data-dish-course="${t}">${tipoIcon(t)} ${escapeHtml(courseLabel(t))}</button>`).join('')
+  const chips = (frozen.length ? `<button type="button" class="btn is-chip ${dp.tipo==='freezer'?'active':''}" data-dish-course="freezer">❄️ Dal freezer</button>` : '') + COURSE_ORDER.map(t => `<button type="button" class="btn is-chip ${dp.tipo===t?'active':''}" data-dish-course="${t}">${tipoIcon(t)} ${escapeHtml(courseLabel(t))}</button>`).join('')
     + `<button type="button" class="btn is-chip ${dp.tipo==='all'?'active':''}" data-dish-course="all">Tutte</button>`;
   return `
   <div class="meal-detail-screen">
@@ -4625,6 +4667,164 @@ function renderDishPickerScreen(){
 // Card di un giorno intero: intestazione (nome/data) + i due blocchi pasto,
 // pranzo e cena. isPastCard non è più usato per lo stile del singolo pasto
 // (era .day-card-past) ma resta sulla card per coerenza col resto del Menù.
+// --- Meal prep e freezer ------------------------------------------------------
+// Il giorno di prep (sabato o domenica, settimana per settimana) ha in cima
+// alla sua card la lista di cosa preparare per i giorni dopo: i piatti
+// "🍱 Meal prep" ci finiscono da soli, gli altri che si possono fare prima
+// (congelabili, basi, preparazioni anticipate) sono proposti con un "+".
+// Ogni piatto ha poi la sua "doppia dose": Spesa ne compra il doppio e,
+// quando è pronto (spuntato nel prep o pasto segnato cucinato), metà finisce
+// in Dispensa nel freezer come porzioni di quella ricetta. Da lì si
+// rimette in un pasto con "+ piatto" → "Dal freezer": niente ingredienti in
+// Spesa, la sera prima il promemoria di scongelarlo, e a pasto cucinato le
+// porzioni scendono.
+// state.dishPlan[mealKey] = [{ name, prep, double, done, frozen }]: un array
+// (non un oggetto per nome) perché i nomi delle ricette possono contenere
+// caratteri non ammessi nelle chiavi di Firebase ("/", ".").
+// state.freezerDishes[mealKey] = [nomi dei piatti presi dal freezer].
+const PREP_DAYS = { sab: 5, dom: 6 };
+function weekStartIso(weekIdx){ return isoLocalDate(weekDatesFor(weekIdx)[0]); }
+function prepDayOf(weekIdx){ return (state.prepDay && state.prepDay[weekStartIso(weekIdx)]) || 'dom'; }
+function dishPlanList(mk){ return (state.dishPlan && state.dishPlan[mk]) || []; }
+function getDishPlan(mk, name){ return dishPlanList(mk).find(p => p.name === name) || {}; }
+function setDishPlan(mk, name, patch){
+  if(!state.dishPlan) state.dishPlan = {};
+  const list = dishPlanList(mk).slice();
+  const idx = list.findIndex(p => p.name === name);
+  const next = Object.assign({ name }, idx >= 0 ? list[idx] : {}, patch);
+  if(idx >= 0) list[idx] = next; else list.push(next);
+  state.dishPlan[mk] = list;
+}
+function dropDishPlan(mk, name){
+  if(!state.dishPlan || !state.dishPlan[mk]) return;
+  const list = state.dishPlan[mk].filter(p => p.name !== name);
+  if(list.length) state.dishPlan[mk] = list; else delete state.dishPlan[mk];
+}
+function isFreezerDish(mk, name){ return ((state.freezerDishes && state.freezerDishes[mk]) || []).includes(name); }
+function setFreezerDish(mk, name, on){
+  if(!state.freezerDishes) state.freezerDishes = {};
+  const list = (state.freezerDishes[mk] || []).filter(n => n !== name);
+  if(on) list.push(name);
+  if(list.length) state.freezerDishes[mk] = list; else delete state.freezerDishes[mk];
+}
+// Quanto di un piatto si cucina davvero per il pasto: 0 se arriva dal
+// freezer, 2 con la doppia dose, altrimenti 1. Vale per Spesa e per la
+// finestra "Ricetta fatta!".
+function dishCookFactor(mk, name){
+  if(isFreezerDish(mk, name)) return 0;
+  return getDishPlan(mk, name).double ? 2 : 1;
+}
+// Ingredienti da scalare dalla Dispensa a pasto cucinato, ognuno col suo
+// fattore (0 = dal freezer, quindi escluso; 2 = doppia dose).
+function mealCookIngredients(mk, mealData){
+  const names = (mealData.principale ? [mealData.principale] : []).concat(mealData.contorni || []);
+  const out = [];
+  names.forEach(n => {
+    const factor = dishCookFactor(mk, n);
+    if(factor) getIngredientsFor(n).forEach(it => out.push(Object.assign({}, it, { factor })));
+  });
+  return out;
+}
+function canFreeze(name){ const r = getRecipeMeta(name); return !!r && r.freezerNew && r.freezerNew !== 'non-adatta'; }
+function canPrepAhead(name){
+  const r = getRecipeMeta(name);
+  return !!r && ((r.freezerNew && r.freezerNew !== 'non-adatta') || (r.pianificazione && r.pianificazione !== 'nessuna'));
+}
+function mealPortions(mk, principale){
+  const det = principale ? getRecipeDetails(principale) : null;
+  return state.dayPortions[mk] || (det && parsePortionsBase(det.porzioni)) || 2;
+}
+// Porzioni di una ricetta nel freezer (voce di Dispensa segnata frozenMeal).
+function freezerPortionsOf(name){
+  const it = state.pantryItems[(name || '').trim().toLowerCase()];
+  return it && it.frozenMeal && typeof it.qty === 'number' ? it.qty : 0;
+}
+function freezerMeals(){
+  return Object.values(state.pantryItems).filter(it => it.frozenMeal && typeof it.qty === 'number' && it.qty > 0 && getRecipeMeta(it.nome));
+}
+function addFreezerPortions(name, portions){
+  const key = name.trim().toLowerCase();
+  upsertPantryItem(name, 'freezer', portions, '', 'avanzi');
+  const it = state.pantryItems[key];
+  it.luogo = 'freezer';
+  it.leftover = true;
+  it.frozenMeal = true;
+}
+function takeFreezerPortions(name, portions){
+  const it = state.pantryItems[(name || '').trim().toLowerCase()];
+  if(!it || !it.frozenMeal) return;
+  it.qty = Math.max(0, (it.qty || 0) - portions);
+}
+// Doppia dose pronta (prep spuntato o pasto cucinato, quello che viene
+// prima): la metà in più va nel freezer, una volta sola.
+function freezeDoubleIfReady(weekIdx, i, meal, name){
+  const mk = mealKey(weekIdx, i, meal);
+  const plan = getDishPlan(mk, name);
+  if(!plan.double || plan.frozen) return 0;
+  const n = mealPortions(mk, effectiveMeal(weekIdx, i, meal).principale);
+  addFreezerPortions(name, n);
+  setDishPlan(mk, name, { frozen: true });
+  return n;
+}
+// Piatti che si possono preparare nel giorno di prep: quelli dei giorni
+// dopo, fino a venerdì. chosen = già in lista; gli altri sono suggerimenti.
+function prepCandidates(weekIdx){
+  const startPos = WEEK_DISPLAY_ORDER.indexOf(PREP_DAYS[prepDayOf(weekIdx)]);
+  const out = [];
+  WEEK_DISPLAY_ORDER.forEach((i, pos) => {
+    if(pos <= startPos) return;
+    ['pranzo', 'cena'].forEach(meal => {
+      const mk = mealKey(weekIdx, i, meal);
+      const linked = !!linkedSourceMealKey(weekIdx, i, meal);
+      mealDishes(weekIdx, i, meal).forEach(dsh => {
+        if((linked && dsh.role === 'p') || isFreezerDish(mk, dsh.name) || !canPrepAhead(dsh.name)) return;
+        const plan = getDishPlan(mk, dsh.name);
+        const r = getRecipeMeta(dsh.name);
+        const chosen = plan.prep === undefined ? r.freezerNew === 'meal-prep' : !!plan.prep;
+        out.push({ mk, i, meal, name: dsh.name, plan, chosen });
+      });
+    });
+  });
+  return out;
+}
+function renderPrepBox(weekIdx, i){
+  const day = prepDayOf(weekIdx);
+  if(PREP_DAYS[day] !== parseInt(i, 10)) return '';
+  const cands = prepCandidates(weekIdx);
+  if(!cands.length) return '';
+  const iso = weekStartIso(weekIdx);
+  const forLabel = c => `${DATA.week1[c.i].giorno.slice(0, 3).toLowerCase()} ${MEAL_LABEL[c.meal].toLowerCase()}`;
+  const chosen = cands.filter(c => c.chosen), others = cands.filter(c => !c.chosen);
+  const doneCount = chosen.filter(c => c.plan.done).length;
+  const rowAttrs = c => `data-prep-key="${c.mk}" data-prep-name="${escapeAttr(c.name)}"`;
+  const chosenHtml = chosen.map(c => `
+      <div class="prep-row${c.plan.done ? ' is-done' : ''}">
+        <button type="button" class="prep-check" data-prep-done ${rowAttrs(c)} aria-pressed="${!!c.plan.done}" aria-label="Fatto">${c.plan.done ? '✓' : ''}</button>
+        <div class="prep-row-text"><span class="prep-row-name">${escapeHtml(c.name)}</span><span class="prep-row-for">per ${escapeHtml(forLabel(c))}${c.plan.double ? ' · doppia dose, metà in freezer' : ''}</span></div>
+        ${canFreeze(c.name) ? `<button type="button" class="btn prep-double${c.plan.double ? ' active' : ''}" data-prep-double ${rowAttrs(c)} aria-pressed="${!!c.plan.double}" aria-label="Doppia dose, metà in freezer">❄️ ×2</button>` : ''}
+        <button type="button" class="btn is-icon dish-act" data-prep-toggle ${rowAttrs(c)} aria-label="Togli dal prep">✕</button>
+      </div>`).join('');
+  const othersOpen = !!(state.prepSuggOpen && state.prepSuggOpen[iso]);
+  const othersHtml = others.length ? `
+      <button type="button" class="prep-sugg-toggle" data-prep-sugg="${iso}">${othersOpen ? '▴' : '▾'} Si possono preparare prima (${others.length})</button>
+      ${othersOpen ? others.map(c => `
+      <div class="prep-row is-sugg">
+        <div class="prep-row-text"><span class="prep-row-name">${escapeHtml(c.name)}</span><span class="prep-row-for">per ${escapeHtml(forLabel(c))}</span></div>
+        <button type="button" class="btn prep-add" data-prep-toggle ${rowAttrs(c)}>+ prep</button>
+      </div>`).join('') : ''}` : '';
+  return `
+      <div class="prep-box">
+        <div class="prep-head">
+          <span class="prep-title">🔪 Prep${chosen.length ? ` <span class="prep-count">${doneCount}/${chosen.length}</span>` : ''}</span>
+          <span class="prep-day-chips" role="group" aria-label="Giorno di prep">
+            ${Object.keys(PREP_DAYS).map(d => `<button type="button" class="btn is-chip${day === d ? ' active' : ''}" data-prep-day="${d}" data-prep-week="${iso}" aria-pressed="${day === d}">${d === 'sab' ? 'Sab' : 'Dom'}</button>`).join('')}
+          </span>
+        </div>
+        ${chosen.length ? `<div class="prep-list">${chosenHtml}</div>` : '<div class="prep-empty">Niente in lista: aggiungi qui sotto cosa preparare.</div>'}
+        ${othersHtml}
+      </div>`;
+}
+
 // Promemoria della sera: se domani (pranzo o cena) c'è un piatto con legumi
 // secchi da mettere a bagno, la card di oggi lo dice in un riquadro sotto la
 // cena, sempre visibile senza aprire il dettaglio. Vale solo per le ricette
@@ -4642,19 +4842,37 @@ function nextDayRef(weekIdx, pos){
   if(pos < WEEK_DISPLAY_ORDER.length - 1) return { weekIdx, i: WEEK_DISPLAY_ORDER[pos+1] };
   return { weekIdx: weekIdx + 1, i: WEEK_DISPLAY_ORDER[0] };
 }
+function dishNeedsOvernightMarinade(name){
+  const r = getRecipeMeta(name);
+  if(!r || r.pianificazione !== 'marinatura') return false;
+  const det = getRecipeDetails(name);
+  return /notte/i.test(((det && det.ricordare) || '') + ' ' + (r.prep || ''));
+}
+// Riquadro "Stasera, per domani" sotto la cena: ammollo dei legumi,
+// marinatura di una notte, e cosa tirare fuori dal freezer.
 function soakReminderHtml(weekIdx, pos){
   const nx = nextDayRef(weekIdx, pos);
   if(nx.weekIdx > 0 && !state.extraWeeks[nx.weekIdx - 1]) return '';
-  const hits = [];
+  const groups = [
+    { ic: '💧', label: 'Ammollo dei legumi', items: [] },
+    { ic: '❄️', label: 'Togli dal freezer', items: [] },
+    { ic: '🥩', label: 'Marinatura', items: [] }
+  ];
   ['pranzo', 'cena'].forEach(meal => {
-    mealDishes(nx.weekIdx, nx.i, meal).forEach(dsh => { if(dishNeedsSoak(dsh.name)) hits.push({ meal, name: dsh.name }); });
+    const mk = mealKey(nx.weekIdx, nx.i, meal);
+    mealDishes(nx.weekIdx, nx.i, meal).forEach(dsh => {
+      const what = `<b>${escapeHtml(dsh.name)}</b> (${escapeHtml(MEAL_LABEL[meal].toLowerCase())})`;
+      if(isFreezerDish(mk, dsh.name)){ groups[1].items.push(what); return; }
+      if(dishNeedsSoak(dsh.name)) groups[0].items.push(what);
+      if(dishNeedsOvernightMarinade(dsh.name)) groups[2].items.push(what);
+    });
   });
-  if(!hits.length) return '';
-  const what = hits.map(h => `<b>${escapeHtml(h.name)}</b> (${escapeHtml(MEAL_LABEL[h.meal].toLowerCase())})`).join(' e ');
+  const lines = groups.filter(g => g.items.length);
+  if(!lines.length) return '';
   return `
       <div class="soak-note" role="note">
-        <span class="soak-note-ic" aria-hidden="true">💧</span>
-        <span><span class="soak-note-title">Stasera: legumi in ammollo</span><br>Domani c'è ${what}.</span>
+        <span class="soak-note-title">Stasera, per domani</span>
+        ${lines.map(g => `<div class="soak-note-line"><span class="soak-note-ic" aria-hidden="true">${g.ic}</span><span>${g.label}: ${g.items.join(', ')}</span></div>`).join('')}
       </div>`;
 }
 
@@ -4677,6 +4895,7 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
       </div>
     </div>
     <div class="meals-block">
+      ${isPastCard ? '' : renderPrepBox(weekIdx, i)}
       ${hidePranzo ? '' : renderMealBlock(weekIdx, i, 'pranzo', pos, weekDates, isPastCard, d, dateLabel, isToday)}
       ${renderMealBlock(weekIdx, i, 'cena', pos, weekDates, isPastCard, d, dateLabel, isToday)}
       ${isPastCard ? '' : soakReminderHtml(weekIdx, pos)}
@@ -4942,7 +5161,7 @@ function renderMenu(){
     const { weekIdx: doneWeekIdx, i: di, meal: doneMeal } = parseMealKey(state.doneModalDay);
     const doneMealData = effectiveMeal(doneWeekIdx, di, doneMeal);
     const doneName = doneMealData.principale || '';
-    const doneIng = (doneName ? getIngredientsFor(doneName) : []).concat(doneMealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
+    const doneIng = mealCookIngredients(state.doneModalDay, doneMealData);
     const qtyMap = state.doneModalQty || {};
     const finishedMap = state.doneModalFinished || {};
     // Stesso ingrediente può ripetersi tra principale e contorni: una riga sola.
@@ -5211,13 +5430,16 @@ function buildShopFlat(){
     const contextShort = `${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${MEAL_LABEL[meal]}`;
     const dishes = [{ role:'p', name: principale }].concat(contorni.map((c,ci)=>({ role:`c${ci}`, name:c })));
     dishes.forEach(({role, name})=>{
+      // Dal freezer: niente da comprare. Doppia dose: il doppio.
+      const factor = dishCookFactor(mk, name);
+      if(!factor) return;
       const ingList = getIngredientsFor(name);
       ingList.forEach((it,idx)=>{
         const key = dayIngKey(weekIdx, i, meal, role, ingList, idx);
         if(state.shopDismissed[key]) return;
         // Le quantità scalate valgono solo finché non è già stato spuntato:
         // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
-        const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio);
+        const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio * factor);
         // Se in Dispensa ce n'è già abbastanza, non compare proprio in Spesa
         // (niente riga da vedere/spuntare) — a meno che non l'avessi già
         // esplicitamente de-spuntato in passato per dire "mi serve comunque".
@@ -7361,8 +7583,9 @@ function attachHandlers(){
         const det = mealData.principale ? getRecipeDetails(mealData.principale) : null;
         const basePortions = det ? parsePortionsBase(det.porzioni) : null;
         const ratio = basePortions ? (state.dayPortions[key] || basePortions) / basePortions : 1;
-        const allIng = (mealData.principale ? getIngredientsFor(mealData.principale) : [])
-          .concat(mealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
+        // Per piatto: niente ingredienti per quelli presi dal freezer, il
+        // doppio per quelli fatti in doppia dose (vedi dishCookFactor).
+        const allIng = mealCookIngredients(key, mealData);
         const qtyMap = {};
         allIng.forEach(it=>{
           // resolvePantryItem (non un lookup diretto per nome): un ingrediente
@@ -7370,7 +7593,7 @@ function attachHandlers(){
           // o parte di un gruppo va risolto come ovunque in Dispensa/Spesa.
           const pantryIt = resolvePantryItem(it.ingrediente);
           if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.unit !== 'none'){
-            qtyMap[it.ingrediente] = usedQtyForPantry(pantryIt.unit, it.qta, ratio);
+            qtyMap[it.ingrediente] = (qtyMap[it.ingrediente] || 0) + usedQtyForPantry(pantryIt.unit, it.qta, ratio * it.factor);
           }
         });
         state.doneModalDay = key;
@@ -7582,6 +7805,14 @@ function attachHandlers(){
       const doneIngAll = (doneMealData.principale ? getIngredientsFor(doneMealData.principale) : []).concat(doneMealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
       if(mealHasBread(i, meal) && !recipeListsBread(doneIngAll)) takeBread(state.doneModalBread);
       state.doneModalBread = 0;
+      // Freezer: le porzioni prese per questo pasto scendono; la metà in più
+      // di una doppia dose (se non già messa via dal prep) ci va adesso.
+      const doneMk = mealKey(weekIdx, i, meal);
+      const donePortions = mealPortions(doneMk, doneMealData.principale);
+      mealDishes(weekIdx, i, meal).forEach(dsh => {
+        if(isFreezerDish(doneMk, dsh.name)) takeFreezerPortions(dsh.name, donePortions);
+        else freezeDoubleIfReady(weekIdx, i, meal, dsh.name);
+      });
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(!mealsDone[i]) mealsDone[i] = {};
       mealsDone[i][meal] = true;
@@ -8876,6 +9107,7 @@ document.addEventListener('click', e=>{
     const snap = snapshotMealDishes(weekIdx, i, meal);
     if(oldName) replaceMealDish(weekIdx, i, meal, oldName, name);
     else addMealDish(weekIdx, i, meal, name);
+    if(state.dishPicker.tipo === 'freezer') setFreezerDish(mealKey(weekIdx, i, meal), name, true);
     state.dishPicker = null;
     persist(); render();
     if(oldName) showUndoToast('Piatto cambiato', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
@@ -8885,6 +9117,40 @@ document.addEventListener('click', e=>{
   if(removeEl){
     const { weekIdx, i, meal } = parseMealKey(removeEl.dataset.dishRemove);
     removeMealDish(weekIdx, i, meal, removeEl.dataset.dishName);
+    return;
+  }
+  const prepEl = e.target.closest('[data-prep-done],[data-prep-double],[data-prep-toggle]');
+  if(prepEl){
+    const mk = prepEl.dataset.prepKey, name = prepEl.dataset.prepName;
+    const { weekIdx, i, meal } = parseMealKey(mk);
+    const plan = getDishPlan(mk, name);
+    const unfreeze = ()=>{ if(plan.frozen){ takeFreezerPortions(name, mealPortions(mk, effectiveMeal(weekIdx, i, meal).principale)); setDishPlan(mk, name, { frozen: false }); } };
+    if(prepEl.hasAttribute('data-prep-done')){
+      setDishPlan(mk, name, { done: !plan.done });
+      if(!plan.done) freezeDoubleIfReady(weekIdx, i, meal, name); else unfreeze();
+    } else if(prepEl.hasAttribute('data-prep-double')){
+      if(plan.double) unfreeze();
+      setDishPlan(mk, name, { double: !plan.double });
+      if(!plan.double && plan.done) freezeDoubleIfReady(weekIdx, i, meal, name);
+    } else {
+      const cand = prepCandidates(weekIdx).find(c => c.mk === mk && c.name === name);
+      setDishPlan(mk, name, { prep: !(cand && cand.chosen) });
+    }
+    persist(); render();
+    return;
+  }
+  const prepDayEl = e.target.closest('[data-prep-day]');
+  if(prepDayEl){
+    if(!state.prepDay) state.prepDay = {};
+    state.prepDay[prepDayEl.dataset.prepWeek] = prepDayEl.dataset.prepDay;
+    persist(); render();
+    return;
+  }
+  const suggEl = e.target.closest('[data-prep-sugg]');
+  if(suggEl){
+    const iso = suggEl.dataset.prepSugg;
+    state.prepSuggOpen[iso] = !state.prepSuggOpen[iso];
+    render();
     return;
   }
   const toggleEl = e.target.closest('[data-dish-toggle]');

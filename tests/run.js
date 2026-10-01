@@ -828,7 +828,7 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
     // principale "primo", poi aggiunti a caso: la card li mette in ordine di portata
     writeMealDishes(1, 1, 'cena', primo, [dolce, contorno, antipasto]);
     state.tab = 'menu'; render();
-    const courses = () => [...document.querySelectorAll('.meal-block[data-week-idx="1"][data-day-index="1"][data-meal="cena"] .dish-course')].map(e => e.textContent);
+    const courses = () => [...document.querySelectorAll('.meal-block[data-week-idx="1"][data-day-index="1"][data-meal="cena"] .dish-course')].map(e => e.firstChild.textContent);
     const out = { names: { primo, contorno, contorno2, antipasto, dolce }, order: courses() };
     // + piatto: la portata di partenza è una che manca, si sceglie dai chip
     document.querySelector('[data-open-dish-picker="1_1_cena"]:not([data-dish-replace])').click();
@@ -891,7 +891,7 @@ test('ammollo: promemoria sotto la cena del giorno prima, solo per legumi da met
     out.inCard = !!document.querySelector('.meal-detail-screen .soak-note');
     return out;
   });
-  assert(r.mon && r.mon.includes('Stasera: legumi in ammollo') && r.mon.includes('Pasta e ceci (cena)'), `lunedì: ${r.mon}`);
+  assert(r.mon && r.mon.includes('Stasera, per domani') && r.mon.includes('Ammollo dei legumi: Pasta e ceci (cena)'), `lunedì: ${r.mon}`);
   eq([r.tue, r.monCanned, r.inCard], [null, null, false], 'solo quando serve');
   eq(page.errors, [], 'errori JS');
 });
@@ -906,6 +906,47 @@ test('menù: un pasto vuoto non risulta mai cucinato, anche con una spunta rimas
     return { done: b.classList.contains('done'), tag: !!b.querySelector('.done-tag') };
   });
   eq(r, { done: false, tag: false });
+  eq(page.errors, [], 'errori JS');
+});
+
+test('meal prep: lista nel giorno di prep, doppia dose in Spesa e in freezer, piatto dal freezer senza Spesa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1);
+    ['pranzo', 'cena'].forEach(m => WEEK_DISPLAY_ORDER.forEach(i => writeMealDishes(1, i, m, 'Pasta al pesto', [])));
+    const mp = allRecipeMetas().find(x => x.freezerNew === 'meal-prep' && getIngredientsFor(x.nome).length);
+    writeMealDishes(1, 2, 'cena', mp.nome, []); // mercoledì
+    Object.keys(state.pantryItems).forEach(k => { if(state.pantryItems[k].frozenMeal) delete state.pantryItems[k]; });
+    state.tab = 'menu'; render();
+    const box = () => document.querySelector('.day-card[data-week-idx="1"][data-day-index="6"] .prep-box');
+    const out = { name: mp.nome, inSunBox: !!box() && box().textContent.includes(mp.nome), inSatBox: !!document.querySelector('.day-card[data-week-idx="1"][data-day-index="5"] .prep-box') };
+    const ing = getIngredientsFor(mp.nome)[0];
+    const shopQty = () => buildShopFlat().filter(x => x.ingrediente === ing.ingrediente && x.context.includes('Mercoledì')).map(x => x.qta).join('|');
+    out.qty1 = shopQty();
+    box().querySelector('[data-prep-double]').click();
+    out.qty2 = shopQty();
+    box().querySelector('[data-prep-done]').click();
+    out.frozen = freezerPortionsOf(mp.nome);
+    out.tag = document.querySelector('.meal-block[data-week-idx="1"][data-day-index="2"][data-meal="cena"] .dish-tag').textContent;
+    // venerdì a pranzo: dal freezer → niente Spesa, promemoria giovedì sera
+    document.querySelector('.meal-block[data-week-idx="1"][data-day-index="4"][data-meal="pranzo"] [data-open-dish-picker]:not([data-dish-replace])').click();
+    document.querySelector('[data-dish-course="freezer"]').click();
+    document.querySelector(`[data-dish-pick="${CSS.escape(mp.nome)}"]`).click();
+    out.fromFreezer = isFreezerDish('1_4_pranzo', mp.nome);
+    out.shopFri = buildShopFlat().some(x => x.ingrediente === ing.ingrediente && x.context.startsWith('Venerdì'));
+    const thu = document.querySelector('.day-card[data-week-idx="1"][data-day-index="3"] .soak-note');
+    out.thuNote = thu ? thu.textContent.replace(/\s+/g, ' ') : '';
+    // sabato: prep spostato
+    document.querySelector('[data-prep-day="sab"][data-prep-week]').click();
+    out.movedToSat = !!document.querySelector('.day-card[data-week-idx="1"][data-day-index="5"] .prep-box');
+    return out;
+  });
+  assert(r.inSunBox && !r.inSatBox, 'il piatto meal prep è nella lista di domenica');
+  assert(r.qty1 && r.qty2 && r.qty1 !== r.qty2, `doppia dose in Spesa: ${r.qty1} → ${r.qty2}`);
+  assert(r.frozen > 0, 'porzioni in freezer dopo il prep');
+  assert(r.tag.includes('pronto') && r.tag.includes('×2'), `etichetta: ${r.tag}`);
+  assert(r.fromFreezer && !r.shopFri, 'dal freezer, niente Spesa');
+  assert(r.thuNote.includes('Togli dal freezer') && r.thuNote.includes(r.name), `giovedì sera: ${r.thuNote}`);
+  assert(r.movedToSat, 'prep spostato a sabato');
   eq(page.errors, [], 'errori JS');
 });
 
