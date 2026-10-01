@@ -934,7 +934,7 @@
 .note-box .detail-extra-note + .detail-extra-note{ margin-top:var(--space-xxsmall, 0.25rem); }
 /* Promemoria ammollo: riquadro sotto la cena, da leggere la sera prima. */
 .soak-note{ display:flex; gap:var(--space-small); align-items:flex-start; padding:var(--space-small) var(--space-medium); border-radius:var(--radius-modal); background:color-mix(in srgb, var(--amber) 22%, var(--surface)); border:1px solid color-mix(in srgb, var(--amber) 55%, transparent); font-size:var(--text-small); line-height:1.4; color:var(--ink); }
-.soak-note-ic{ font-size:1.125rem; line-height:1.2; }
+.soak-note-ic{ font-size:1rem; line-height:1.2; }
 .soak-note-title{ font-weight:var(--weight-bold); }
 /* Più aria tra un piatto e l'altro; l'ultimo piatto non ha la linea sotto. */
 .dish-item{ padding-bottom:var(--space-medium); }
@@ -945,3 +945,32 @@
 .meal-block .section-footer-row{ align-items:center; }
 .meal-block .meal-overflow-btn{ display:inline-flex; align-items:center; justify-content:center; line-height:0; margin-right:calc(-1 * var(--space-xsmall)); }
 .meal-block .meal-overflow-btn svg{ width:1.25rem; height:1.25rem; }
+/* Meal prep: riquadro in cima al giorno di prep. */
+.prep-box{ display:flex; flex-direction:column; gap:var(--space-xsmall); padding:var(--space-small) var(--space-medium); border-radius:var(--radius-modal); background:var(--surface); border:1.5px dashed color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.prep-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-xsmall); }
+.prep-title{ font-size:var(--text-xsmall); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-light); }
+.prep-count{ color:var(--gold); margin-left:0.25rem; }
+.prep-day-chips{ display:flex; gap:0.25rem; }
+.prep-day-chips .btn.is-chip{ padding:var(--space-xxsmall, 0.25rem) var(--space-small); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-xsmall); }
+.prep-day-chips .btn.is-chip.active{ background:var(--ink); color:var(--bg); }
+.prep-list{ display:flex; flex-direction:column; }
+.prep-row{ display:flex; align-items:center; gap:var(--space-xsmall); padding:var(--space-xsmall) 0; border-top:1px dashed var(--line); min-width:0; }
+.prep-list .prep-row:first-child{ border-top:0; }
+.prep-row-text{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.prep-row-name{ font-size:var(--text-small); font-weight:var(--weight-bold); overflow-wrap:anywhere; }
+.prep-row-for{ font-size:var(--text-xsmall); color:var(--ink-light); }
+.prep-row.is-done .prep-row-name{ text-decoration:line-through; opacity:0.6; }
+.prep-check{ flex-shrink:0; width:1.5rem; height:1.5rem; border-radius:0.375rem; border:1.5px solid var(--line-light, var(--line)); background:transparent; color:var(--bg); font-weight:var(--weight-bold); display:grid; place-items:center; padding:0; cursor:pointer; }
+.prep-row.is-done .prep-check{ background:var(--green-mid, var(--gold)); border-color:transparent; }
+.prep-double, .prep-add{ flex-shrink:0; font-size:var(--text-xsmall); padding:var(--space-xxsmall, 0.25rem) var(--space-xsmall); border-radius:var(--radius-pill); background:var(--surface-2); border:0; white-space:nowrap; }
+.prep-double.active{ background:color-mix(in srgb, #4aa3df 25%, var(--surface)); color:var(--ink); }
+.prep-empty{ font-size:var(--text-xsmall); color:var(--ink-light); }
+.prep-sugg-toggle{ align-self:flex-start; background:transparent; border:0; padding:0; font-size:var(--text-xsmall); font-weight:var(--weight-bold); color:var(--ink-light); cursor:pointer; }
+.prep-row.is-sugg .prep-row-name{ font-weight:var(--weight-medium); }
+.dish-tag{ color:var(--ink-light); letter-spacing:0; text-transform:none; font-weight:var(--weight-medium); }
+.dish-freezer-note{ font-size:var(--text-xsmall); padding:var(--space-xsmall) var(--space-small); border-radius:var(--radius-modal); background:color-mix(in srgb, #4aa3df 14%, var(--surface)); }
+.dish-double{ align-self:flex-start; }
+.dish-double.active{ background:color-mix(in srgb, #4aa3df 25%, var(--surface)); }
+/* "Stasera, per domani": più righe (ammollo, freezer, marinatura). */
+.soak-note{ flex-direction:column; gap:0.25rem; }
+.soak-note-line{ display:flex; gap:var(--space-xsmall); align-items:baseline; }
