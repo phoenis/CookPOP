@@ -3758,10 +3758,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-22',
+  version: '2026-10-23',
   title: 'Novità',
   items: [
-    'Ordine corsie: ora puoi anche trascinare le categorie dalla maniglia ⠿.'
+    'Spesa: quello che tieni nel freezer non finisce più in Surgelati (il pane si compra fresco e si congela dopo). In Surgelati va ciò che ha "surgelato" nel nome o che metti a mano in quella categoria.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5696,11 +5696,10 @@ function renderSpesa(){
     // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
     // nel loro reparto vero, tra le sezioni normali.
     const classified = mainFlat.map(it=>{
-      let dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
-      // Quello che in Dispensa sta nel freezer si compra al banco surgelati,
-      // qualunque sia la sua categoria (piselli, merluzzo...).
-      const stored = state.pantryItems[(it.ingrediente || '').trim().toLowerCase()];
-      if(dept !== 'finiti' && stored && stored.luogo === 'freezer' && !isNonFoodDept(dept)) dept = 'surgelati';
+      // Nota: il "dove sta" (freezer) non conta, il pane per esempio si compra
+      // fresco e si congela a casa: va in Surgelati solo ciò che è surgelato
+      // nel nome o messo a mano in quella categoria.
+      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
       return {...it, dept};
     });
     // unisco articoli identici (stesso ingrediente) comparsi in più ricette,

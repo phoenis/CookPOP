@@ -1120,7 +1120,7 @@ test('spesa in ordine di corsia: casa in cima, surgelati in fondo; rosmarino con
   eq(page.errors, [], 'errori JS');
 });
 
-test('ordine corsie: frecce su/giù in Spesa, ripristino; quello che sta nel freezer va in Surgelati', async ({ page }) => {
+test('ordine corsie: frecce su/giù in Spesa, ripristino; il freezer non sposta in Surgelati', async ({ page }) => {
   await page.evaluate(() => {
     state.shopAisleCustom = [];
     upsertPantryItem('Piselli', 'freezer', 0);
@@ -1135,7 +1135,7 @@ test('ordine corsie: frecce su/giù in Spesa, ripristino; quello che sta nel fre
   const r = await page.evaluate(() => ({ first2: shopAisles().slice(0, 6), custom: state.shopAisleCustom.length > 0 }));
   await page.click('[data-aisle-reset]');
   const reset = await page.evaluate(() => state.shopAisleCustom.length);
-  eq([iPul >= 0 && iPul < iVer, iSur > iVer], [true, true], 'casa in cima, piselli dal freezer in Surgelati in fondo');
+  eq([iPul >= 0 && iPul < iVer, iSur], [true, -1], 'casa in cima, piselli del freezer restano in Frutta e verdura');
   eq(r.first2.indexOf('verdura') < r.first2.indexOf('altro-casa'), true, 'verdura spostata su');
   eq([r.custom, reset], [true, 0], 'ripristino');
   eq(page.errors, [], 'errori JS');
