@@ -877,6 +877,25 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
   eq(page.errors, [], 'errori JS');
 });
 
+test('ammollo: promemoria sotto la cena del giorno prima, solo per legumi da mettere a bagno', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1);
+    // settimana 1, ordine sab..ven: mar (i=1) viene dopo lun (i=0)
+    ['pranzo', 'cena'].forEach(m => WEEK_DISPLAY_ORDER.forEach(i => writeMealDishes(1, i, m, 'Pasta al pesto', [])));
+    writeMealDishes(1, 1, 'cena', 'Pasta e ceci', []);
+    state.tab = 'menu'; render();
+    const noteIn = i => { const c = document.querySelector(`.day-card[data-week-idx="1"][data-day-index="${i}"] .soak-note`); return c ? c.textContent.replace(/\s+/g, ' ').trim() : null; };
+    const out = { mon: noteIn(0), tue: noteIn(1) };
+    writeMealDishes(1, 1, 'cena', 'Pasta e lenticchie', []); render(); // lenticchie già cotte: niente ammollo
+    out.monCanned = noteIn(0);
+    out.inCard = !!document.querySelector('.meal-detail-screen .soak-note');
+    return out;
+  });
+  assert(r.mon && r.mon.includes('Stasera: legumi in ammollo') && r.mon.includes('Pasta e ceci (cena)'), `lunedì: ${r.mon}`);
+  eq([r.tue, r.monCanned, r.inCard], [null, null, false], 'solo quando serve');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
