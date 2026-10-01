@@ -932,3 +932,7 @@
 .dish-acc-actions{ column-gap:var(--space-large); }
 .dish-acc-body .detail-section.note-box{ padding:var(--space-small) var(--space-medium); margin-top:var(--space-medium); }
 .note-box .detail-extra-note + .detail-extra-note{ margin-top:var(--space-xxsmall, 0.25rem); }
+/* Promemoria ammollo: riquadro sotto la cena, da leggere la sera prima. */
+.soak-note{ display:flex; gap:var(--space-small); align-items:flex-start; padding:var(--space-small) var(--space-medium); border-radius:var(--radius-modal); background:color-mix(in srgb, var(--amber) 22%, var(--surface)); border:1px solid color-mix(in srgb, var(--amber) 55%, transparent); font-size:var(--text-small); line-height:1.4; color:var(--ink); }
+.soak-note-ic{ font-size:1.125rem; line-height:1.2; }
+.soak-note-title{ font-weight:var(--weight-bold); }

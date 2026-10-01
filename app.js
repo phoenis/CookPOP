@@ -3630,10 +3630,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-10',
+  version: '2026-10-11',
   title: 'Novità',
   items: [
-    'Scheda del pasto più ordinata: il tempo sta accanto a Pranzo/Cena, "Cambia" e ✕ dei piatti sono più discreti, e nel dettaglio porzioni e spesa stanno in un riquadro in alto, con le azioni di ogni piatto in fondo al piatto.'
+    'Promemoria ammollo: se domani c\'è un piatto con legumi da mettere a bagno, sotto la cena di oggi compare un riquadro giallo, senza dover aprire il dettaglio. Con i legumi già cotti non compare.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4280,19 +4280,6 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
   }
 
-  // auto reminder: se domani è Legumi, avvisa stasera di mettere in ammollo
-  // (solo sul blocco cena: è la cena di oggi il momento buono per l'ammollo
-  // in vista della cena di domani — il "domani" segue l'ordine di
-  // visualizzazione, non l'indice originale, dato che la settimana parte dal
-  // sabato; non attraversa il confine tra una settimana e la successiva)
-  let soakChip = '';
-  if(meal === 'cena' && pos < WEEK_DISPLAY_ORDER.length - 1){
-    const nextCat = effectiveCategoria(weekIdx, WEEK_DISPLAY_ORDER[pos+1], 'cena');
-    if(nextCat === 'legumi'){
-      soakChip = `<div class="soak-chip">💧 Domani legumi — valuta l'ammollo stasera</div>`;
-    }
-  }
-
   // Badge di stato accanto al tempo. "Cucinato" non è più un badge
   // chiudibile: si dice una volta sola nel titolo barrato (vedi .done .day-menu
   // in CSS) più questa etichettina di conferma — l'annullo sta nel bottone
@@ -4378,14 +4365,6 @@ function renderMealDetailScreen(weekIdx, i, meal){
     if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
   }
 
-  let soakChip = '';
-  if(meal === 'cena' && pos < WEEK_DISPLAY_ORDER.length - 1){
-    const nextCat = effectiveCategoria(weekIdx, WEEK_DISPLAY_ORDER[pos+1], 'cena');
-    if(nextCat === 'legumi'){
-      soakChip = `<div class="soak-chip">💧 Domani legumi — valuta l'ammollo stasera</div>`;
-    }
-  }
-
   // Porzioni: valgono per tutto il pasto. La base è quella del principale
   // (o del primo piatto che ne ha una), e ogni piatto scala le sue quantità
   // rispetto alle proprie porzioni base.
@@ -4415,10 +4394,9 @@ function renderMealDetailScreen(weekIdx, i, meal){
     return renderDishAccordion(dsh, ratio, ctx, isOpen, !!linkSource && dsh.role === 'p');
   }).join('');
   const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
-  const mealTop = (dayMetaHtml || soakChip || portionsControl || missing.length) ? `
+  const mealTop = (dayMetaHtml || portionsControl || missing.length) ? `
       <div class="meal-detail-top">
         ${dayMetaHtml}
-        ${soakChip}
         ${portionsControl}
         ${mancantiButtonHtml(missing)}
       </div>` : '';
@@ -4645,6 +4623,39 @@ function renderDishPickerScreen(){
 // Card di un giorno intero: intestazione (nome/data) + i due blocchi pasto,
 // pranzo e cena. isPastCard non è più usato per lo stile del singolo pasto
 // (era .day-card-past) ma resta sulla card per coerenza col resto del Menù.
+// Promemoria della sera: se domani (pranzo o cena) c'è un piatto con legumi
+// secchi da mettere a bagno, la card di oggi lo dice in un riquadro sotto la
+// cena, sempre visibile senza aprire il dettaglio. Vale solo per le ricette
+// che lo chiedono davvero (ammollo nella preparazione anticipata o legumi
+// "secchi" tra gli ingredienti): con i legumi già cotti non serve.
+const SOAK_LEGUMI_RE = /\b(ceci|fagiol\w*|lenticch\w*|fave|cicerch\w*|borlott\w*|cannellin\w*|piselli)\b/i;
+function dishNeedsSoak(name){
+  const r = getRecipeMeta(name);
+  if(r && /ammollo/i.test(r.prep || '')) return true;
+  return getIngredientsFor(name).some(it => SOAK_LEGUMI_RE.test(it.ingrediente || '') && /secch/i.test(it.ingrediente || ''));
+}
+// Il giorno dopo nell'ordine di visualizzazione (la settimana parte dal
+// sabato); dall'ultimo giorno si passa al primo della settimana seguente.
+function nextDayRef(weekIdx, pos){
+  if(pos < WEEK_DISPLAY_ORDER.length - 1) return { weekIdx, i: WEEK_DISPLAY_ORDER[pos+1] };
+  return { weekIdx: weekIdx + 1, i: WEEK_DISPLAY_ORDER[0] };
+}
+function soakReminderHtml(weekIdx, pos){
+  const nx = nextDayRef(weekIdx, pos);
+  if(nx.weekIdx > 0 && !state.extraWeeks[nx.weekIdx - 1]) return '';
+  const hits = [];
+  ['pranzo', 'cena'].forEach(meal => {
+    mealDishes(nx.weekIdx, nx.i, meal).forEach(dsh => { if(dishNeedsSoak(dsh.name)) hits.push({ meal, name: dsh.name }); });
+  });
+  if(!hits.length) return '';
+  const what = hits.map(h => `<b>${escapeHtml(h.name)}</b> (${escapeHtml(MEAL_LABEL[h.meal].toLowerCase())})`).join(' e ');
+  return `
+      <div class="soak-note" role="note">
+        <span class="soak-note-ic" aria-hidden="true">💧</span>
+        <span><span class="soak-note-title">Stasera: legumi in ammollo</span><br>Domani c'è ${what}.</span>
+      </div>`;
+}
+
 function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
   const d = DATA.week1[i];
   const dateLabel = formatShortDate(weekDates[pos]);
@@ -4666,6 +4677,7 @@ function renderDayCard(weekIdx, i, pos, weekDates, isPastCard){
     <div class="meals-block">
       ${hidePranzo ? '' : renderMealBlock(weekIdx, i, 'pranzo', pos, weekDates, isPastCard, d, dateLabel, isToday)}
       ${renderMealBlock(weekIdx, i, 'cena', pos, weekDates, isPastCard, d, dateLabel, isToday)}
+      ${isPastCard ? '' : soakReminderHtml(weekIdx, pos)}
     </div>
   </div>`;
 }
