@@ -909,7 +909,7 @@ test('menù: un pasto vuoto non risulta mai cucinato, anche con una spunta rimas
   eq(page.errors, [], 'errori JS');
 });
 
-test('meal prep: lista nel giorno di prep, doppia dose in Spesa e in freezer, piatto dal freezer senza Spesa', async ({ page }) => {
+test('meal prep: lista nel giorno di prep (sabato di default), doppia dose in Spesa e in freezer, piatto dal freezer senza Spesa', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.extraWeeks = []; generateWeek(1);
     ['pranzo', 'cena'].forEach(m => WEEK_DISPLAY_ORDER.forEach(i => writeMealDishes(1, i, m, 'Pasta al pesto', [])));
@@ -917,8 +917,8 @@ test('meal prep: lista nel giorno di prep, doppia dose in Spesa e in freezer, pi
     writeMealDishes(1, 2, 'cena', mp.nome, []); // mercoledì
     Object.keys(state.pantryItems).forEach(k => { if(state.pantryItems[k].frozenMeal) delete state.pantryItems[k]; });
     state.tab = 'menu'; render();
-    const box = () => document.querySelector('.day-card[data-week-idx="1"][data-day-index="6"] .prep-box');
-    const out = { name: mp.nome, inSunBox: !!box() && box().textContent.includes(mp.nome), inSatBox: !!document.querySelector('.day-card[data-week-idx="1"][data-day-index="5"] .prep-box') };
+    const box = () => document.querySelector('.day-card[data-week-idx="1"][data-day-index="5"] .prep-box');
+    const out = { name: mp.nome, inSatBox: !!box() && box().textContent.includes(mp.nome), inSunBox: !!document.querySelector('.day-card[data-week-idx="1"][data-day-index="6"] .prep-box') };
     const ing = getIngredientsFor(mp.nome)[0];
     const shopQty = () => buildShopFlat().filter(x => x.ingrediente === ing.ingrediente && x.context.includes('Mercoledì')).map(x => x.qta).join('|');
     out.qty1 = shopQty();
@@ -936,17 +936,17 @@ test('meal prep: lista nel giorno di prep, doppia dose in Spesa e in freezer, pi
     const thu = document.querySelector('.day-card[data-week-idx="1"][data-day-index="3"] .soak-note');
     out.thuNote = thu ? thu.textContent.replace(/\s+/g, ' ') : '';
     // sabato: prep spostato
-    document.querySelector('[data-prep-day="sab"][data-prep-week]').click();
-    out.movedToSat = !!document.querySelector('.day-card[data-week-idx="1"][data-day-index="5"] .prep-box');
+    document.querySelector('[data-prep-day="dom"][data-prep-week]').click();
+    out.movedToSun = !!document.querySelector('.day-card[data-week-idx="1"][data-day-index="6"] .prep-box');
     return out;
   });
-  assert(r.inSunBox && !r.inSatBox, 'il piatto meal prep è nella lista di domenica');
+  assert(r.inSatBox && !r.inSunBox, 'di default il prep è di sabato, col piatto meal prep');
   assert(r.qty1 && r.qty2 && r.qty1 !== r.qty2, `doppia dose in Spesa: ${r.qty1} → ${r.qty2}`);
   assert(r.frozen > 0, 'porzioni in freezer dopo il prep');
   assert(r.tag.includes('pronto') && r.tag.includes('×2'), `etichetta: ${r.tag}`);
   assert(r.fromFreezer && !r.shopFri, 'dal freezer, niente Spesa');
   assert(r.thuNote.includes('Togli dal freezer') && r.thuNote.includes(r.name), `giovedì sera: ${r.thuNote}`);
-  assert(r.movedToSat, 'prep spostato a sabato');
+  assert(r.movedToSun, 'prep spostato a domenica');
   eq(page.errors, [], 'errori JS');
 });
 
