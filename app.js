@@ -1323,7 +1323,7 @@ const state = {
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
-  cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, // non persistiti: pagine Carte
+  cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', // non persistiti: pagine Carte
   inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
   inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e righe col Sì ancora aperte (in attesa di OK)
   inventoryAnswered: null, // risposte dell'inventario (in localStorage, vedi inventoryAnswers)
@@ -1436,6 +1436,13 @@ function tabFromHash(){
 // Link "#carte=…" (dati in base64url: [[negozio, numero, formato, colore], …]):
 // importa delle carte fedeltà dopo una conferma (vedi renderCardsPages). Il
 // frammento dopo # non arriva a nessun server; tolto subito dall'indirizzo.
+// [[negozio, numero, formato, colore, logo (data:image/…)], …]
+function parseCardsImport(list){
+  return (Array.isArray(list) ? list : []).filter(c => Array.isArray(c) && c[0] && c[1]).map(c => ({
+    name: String(c[0]), number: String(c[1]), format: c[2] || undefined, color: c[3] || undefined,
+    logo: typeof c[4] === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(c[4]) ? c[4] : undefined
+  }));
+}
 function readCardsImportFromHash(){
   const m = /^#carte=([A-Za-z0-9_-]+)/.exec(window.location.hash);
   if(!m) return false;
@@ -1443,7 +1450,7 @@ function readCardsImportFromHash(){
     const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
     const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
     const list = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
-    state.cardsImport = list.filter(c => Array.isArray(c) && c[0] && c[1]).map(c => ({ name: String(c[0]), number: String(c[1]), format: c[2] || undefined, color: c[3] || undefined }));
+    state.cardsImport = parseCardsImport(list);
   }catch(e){ state.cardsImport = null; }
   history.replaceState(null, '', location.pathname + location.search + '#spesa');
   return true;
@@ -3681,10 +3688,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-16',
+  version: '2026-10-17',
   title: 'Novità',
   items: [
-    'Carte fedeltà: ora si vedono anche le carte col QR (come IKEA) e quelle in "Code 39" (come Intimissimi), sempre nel formato originale letto dalla foto. E si possono importare tutte insieme da un link.'
+    'Carte fedeltà in ordine alfabetico, con una ricerca per nome in alto e il logo di ogni negozio. Il logo si può mettere anche a mano da Gestisci carte → Logo, e da lì c\'è "Importa da file".'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -9582,24 +9589,41 @@ function barcodeSvg(number, format){
   return `<svg class="card-barcode" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Codice a barre ${escapeAttr(number)}"><rect width="${w}" height="${h}" fill="#fff"/><g fill="#000">${rects}</g></svg>`;
 }
 function cardColor(card){ return card.color || CARD_COLORS[0]; }
-function newCardDraft(){ return { id: null, name: '', number: '', color: CARD_COLORS[(state.loyaltyCards || []).length % CARD_COLORS.length] }; }
-function cardTileHtml(card, attr){
-  return `<button type="button" class="card-tile" ${attr} style="--card-color:${escapeAttr(cardColor(card))}"><span class="card-tile-name">${escapeHtml(card.name)}</span></button>`;
+// Testo scuro sui colori chiari (carte bianche come Iper o laFeltrinelli).
+function cardInk(color){
+  const m = /^#?([0-9a-f]{6})$/i.exec(color || '');
+  if(!m) return '#fff';
+  const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 170 ? '#1a1a1a' : '#fff';
 }
+function cardStyle(color){ return `--card-color:${escapeAttr(color)};--card-ink:${cardInk(color)}`; }
+function newCardDraft(){ return { id: null, name: '', number: '', color: CARD_COLORS[(state.loyaltyCards || []).length % CARD_COLORS.length] }; }
+// Tessera: col logo, se c'è (il nome resta per la ricerca e per i lettori di
+// schermo), altrimenti il nome in grande sul colore della carta.
+function cardTileHtml(card, attr){
+  const inner = card.logo
+    ? `<img class="card-tile-logo" src="${escapeAttr(card.logo)}" alt="">`
+    : `<span class="card-tile-name">${escapeHtml(card.name)}</span>`;
+  return `<button type="button" class="card-tile${card.logo ? ' has-logo' : ''}" ${attr} style="${cardStyle(cardColor(card))}" aria-label="${escapeAttr(card.name)}">${inner}</button>`;
+}
+function sortedCards(){ return (state.loyaltyCards || []).slice().sort((a, b) => IT_COLLATOR.compare(a.name, b.name)); }
 function renderCardsPages(){
   const cards = state.loyaltyCards || [];
   if(state.cardsImport && state.cardsImport.length){
     const have = new Set(cards.map(c => c.number));
     const fresh = state.cardsImport.filter(c => !have.has(c.number));
+    const logos = state.cardsImport.filter(c => c.logo && cards.some(x => x.number === c.number && !x.logo));
+    const todo = fresh.length + logos.length;
     return `
   <div class="filters-modal-backdrop" data-cards-import-cancel>
     <div class="filters-modal" data-stop-close role="dialog" aria-label="Importa carte">
       <div class="filters-modal-header"><h3>Importa carte fedeltà</h3><button class="btn is-icon filters-close-btn" data-cards-import-cancel>✕</button></div>
-      <p class="settings-note">${fresh.length ? `${fresh.length} carte da aggiungere${fresh.length < state.cardsImport.length ? ` (${state.cardsImport.length - fresh.length} le hai già)` : ''}:` : 'Hai già tutte queste carte.'}</p>
-      <div class="card-import-list">${fresh.map(c => `<span class="card-import-chip" style="--card-color:${escapeAttr(c.color || CARD_COLORS[0])}">${escapeHtml(c.name)}</span>`).join('')}</div>
+      <p class="settings-note">${fresh.length ? `${fresh.length} carte da aggiungere${fresh.length < state.cardsImport.length ? ` (${state.cardsImport.length - fresh.length} le hai già)` : ''}:` : (logos.length ? 'Hai già queste carte.' : 'Hai già tutte queste carte.')}</p>
+      <div class="card-import-list">${fresh.map(c => `<span class="card-import-chip" style="${cardStyle(c.color || CARD_COLORS[0])}">${escapeHtml(c.name)}</span>`).join('')}</div>
+      ${logos.length ? `<p class="settings-note">E ${logos.length} loghi per le carte che hai già.</p>` : ''}
       <div class="filters-modal-footer">
         <button class="btn is-ghost" data-cards-import-cancel>Annulla</button>
-        ${fresh.length ? '<button class="btn is-solid" data-cards-import-ok>Importa</button>' : ''}
+        ${todo ? '<button class="btn is-solid" data-cards-import-ok>Importa</button>' : ''}
       </div>
     </div>
   </div>`;
@@ -9609,8 +9633,8 @@ function renderCardsPages(){
     if(card) return `
   <div class="card-view" data-close-card-view role="dialog" aria-label="${escapeAttr(card.name)}">
     <div class="card-view-inner" data-stop-close>
-      <div class="card-view-head" style="--card-color:${escapeAttr(cardColor(card))}">
-        <span>${escapeHtml(card.name)}</span>
+      <div class="card-view-head${card.logo ? ' has-logo' : ''}" style="${cardStyle(cardColor(card))}">
+        ${card.logo ? `<img class="card-view-logo" src="${escapeAttr(card.logo)}" alt="${escapeAttr(card.name)}">` : `<span>${escapeHtml(card.name)}</span>`}
         <button type="button" class="btn is-icon card-view-close" data-close-card-view aria-label="Chiudi">✕</button>
       </div>
       <div class="card-view-code">${barcodeSvg(card.number, card.format)}</div>
@@ -9620,8 +9644,13 @@ function renderCardsPages(){
   </div>`;
   }
   if(state.cardsOpen === 'list'){
+    const q = (state.cardsSearch || '').trim().toLowerCase();
+    const shown = sortedCards().filter(c => !q || c.name.toLowerCase().includes(q));
     const body = cards.length ? `
-      <div class="card-grid">${cards.map(c => cardTileHtml(c, `data-card-view="${escapeAttr(c.id)}"`)).join('')}</div>
+      <div class="search-field card-search">
+        <input class="input-search" type="search" id="cards-search" placeholder="Cerca una carta…" value="${escapeAttr(state.cardsSearch || '')}" autocomplete="off">
+      </div>
+      ${shown.length ? `<div class="card-grid">${shown.map(c => cardTileHtml(c, `data-card-view="${escapeAttr(c.id)}"`)).join('')}</div>` : '<p class="settings-note">Nessuna carta con questo nome.</p>'}
       <button type="button" class="btn is-outline is-block" data-cards-manage>Gestisci carte</button>` : `
       <p class="settings-note">Nessuna carta salvata. Aggiungi le tessere dei negozi che usi, poi le mostri in cassa da qui.</p>
       <button type="button" class="btn is-solid is-block" data-cards-manage>+ Aggiungi carta</button>`;
@@ -9630,9 +9659,9 @@ function renderCardsPages(){
   if(state.cardsOpen === 'manage'){
     const d = state.cardDraft || (state.cardDraft = newCardDraft());
     const canScan = 'BarcodeDetector' in window;
-    const rows = cards.map(c => `
+    const rows = sortedCards().map(c => `
         <div class="card-manage-row">
-          <span class="card-dot" style="background:${escapeAttr(cardColor(c))}"></span>
+          ${c.logo ? `<img class="card-manage-logo" src="${escapeAttr(c.logo)}" alt="" style="background:${escapeAttr(cardColor(c))}">` : `<span class="card-dot" style="background:${escapeAttr(cardColor(c))}"></span>`}
           <span class="card-manage-text"><b>${escapeHtml(c.name)}</b><span>${escapeHtml(c.number)}</span></span>
           <button type="button" class="btn is-icon dish-act" data-card-edit="${escapeAttr(c.id)}" aria-label="Modifica ${escapeAttr(c.name)}">✎</button>
           <button type="button" class="btn is-icon dish-act" data-card-delete="${escapeAttr(c.id)}" aria-label="Elimina ${escapeAttr(c.name)}">✕</button>
@@ -9650,6 +9679,12 @@ function renderCardsPages(){
             ${canScan ? `<label class="btn is-outline card-scan">📷 Scansiona<input type="file" accept="image/*" capture="environment" id="card-scan-input" hidden></label>` : ''}
           </div>
           ${state.cardScanMsg ? `<p class="settings-note">${escapeHtml(state.cardScanMsg)}</p>` : ''}
+          <div class="settings-field-label">Logo</div>
+          <div class="card-logo-row">
+            ${d.logo ? `<img class="card-manage-logo is-big" src="${escapeAttr(d.logo)}" alt="" style="background:${escapeAttr(d.color || CARD_COLORS[0])}">` : ''}
+            <label class="btn is-outline card-scan">🖼️ ${d.logo ? 'Cambia' : 'Scegli immagine'}<input type="file" accept="image/*" id="card-logo-input" hidden></label>
+            ${d.logo ? '<button type="button" class="btn is-ghost" data-card-logo-remove>Togli</button>' : ''}
+          </div>
           <div class="settings-field-label">Colore</div>
           <div class="card-colors">${CARD_COLORS.map(col => `<button type="button" class="card-color${d.color === col ? ' active' : ''}" data-card-color="${col}" style="background:${col}" aria-label="Colore" aria-pressed="${d.color === col}"></button>`).join('')}</div>
           ${d.number.trim() ? `<div class="card-preview">${barcodeSvg(d.number.trim(), d.format)}</div>` : ''}
@@ -9658,10 +9693,32 @@ function renderCardsPages(){
             <button type="button" class="btn is-solid" data-card-save ${d.name.trim() && d.number.trim() ? '' : 'disabled'}>${d.id ? 'Salva' : 'Aggiungi'}</button>
           </div>
         </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Importa</h3>
+        <div class="settings-card">
+          <p class="settings-card-text">Da un file di carte (.json): aggiunge quelle nuove e i loghi che mancano.</p>
+          <label class="btn is-outline is-block">⬆ Importa da file<input type="file" accept="application/json,.json" id="cards-import-file" hidden></label>
+        </div>
       </section>`;
     return managePageHtml({ key: 'cards-manage', title: 'Gestisci carte', closeAttr: 'data-close-cards', body });
   }
   return '';
+}
+// Logo: ridotto sul telefono (max 360×160) prima di salvarlo con la carta.
+async function loadCardLogo(file){
+  if(!file || !state.cardDraft) return;
+  try{
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 360 / bmp.width, 160 / bmp.height);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    let url = c.toDataURL('image/webp', 0.85);
+    if(!url.startsWith('data:image/webp')) url = c.toDataURL('image/png');
+    state.cardDraft.logo = url;
+  }catch(e){ state.cardScanMsg = 'Non riesco a leggere l\'immagine.'; }
+  render();
 }
 async function scanCardImage(file){
   if(!file || !('BarcodeDetector' in window)) return;
@@ -9694,11 +9751,18 @@ document.addEventListener('click', e=>{
   if(t.closest('[data-cards-import-ok]') && state.cardsImport){
     const have = new Set((state.loyaltyCards || []).map(c => c.number));
     const added = state.cardsImport.filter(c => !have.has(c.number)).map((c, idx) => Object.assign({ id: 'c' + Date.now().toString(36) + idx, name: c.name, number: c.number, color: c.color || CARD_COLORS[idx % CARD_COLORS.length] }, c.format ? { format: c.format } : {}));
-    state.loyaltyCards = (state.loyaltyCards || []).concat(added);
+    const before = JSON.parse(JSON.stringify(state.loyaltyCards || []));
+    added.forEach((c, idx) => { const src = state.cardsImport.find(x => x.number === c.number); if(src && src.logo) c.logo = src.logo; });
+    const withLogos = (state.loyaltyCards || []).map(c => {
+      if(c.logo) return c;
+      const src = state.cardsImport.find(x => x.number === c.number && x.logo);
+      return src ? Object.assign({}, c, { logo: src.logo }, src.color ? { color: src.color } : {}) : c;
+    });
+    state.loyaltyCards = withLogos.concat(added);
     state.cardsImport = null;
     state.cardsOpen = 'list';
     persist(); render();
-    showUndoToast(`${added.length} carte importate`, ()=>{ const ids = new Set(added.map(c => c.id)); state.loyaltyCards = state.loyaltyCards.filter(c => !ids.has(c.id)); persist(); render(); });
+    showUndoToast(added.length ? `${added.length} carte importate` : 'Loghi aggiunti', ()=>{ state.loyaltyCards = before; persist(); render(); });
     return;
   }
   const open = t.closest('[data-open-cards]');
@@ -9715,6 +9779,7 @@ document.addEventListener('click', e=>{
     if(c){ state.cardDraft = Object.assign({}, c); state.cardScanMsg = ''; render(); }
     return;
   }
+  if(t.closest('[data-card-logo-remove]') && state.cardDraft){ delete state.cardDraft.logo; render(); return; }
   if(t.closest('[data-card-cancel]')){ state.cardDraft = newCardDraft(); state.cardScanMsg = ''; render(); return; }
   const del = t.closest('[data-card-delete]');
   if(del){
@@ -9731,6 +9796,7 @@ document.addEventListener('click', e=>{
     if(!name || !number) return;
     const card = { id: d.id || ('c' + Date.now().toString(36)), name, number, color: d.color || CARD_COLORS[0] };
     if(d.format && d.number.trim().replace(/\s+/g, '') === number) card.format = d.format;
+    if(d.logo) card.logo = d.logo;
     const list = (state.loyaltyCards || []).filter(x => x.id !== card.id);
     const idx = (state.loyaltyCards || []).findIndex(x => x.id === card.id);
     if(idx >= 0) list.splice(idx, 0, card); else list.push(card);
@@ -9741,6 +9807,7 @@ document.addEventListener('click', e=>{
   }
 }, true); // in cattura: dentro le finestre il primo [data-stop-close] ferma la risalita
 document.addEventListener('input', e=>{
+  if(e.target.id === 'cards-search'){ state.cardsSearch = e.target.value; render(); return; }
   const f = e.target.dataset && e.target.dataset.cardField;
   if(!f || !state.cardDraft) return;
   state.cardDraft[f] = e.target.value;
@@ -9752,6 +9819,15 @@ document.addEventListener('input', e=>{
 document.addEventListener('change', e=>{
   if(e.target.id === 'card-number' || e.target.id === 'card-name') render();
   if(e.target.id === 'card-scan-input') scanCardImage(e.target.files && e.target.files[0]);
+  if(e.target.id === 'card-logo-input') loadCardLogo(e.target.files && e.target.files[0]);
+  if(e.target.id === 'cards-import-file'){
+    const f = e.target.files && e.target.files[0];
+    if(f) f.text().then(txt => {
+      try{ state.cardsImport = parseCardsImport(JSON.parse(txt)); }catch(err){ state.cardsImport = []; }
+      if(!state.cardsImport.length){ state.cardsImport = null; state.cardScanMsg = 'File non valido: nessuna carta trovata.'; }
+      render();
+    });
+  }
 });
 
 (async function init(){

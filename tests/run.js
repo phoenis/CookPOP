@@ -1035,6 +1035,29 @@ test('carte fedeltà: Code 39 e QR, import da link #carte= con conferma, senza d
   eq(page.errors, [], 'errori JS');
 });
 
+test('carte fedeltà: in ordine alfabetico, ricerca per nome che tiene il fuoco, loghi da file anche per le carte già presenti', async ({ page }) => {
+  const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  await page.evaluate(() => {
+    state.loyaltyCards = [{ id: 'a', name: 'Penny', number: '2095057969316', color: '#123456' }, { id: 'b', name: 'Famila', number: '0402008090593', color: '#e5512f' }];
+    state.tab = 'spesa'; state.cardsOpen = 'manage'; render();
+  });
+  await page.setInputFiles('#cards-import-file', { name: 'carte.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([['Penny', '2095057969316', 'ean_13', '#e52d21', logo], ['IKEA', '6275980414616639489', 'qr_code', '#0057a4', logo]])) });
+  await page.waitForSelector('[data-cards-import-ok]');
+  await page.click('[data-cards-import-ok]');
+  const r1 = await page.evaluate(() => ({
+    order: [...document.querySelectorAll('.card-grid .card-tile')].map(e => e.getAttribute('aria-label')),
+    penny: state.loyaltyCards.find(c => c.name === 'Penny'),
+    ikeaLogo: !!state.loyaltyCards.find(c => c.name === 'IKEA').logo,
+    logos: document.querySelectorAll('.card-grid .card-tile-logo').length
+  }));
+  await page.fill('#cards-search', 'fam');
+  const r2 = await page.evaluate(() => ({ shown: [...document.querySelectorAll('.card-grid .card-tile')].map(e => e.getAttribute('aria-label')), focus: document.activeElement && document.activeElement.id }));
+  eq(r1.order, ['Famila', 'IKEA', 'Penny'], 'ordine alfabetico');
+  eq([!!r1.penny.logo, r1.penny.color, r1.ikeaLogo, r1.logos], [true, '#e52d21', true, 2], 'logo e colore aggiunti a Penny, IKEA nuova col logo');
+  eq(r2, { shown: ['Famila'], focus: 'cards-search' }, 'ricerca');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
