@@ -1039,3 +1039,18 @@
 .card-preview .card-qr{ width:8rem; }
 .card-import-list{ display:flex; flex-wrap:wrap; gap:0.375rem; margin:var(--space-xsmall) 0 var(--space-small); }
 .card-import-chip{ background:var(--card-color); color:#fff; border-radius:var(--radius-pill); padding:0.25rem 0.625rem; font-size:var(--text-xsmall); font-weight:var(--weight-bold); }
+.card-search{ margin-bottom:var(--space-medium); }
+.card-tile.has-logo{ align-items:center; justify-content:center; padding:var(--space-small); }
+.card-tile-logo{ max-width:85%; max-height:70%; object-fit:contain; display:block; }
+.card-tile.has-logo[style*="#ffffff"], .card-tile.has-logo[style*="#fafafc"]{ border:1px solid var(--line); }
+.card-view-head.has-logo{ justify-content:center; position:relative; min-height:4.5rem; }
+.card-view-head.has-logo .card-view-close{ position:absolute; right:var(--space-small); top:50%; transform:translateY(-50%); color:inherit; mix-blend-mode:difference; color:#fff; }
+.card-view-logo{ max-height:3.5rem; max-width:70%; object-fit:contain; display:block; }
+.card-manage-logo{ width:2.75rem; height:1.75rem; object-fit:contain; border-radius:0.375rem; flex-shrink:0; padding:2px; }
+.card-manage-logo.is-big{ width:5rem; height:2.75rem; }
+.card-logo-row{ display:flex; align-items:center; gap:var(--space-xsmall); flex-wrap:wrap; }
+.card-tile, .card-import-chip, .card-view-head, .card-view-close{ color:var(--card-ink, #fff); }
+.card-import-chip{ box-shadow:inset 0 0 0 1px rgba(0,0,0,0.12); }
+.card-view-head.has-logo .card-view-close{ mix-blend-mode:normal; color:var(--card-ink, #fff); }
+.card-tile-name{ text-shadow:none; }
+.card-search .input-search{ border:1px solid var(--line); border-radius:var(--radius-pill); padding:0.5rem var(--space-medium); background:var(--surface); width:100%; }
