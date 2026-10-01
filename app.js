@@ -1323,7 +1323,7 @@ const state = {
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
-  inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e risposte appena date che restano in vista
+  inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e righe col Sì ancora aperte (in attesa di OK)
   inventoryAnswered: null, // risposte dell'inventario (in localStorage, vedi inventoryAnswers)
   ingredientManagerFilter: 'tutti', // non persistito: 'tutti' | 'casa' (in Dispensa) | 'no'
   deptEditId: null, // non persistito: categoria aperta in modifica ('new' per una nuova)
@@ -3661,10 +3661,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-13',
+  version: '2026-10-14',
   title: 'Novità',
   items: [
-    'Inventario veloce (Dispensa → menu ⋮): tutti gli ingredienti divisi per categoria, per ognuno "Sì" o "No"; col Sì scegli quanto e dove (frigo, freezer…). Si salva da solo: puoi fermarti e riprendere da "Da fare".'
+    'Inventario veloce (Dispensa → menu ⋮): col Sì scrivi la quantità, scegli l\'unità e il luogo (tutti), poi OK e la riga sparisce da "Da fare". Quello che hai già in Dispensa parte coi suoi dati: controlli e dai OK.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -6653,6 +6653,10 @@ function inventoryDefaultQty(unit){
   if(unit === 'kg' || unit === 'l') return 1;
   return 1;
 }
+// Sì: la voce entra (o resta) in Dispensa e la riga si apre per quantità,
+// unità e luogo; si chiude, e sparisce da "Da fare", con OK. No: chiude
+// subito. Quello che è già in Dispensa parte già aperto col Sì e i suoi
+// dati, da confermare con OK o correggere.
 function inventorySetHas(name, has){
   const key = name.trim().toLowerCase();
   const answers = inventoryAnswers();
@@ -6664,14 +6668,24 @@ function inventorySetHas(name, has){
       upsertPantryItem(name, (it && it.luogo) || inventoryGuessLuogo(name, dept), unit === 'none' ? 1 : inventoryDefaultQty(unit), unit, (it && it.cat) || dept);
     }
     delete state.shopDismissed['oos_' + key];
-  } else if(it && typeof it.qty === 'number' && it.qty > 0){
+    delete answers[key];
+    state.inventoryKeep[key] = true;
+  } else {
     // Era in Dispensa e non c'è più: a 0, senza farlo comparire tra i
     // "Finiti" in Spesa (è un inventario, non una lista della spesa).
-    it.qty = 0;
-    state.shopDismissed['oos_' + key] = true;
+    if(it && typeof it.qty === 'number' && it.qty > 0){
+      it.qty = 0;
+      state.shopDismissed['oos_' + key] = true;
+    }
+    answers[key] = 'no';
+    delete state.inventoryKeep[key];
   }
-  answers[key] = has ? 'si' : 'no';
-  state.inventoryKeep[key] = true;
+  saveInventoryAnswers();
+}
+function inventoryConfirm(name){
+  const key = name.trim().toLowerCase();
+  inventoryAnswers()[key] = 'si';
+  delete state.inventoryKeep[key];
   saveInventoryAnswers();
 }
 function renderInventoryPage(){
@@ -6680,10 +6694,11 @@ function renderInventoryPage(){
   const search = (state.inventorySearch || '').trim().toLowerCase();
   const filter = state.inventoryFilter || 'todo';
   const answerOf = n => answers[n.trim().toLowerCase()];
+  const inStock = n => { const it = state.pantryItems[n.trim().toLowerCase()]; return !!(it && typeof it.qty === 'number' && it.qty > 0); };
   const done = names.filter(n => answerOf(n)).length;
   const shown = names
     .filter(n => !search || n.toLowerCase().includes(search))
-    .filter(n => filter === 'tutti' || (filter === 'si' ? answerOf(n) === 'si' : (!answerOf(n) || state.inventoryKeep[n.trim().toLowerCase()])));
+    .filter(n => filter === 'tutti' || (filter === 'si' ? inStock(n) : !answerOf(n)));
   const byDept = {};
   shown.forEach(n => { const d = inventoryDept(n); (byDept[d] = byDept[d] || []).push(n); });
   const depts = DEPT_ORDER.filter(d => byDept[d]).concat(Object.keys(byDept).filter(d => !DEPT_ORDER.includes(d)));
@@ -6691,27 +6706,34 @@ function renderInventoryPage(){
     const key = name.trim().toLowerCase();
     const it = state.pantryItems[key];
     const ans = answerOf(name);
-    const has = ans === 'si' && it && typeof it.qty === 'number' && it.qty > 0;
+    const has = ans !== 'no' && inStock(name);
+    const open = has && ans !== 'si';
     const unit = it ? (it.unit || '') : '';
     const attr = `data-inv-name="${escapeAttr(name)}"`;
+    const luogo = (it && it.luogo) || 'dispensa';
     const details = has ? `
         <div class="inv-q-details">
           ${unit === 'none' ? '<span class="inv-q-presence">In casa</span>' : `
-          <span class="qty-stepper">
+          <span class="qty-stepper inv-q-stepper">
             <button class="qty-btn" type="button" data-inv-qty="-1" ${attr} aria-label="Diminuisci">−</button>
-            <span class="qty-num">${it.qty}${unit ? ' ' + escapeHtml(unit) : ''}</span>
+            <input type="number" inputmode="decimal" min="0" step="${qtyStepFor(unit)}" class="qty-input inv-q-qty" value="${it.qty}" data-inv-qty-input ${attr} aria-label="Quantità">
             <button class="qty-btn" type="button" data-inv-qty="1" ${attr} aria-label="Aumenta">+</button>
           </span>`}
+          <select class="inv-q-unit" data-inv-unit ${attr} aria-label="Unità">
+            ${UNIT_ORDER.map(u => `<option value="${u}" ${unit === u ? 'selected' : ''}>${escapeHtml(UNIT_SHORT[u] || u)}</option>`).join('')}
+          </select>
           <span class="inv-q-luoghi" role="group" aria-label="Dove">
-            ${LUOGO_ORDER.filter(l => l !== 'giardino' || it.luogo === 'giardino').map(l => `<button type="button" class="btn is-icon inv-q-luogo${(it.luogo || 'dispensa') === l ? ' active' : ''}" data-inv-luogo="${l}" ${attr} aria-label="${escapeAttr(LUOGO_LABEL[l])}" aria-pressed="${(it.luogo || 'dispensa') === l}">${LUOGO_ICON[l]}</button>`).join('')}
+            ${LUOGO_ORDER.map(l => `<button type="button" class="btn is-icon inv-q-luogo${luogo === l ? ' active' : ''}" data-inv-luogo="${l}" ${attr} aria-label="${escapeAttr(LUOGO_LABEL[l])}" aria-pressed="${luogo === l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
+            <span class="inv-q-luogo-name">${escapeHtml(LUOGO_LABEL[luogo])}</span>
+            ${open ? `<button type="button" class="btn is-solid inv-q-ok" data-inv-ok ${attr}>OK</button>` : ''}
           </span>
         </div>` : '';
     return `
-      <div class="inv-q-row${ans ? ' is-answered' : ''}">
+      <div class="inv-q-row${ans ? ' is-answered' : ''}${open ? ' is-open' : ''}">
         <div class="inv-q-top">
           <span class="inv-q-name">${escapeHtml(name.charAt(0).toUpperCase() + name.slice(1))}</span>
           <span class="inv-q-answers">
-            <button type="button" class="btn inv-q-btn${ans === 'si' ? ' active is-yes' : ''}" data-inv-has="1" ${attr} aria-pressed="${ans === 'si'}">Sì</button>
+            <button type="button" class="btn inv-q-btn${has ? ' active is-yes' : ''}" data-inv-has="1" ${attr} aria-pressed="${has}">Sì</button>
             <button type="button" class="btn inv-q-btn${ans === 'no' ? ' active is-no' : ''}" data-inv-has="0" ${attr} aria-pressed="${ans === 'no'}">No</button>
           </span>
         </div>
@@ -6724,7 +6746,7 @@ function renderInventoryPage(){
       <div class="inv-q-progress">
         <div class="inv-q-progress-text"><b>${done}</b> su ${names.length} ingredienti · ${pct}%</div>
         <div class="inv-q-bar"><span style="width:${pct}%"></span></div>
-        <p class="settings-note">Per ogni ingrediente: Sì o No. Col Sì scegli quanto e dove. Si salva da solo: puoi fermarti e riprendere quando vuoi.</p>
+        <p class="settings-note">Sì o No per ogni ingrediente. Col Sì scrivi quanto e scegli dove, poi OK: la riga sparisce da "Da fare". Quello che hai già in Dispensa parte coi suoi dati, basta controllare e dare OK. Si salva da solo.</p>
       </div>
       <div class="manage-toolbar">
         <div class="search-field">
@@ -8523,6 +8545,22 @@ function attachHandlers(){
     state.inventoryKeep = {};
     render();
   }));
+  document.querySelectorAll('[data-inv-qty-input]').forEach(inp=> inp.addEventListener('change', e=>{
+    const name = e.target.dataset.invName;
+    const it = state.pantryItems[name.trim().toLowerCase()];
+    const n = parseFloat(String(e.target.value).replace(',', '.'));
+    if(!it || Number.isNaN(n)) return;
+    it.qty = Math.max(0, Math.round(n * 100) / 100);
+    if(it.qty === 0) inventorySetHas(name, false);
+    persist(); render();
+  }));
+  document.querySelectorAll('[data-inv-unit]').forEach(sel=> sel.addEventListener('change', e=>{
+    const it = state.pantryItems[e.target.dataset.invName.trim().toLowerCase()];
+    if(!it) return;
+    if(e.target.value) it.unit = e.target.value; else delete it.unit;
+    if(it.unit === 'none') it.qty = 1;
+    persist(); render();
+  }));
   const inventorySearch = document.getElementById('inventory-search');
   if(inventorySearch) inventorySearch.addEventListener('input', e=>{
     state.inventorySearch = e.target.value;
@@ -9270,11 +9308,12 @@ document.addEventListener('click', e=>{
     removeMealDish(weekIdx, i, meal, removeEl.dataset.dishName);
     return;
   }
-  const invEl = e.target.closest('[data-inv-has],[data-inv-qty],[data-inv-luogo]');
+  const invEl = e.target.closest('[data-inv-has],[data-inv-qty],[data-inv-luogo],[data-inv-ok]');
   if(invEl){
     const name = invEl.dataset.invName;
     const it = state.pantryItems[name.trim().toLowerCase()];
-    if(invEl.hasAttribute('data-inv-has')) inventorySetHas(name, invEl.dataset.invHas === '1');
+    if(invEl.hasAttribute('data-inv-ok')) inventoryConfirm(name);
+    else if(invEl.hasAttribute('data-inv-has')) inventorySetHas(name, invEl.dataset.invHas === '1');
     else if(it && invEl.hasAttribute('data-inv-qty')){
       const step = qtyStepFor(it.unit || '');
       it.qty = Math.max(0, Math.round(((it.qty || 0) + step * Number(invEl.dataset.invQty)) * 100) / 100);
