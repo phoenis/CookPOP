@@ -3758,10 +3758,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-23',
+  version: '2026-10-24',
   title: 'Novità',
   items: [
-    'Spesa: quello che tieni nel freezer non finisce più in Surgelati (il pane si compra fresco e si congela dopo). In Surgelati va ciò che ha "surgelato" nel nome o che metti a mano in quella categoria.'
+    'Spesa: il bottone 💳 Carte ora è accanto a Modalità spesa; Ordine corsie si apre dal menu ⋯ in alto.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5954,13 +5954,12 @@ function renderSpesa(){
     </div>
     <div class="shop-checks">
     <div class="shop-progress">${displayDone} / ${displayTotal} presi</div>
-    <button type="button" class="btn is-chip shop-cards-btn" data-open-cards>💳 Carte</button>
-    ${state.shopView === 'reparto' ? '<button type="button" class="btn is-chip shop-cards-btn" data-open-aisles>↕️ Corsie</button>' : ''}
     </div>
     ${body}
           
     <div class="shop-top-actions">
       <button class="btn is-outline ${state.shopMode ? 'active' : ''}" id="shop-mode-toggle" type="button" title="Se attiva, spuntare una riga la sposta subito in Dispensa"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Modalità spesa${state.shopMode ? ': ON' : ''}</button>
+      <button type="button" class="btn is-outline" data-open-cards>💳 Carte</button>
 
  ${displayDoneShoppable ? `
   <div class="buttons-fixed is-checked">

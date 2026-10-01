@@ -1066,3 +1066,5 @@
 .aisle-handle{ flex:0 0 1.75rem; height:2rem; display:flex; align-items:center; justify-content:center; color:var(--ink-light); font-size:1.125rem; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
 .aisle-row.is-dragging{ background:var(--surface); box-shadow:0 4px 14px rgba(0,0,0,0.25); border-radius:0.5rem; position:relative; z-index:1; }
 .aisle-move:disabled{ opacity:0.25; }
+
+.shop-top-actions{ flex-direction:row; flex-wrap:wrap; justify-content:center; }
