@@ -141,6 +141,16 @@ function homeUnitOptionsHtml(selected){
   const units = HOME_UNITS.concat(selected && !HOME_UNITS.includes(selected) ? [selected] : []);
   return units.map(u=>`<option value="${u}" ${(selected||'')===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('');
 }
+// Ordine dei reparti in Spesa, come si gira il supermercato: prima la casa
+// (detersivi, igiene...), poi il fresco, poi gli scaffali, i surgelati in
+// fondo per non scongelarli nel carrello. Le categorie create a mano vanno
+// in fondo al loro gruppo (casa o cibo), prima del rispettivo "Altro".
+const SHOP_AISLE_FOOD = ['verdura','pane','salumi','latticini','carne','pesce','pasta','legumi','conserve','salse','base','dolci','bibite'];
+function shopAisleOrder(){
+  const casa = DEPT_ORDER.filter(d => isNonFoodDept(d) && d !== 'altro-casa');
+  const food = SHOP_AISLE_FOOD.concat(DEPT_ORDER.filter(d => !isNonFoodDept(d) && !SHOP_AISLE_FOOD.includes(d) && !['avanzi','altro','surgelati','finiti'].includes(d)));
+  return ['avanzi'].concat(casa, ['altro-casa'], food, ['altro','surgelati','finiti']);
+}
 function knownDept(cat){
   return cat && DEPT_LABEL[cat] && cat !== 'finiti' ? cat : '';
 }
@@ -210,6 +220,7 @@ const DEPT_RULES = [
   // parola chiave di un altro reparto: "Colla di pesce" non è pesce, "Farina
   // di ceci" non è un legume, "Fagiolini" non sono fagioli, "Pasta sfoglia"
   // non è pasta, "Tonno sott'olio" non è olio, "Ragù di carne" non è carne.
+  ['surgelat','surgelati'], ['congelat','surgelati'], ['gelato','surgelati'], ['bastoncini','surgelati'],
   ['colla di pesce','dolci'], ['brodo','salse'], ['dado','salse'], ['dadi','salse'], ['aglio in polvere','base'], ['aranciata','bibite'],
   ['latte di cocco','salse'], ['tahina','salse'], ['robiola','latticini'], ['bagoss','latticini'], ['fagiolini','verdura'],
   ['fette biscottate','pane'], ['pangrattato','pane'], ['lievito','dolci'], ['olive','conserve'], // "denocciolate" contiene "nocciol"
@@ -245,15 +256,15 @@ const DEPT_RULES = [
   // di "pepe", che altrimenti li intercetterebbe essendo una loro sottostringa.
   ['peperoncino','base'], ['peperon','verdura'],
   ['sale','base'], ['olio','base'], ['pepe','base'], ['aceto','base'], ['spezie','base'],
-  ['origano','base'], ['rosmarino','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'], ['curry','base'],
+  // Erbe: secche tra le spezie, fresche (rosmarino, salvia, basilico...) con la verdura.
+  ['rosmarino secco','base'], ['salvia secca','base'], ['basilico secco','base'], ['prezzemolo secco','base'], ['erbe secche','base'], ['origano','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'], ['curry','base'],
   ['curcuma','base'], ['cumino','base'], ['zafferano','base'], ['chiodi di garofano','base'],
-  ['surgelat','surgelati'], ['gelato','surgelati'],
   ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
   ['melone','verdura'], ['anguria','verdura'], ['mela','verdura'], ['pera','verdura'], ['limone','verdura'], ['arancia','verdura'], ['banana','verdura'], ['fragol','verdura'], ['uva','verdura'],
   ['cipoll','verdura'], ['borettan','verdura'], ['scalogno','verdura'], ['porr','verdura'], ['sedano','verdura'], ['finocchi','verdura'],
   ['carciof','verdura'], ['funghi','verdura'], ['broccol','verdura'], ['cavolfior','verdura'], ['verza','verdura'], ['cime di rapa','verdura'],
   ['friariell','verdura'], ['spinaci','verdura'], ['bietol','verdura'], ['asparag','verdura'], ['cetriol','verdura'], ['radicchio','verdura'], ['cicoria','verdura'], ['zenzero','verdura'],
-  ['rucola','verdura'], ['zucca','verdura'], ['piselli','verdura'], ['verdur','verdura'], ['prezzemolo','verdura'], ['salvia','verdura'],
+  ['rucola','verdura'], ['zucca','verdura'], ['piselli','verdura'], ['verdur','verdura'], ['prezzemolo','verdura'], ['salvia','verdura'], ['rosmarino','verdura'],
   ['menta','verdura'], ['aneto','verdura'], ['aranc','verdura'], ['mele','verdura'], ['pere','verdura'],
   ['acqua','bibite'], ['bibit','bibite'], ['birra','bibite'], ['succo di frutta','bibite'], ['tè freddo','bibite'], ['vino','bibite'], ['liquor','bibite'],
   [/\brum\b/,'bibite'], ['caffè','bibite'], ['spumante','bibite'], ['prosecco','bibite'],
@@ -2044,6 +2055,20 @@ const MIGRATIONS = [
     Object.values(state.pantryGroups || {}).forEach(g=>{ if(g && g.cat) g.cat = recat(g.cat, g.matchName || g.label); });
     const custom = state.customDepts || {};
     RESHUFFLED.forEach(id=>{ if(custom[id]) delete custom[id]; });
+  }},
+  // 23. Una tantum: il rosmarino fresco va con la verdura come la salvia (era
+  // tra le spezie), e ciò che nel nome è surgelato/congelato va in Surgelati
+  // qualunque cosa sia, così in Spesa sta in fondo con gli altri surgelati.
+  { flag: 'deptsRegrouped2', run(){
+    const fix = (cat, name) => {
+      const auto = classifyDept(name || '');
+      if(auto === 'surgelati' && cat && !isNonFoodDept(cat)) return 'surgelati';
+      if(cat === 'base' && auto === 'verdura') return 'verdura';
+      return cat;
+    };
+    Object.values(state.pantryItems || {}).forEach(it=>{ if(it && it.cat) it.cat = fix(it.cat, it.nome); });
+    Object.values(state.shopExtras || {}).forEach(it=>{ if(it && it.cat) it.cat = fix(it.cat, it.ingrediente); });
+    Object.values(state.pantryGroups || {}).forEach(g=>{ if(g && g.cat) g.cat = fix(g.cat, g.matchName || g.label); });
   }}
 ];
 function runMigrations(){
@@ -3720,10 +3745,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-19',
+  version: '2026-10-20',
   title: 'Novità',
   items: [
-    'Nuove categorie, come le corsie del supermercato: Salumi, Pasta riso e cereali, Legumi, Pomodoro e conserve, Olio aceto e spezie, Salse e brodi, Dolci e forno, Bevande. Le uova ora stanno con i latticini. Gli ingredienti che avevi sono già stati spostati.'
+    'Lista spesa in ordine di corsia: prima i prodotti per la casa, poi frutta e verdura, pane, salumi, latticini, carne, pesce, pasta, legumi, conserve, salse, olio e spezie, dolci, bevande, e i surgelati in fondo.',
+    'Tutto ciò che è surgelato va in Surgelati, anche verdura o pesce. Il rosmarino fresco ora sta con la verdura, come la salvia.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5684,15 +5710,9 @@ function renderSpesa(){
       byDept[it.dept].push(it);
     });
 
-    // Alfabetico per nome reparto: prima il cibo (con "Altro" in fondo), poi
-    // i prodotti per la casa (col loro "Altro" in fondo), "Finiti" ultimo.
+    // In ordine di corsia (vedi shopAisleOrder), "Finiti" ultimo.
     const deptsPresent = DEPT_ORDER.filter(dept => byDept[dept] && byDept[dept].length);
-    const byLabel = (a,b)=> IT_COLLATOR.compare(DEPT_LABEL[a], DEPT_LABEL[b]);
-    const sortedDepts = deptsPresent.filter(d => d !== 'altro' && d !== 'finiti' && !isNonFoodDept(d)).sort(byLabel);
-    if(deptsPresent.includes('altro')) sortedDepts.push('altro');
-    sortedDepts.push(...deptsPresent.filter(d => d !== 'altro-casa' && isNonFoodDept(d)).sort(byLabel));
-    if(deptsPresent.includes('altro-casa')) sortedDepts.push('altro-casa');
-    if(deptsPresent.includes('finiti')) sortedDepts.push('finiti');
+    const sortedDepts = shopAisleOrder().filter(d => deptsPresent.includes(d));
     hasFinitiThisView = deptsPresent.includes('finiti');
 
     body = sortedDepts.map(dept => {
