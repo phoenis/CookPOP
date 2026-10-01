@@ -936,3 +936,8 @@
 .soak-note{ display:flex; gap:var(--space-small); align-items:flex-start; padding:var(--space-small) var(--space-medium); border-radius:var(--radius-modal); background:color-mix(in srgb, var(--amber) 22%, var(--surface)); border:1px solid color-mix(in srgb, var(--amber) 55%, transparent); font-size:var(--text-small); line-height:1.4; color:var(--ink); }
 .soak-note-ic{ font-size:1.125rem; line-height:1.2; }
 .soak-note-title{ font-weight:var(--weight-bold); }
+/* Più aria tra un piatto e l'altro; l'ultimo piatto non ha la linea sotto. */
+.dish-item{ padding-bottom:var(--space-medium); }
+.dish-item::before{ bottom:0.5rem; }
+.dish-item:last-of-type::before{ display:none; }
+.dish-item:last-of-type{ padding-bottom:var(--space-xsmall); }
