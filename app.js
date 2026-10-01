@@ -9700,15 +9700,7 @@ function cardsPageHtml(){
           <button type="button" class="btn is-solid is-block" data-card-save ${d.name.trim() && d.number.trim() ? '' : 'disabled'}>${d.id ? 'Salva' : 'Aggiungi'}</button>
           ${d.id ? `<button type="button" class="btn is-outline is-block settings-item-danger" data-card-delete="${escapeAttr(d.id)}">Elimina carta</button>` : ''}
         </div>
-      </section>
-      ${d.id ? '' : `
-      <section class="settings-section">
-        <h3 class="settings-section-title">Oppure importa</h3>
-        <div class="settings-card">
-          <p class="settings-card-text">Da un file di carte (.json): aggiunge quelle nuove e i loghi che mancano.</p>
-          <label class="btn is-outline is-block">⬆ Importa da file<input type="file" accept="application/json,.json" id="cards-import-file" hidden></label>
-        </div>
-      </section>`}`;
+      </section>`;
     html += managePageHtml({ key: 'cards-form', title: d.id ? 'Modifica carta' : 'Nuova carta', closeAttr: 'data-close-card-form', body });
   }
   return html;
@@ -9850,14 +9842,6 @@ document.addEventListener('change', e=>{
   if(e.target.id === 'card-number' || e.target.id === 'card-name') render();
   if(e.target.id === 'card-scan-input') scanCardImage(e.target.files && e.target.files[0]);
   if(e.target.id === 'card-logo-input') loadCardLogo(e.target.files && e.target.files[0]);
-  if(e.target.id === 'cards-import-file'){
-    const f = e.target.files && e.target.files[0];
-    if(f) f.text().then(txt => {
-      try{ state.cardsImport = parseCardsImport(JSON.parse(txt)); }catch(err){ state.cardsImport = []; }
-      if(!state.cardsImport.length){ state.cardsImport = null; state.cardScanMsg = 'File non valido: nessuna carta trovata.'; }
-      render();
-    });
-  }
 });
 
 (async function init(){

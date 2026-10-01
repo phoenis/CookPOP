@@ -1036,14 +1036,13 @@ test('carte fedeltà: Code 39 e QR, import da link #carte= con conferma, senza d
   eq(page.errors, [], 'errori JS');
 });
 
-test('carte fedeltà: in ordine alfabetico, ricerca per nome che tiene il fuoco, loghi da file anche per le carte già presenti', async ({ page }) => {
+test('carte fedeltà: in ordine alfabetico, ricerca per nome che tiene il fuoco, loghi importati anche per le carte già presenti', async ({ page }) => {
   const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
   await page.evaluate(() => {
     state.loyaltyCards = [{ id: 'a', name: 'Penny', number: '2095057969316', color: '#123456' }, { id: 'b', name: 'Famila', number: '0402008090593', color: '#e5512f' }];
     state.tab = 'spesa'; state.cardsOpen = 'list'; render();
-    document.querySelector('[data-card-add]').click();
   });
-  await page.setInputFiles('#cards-import-file', { name: 'carte.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([['Penny', '2095057969316', 'ean_13', '#e52d21', logo], ['IKEA', '6275980414616639489', 'qr_code', '#0057a4', logo]])) });
+  await page.evaluate(list => { state.cardsImport = parseCardsImport(list); render(); }, [['Penny', '2095057969316', 'ean_13', '#e52d21', logo], ['IKEA', '6275980414616639489', 'qr_code', '#0057a4', logo]]);
   await page.waitForSelector('[data-cards-import-ok]');
   await page.click('[data-cards-import-ok]');
   const r1 = await page.evaluate(() => ({
