@@ -1056,4 +1056,6 @@
 .card-search .input-search{ border:1px solid var(--line); border-radius:var(--radius-pill); padding:0.5rem var(--space-medium); background:var(--surface); width:100%; }
 .settings-action{ margin-left:auto; font-size:1.75rem; line-height:1; width:2.5rem; height:2.5rem; color:var(--gold); }
 .card-view-edit{ align-self:center; margin-top:var(--space-small); }
+.card-view-inner .card-view-edit{ background:#fff; color:#111; border-color:#ccc; }
+.card-view-inner .card-view-edit:hover{ background:#f3f3f3; color:#111; border-color:#999; }
 .card-form .is-block{ width:100%; }
