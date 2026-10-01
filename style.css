@@ -1059,3 +1059,8 @@
 .card-view-inner .card-view-edit{ background:#fff; color:#111; border-color:#ccc; }
 .card-view-inner .card-view-edit:hover{ background:#f3f3f3; color:#111; border-color:#999; }
 .card-form .is-block{ width:100%; }
+
+.aisle-row{ gap:var(--space-xsmall); }
+.aisle-row .manage-row-main{ flex:1; }
+.aisle-move{ font-size:1.125rem; width:2.25rem; height:2.25rem; }
+.aisle-move:disabled{ opacity:0.25; }

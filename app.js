@@ -145,11 +145,21 @@ function homeUnitOptionsHtml(selected){
 // (detersivi, igiene...), poi il fresco, poi gli scaffali, i surgelati in
 // fondo per non scongelarli nel carrello. Le categorie create a mano vanno
 // in fondo al loro gruppo (casa o cibo), prima del rispettivo "Altro".
+// L'ordine si può cambiare a mano ("Ordine corsie" in Spesa): resta in
+// state.shopAisleCustom, e una categoria nata dopo si aggiunge in fondo.
 const SHOP_AISLE_FOOD = ['verdura','pane','salumi','latticini','carne','pesce','pasta','legumi','conserve','salse','base','dolci','bibite'];
-function shopAisleOrder(){
+function defaultShopAisles(){
   const casa = DEPT_ORDER.filter(d => isNonFoodDept(d) && d !== 'altro-casa');
   const food = SHOP_AISLE_FOOD.concat(DEPT_ORDER.filter(d => !isNonFoodDept(d) && !SHOP_AISLE_FOOD.includes(d) && !['avanzi','altro','surgelati','finiti'].includes(d)));
-  return ['avanzi'].concat(casa, ['altro-casa'], food, ['altro','surgelati','finiti']);
+  return casa.concat(['altro-casa'], food, ['altro','surgelati']).filter(d => DEPT_LABEL[d]);
+}
+function shopAisles(){
+  const def = defaultShopAisles();
+  const custom = ((typeof state !== 'undefined' && state.shopAisleCustom) || []).filter(d => def.includes(d));
+  return custom.concat(def.filter(d => !custom.includes(d)));
+}
+function shopAisleOrder(){
+  return ['avanzi'].concat(shopAisles(), ['finiti']);
 }
 function knownDept(cat){
   return cat && DEPT_LABEL[cat] && cat !== 'finiti' ? cat : '';
@@ -1342,6 +1352,8 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
+  aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
   inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
@@ -2381,7 +2393,8 @@ function buildPersonalPayload(){
     prepDay: state.prepDay,
     dishPlan: state.dishPlan,
     freezerDishes: state.freezerDishes,
-    loyaltyCards: state.loyaltyCards
+    loyaltyCards: state.loyaltyCards,
+    shopAisleCustom: state.shopAisleCustom
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
   return payload;
@@ -3745,11 +3758,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-20',
+  version: '2026-10-21',
   title: 'Novità',
   items: [
-    'Lista spesa in ordine di corsia: prima i prodotti per la casa, poi frutta e verdura, pane, salumi, latticini, carne, pesce, pasta, legumi, conserve, salse, olio e spezie, dolci, bevande, e i surgelati in fondo.',
-    'Tutto ciò che è surgelato va in Surgelati, anche verdura o pesce. Il rosmarino fresco ora sta con la verdura, come la salvia.'
+    'Spesa: con "↕️ Corsie" (accanto a Carte) metti i reparti nell\'ordine del tuo supermercato.',
+    'Quello che in Dispensa sta nel freezer, in Spesa va in Surgelati.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3805,7 +3818,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderAislesPage() + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
   endPageRender();
   attachHandlers();
   restoreInnerScroll(panel, scrolls);
@@ -3916,6 +3929,7 @@ const MODAL_CHECKS = [
   // Sotto la scheda ingrediente (che si apre da qui): si chiude dopo di lei.
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
+  [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
   [()=> !!state.inventoryOpen, ()=>{ state.inventoryOpen = false; }],
@@ -5683,7 +5697,11 @@ function renderSpesa(){
     // — a meno che non siano stati segnati "da comprare" da Spesa: a quel punto si mescolano
     // nel loro reparto vero, tra le sezioni normali.
     const classified = mainFlat.map(it=>{
-      const dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
+      let dept = (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
+      // Quello che in Dispensa sta nel freezer si compra al banco surgelati,
+      // qualunque sia la sua categoria (piselli, merluzzo...).
+      const stored = state.pantryItems[(it.ingrediente || '').trim().toLowerCase()];
+      if(dept !== 'finiti' && stored && stored.luogo === 'freezer' && !isNonFoodDept(dept)) dept = 'surgelati';
       return {...it, dept};
     });
     // unisco articoli identici (stesso ingrediente) comparsi in più ricette,
@@ -5939,6 +5957,7 @@ function renderSpesa(){
     <div class="shop-checks">
     <div class="shop-progress">${displayDone} / ${displayTotal} presi</div>
     <button type="button" class="btn is-chip shop-cards-btn" data-open-cards>💳 Carte</button>
+    ${state.shopView === 'reparto' ? '<button type="button" class="btn is-chip shop-cards-btn" data-open-aisles>↕️ Corsie</button>' : ''}
     </div>
     ${body}
           
@@ -9062,6 +9081,9 @@ const TAB_MENU_ITEMS = {
     { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } },
     { label: '+ Aggiungi ingrediente', action: ()=>{ state.pantryAddModalOpen = true; } }
   ],
+  spesa: [
+    { label: '↕️ Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
+  ],
   prep: [
     { label: '+ Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; } }
   ]
@@ -9667,6 +9689,45 @@ function sortedCards(){ return (state.loyaltyCards || []).slice().sort((a, b) =>
 // La pagina (elenco/gestione) resta sotto anche con una carta aperta o
 // l'import da confermare: sono finestre sopra, non un cambio di pagina, così
 // chiudendole l'elenco non rifà l'animazione d'ingresso.
+// --- Ordine corsie (Spesa) ---------------------------------------------------
+// I reparti della Spesa nell'ordine in cui si gira il proprio supermercato:
+// frecce su/giù per spostarli (più sicure del trascinamento col pollice).
+function renderAislesPage(){
+  if(!state.aisleOrderOpen) return '';
+  const list = shopAisles();
+  const rows = list.map((d, i) => `
+      <div class="manage-row aisle-row">
+        <span class="manage-row-icon">${DEPT_ICON[d] || ''}</span>
+        <span class="manage-row-main">${escapeHtml(DEPT_LABEL[d])}${d === 'altro-casa' ? ' (casa)' : ''}</span>
+        <button type="button" class="btn is-icon aisle-move" data-aisle-move="${escapeAttr(d)}" data-dir="-1" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="btn is-icon aisle-move" data-aisle-move="${escapeAttr(d)}" data-dir="1" aria-label="Sposta giù" ${i === list.length - 1 ? 'disabled' : ''}>↓</button>
+      </div>`).join('');
+  const body = `
+      <p class="settings-note manage-intro">L'ordine dei reparti nella lista della Spesa: mettili come li trovi girando il tuo supermercato.</p>
+      <section class="settings-section"><div class="settings-card manage-list">${rows}</div></section>
+      ${(state.shopAisleCustom || []).length ? '<button type="button" class="btn is-outline is-block" data-aisle-reset>Ripristina ordine originale</button>' : ''}`;
+  return managePageHtml({ key: 'aisles', title: 'Ordine corsie', closeAttr: 'data-close-aisles', body });
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  if(t.closest('[data-open-aisles]')){ state.aisleOrderOpen = true; render(); return; }
+  const closeEl = t.closest('[data-close-aisles]');
+  if(closeEl){
+    if(!isCloseTap(e, closeEl)) return;
+    state.aisleOrderOpen = false; render(); return;
+  }
+  const move = t.closest('[data-aisle-move]');
+  if(move){
+    const list = shopAisles();
+    const i = list.indexOf(move.dataset.aisleMove), j = i + Number(move.dataset.dir);
+    if(i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    state.shopAisleCustom = list;
+    persist(); render(); return;
+  }
+  if(t.closest('[data-aisle-reset]')){ state.shopAisleCustom = []; persist(); render(); }
+}, true);
+
 function renderCardsPages(){ return cardsPageHtml() + cardsOverlayHtml(); }
 function cardsOverlayHtml(){
   const cards = state.loyaltyCards || [];

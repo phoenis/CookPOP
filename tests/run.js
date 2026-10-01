@@ -1120,6 +1120,27 @@ test('spesa in ordine di corsia: casa in cima, surgelati in fondo; rosmarino con
   eq(page.errors, [], 'errori JS');
 });
 
+test('ordine corsie: frecce su/giù in Spesa, ripristino; quello che sta nel freezer va in Surgelati', async ({ page }) => {
+  await page.evaluate(() => {
+    state.shopAisleCustom = [];
+    upsertPantryItem('Piselli', 'freezer', 0);
+    state.shopExtras = { x1: { ingrediente: 'Piselli', qta: '' }, x2: { ingrediente: 'Zucchine', qta: '' }, x3: { ingrediente: 'Detersivo piatti', qta: '' } };
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+  });
+  const before = await page.evaluate(() => [...document.querySelectorAll('.dept-title')].map(e => e.textContent.trim()).join('|'));
+  const iPul = before.indexOf('Pulizia'), iVer = before.indexOf('Frutta e verdura'), iSur = before.indexOf('Surgelati');
+  await page.click('[data-open-aisles]');
+  await page.waitForSelector('[data-page="aisles"]');
+  await page.click('[data-aisle-move="verdura"][data-dir="-1"]');
+  const r = await page.evaluate(() => ({ first2: shopAisles().slice(0, 6), custom: state.shopAisleCustom.length > 0 }));
+  await page.click('[data-aisle-reset]');
+  const reset = await page.evaluate(() => state.shopAisleCustom.length);
+  eq([iPul >= 0 && iPul < iVer, iSur > iVer], [true, true], 'casa in cima, piselli dal freezer in Surgelati in fondo');
+  eq(r.first2.indexOf('verdura') < r.first2.indexOf('altro-casa'), true, 'verdura spostata su');
+  eq([r.custom, reset], [true, 0], 'ripristino');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
