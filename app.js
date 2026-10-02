@@ -3758,10 +3758,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-24',
+  version: '2026-10-25',
   title: 'Novità',
   items: [
-    'Spesa: il bottone 💳 Carte ora è accanto a Modalità spesa; Ordine corsie si apre dal menu ⋯ in alto.'
+    'Lista spesa più leggera: in alto "Raggruppa per" (Corsia, Giorno, Dalla A alla Z), sezioni come semplici etichette col numero di articoli, e per aggiungere una nota tocca la matita accanto al nome.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5661,7 +5661,7 @@ function renderSpesa(){
     const editingIngNote = state.ingNoteEditingKey === ingNoteKey;
     const ingNoteHtml = editingIngNote
       ? `<span class="ing-note-row"><input type="text" class="ing-note-input" placeholder="Nota per questo ingrediente…" value="${escapeAttr(ingNote)}" data-ing-note="${escapeAttr(ingNoteKey)}"></span>`
-      : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">📝 ${escapeHtml(ingNote)}</span>` : `<button type="button" class="btn is-text ing-note-add" data-ing-note-show="${escapeAttr(ingNoteKey)}">+ nota</button>`}</span>`;
+      : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">${escapeHtml(ingNote)}</span>` : ''}</span>`;
     return `
     <div class="swipe-wrap" data-swipe-id="shop:${escapeAttr(rowKey)}" data-swipe-shop="${escapeAttr(rowKey)}" data-swipe-label="${escapeAttr(ingrediente)}">
     <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(ingrediente)}">${TRASH_ICON_SVG}</button>
@@ -5669,7 +5669,7 @@ function renderSpesa(){
       <label class="shop-item ${checked?'checked':''}">
         <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
         <span>
-          <span class="item-name">${escapeHtml(ingrediente)}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}</span>
+          <span class="item-name">${escapeHtml(ingrediente)}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}${!ingNote && !editingIngNote ? `<button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Aggiungi una nota">${PENCIL_ICON_SVG}</button>` : ''}</span>
           ${(subtitle || note) ? `<span class="item-detail">${escapeHtml(subtitle||'')}${subtitle && note ? ' · ' : ''}${escapeHtml(note||'')}</span>` : ''}
           ${ingNoteHtml}
         </span>
@@ -5689,7 +5689,7 @@ function renderSpesa(){
 
   let body = '';
   let hasFinitiThisView = false;
-  if(state.shopView === 'reparto'){
+  if(state.shopView === 'reparto' || state.shopView === 'az'){
     // Solo reparto merceologico, niente più negozio: si compra dove capita.
     // I "Finiti in Dispensa" vanno nel loro reparto dedicato invece che in "Altro"
     // (o nel reparto merceologico vero, che a colpo d'occhio non spiegherebbe il perché sono lì)
@@ -5728,7 +5728,12 @@ function renderSpesa(){
 
     // In ordine di corsia (vedi shopAisleOrder), "Finiti" ultimo.
     const deptsPresent = DEPT_ORDER.filter(dept => byDept[dept] && byDept[dept].length);
-    const sortedDepts = shopAisleOrder().filter(d => deptsPresent.includes(d));
+    let sortedDepts = shopAisleOrder().filter(d => deptsPresent.includes(d));
+    // "Dalla A alla Z": una lista sola senza sezioni (i Finiti restano a parte, in fondo).
+    if(state.shopView === 'az'){
+      byDept.__az = mergedList.filter(it => it.dept !== 'finiti').sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente));
+      sortedDepts = (byDept.__az.length ? ['__az'] : []).concat(deptsPresent.includes('finiti') ? ['finiti'] : []);
+    }
     hasFinitiThisView = deptsPresent.includes('finiti');
 
     body = sortedDepts.map(dept => {
@@ -5752,12 +5757,13 @@ function renderSpesa(){
           ${finishedActions}
         </div>`;
       }
+      if(dept === '__az') return `<div class="shop-day-group shop-az">${rowsHtml}</div>`;
       const sectionId = `reparto_${dept}`;
       const isOpen = !state.shopSectionCollapsed[sectionId];
       return `
       <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
-          <span class="dept-icon">${DEPT_ICON[dept]}</span>${DEPT_LABEL[dept]}
+          ${escapeHtml(DEPT_LABEL[dept])}<span class="dept-count">${items.length}</span>
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
         <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">${rowsHtml}</div>
@@ -5948,14 +5954,18 @@ function renderSpesa(){
   return `
     <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa non compare qui</p>
     ${missingBanner}
-    <div class="view-toggle">
-      <button class="view-btn ${state.shopView==='reparto'?'active':''}" data-shop-view="reparto">Per reparto</button>
-      <button class="view-btn ${state.shopView!=='reparto'?'active':''}" data-shop-view="giorno">Per giorno</button>
+    <div class="shop-head">
+      <div class="shop-head-title">
+        <h2 class="shop-list-title">La tua lista della spesa</h2>
+        <span class="shop-head-sub">${displayTotal} ${displayTotal === 1 ? 'articolo' : 'articoli'}${displayDone ? ` · ${displayDone} ${displayDone === 1 ? 'preso' : 'presi'}` : ''}</span>
+      </div>
+      <label class="shop-group-by"><span>Raggruppa per</span>
+        <select data-shop-group aria-label="Raggruppa per">
+          ${[['reparto','Corsia'],['giorno','Giorno'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </label>
     </div>
-    <div class="shop-checks">
-    <div class="shop-progress">${displayDone} / ${displayTotal} presi</div>
-    </div>
-    ${body}
+    <div class="shop-list">${body}</div>
           
     <div class="shop-top-actions">
       <button class="btn is-outline ${state.shopMode ? 'active' : ''}" id="shop-mode-toggle" type="button" title="Se attiva, spuntare una riga la sposta subito in Dispensa"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Modalità spesa${state.shopMode ? ': ON' : ''}</button>
@@ -7039,6 +7049,9 @@ function attachHandlers(){
   // non passa da un render() completo).
   document.querySelectorAll('.edit-ing-name, [data-ning], [data-rning]').forEach(attachIngredientCombobox);
 
+  document.querySelectorAll('[data-shop-group]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{ state.shopView = sel.value; render(); });
+  });
   document.querySelectorAll('[data-shop-view]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.shopView = e.target.dataset.shopView;
@@ -9207,6 +9220,7 @@ let dragState = null;
 // Non parte da campi, stepper e icona del luogo, che hanno i loro gesti; a
 // swipe iniziato avvisa la riga (evento "swipestart") così la pressione lunga
 // di Dispensa non scatta, e il tocco finale non spunta/apre nulla.
+const PENCIL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M227.31 73.37L182.63 28.68a16 16 0 0 0-22.63 0L36.69 152A15.86 15.86 0 0 0 32 163.31V208a16 16 0 0 0 16 16h44.69a15.86 15.86 0 0 0 11.31-4.69L227.31 96a16 16 0 0 0 0-22.63M92.69 208H48v-44.69l88-88L180.69 120ZM192 108.68L147.31 64l24-24L216 84.68Z"/></svg>';
 const TRASH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg>';
 const SWIPE_REVEAL = 80, SWIPE_AUTO = 170;
 let revealedSwipeId = null; // riga col cestino rivelato: sopravvive ai render
