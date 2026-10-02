@@ -1168,3 +1168,14 @@
 .album-for-row.is-new .album-for-check{ color:var(--gold); border-color:var(--gold); }
 .prep-search-row .btn.prep-filters-btn{ background:var(--surface); color:var(--ink); border:1px solid var(--line); box-shadow:none; }
 .prep-search-row .btn.prep-filters-btn.active{ border-color:var(--gold); color:var(--gold-dark); }
+/* Ricerca e Filtri in Ricette: stessa altezza, stesso bordo, allineati. */
+.prep-search-row{ align-items:stretch; }
+.prep-search-row .list-search, .prep-search-row .btn.prep-filters-btn{ box-sizing:border-box; height:2.75rem; margin:0; }
+.prep-search-row .list-search .input-search{ padding-top:0; padding-bottom:0; height:100%; }
+.prep-search-row .btn.prep-filters-btn{ padding:0 1rem; border-radius:var(--radius-pill); font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); line-height:1; }
+.cookbook-use-btn{ width:100%; margin-top:var(--space-medium); }
+.cookbook-use-btn + .cookbook-add-btn{ margin-top:var(--space-xsmall); }
+.cookbook-use-meals{ display:grid; grid-template-columns:1fr 1fr; gap:var(--space-xsmall); }
+.cookbook-use-meal{ display:flex; flex-direction:column; align-items:flex-start; gap:0.125rem; padding:0.625rem 0.75rem; border:1px solid var(--line); border-radius:0.75rem; background:var(--surface); color:var(--ink); font-family:var(--font-family); text-align:left; cursor:pointer; min-width:0; }
+.cookbook-use-meal-label{ font-size:var(--text-xsmall); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:0.05em; color:var(--gold-dark); }
+.cookbook-use-meal-now{ font-size:var(--text-small); color:var(--ink-light); width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

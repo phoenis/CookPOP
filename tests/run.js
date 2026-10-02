@@ -1269,6 +1269,26 @@ test('ricette: interruttore Ricette/Libro di cucina, ricerca in alto, album crea
   eq(page.errors, [], 'errori JS');
 });
 
+test('libro di cucina: "Usa nel menù" mette le ricette dell\'album nel pasto scelto, con Annulla', async ({ page }) => {
+  const names = await page.evaluate(() => {
+    const all = allRecipeMetas();
+    const primo = all.find(r => r.tipologia === 'primo').nome, contorno = all.find(r => r.tipologia === 'contorno').nome;
+    state.cookbooks = [{ id: 'x', name: 'Natale', recipes: [contorno, primo] }];
+    state.tab = 'prep'; state.prepView = 'libro'; state.cookbookOpenId = 'x'; render();
+    return { primo, contorno };
+  });
+  await page.click('[data-cookbook-use]');
+  const slotKey = await page.evaluate(() => document.querySelector('[data-cookbook-use-slot]').dataset.cookbookUseSlot);
+  const before = await page.evaluate(k => { const m = parseMealKey(k); return effectiveMeal(m.weekIdx, m.i, m.meal).principale || null; }, slotKey);
+  await page.click(`[data-cookbook-use-slot="${slotKey}"]`);
+  const after = await page.evaluate(k => { const m = parseMealKey(k); const e = effectiveMeal(m.weekIdx, m.i, m.meal); return { p: e.principale, c: e.contorni, page: !!document.querySelector('[data-page="cookbook-use"]') }; }, slotKey);
+  await page.click('.undo-toast button');
+  const undone = await page.evaluate(k => { const m = parseMealKey(k); return effectiveMeal(m.weekIdx, m.i, m.meal).principale || null; }, slotKey);
+  eq(after, { p: names.primo, c: [names.contorno], page: false }, 'primo come principale, il resto accanto');
+  eq(undone, before, 'annulla');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
