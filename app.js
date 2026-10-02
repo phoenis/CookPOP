@@ -1354,6 +1354,9 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  cookbooks: [], // Libro di cucina: album di ricette [{ id, name, recipes:[nomi] }] (vedi renderCookbooksView)
+  prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
+  cookbookOpenId: null, cookbookPickOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
@@ -1370,7 +1373,6 @@ const state = {
   expiryConfirm: [], // non persistito: chiavi di Dispensa con scadenza stimata da confermare (renderExpiryConfirmModal)
   balanceDetailsOpen: false, // non persistito: spiegazione sotto la riga dell'equilibrio nel Menù
   prepPantryMode: false, // non persistito: Ricette in modalità "Con quello che ho"
-  prepSearchOpen: false, // non persistito: campo di ricerca ricette (Prep) visibile o ridotto a icona
   whatsNewSeen: null, // vecchio: una sola "già vista" per tutto lo spazio — non più usato, vedi whatsNewSeenBy
   whatsNewSeenBy: {}, // { persona: ultima WHATS_NEW.version chiusa } — per persona, non per spazio (vedi renderWhatsNewModal)
   pantryEditingKey: null,
@@ -2395,7 +2397,8 @@ function buildPersonalPayload(){
     dishPlan: state.dishPlan,
     freezerDishes: state.freezerDishes,
     loyaltyCards: state.loyaltyCards,
-    shopAisleCustom: state.shopAisleCustom
+    shopAisleCustom: state.shopAisleCustom,
+    cookbooks: state.cookbooks
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
   return payload;
@@ -3759,10 +3762,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-29',
+  version: '2026-10-30',
   title: 'Novità',
   items: [
-    'Spesa e Dispensa: la ricerca ora è sempre visibile in cima alla pagina.'
+    'Ricette: in basso puoi passare da Ricette al nuovo 📖 Libro di cucina, dove raccogli le ricette in album per le occasioni (es. Menù di Natale). Da una ricetta aperta tocca "📚 Aggiungi a un album".',
+    'La ricerca delle ricette ora è sempre visibile in alto, con i Filtri accanto.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3818,7 +3822,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderAislesPage() + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderAislesPage() + renderCookbookModals() + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
   endPageRender();
   attachHandlers();
   restoreInnerScroll(panel, scrolls);
@@ -3910,6 +3914,8 @@ function closeTopbarMenu(){
   if(el) el.classList.remove('open');
 }
 const MODAL_CHECKS = [
+  [()=> !!state.cookbookNameDraft, ()=>{ state.cookbookNameDraft = null; }],
+  [()=> !!state.albumForRecipe, ()=>{ state.albumForRecipe = null; }],
   [()=> expiryConfirmKeys().length > 0, ()=>{ closeExpiryConfirm(); }],
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> !!state.doneModalLeftoverPickerOpen, ()=>{ state.doneModalLeftoverPickerOpen = false; }],
@@ -3942,6 +3948,8 @@ const MODAL_CHECKS = [
   [()=> !!state.avanzoDiPickerOpenDay, ()=>{ state.avanzoDiPickerOpenDay = null; }],
   [()=> !!state.dishPicker, ()=>{ state.dishPicker = null; }],
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
+  [()=> !!state.cookbookPickOpen, ()=>{ state.cookbookPickOpen = false; state.cookbookPickSearch = ''; }],
+  [()=> !!state.cookbookOpenId, ()=>{ state.cookbookOpenId = null; }],
   [()=> !!state.expandedDay, ()=>{ state.expandedDay = null; }],
   [()=> isSettingsBackdropOpen(), ()=> closeSettingsBackdrop()],
   [()=> isTopbarMenuOpen(), ()=> closeTopbarMenu()],
@@ -6072,7 +6080,7 @@ function renderRecipeDetailScreen(name){
         ${stepsHtml}
         ${noteBox}
         ${addFormHtml}
-        <div class="button-wrapper">${editRecipeBtn}${linkHtml}</div>
+        <div class="button-wrapper">${editRecipeBtn}<button type="button" class="btn is-chip" data-album-for="${escapeAttr(name)}">📚 ${cookbooksWith(name).length ? `In ${cookbooksWith(name).length} ${cookbooksWith(name).length === 1 ? 'album' : 'album'}` : 'Aggiungi a un album'}</button>${linkHtml}</div>
       </div>
     </div>
   </div>
@@ -6232,9 +6240,30 @@ function renderPrep(){
  */
   const recipeDetailScreen = state.expandedRecipe ? renderRecipeDetailScreen(state.expandedRecipe) : '';
 
+  const prepSwitch = `<div class="pantry-kind-switch" role="group" aria-label="Ricette o Libro di cucina">
+      <button type="button" class="pantry-kind-btn${state.prepView !== 'libro' ? ' active' : ''}" data-prep-view="ricette" aria-label="Ricette" aria-pressed="${state.prepView !== 'libro'}">${CHEF_ICON_SVG}</button>
+      <span class="pantry-kind-sep" aria-hidden="true"></span>
+      <button type="button" class="pantry-kind-btn${state.prepView === 'libro' ? ' active' : ''}" data-prep-view="libro" aria-label="Libro di cucina" aria-pressed="${state.prepView === 'libro'}">${BOOK_ICON_SVG}</button>
+    </div>`;
+  if(state.prepView === 'libro'){
+    return `
+    <div class="cookbook-view">${renderCookbooksView()}</div>
+    ${renderCookbookPage()}
+    ${renderCookbookPicker()}
+    ${renderRecipeEditModal()}
+    ${recipeDetailScreen}
+    ${prepSwitch}
+    <div class="buttons-fixed">
+      <button class="btn is-fixed" type="button" data-cookbook-new aria-label="Nuovo album"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>`;
+  }
+
   return `
     <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
-
+    <div class="prep-search-row">
+      ${listSearchHtml('f-search', state.filters.search, 'Cerca una ricetta…')}
+      <button class="btn is-filters prep-filters-btn${activeCount ? ' active' : ''}" type="button" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
+    </div>
 
     ${filtersModal}
     <div class="prep-toolbar">
@@ -6248,17 +6277,9 @@ function renderPrep(){
     ${renderRecipeEditModal()}
     ${newRecipeModal}
     ${recipeDetailScreen}
+    ${prepSwitch}
     <div class="buttons-fixed">
-      ${state.prepSearchOpen ? `
-              <div class="search_wrapper">
-              <div class="input_wrapper">
-                <input class="input-search" type="search" id="f-search" placeholder="Cerca ricetta…" value="${escapeAttr(state.filters.search)}">
-                <button class="btn is-filters" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
-              </div>
-      <button type="button" class="btn is-fixed" id="prep-search-close" aria-label="${state.filters.search ? 'Cancella ricerca' : 'Chiudi ricerca'}">✕</button>
-      </div>
-      ` : `<button type="button" class="btn is-fixed${state.filters.search ? ' active' : ''}" id="prep-search-toggle" aria-label="Cerca ricetta">${SEARCH_ICON_SVG}${state.filters.search ? ' Cerca' : ''}</button>
-      <button class="btn is-fixed" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
+      <button class="btn is-fixed" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
     </div>
   `;
 }
@@ -8365,7 +8386,10 @@ function attachHandlers(){
   if(shopSearch) shopSearch.addEventListener('input', e=>{ state.shopSearch = e.target.value; render(); });
   document.querySelectorAll('[data-search-clear]').forEach(btn=> btn.addEventListener('click', ()=>{
     const id = btn.dataset.searchClear;
-    if(id === 'shop-search') state.shopSearch = ''; else state.pantrySearch = '';
+    if(id === 'shop-search') state.shopSearch = '';
+    else if(id === 'f-search') state.filters.search = '';
+    else if(id === 'cookbook-pick-search') state.cookbookPickSearch = '';
+    else state.pantrySearch = '';
     render();
     const el = document.getElementById(id);
     if(el) el.focus();
@@ -8395,26 +8419,6 @@ function attachHandlers(){
     state.prepPantryMode = !state.prepPantryMode;
     render();
   }));
-  const prepSearchToggle = document.getElementById('prep-search-toggle');
-  if(prepSearchToggle) prepSearchToggle.addEventListener('click', ()=>{
-    state.prepSearchOpen = true;
-    render();
-    const el = document.getElementById('f-search');
-    if(el) el.focus();
-  });
-  const prepSearchClose = document.getElementById('prep-search-close');
-  // Un'unica X: con del testo lo cancella, a campo vuoto chiude la ricerca.
-  if(prepSearchClose) prepSearchClose.addEventListener('click', ()=>{
-    if(state.filters.search){
-      state.filters.search = '';
-      render();
-      const el = document.getElementById('f-search');
-      if(el) el.focus();
-      return;
-    }
-    state.prepSearchOpen = false;
-    render();
-  });
   // "+" di Dispensa: stesso modale di "+ Aggiungi ingrediente" nel menu ⋯
   // (titolo/categoria di ripiego seguono la vista Cibo/Casa aperta).
   const pantryFab = document.getElementById('pantry-fab');
@@ -9246,6 +9250,9 @@ const HOME_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true
 function listSearchHtml(id, value, placeholder){
   return `<div class="list-search">${SEARCH_ICON_SVG}<input class="input-search" type="search" id="${id}" placeholder="${escapeAttr(placeholder)}" value="${escapeAttr(value || '')}" autocomplete="off">${value ? `<button type="button" class="list-search-clear" data-search-clear="${id}" aria-label="Cancella ricerca">✕</button>` : ''}</div>`;
 }
+// Ricette / Libro di cucina (interruttore in basso in Ricette).
+const CHEF_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg>';
+const BOOK_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
 const PENCIL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M227.31 73.37L182.63 28.68a16 16 0 0 0-22.63 0L36.69 152A15.86 15.86 0 0 0 32 163.31V208a16 16 0 0 0 16 16h44.69a15.86 15.86 0 0 0 11.31-4.69L227.31 96a16 16 0 0 0 0-22.63M92.69 208H48v-44.69l88-88L180.69 120ZM192 108.68L147.31 64l24-24L216 84.68Z"/></svg>';
 const TRASH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg>';
 const SWIPE_REVEAL = 80, SWIPE_AUTO = 170;
@@ -9808,6 +9815,204 @@ document.addEventListener('click', e=>{
   document.addEventListener('pointerup', end);
   document.addEventListener('pointercancel', end);
 })();
+
+// --- Libro di cucina ---------------------------------------------------------
+// Album di ricette per le occasioni (il menù di Natale, le cene con gli
+// amici...): state.cookbooks, per spazio. Un album tiene solo i nomi delle
+// ricette; una ricetta eliminata sparisce dall'album da sola (getRecipeMeta).
+function cookbooksList(){ return (state.cookbooks || []).filter(c => c && c.id); }
+function cookbookById(id){ return cookbooksList().find(c => c.id === id) || null; }
+function cookbookRecipes(cb){ return (cb && cb.recipes || []).filter(n => getRecipeMeta(n)); }
+function cookbooksWith(name){ return cookbooksList().filter(c => (c.recipes || []).includes(name)); }
+function cookbookThumbHtml(name){
+  ensureRecipePhoto(name);
+  const c = recipePhotoCache[name];
+  if(c && c.status === 'ok') return `<img src="${escapeAttr(c.src)}" alt="">`;
+  const r = getRecipeMeta(name);
+  return `<span class="cookbook-thumb-emoji">${r ? catIcon(r.categoriaNew) : '🍽️'}</span>`;
+}
+function renderCookbooksView(){
+  const list = cookbooksList();
+  const cards = list.map(cb => {
+    const rs = cookbookRecipes(cb);
+    const thumbs = rs.slice(0, 3).map((n, i) => `<span class="cookbook-photo p${i}">${cookbookThumbHtml(n)}</span>`).join('');
+    return `
+      <button type="button" class="cookbook-card" data-cookbook-open="${escapeAttr(cb.id)}">
+        <span class="cookbook-stack">${thumbs || '<span class="cookbook-photo p0 is-empty">📖</span>'}</span>
+        <span class="cookbook-front">
+          <span class="cookbook-name">${escapeHtml(cb.name)}</span>
+          <span class="cookbook-count">${rs.length} ${rs.length === 1 ? 'ricetta' : 'ricette'}</span>
+        </span>
+      </button>`;
+  }).join('');
+  return `
+    ${list.length ? '' : '<p class="cookbook-intro">Raccogli le ricette in album per le occasioni: il menù di Natale, le cene con gli amici, i dolci delle feste…</p>'}
+    <div class="cookbook-grid">
+      ${cards}
+      <button type="button" class="cookbook-card is-new" data-cookbook-new>
+        <span class="cookbook-add">+</span>
+        <span class="cookbook-new-label">Nuovo album</span>
+      </button>
+    </div>`;
+}
+function renderCookbookPage(){
+  const cb = cookbookById(state.cookbookOpenId);
+  if(!cb) return '';
+  const rs = cookbookRecipes(cb);
+  const rows = rs.map(n => `
+      <div class="cookbook-row">
+        <button type="button" class="cookbook-row-main" data-toggle-recipe="${escapeAttr(n)}">
+          <span class="cookbook-row-thumb">${cookbookThumbHtml(n)}</span>
+          <span class="cookbook-row-name">${escapeHtml(n)}</span>
+        </button>
+        <button type="button" class="btn is-icon cookbook-row-remove" data-cookbook-remove="${escapeAttr(n)}" aria-label="Togli ${escapeAttr(n)} dall'album">✕</button>
+      </div>`).join('');
+  const body = `
+      ${rs.length ? `<div class="settings-card cookbook-rows">${rows}</div>` : '<p class="settings-note">Album vuoto: aggiungi le ricette che vuoi tenere insieme.</p>'}
+      <button type="button" class="btn is-solid is-block cookbook-add-btn" data-cookbook-pick>+ Aggiungi ricette</button>
+      <div class="cookbook-page-actions">
+        <button type="button" class="btn is-text" data-cookbook-rename="${escapeAttr(cb.id)}">Rinomina</button>
+        <button type="button" class="btn is-text color-delete" data-cookbook-delete="${escapeAttr(cb.id)}">Elimina album</button>
+      </div>`;
+  return managePageHtml({ key: 'cookbook', title: escapeHtml(cb.name), closeAttr: 'data-close-cookbook', body });
+}
+function renderCookbookPicker(){
+  const cb = state.cookbookPickOpen && cookbookById(state.cookbookOpenId);
+  if(!cb) return '';
+  const q = (state.cookbookPickSearch || '').trim().toLowerCase();
+  const inAlbum = new Set(cb.recipes || []);
+  const all = allRecipeMetas().filter(r => !q || r.nome.toLowerCase().includes(q)).sort((a, b) => IT_COLLATOR_BASE.compare(a.nome, b.nome));
+  const rows = all.map(r => `
+      <label class="cookbook-pick-row">
+        <input type="checkbox" data-cookbook-pick-toggle="${escapeAttr(r.nome)}" ${inAlbum.has(r.nome) ? 'checked' : ''}>
+        <span class="cookbook-row-name">${escapeHtml(r.nome)}</span>
+        <span class="cat-icon">${catIcon(r.categoriaNew)}</span>
+      </label>`).join('');
+  const body = `
+      ${listSearchHtml('cookbook-pick-search', state.cookbookPickSearch, 'Cerca una ricetta…')}
+      <div class="settings-card cookbook-pick-list">${rows || '<p class="settings-note">Nessuna ricetta trovata.</p>'}</div>`;
+  return managePageHtml({ key: 'cookbook-pick', title: `Aggiungi a “${escapeHtml(cb.name)}”`, closeAttr: 'data-close-cookbook-pick', body, footer: '<button type="button" class="btn is-solid is-block" data-close-cookbook-pick>Fatto</button>' });
+}
+// Modali globali (sopra anche il dettaglio ricetta): nome album, "Aggiungi a un album".
+function renderCookbookModals(){
+  let html = '';
+  const forName = state.albumForRecipe;
+  if(forName){
+    const list = cookbooksList();
+    html += `
+    <div class="filters-modal-backdrop" data-close-album-for>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header"><h3>Album</h3><button class="btn is-icon filters-close-btn" data-close-album-for>✕</button></div>
+        <p class="settings-note">Scegli in quali album mettere «${escapeHtml(forName)}».</p>
+        <div class="album-for-list">
+          ${list.map(cb => { const on = (cb.recipes || []).includes(forName); return `<button type="button" class="album-for-row${on ? ' active' : ''}" data-album-for-toggle="${escapeAttr(cb.id)}" aria-pressed="${on}"><span class="album-for-check">${on ? '✓' : ''}</span>${escapeHtml(cb.name)}</button>`; }).join('')}
+          <button type="button" class="album-for-row is-new" data-cookbook-new data-for-recipe="${escapeAttr(forName)}"><span class="album-for-check">+</span>Nuovo album</button>
+        </div>
+        <div class="filters-modal-footer"><button class="btn is-solid mini-add-btn" data-close-album-for>Fatto</button></div>
+      </div>
+    </div>`;
+  }
+  const d = state.cookbookNameDraft;
+  if(d){
+    html += `
+    <div class="filters-modal-backdrop" data-close-cookbook-name>
+      <div class="filters-modal" data-stop-close>
+        <div class="filters-modal-header"><h3>${d.id ? 'Rinomina album' : 'Nuovo album'}</h3><button class="btn is-icon filters-close-btn" data-close-cookbook-name>✕</button></div>
+        <div class="filter-groups"><div class="filter-group">
+          <div class="filter-group-label">Nome</div>
+          <input type="text" id="cookbook-name" placeholder="Es. Menù di Natale" value="${escapeAttr(d.name || '')}" autocomplete="off">
+        </div></div>
+        <div class="filters-modal-footer"><button class="btn is-solid mini-add-btn" id="cookbook-name-save" type="button">${d.id ? 'Salva' : 'Crea'}</button></div>
+      </div>
+    </div>`;
+  }
+  return html;
+}
+function saveCookbookName(){
+  const d = state.cookbookNameDraft;
+  if(!d) return;
+  const name = (d.name || '').trim();
+  if(!name){ const el = document.getElementById('cookbook-name'); if(el) el.focus(); return; }
+  state.cookbooks = cookbooksList();
+  if(d.id){
+    const cb = cookbookById(d.id);
+    if(cb) cb.name = name;
+  } else {
+    const cb = { id: 'cb' + Date.now().toString(36), name, recipes: d.forRecipe ? [d.forRecipe] : [] };
+    state.cookbooks.push(cb);
+    if(!d.forRecipe) state.cookbookOpenId = cb.id;
+  }
+  state.cookbookNameDraft = null;
+  persist(); render();
+}
+document.addEventListener('input', e=>{
+  if(e.target.id === 'cookbook-name' && state.cookbookNameDraft) state.cookbookNameDraft.name = e.target.value;
+  if(e.target.id === 'cookbook-pick-search'){ state.cookbookPickSearch = e.target.value; render(); }
+});
+document.addEventListener('keydown', e=>{ if(e.target.id === 'cookbook-name' && e.key === 'Enter'){ e.preventDefault(); saveCookbookName(); } });
+document.addEventListener('change', e=>{
+  const name = e.target.dataset && e.target.dataset.cookbookPickToggle;
+  if(!name) return;
+  const cb = cookbookById(state.cookbookOpenId);
+  if(!cb) return;
+  cb.recipes = (cb.recipes || []).filter(n => n !== name);
+  if(e.target.checked) cb.recipes.push(name);
+  persist(); render();
+});
+document.addEventListener('click', e=>{
+  const t = e.target;
+  const pv = t.closest('[data-prep-view]');
+  if(pv){ state.prepView = pv.dataset.prepView; render(); return; }
+  const newBtn = t.closest('[data-cookbook-new]');
+  if(newBtn){ state.cookbookNameDraft = { id: null, name: '', forRecipe: newBtn.dataset.forRecipe || null }; render(); const el = document.getElementById('cookbook-name'); if(el) el.focus(); return; }
+  // Prima le azioni dentro le finestre, poi la chiusura toccando lo sfondo
+  // (lo sfondo contiene la finestra: closest lo troverebbe comunque).
+  if(t.closest('#cookbook-name-save')){ saveCookbookName(); return; }
+  const nameClose = t.closest('[data-close-cookbook-name]');
+  if(nameClose){ if(!isCloseTap(e, nameClose)) return; state.cookbookNameDraft = null; render(); return; }
+  const open = t.closest('[data-cookbook-open]');
+  if(open){ state.cookbookOpenId = open.dataset.cookbookOpen; render(); return; }
+  const close = t.closest('[data-close-cookbook]');
+  if(close){ if(!isCloseTap(e, close)) return; state.cookbookOpenId = null; render(); return; }
+  if(t.closest('[data-cookbook-pick]')){ state.cookbookPickOpen = true; state.cookbookPickSearch = ''; render(); return; }
+  const pickClose = t.closest('[data-close-cookbook-pick]');
+  if(pickClose){ if(!isCloseTap(e, pickClose)) return; state.cookbookPickOpen = false; state.cookbookPickSearch = ''; render(); return; }
+  const rm = t.closest('[data-cookbook-remove]');
+  if(rm){
+    const cb = cookbookById(state.cookbookOpenId);
+    if(!cb) return;
+    const before = (cb.recipes || []).slice();
+    cb.recipes = before.filter(n => n !== rm.dataset.cookbookRemove);
+    persist(); render();
+    showUndoToast('Tolta dall\'album', ()=>{ cb.recipes = before; persist(); render(); });
+    return;
+  }
+  const ren = t.closest('[data-cookbook-rename]');
+  if(ren){ const cb = cookbookById(ren.dataset.cookbookRename); if(cb){ state.cookbookNameDraft = { id: cb.id, name: cb.name }; render(); const el = document.getElementById('cookbook-name'); if(el) el.focus(); } return; }
+  const del = t.closest('[data-cookbook-delete]');
+  if(del){
+    const before = cookbooksList().map(c => ({ ...c, recipes: (c.recipes || []).slice() }));
+    state.cookbooks = cookbooksList().filter(c => c.id !== del.dataset.cookbookDelete);
+    state.cookbookOpenId = null;
+    persist(); render();
+    showUndoToast('Album eliminato', ()=>{ state.cookbooks = before; persist(); render(); });
+    return;
+  }
+  const af = t.closest('[data-album-for]');
+  if(af){ state.albumForRecipe = af.dataset.albumFor; render(); return; }
+  const aft = t.closest('[data-album-for-toggle]');
+  if(aft){
+    const cb = cookbookById(aft.dataset.albumForToggle), name = state.albumForRecipe;
+    if(!cb || !name) return;
+    const has = (cb.recipes || []).includes(name);
+    cb.recipes = (cb.recipes || []).filter(n => n !== name);
+    if(!has) cb.recipes.push(name);
+    persist(); render();
+    return;
+  }
+  const afClose = t.closest('[data-close-album-for]');
+  if(afClose){ if(!isCloseTap(e, afClose)) return; state.albumForRecipe = null; render(); return; }
+}, true);
 
 function renderCardsPages(){ return cardsPageHtml() + cardsOverlayHtml(); }
 function cardsOverlayHtml(){
