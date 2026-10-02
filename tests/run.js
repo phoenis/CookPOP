@@ -1307,6 +1307,22 @@ test('importa ricetta: arrivo dal menu Condividi, didascalia letta in ingredient
   eq(page.errors, [], 'errori JS');
 });
 
+test('album: Rinomina ed Elimina stanno nel menu ⋯ in alto a destra', async ({ page }) => {
+  await page.evaluate(() => { state.cookbooks = [{ id: 'm', name: 'Prova', recipes: [] }]; state.tab = 'prep'; state.prepView = 'libro'; state.cookbookOpenId = 'm'; state.cookbookMenuOpen = false; render(); });
+  const before = await page.evaluate(() => !!document.querySelector('[data-page="cookbook"] [data-cookbook-rename]'));
+  await page.click('[data-cookbook-menu]');
+  await page.click('[data-cookbook-rename]');
+  const renameOpen = await page.evaluate(() => ({ draft: !!state.cookbookNameDraft, menu: state.cookbookMenuOpen }));
+  await page.evaluate(() => { state.cookbookNameDraft = null; render(); });
+  await page.click('[data-cookbook-menu]');
+  await page.click('[data-cookbook-delete]');
+  const after = await page.evaluate(() => ({ n: state.cookbooks.length, open: state.cookbookOpenId }));
+  eq(before, false, 'non più in fondo alla pagina');
+  eq(renameOpen, { draft: true, menu: false });
+  eq(after, { n: 0, open: null });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
