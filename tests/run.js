@@ -1243,6 +1243,32 @@ test('ricerca sempre visibile in cima a Spesa e Dispensa, filtra mentre scrivi s
   eq(page.errors, [], 'errori JS');
 });
 
+test('ricette: interruttore Ricette/Libro di cucina, ricerca in alto, album creati, riempiti e usati dalla ricetta', async ({ page }) => {
+  await page.evaluate(() => { state.cookbooks = []; state.prepView = 'ricette'; state.filters.search = ''; state.tab = 'prep'; render(); });
+  await page.click('#f-search'); await page.keyboard.type('pesto');
+  const search = await page.evaluate(() => ({ focus: document.activeElement.id, n: document.querySelectorAll('.recipe-card').length, all: document.querySelectorAll('.recipe-card .recipe-title').length }));
+  await page.click('[data-search-clear="f-search"]');
+  await page.click('[data-prep-view="libro"] svg');
+  await page.click('.cookbook-card.is-new');
+  await page.fill('#cookbook-name', 'Menù di Natale');
+  await page.click('#cookbook-name-save');
+  const created = await page.evaluate(() => ({ n: state.cookbooks.length, open: !!document.querySelector('[data-page="cookbook"]') }));
+  await page.click('[data-cookbook-pick]');
+  const first = await page.evaluate(() => allRecipeMetas().map(r => r.nome).sort((a, b) => IT_COLLATOR_BASE.compare(a, b))[0]);
+  await page.check(`[data-cookbook-pick-toggle="${first}"]`);
+  await page.click('.sheet-footer [data-close-cookbook-pick]');
+  const inAlbum = await page.evaluate(() => [...document.querySelectorAll('[data-page="cookbook"] .cookbook-row-name')].map(e => e.textContent.trim()));
+  await page.evaluate(n => { state.cookbookOpenId = null; state.expandedRecipe = n; render(); }, first);
+  await page.click('[data-album-for]');
+  await page.click('.album-for-row[data-album-for-toggle]');
+  const removed = await page.evaluate(() => state.cookbooks[0].recipes.length);
+  eq([search.focus, search.n > 0], ['f-search', true], 'ricerca in alto');
+  eq(created, { n: 1, open: true }, 'album creato e aperto');
+  eq(inAlbum, [first], 'ricetta aggiunta');
+  eq(removed, 0, 'tolta dall\'album dal dettaglio ricetta');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
