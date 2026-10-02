@@ -1348,6 +1348,7 @@ const state = {
   pantryGroupsModalOpen: false,
   deptsModalOpen: false, // non persistito: modale "Gestisci categorie" aperta/chiusa
   customDepts: {}, // categorie create dall'utente, condivise tra gli spazi (vedi applyCustomDepts)
+  pantryGroupBy: 'cat', // 'cat' | 'luogo' | 'az' — "Raggruppa per" in Dispensa, non persistito come shopView
   pantryView: 'cibo', // 'cibo' | 'casa' — non persistito (vedi persist()): stesso motivo di shopView
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
@@ -3758,10 +3759,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-26',
+  version: '2026-10-27',
   title: 'Novità',
   items: [
-    'Spesa: quando spunti un articolo va in "Completati", in fondo alla lista, con il bottone "Sposta in dispensa". Se hai sbagliato, togli la spunta e torna al suo posto. La Modalità spesa non serve più.'
+    'Dispensa con la stessa grafica della Spesa: oltre a Cibo/Casa c\'è "Raggruppa per" (Categoria, Luogo, Dalla A alla Z).',
+    'In Spesa "Raggruppa per Giorno" ora si chiama "Pasto".'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5989,7 +5991,7 @@ function renderSpesa(){
       </div>
       <label class="shop-group-by"><span>Raggruppa per</span>
         <select data-shop-group aria-label="Raggruppa per">
-          ${[['reparto','Corsia'],['giorno','Giorno'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
+          ${[['reparto','Corsia'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
     </div>
@@ -6946,6 +6948,7 @@ function renderDispensa(){
 /*       <button class="btn-remove" data-inv-remove="${escapeAttr(it.key)}" type="button" aria-label="Elimina ${escapeAttr(it.nome)}"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg></button>
  */
   let body;
+  const pantryShownCount = items.filter(it => isNonFoodDept(knownDept(it.cat) || classifyDept(it.nome)) === (state.pantryView === 'casa')).length;
   if(!items.length){
     body = searchTerm
       ? `<p class="ing-empty">Nessun ingrediente trovato per "${escapeHtml(state.pantrySearch.trim())}".</p>`
@@ -6972,20 +6975,32 @@ function renderDispensa(){
       </div>` : '';
     body = expiringHtml + (!depts.length
       ? `<p class="ing-empty">${searchTerm ? `Nessun prodotto trovato per "${escapeHtml(state.pantrySearch.trim())}" in ${wantNonFood ? 'Casa' : 'Cibo'}.` : (wantNonFood ? 'Nessun prodotto per la casa, per ora — tocca il + per aggiungerne uno (detersivi, igiene, carta forno...).' : 'Nessun alimento, per ora.')}</p>`
-      : depts.map(d=>{
-      const sectionId = `cat_${d}`;
+      : pantryGroupsHtml());
+    // Raggruppa per (come la Spesa): categoria, luogo o una lista sola A-Z.
+    function pantrySection(sectionId, iconHtml, label, list){
       const isOpen = !state.pantrySectionCollapsed[sectionId];
       return `
       <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
-          <span class="dept-icon">${DEPT_ICON[d]}</span>${DEPT_LABEL[d]}
-          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
+          <span class="dept-icon">${iconHtml}</span>${escapeHtml(label)}
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"/></svg>
         </div>
         <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">
-          ${byDept[d].sort((a,b)=>IT_COLLATOR.compare(a.nome, b.nome)).map(itemRow).join('')}
+          ${list.sort((a,b)=>IT_COLLATOR.compare(a.nome, b.nome)).map(itemRow).join('')}
         </div>
       </div>`;
-    }).join(''));
+    }
+    function pantryGroupsHtml(){
+      const shown = depts.flatMap(d => byDept[d]);
+      if(state.pantryGroupBy === 'az') return `<div class="shop-day-group shop-az">${shown.sort((a,b)=>IT_COLLATOR.compare(a.nome, b.nome)).map(itemRow).join('')}</div>`;
+      if(state.pantryGroupBy === 'luogo'){
+        return LUOGO_ORDER.map(l => {
+          const list = shown.filter(it => it.luogo === l);
+          return list.length ? pantrySection(`luogo_${l}`, LUOGO_ICON[l], LUOGO_LABEL[l], list) : '';
+        }).join('');
+      }
+      return depts.map(d => pantrySection(`cat_${d}`, DEPT_ICON[d], DEPT_LABEL[d], byDept[d])).join('');
+    }
   }
 
   // Scheda ingrediente: Modifica e Aggiungi sono la stessa pagina (vedi
@@ -7031,9 +7046,16 @@ function renderDispensa(){
     <div class="view-toggle">
       <button class="view-btn ${state.pantryView!=='casa'?'active':''}" data-pantry-view="cibo">Cibo</button>
       <button class="view-btn ${state.pantryView==='casa'?'active':''}" data-pantry-view="casa">Casa</button>
-      
     </div>
-    ${body}
+    <div class="shop-head">
+      <div class="shop-head-title"><span class="shop-head-sub">${pantryShownCount} ${state.pantryView === 'casa' ? (pantryShownCount === 1 ? 'prodotto' : 'prodotti') : (pantryShownCount === 1 ? 'ingrediente' : 'ingredienti')}</span></div>
+      <label class="shop-group-by"><span>Raggruppa per</span>
+        <select data-pantry-group aria-label="Raggruppa per">
+          ${[['cat','Categoria'],['luogo','Luogo'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.pantryGroupBy === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </label>
+    </div>
+    <div class="shop-list pantry-list">${body}</div>
     <div class="save-hint"></div>
     ${ingredientManagerModal}
     ${inventoryPage}
@@ -8450,6 +8472,9 @@ function attachHandlers(){
     if(el) el.addEventListener('change', e=>{ state.filters[key] = e.target.value; render(); });
   });
 
+  document.querySelectorAll('[data-pantry-group]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{ state.pantryGroupBy = sel.value; render(); });
+  });
   document.querySelectorAll('[data-pantry-view]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.pantryView = e.target.dataset.pantryView;

@@ -1097,3 +1097,7 @@
 .shop-completed-actions .is-text{ margin-right:auto; color:var(--ink-light); }
 .shop-head{ align-items:center; padding-top:var(--space-small); }
 .shop-group-by{ flex-direction:row; align-items:center; gap:var(--space-xsmall); }
+
+.shop-list .inv-item{ border-bottom:0; padding-top:0.25rem; padding-bottom:0.25rem; }
+.pantry-list .dept-icon svg{ width:1em; height:1em; }
+.view-toggle + .shop-head{ padding-top:0; }
