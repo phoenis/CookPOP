@@ -1101,3 +1101,10 @@
 .shop-list .inv-item{ border-bottom:0; padding-top:0.25rem; padding-bottom:0.25rem; }
 .pantry-list .dept-icon svg{ width:1em; height:1em; }
 .view-toggle + .shop-head{ padding-top:0; }
+
+/* Dispensa: interruttore Cibo/Casa flottante in basso al centro. */
+.pantry-kind-switch{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(4.5rem + env(safe-area-inset-bottom) + 0.25rem); z-index:80; display:flex; align-items:center; gap:0.25rem; padding:0.3125rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-pill); box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+.pantry-kind-btn{ display:flex; align-items:center; justify-content:center; width:3rem; height:2.5rem; border:0; border-radius:var(--radius-pill); background:none; color:var(--ink-light); cursor:pointer; }
+.pantry-kind-btn svg{ width:1.375rem; height:1.375rem; }
+.pantry-kind-btn.active{ background:var(--ink); color:var(--bg); }
+.pantry-kind-sep{ width:1px; height:1.25rem; background:var(--line); }
