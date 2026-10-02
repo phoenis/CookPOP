@@ -8476,8 +8476,9 @@ function attachHandlers(){
     sel.addEventListener('change', ()=>{ state.pantryGroupBy = sel.value; render(); });
   });
   document.querySelectorAll('[data-pantry-view]').forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      state.pantryView = e.target.dataset.pantryView;
+    btn.addEventListener('click', ()=>{
+      // btn, non e.target: il tocco cade spesso sull'icona SVG dentro il bottone.
+      state.pantryView = btn.dataset.pantryView;
       render();
     });
   });
