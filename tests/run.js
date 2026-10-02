@@ -1213,6 +1213,16 @@ test('dispensa come la spesa: Cibo/Casa restano, Raggruppa per Categoria/Luogo/A
   eq(page.errors, [], 'errori JS');
 });
 
+test('dispensa: un tocco sull\'icona Casa passa subito a Casa (anche toccando il disegno)', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantrySelectMode = false; render(); });
+  await page.click('[data-pantry-view="casa"] svg');
+  const v1 = await page.evaluate(() => state.pantryView);
+  await page.click('[data-pantry-view="cibo"] svg path');
+  const v2 = await page.evaluate(() => state.pantryView);
+  eq([v1, v2], ['casa', 'cibo']);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
