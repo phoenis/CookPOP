@@ -1357,7 +1357,7 @@ const state = {
   recipeImport: null, // non persistito: { name, link, text } della pagina "Importa ricetta"
   cookbooks: [], // Libro di cucina: album di ricette [{ id, name, recipes:[nomi] }] (vedi renderCookbooksView)
   prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
-  cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
+  cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
@@ -3949,6 +3949,7 @@ const MODAL_CHECKS = [
   [()=> !!state.avanzoDiPickerOpenDay, ()=>{ state.avanzoDiPickerOpenDay = null; }],
   [()=> !!state.dishPicker, ()=>{ state.dishPicker = null; }],
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
+  [()=> !!state.cookbookMenuOpen, ()=>{ state.cookbookMenuOpen = false; }],
   [()=> !!state.cookbookUseOpen, ()=>{ state.cookbookUseOpen = false; }],
   [()=> !!state.cookbookPickOpen, ()=>{ state.cookbookPickOpen = false; state.cookbookPickSearch = ''; }],
   [()=> !!state.cookbookOpenId, ()=>{ state.cookbookOpenId = null; }],
@@ -9257,6 +9258,7 @@ function listSearchHtml(id, value, placeholder){
 // Ricette / Libro di cucina (interruttore in basso in Ricette).
 const CHEF_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg>';
 const BOOK_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
+const DOTS_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M112 60a16 16 0 1 1 16 16a16 16 0 0 1-16-16m16 52a16 16 0 1 0 16 16a16 16 0 0 0-16-16m0 68a16 16 0 1 0 16 16a16 16 0 0 0-16-16"/></svg>';
 const PENCIL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M227.31 73.37L182.63 28.68a16 16 0 0 0-22.63 0L36.69 152A15.86 15.86 0 0 0 32 163.31V208a16 16 0 0 0 16 16h44.69a15.86 15.86 0 0 0 11.31-4.69L227.31 96a16 16 0 0 0 0-22.63M92.69 208H48v-44.69l88-88L180.69 120ZM192 108.68L147.31 64l24-24L216 84.68Z"/></svg>';
 const TRASH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg>';
 const SWIPE_REVEAL = 80, SWIPE_AUTO = 170;
@@ -9875,11 +9877,14 @@ function renderCookbookPage(){
       ${rs.length ? `<div class="settings-card cookbook-rows">${rows}</div>` : '<p class="settings-note">Album vuoto: aggiungi le ricette che vuoi tenere insieme.</p>'}
       ${rs.length ? '<button type="button" class="btn is-outline is-block cookbook-use-btn" data-cookbook-use>🍽️ Usa nel menù</button>' : ''}
       <button type="button" class="btn is-solid is-block cookbook-add-btn" data-cookbook-pick>+ Aggiungi ricette</button>
-      <div class="cookbook-page-actions">
-        <button type="button" class="btn is-text" data-cookbook-rename="${escapeAttr(cb.id)}">Rinomina</button>
-        <button type="button" class="btn is-text color-delete" data-cookbook-delete="${escapeAttr(cb.id)}">Elimina album</button>
-      </div>`;
-  return managePageHtml({ key: 'cookbook', title: escapeHtml(cb.name), closeAttr: 'data-close-cookbook', body });
+      ${state.cookbookMenuOpen ? `
+      <div class="cookbook-menu-backdrop" data-cookbook-menu-close></div>
+      <div class="topbar-menu cookbook-menu" role="menu">
+        <button type="button" class="topbar-menu-item" role="menuitem" data-cookbook-rename="${escapeAttr(cb.id)}">✏️ Rinomina</button>
+        <button type="button" class="topbar-menu-item color-delete" role="menuitem" data-cookbook-delete="${escapeAttr(cb.id)}">🗑️ Elimina album</button>
+      </div>` : ''}`;
+  const action = `<button type="button" class="btn is-icon cookbook-menu-btn" data-cookbook-menu aria-label="Impostazioni album" aria-expanded="${!!state.cookbookMenuOpen}">${DOTS_ICON_SVG}</button>`;
+  return managePageHtml({ key: 'cookbook', title: escapeHtml(cb.name), closeAttr: 'data-close-cookbook', body, action });
 }
 function renderCookbookPicker(){
   const cb = state.cookbookPickOpen && cookbookById(state.cookbookOpenId);
@@ -10009,7 +10014,9 @@ document.addEventListener('click', e=>{
   const open = t.closest('[data-cookbook-open]');
   if(open){ state.cookbookOpenId = open.dataset.cookbookOpen; render(); return; }
   const close = t.closest('[data-close-cookbook]');
-  if(close){ if(!isCloseTap(e, close)) return; state.cookbookOpenId = null; render(); return; }
+  if(close){ if(!isCloseTap(e, close)) return; state.cookbookOpenId = null; state.cookbookMenuOpen = false; render(); return; }
+  if(t.closest('[data-cookbook-menu]')){ state.cookbookMenuOpen = !state.cookbookMenuOpen; render(); return; }
+  if(t.closest('[data-cookbook-menu-close]')){ state.cookbookMenuOpen = false; render(); return; }
   if(t.closest('[data-cookbook-use]')){ state.cookbookUseOpen = true; render(); return; }
   const useClose = t.closest('[data-close-cookbook-use]');
   if(useClose){ if(!isCloseTap(e, useClose)) return; state.cookbookUseOpen = false; render(); return; }
@@ -10042,12 +10049,12 @@ document.addEventListener('click', e=>{
     return;
   }
   const ren = t.closest('[data-cookbook-rename]');
-  if(ren){ const cb = cookbookById(ren.dataset.cookbookRename); if(cb){ state.cookbookNameDraft = { id: cb.id, name: cb.name }; render(); const el = document.getElementById('cookbook-name'); if(el) el.focus(); } return; }
+  if(ren){ state.cookbookMenuOpen = false; const cb = cookbookById(ren.dataset.cookbookRename); if(cb){ state.cookbookNameDraft = { id: cb.id, name: cb.name }; render(); const el = document.getElementById('cookbook-name'); if(el) el.focus(); } return; }
   const del = t.closest('[data-cookbook-delete]');
   if(del){
     const before = cookbooksList().map(c => ({ ...c, recipes: (c.recipes || []).slice() }));
     state.cookbooks = cookbooksList().filter(c => c.id !== del.dataset.cookbookDelete);
-    state.cookbookOpenId = null;
+    state.cookbookOpenId = null; state.cookbookMenuOpen = false;
     persist(); render();
     showUndoToast('Album eliminato', ()=>{ state.cookbooks = before; persist(); render(); });
     return;
