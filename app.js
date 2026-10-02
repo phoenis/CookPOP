@@ -3759,11 +3759,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-27',
+  version: '2026-10-28',
   title: 'Novità',
   items: [
-    'Dispensa con la stessa grafica della Spesa: oltre a Cibo/Casa c\'è "Raggruppa per" (Categoria, Luogo, Dalla A alla Z).',
-    'In Spesa "Raggruppa per Giorno" ora si chiama "Pasto".'
+    'Dispensa: Cibo e Casa ora sono due icone (posate e casetta) in un interruttore in basso al centro, sempre a portata di pollice.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -7043,10 +7042,11 @@ function renderDispensa(){
 
   return `
     <p class="section-sub">Si aggiorna da sola quando spunti qualcosa in Spesa — aggiungi o togli a mano quello che manca</p>
-    <div class="view-toggle">
-      <button class="view-btn ${state.pantryView!=='casa'?'active':''}" data-pantry-view="cibo">Cibo</button>
-      <button class="view-btn ${state.pantryView==='casa'?'active':''}" data-pantry-view="casa">Casa</button>
-    </div>
+    ${state.pantrySelectMode ? '' : `<div class="pantry-kind-switch" role="group" aria-label="Cibo o Casa">
+      <button type="button" class="pantry-kind-btn${state.pantryView!=='casa'?' active':''}" data-pantry-view="cibo" aria-label="Cibo" aria-pressed="${state.pantryView!=='casa'}">${FOOD_ICON_SVG}</button>
+      <span class="pantry-kind-sep" aria-hidden="true"></span>
+      <button type="button" class="pantry-kind-btn${state.pantryView==='casa'?' active':''}" data-pantry-view="casa" aria-label="Casa" aria-pressed="${state.pantryView==='casa'}">${HOME_ICON_SVG}</button>
+    </div>`}
     <div class="shop-head">
       <div class="shop-head-title"><span class="shop-head-sub">${pantryShownCount} ${state.pantryView === 'casa' ? (pantryShownCount === 1 ? 'prodotto' : 'prodotti') : (pantryShownCount === 1 ? 'ingrediente' : 'ingredienti')}</span></div>
       <label class="shop-group-by"><span>Raggruppa per</span>
@@ -9254,6 +9254,9 @@ let dragState = null;
 // Non parte da campi, stepper e icona del luogo, che hanno i loro gesti; a
 // swipe iniziato avvisa la riga (evento "swipestart") così la pressione lunga
 // di Dispensa non scatta, e il tocco finale non spunta/apre nulla.
+// Cibo/Casa in Dispensa (interruttore flottante in basso): posate e casetta.
+const FOOD_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
+const HOME_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 const PENCIL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M227.31 73.37L182.63 28.68a16 16 0 0 0-22.63 0L36.69 152A15.86 15.86 0 0 0 32 163.31V208a16 16 0 0 0 16 16h44.69a15.86 15.86 0 0 0 11.31-4.69L227.31 96a16 16 0 0 0 0-22.63M92.69 208H48v-44.69l88-88L180.69 120ZM192 108.68L147.31 64l24-24L216 84.68Z"/></svg>';
 const TRASH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg>';
 const SWIPE_REVEAL = 80, SWIPE_AUTO = 170;
