@@ -1354,6 +1354,7 @@ const state = {
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
+  recipeImport: null, // non persistito: { name, link, text } della pagina "Importa ricetta"
   cookbooks: [], // Libro di cucina: album di ricette [{ id, name, recipes:[nomi] }] (vedi renderCookbooksView)
   prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
@@ -3762,11 +3763,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-31',
+  version: '2026-11-01',
   title: 'Novità',
   items: [
-    'Libro di cucina: dentro un album c\'è "🍽️ Usa nel menù": scegli il pranzo o la cena e le ricette dell\'album vanno lì (con Annulla se sbagli).',
-    'In Spesa e Dispensa la tendina ora si chiama "Ordina per".'
+    'Ricette da Instagram: dal reel tocca Condividi → CookPOP (se non lo vedi, togli l\'app dalla schermata Home e aggiungila di nuovo). Incolla la didascalia: ingredienti e procedimento si compilano da soli. C\'è anche nel menu ⋯ di Ricette: "📥 Importa da un reel o da un testo".'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3822,7 +3822,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderAislesPage() + renderCookbookModals() + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
   endPageRender();
   attachHandlers();
   restoreInnerScroll(panel, scrolls);
@@ -3915,6 +3915,7 @@ function closeTopbarMenu(){
 }
 const MODAL_CHECKS = [
   [()=> !!state.cookbookNameDraft, ()=>{ state.cookbookNameDraft = null; }],
+  [()=> !!state.recipeImport, ()=>{ state.recipeImport = null; }],
   [()=> !!state.albumForRecipe, ()=>{ state.albumForRecipe = null; }],
   [()=> expiryConfirmKeys().length > 0, ()=>{ closeExpiryConfirm(); }],
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
@@ -9120,6 +9121,7 @@ const TAB_MENU_ITEMS = {
     { label: '↕️ Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
   ],
   prep: [
+    { label: '📥 Importa da un reel o da un testo', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } },
     { label: '+ Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; } }
   ]
 };
@@ -10064,6 +10066,143 @@ document.addEventListener('click', e=>{
   }
   const afClose = t.closest('[data-close-album-for]');
   if(afClose){ if(!isCloseTap(e, afClose)) return; state.albumForRecipe = null; render(); return; }
+}, true);
+
+// --- Importa ricetta (da Instagram o da un testo) ----------------------------
+// CookPOP è nel menu "Condividi" del telefono (share_target nel manifest):
+// condividendo un reel arriva qui con il link. Instagram non passa la
+// didascalia, quindi la si incolla a mano e parseRecipeText ne ricava nome,
+// ingredienti (con quantità) e procedimento, da controllare prima di salvare.
+const RECIPE_UNIT_RE = '(?:kg|g|gr|grammi|hg|mg|l|lt|litri?|ml|cl|dl|cucchiai(?:ni|no)?|cucchiaio|tazz(?:a|e|ina|ine)|bicchier(?:e|i)|spicchi(?:o)?|fett(?:a|e)|pizzic(?:o|hi)|foglie|foglia|rametti?|mazzett(?:o|i)|bustin(?:a|e)|confezion(?:e|i)|scatolett(?:a|e)|vasett(?:o|i)|noce|pz|pezzi)';
+function parseIngredientLine(line){
+  let s = line.replace(/^[\s\-–—•·*▪️▫️◾◽✅✔️☑️🔸🔹👉➡️►▶️→]+/u, '').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
+  s = s.replace(/[.;,]+$/, '').trim();
+  if(!s) return null;
+  const qb = /\b(q\.?\s?b\.?|quanto basta)\b/i;
+  let m = s.match(new RegExp('^(\\d+(?:[.,]\\d+)?(?:\\s*[-/]\\s*\\d+(?:[.,]\\d+)?)?)\\s*(' + RECIPE_UNIT_RE + ')?\\.?\\s+(?:di\\s+|d\')?(.+)$', 'i'));
+  if(m) return { ingrediente: capitalizeFirst(m[3].trim()), qta: (m[1] + (m[2] ? ' ' + m[2] : '')).replace(',', '.').trim() };
+  m = s.match(new RegExp('^(.+?)[\\s:,-]+(\\d+(?:[.,]\\d+)?(?:\\s*[-/]\\s*\\d+)?)\\s*(' + RECIPE_UNIT_RE + ')?\\.?$', 'i'));
+  if(m) return { ingrediente: capitalizeFirst(m[1].trim()), qta: (m[2] + (m[3] ? ' ' + m[3] : '')).replace(',', '.').trim() };
+  if(qb.test(s)) return { ingrediente: capitalizeFirst(s.replace(qb, '').replace(/[\s:,-]+$/, '').trim()), qta: 'q.b.' };
+  const words = { mezzo:'1/2', mezza:'1/2', un:'1', uno:'1', una:'1', due:'2', tre:'3', quattro:'4', cinque:'5', sei:'6' };
+  m = s.match(/^(mezz[oa]|un[oa]?|due|tre|quattro|cinque|sei)\s+(.+)$/i);
+  if(m) return { ingrediente: capitalizeFirst(m[2].replace(/^(?:di\s+|d')/i, '').trim()), qta: words[m[1].toLowerCase()] };
+  return { ingrediente: capitalizeFirst(s), qta: '' };
+}
+function capitalizeFirst(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function parseRecipeText(text){
+  const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.trim());
+  const isHashtags = l => /^(#\S+\s*)+$/.test(l);
+  const ingHeader = /^[^a-z0-9]*ingredienti\b/i, stepHeader = /^[^a-z0-9]*(procedimento|preparazione|metodo|come si fa|istruzioni|steps?)\b/i;
+  const qtyLike = new RegExp('(^\\s*[-•·*▪️✅👉]|\\d+\\s*' + RECIPE_UNIT_RE + '\\b|\\bq\\.?\\s?b\\.?)', 'iu');
+  let name = '', mode = '', ingredienti = [], procedimento = [], porzioni = '';
+  lines.forEach(l => {
+    if(!l || isHashtags(l)) return;
+    if(ingHeader.test(l)){
+      mode = 'ing';
+      let rest = l.replace(ingHeader, '');
+      // "(per 2 persone):" accanto al titolo: sono le porzioni, non un ingrediente.
+      const por = rest.match(/per\s+(\d+)\s*(persone|porzioni|pers\.?)?/i);
+      if(por){ porzioni = por[1] + ' ' + (por[2] && /porz/i.test(por[2]) ? 'porzioni' : 'persone'); rest = rest.replace(/\(?\s*per\s+\d+[^)]*\)?/i, ''); }
+      rest = rest.replace(/^[^a-z0-9]+/i, '').trim();
+      if(rest) rest.split(/,\s*/).forEach(x => { const it = parseIngredientLine(x); if(it && it.ingrediente) ingredienti.push(it); });
+      return;
+    }
+    if(stepHeader.test(l)){ mode = 'steps'; const rest = l.replace(stepHeader, '').replace(/^[^a-z0-9]+/i, ''); if(rest) procedimento.push(rest); return; }
+    if(mode === 'ing'){
+      if(qtyLike.test(l) || l.length < 45){ const it = parseIngredientLine(l); if(it && it.ingrediente) ingredienti.push(it); return; }
+      mode = 'steps';
+    }
+    if(mode === 'steps'){ procedimento.push(l.replace(/^\s*(\d+[.)]|[-•·*▪️👉➡️])\s*/u, '')); return; }
+    if(!name){ name = l.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 70); return; }
+    if(qtyLike.test(l) && /\d/.test(l)){ const it = parseIngredientLine(l); if(it) ingredienti.push(it); }
+  });
+  procedimento = procedimento.map(p => p.replace(/#\S+/g, '').trim()).filter(Boolean);
+  // Titoli tutti in maiuscolo (frequenti nelle didascalie): in minuscolo con l'iniziale grande.
+  if(name && name === name.toUpperCase() && /[A-Z]/.test(name)) name = name.toLowerCase();
+  return { name: capitalizeFirst(name), ingredienti, procedimento, porzioni };
+}
+function renderRecipeImportPage(){
+  const d = state.recipeImport;
+  if(!d) return '';
+  const parsed = parseRecipeText(d.text);
+  const name = d.name || parsed.name;
+  const preview = d.text ? `
+      <section class="settings-section">
+        <h3 class="settings-section-title">Ingredienti trovati (${parsed.ingredienti.length})</h3>
+        <div class="settings-card import-preview">${parsed.ingredienti.length ? parsed.ingredienti.map(it => `<div class="import-ing"><span>${escapeHtml(it.ingrediente)}</span><span class="import-qta">${escapeHtml(it.qta)}</span></div>`).join('') : '<p class="settings-note">Nessuno: controlla che ci sia la parola «Ingredienti» o le quantità.</p>'}</div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Procedimento (${parsed.procedimento.length} passaggi)</h3>
+        <div class="settings-card import-preview">${parsed.procedimento.length ? `<ol class="import-steps">${parsed.procedimento.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ol>` : '<p class="settings-note">Nessun passaggio trovato.</p>'}</div>
+      </section>
+      <p class="settings-note">Dopo il salvataggio si apre la modifica: lì correggi quello che serve e scegli categoria e stagione.</p>` : '';
+  const body = `
+      <section class="settings-section">
+        <div class="settings-card import-form">
+          <label class="import-label">Nome<input type="text" id="import-name" value="${escapeAttr(name)}" placeholder="Es. Pasta con zucca e salsiccia" autocomplete="off"></label>
+          <label class="import-label">Link (reel o sito)<input type="url" id="import-link" value="${escapeAttr(d.link || '')}" placeholder="https://www.instagram.com/reel/…" autocomplete="off"></label>
+          <label class="import-label">Testo della ricetta
+            <textarea id="import-text" rows="7" placeholder="Apri il reel, tocca la didascalia, copiala e incollala qui">${escapeHtml(d.text || '')}</textarea>
+          </label>
+          <button type="button" class="btn is-outline" data-import-paste>📋 Incolla dagli appunti</button>
+        </div>
+      </section>
+      ${preview}`;
+  const footer = `<button type="button" class="btn is-solid is-block" data-import-save ${name ? '' : 'disabled'}>Salva ricetta</button>`;
+  return managePageHtml({ key: 'recipe-import', title: 'Importa ricetta', closeAttr: 'data-close-import', body, footer });
+}
+function saveRecipeImport(){
+  const d = state.recipeImport;
+  if(!d) return;
+  const parsed = parseRecipeText(d.text);
+  let name = (d.name || parsed.name || '').trim();
+  if(!name) return;
+  const taken = n => !!getRecipeMeta(n) || !!state.customRecipes[n] || Object.keys(recipeByName).some(k => k.toLowerCase() === n.toLowerCase());
+  if(taken(name)){ let k = 2; while(taken(`${name} (${k})`)) k++; name = `${name} (${k})`; }
+  state.customRecipes[name] = { nome: name };
+  state.recipeEdits[name] = Object.assign({}, state.recipeEdits[name], { ingredienti: parsed.ingredienti, procedimento: parsed.procedimento, link: (d.link || '').trim() }, parsed.porzioni ? { porzioni: parsed.porzioni } : {});
+  state.recipeImport = null;
+  state.tab = 'prep'; state.prepView = 'ricette';
+  state.recipeEditName = name;
+  persist(); render();
+}
+// Arrivo dal menu "Condividi": ?share_url=…&share_text=…&share_title=…
+function readShareTarget(){
+  const q = new URLSearchParams(location.search);
+  if(!q.has('share_url') && !q.has('share_text') && !q.has('share_title')) return false;
+  const all = [q.get('share_url'), q.get('share_text'), q.get('share_title')].filter(Boolean).join('\n');
+  const link = (all.match(/https?:\/\/\S+/) || [''])[0];
+  const text = [q.get('share_text'), q.get('share_title')].filter(Boolean).join('\n').replace(link, '').trim();
+  state.recipeImport = { name: '', link, text };
+  state.tab = 'prep';
+  history.replaceState(null, '', location.pathname + location.hash);
+  return true;
+}
+readShareTarget();
+document.addEventListener('input', e=>{
+  const d = state.recipeImport;
+  if(!d) return;
+  if(e.target.id === 'import-name'){ d.name = e.target.value; const b = document.querySelector('[data-import-save]'); if(b) b.disabled = !(d.name.trim() || parseRecipeText(d.text).name); }
+  if(e.target.id === 'import-link') d.link = e.target.value;
+  if(e.target.id === 'import-text'){ d.text = e.target.value; clearTimeout(window.__importT); window.__importT = setTimeout(render, 400); }
+});
+document.addEventListener('click', e=>{
+  const t = e.target;
+  if(t.closest('[data-import-save]')){ saveRecipeImport(); return; }
+  if(t.closest('[data-import-paste]')){
+    if(!navigator.clipboard || !navigator.clipboard.readText){ const el = document.getElementById('import-text'); if(el) el.focus(); return; }
+    navigator.clipboard.readText().then(txt => {
+      if(!state.recipeImport || !txt) return;
+      const link = (txt.match(/https?:\/\/\S+/) || [''])[0];
+      if(link && !state.recipeImport.link) state.recipeImport.link = link;
+      state.recipeImport.text = (state.recipeImport.text ? state.recipeImport.text + '\n' : '') + txt.replace(link, '').trim();
+      render();
+    }).catch(()=>{ const el = document.getElementById('import-text'); if(el) el.focus(); });
+    return;
+  }
+  const close = t.closest('[data-close-import]');
+  if(close){ if(!isCloseTap(e, close)) return; state.recipeImport = null; render(); }
 }, true);
 
 function renderCardsPages(){ return cardsPageHtml() + cardsOverlayHtml(); }
