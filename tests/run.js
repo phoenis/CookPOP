@@ -1223,6 +1223,26 @@ test('dispensa: un tocco sull\'icona Casa passa subito a Casa (anche toccando il
   eq(page.errors, [], 'errori JS');
 });
 
+test('ricerca sempre visibile in cima a Spesa e Dispensa, filtra mentre scrivi senza perdere il fuoco', async ({ page }) => {
+  await page.evaluate(() => {
+    state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Detersivo piatti', qta: '' } };
+    state.shopSearch = ''; state.pantrySearch = '';
+    upsertPantryItem('Zucchine', 'frigo', 2); upsertPantryItem('Carciofi', 'frigo', 1);
+    state.tab = 'spesa'; render();
+  });
+  await page.click('#shop-search'); await page.keyboard.type('zuc');
+  const s = await page.evaluate(() => ({ focus: document.activeElement.id, names: [...document.querySelectorAll('.shop-list .item-name')].map(e => e.textContent.trim()) }));
+  await page.click('[data-search-clear="shop-search"]');
+  const cleared = await page.evaluate(() => state.shopSearch);
+  await page.evaluate(() => { state.tab = 'dispensa'; state.pantryView = 'cibo'; render(); });
+  await page.click('#pantry-search'); await page.keyboard.type('carc');
+  const d = await page.evaluate(() => ({ focus: document.activeElement.id, names: [...document.querySelectorAll('.pantry-list .inv-name')].map(e => e.textContent.trim()), oldToggle: !!document.getElementById('pantry-search-toggle') }));
+  eq(s, { focus: 'shop-search', names: ['Zucchine'] }, 'spesa');
+  eq(cleared, '', 'X cancella');
+  eq([d.focus, d.names.includes('Carciofi'), d.names.includes('Zucchine'), d.oldToggle], ['pantry-search', true, false, false], 'dispensa');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

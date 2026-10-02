@@ -1348,6 +1348,7 @@ const state = {
   pantryGroupsModalOpen: false,
   deptsModalOpen: false, // non persistito: modale "Gestisci categorie" aperta/chiusa
   customDepts: {}, // categorie create dall'utente, condivise tra gli spazi (vedi applyCustomDepts)
+  shopSearch: '', // non persistito: filtro testuale della lista Spesa
   pantryGroupBy: 'cat', // 'cat' | 'luogo' | 'az' — "Raggruppa per" in Dispensa, non persistito come shopView
   pantryView: 'cibo', // 'cibo' | 'casa' — non persistito (vedi persist()): stesso motivo di shopView
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
@@ -1370,7 +1371,6 @@ const state = {
   balanceDetailsOpen: false, // non persistito: spiegazione sotto la riga dell'equilibrio nel Menù
   prepPantryMode: false, // non persistito: Ricette in modalità "Con quello che ho"
   prepSearchOpen: false, // non persistito: campo di ricerca ricette (Prep) visibile o ridotto a icona
-  pantrySearchOpen: false, // non persistito: campo di ricerca Dispensa visibile o ridotto a icona
   whatsNewSeen: null, // vecchio: una sola "già vista" per tutto lo spazio — non più usato, vedi whatsNewSeenBy
   whatsNewSeenBy: {}, // { persona: ultima WHATS_NEW.version chiusa } — per persona, non per spazio (vedi renderWhatsNewModal)
   pantryEditingKey: null,
@@ -3759,10 +3759,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-28',
+  version: '2026-10-29',
   title: 'Novità',
   items: [
-    'Dispensa: Cibo e Casa ora sono due icone (posate e casetta) in un interruttore in basso al centro, sempre a portata di pollice.'
+    'Spesa e Dispensa: la ricerca ora è sempre visibile in cima alla pagina.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5594,7 +5594,8 @@ function renderSpesa(){
   // riga è spuntata solo se l'hai spuntata tu: niente più spunta automatica
   // "ce l'hai già" in base alla Dispensa (faceva partire già spuntato un
   // ingrediente aggiunto a mano proprio perché serviva comunque).
-  const mainFlat = buildShopFlat();
+  const shopQuery = (state.shopSearch || '').trim().toLowerCase();
+  const mainFlat = buildShopFlat().filter(it => !shopQuery || (it.ingrediente || '').toLowerCase().includes(shopQuery));
 
   // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
   // quantità testuale) in Per reparto: se ne hai spuntata una qualsiasi in
@@ -5810,6 +5811,7 @@ function renderSpesa(){
       giornoMergedAll.push(...allDayItems);
       const mergedDayItems = allDayItems.filter(it => { if(isItemChecked(it.keys, it.ingrediente)){ addCompleted(it); return false; } return true; });
       if(allDayItems.length && !mergedDayItems.length) return '';
+      if(shopQuery && !allDayItems.length) return '';
       // Vuota per due motivi ben diversi: la ricetta non ha ingredienti
       // salvati (va aperta dal Menù per aggiungerli) oppure ce li ha tutti,
       // sono solo già "in casa" e quindi filtrati altrove da buildShopFlat —
@@ -5984,6 +5986,7 @@ function renderSpesa(){
   return `
     <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa non compare qui</p>
     ${missingBanner}
+    ${listSearchHtml('shop-search', state.shopSearch, 'Cerca nella lista…')}
     <div class="shop-head">
       <div class="shop-head-title">
         <span class="shop-head-sub">${displayTotal} ${displayTotal === 1 ? 'articolo' : 'articoli'}${displayDone ? ` · ${displayDone} ${displayDone === 1 ? 'preso' : 'presi'}` : ''}</span>
@@ -7047,6 +7050,7 @@ function renderDispensa(){
       <span class="pantry-kind-sep" aria-hidden="true"></span>
       <button type="button" class="pantry-kind-btn${state.pantryView==='casa'?' active':''}" data-pantry-view="casa" aria-label="Casa" aria-pressed="${state.pantryView==='casa'}">${HOME_ICON_SVG}</button>
     </div>`}
+    ${listSearchHtml('pantry-search', state.pantrySearch, 'Cerca in Dispensa…')}
     <div class="shop-head">
       <div class="shop-head-title"><span class="shop-head-sub">${pantryShownCount} ${state.pantryView === 'casa' ? (pantryShownCount === 1 ? 'prodotto' : 'prodotti') : (pantryShownCount === 1 ? 'ingrediente' : 'ingredienti')}</span></div>
       <label class="shop-group-by"><span>Raggruppa per</span>
@@ -7066,13 +7070,7 @@ function renderDispensa(){
     ${mergeModal}
     <div class="buttons-fixed">
       <button type="button" class="btn is-fixed is-secondary" id="pantry-toggle-all-sections">${(Object.entries(state.pantrySectionCollapsed).some(([id,val]) => val && id.startsWith('cat_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>
-      <div class="search_wrapper">
-        ${state.pantrySearchOpen ? `<div class="input_wrapper"><input class="input-search" type="search" id="pantry-search" placeholder="Cerca in Dispensa…" value="${escapeAttr(state.pantrySearch)}"></div>` : ''}
-        ${state.pantrySearchOpen
-            ? `<button type="button" class="btn is-fixed" id="pantry-search-close" aria-label="${state.pantrySearch ? 'Cancella ricerca' : 'Chiudi ricerca'}">✕</button>`
-            : `<button type="button" class="btn is-fixed${state.pantrySearch ? ' active' : ''}" id="pantry-search-toggle" aria-label="Cerca in Dispensa">${SEARCH_ICON_SVG}</button>`}
-      </div>
-      ${state.pantrySearchOpen ? '' : `<button class="btn is-fixed" id="pantry-fab" type="button" aria-label="${state.pantryView === 'casa' ? 'Aggiungi prodotto' : 'Aggiungi ingrediente'}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
+      ${`<button class="btn is-fixed" id="pantry-fab" type="button" aria-label="${state.pantryView === 'casa' ? 'Aggiungi prodotto' : 'Aggiungi ingrediente'}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
     </div>
     ${selectionBar}
   `;
@@ -8363,6 +8361,15 @@ function attachHandlers(){
 
   const fSearch = document.getElementById('f-search');
   if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); });
+  const shopSearch = document.getElementById('shop-search');
+  if(shopSearch) shopSearch.addEventListener('input', e=>{ state.shopSearch = e.target.value; render(); });
+  document.querySelectorAll('[data-search-clear]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const id = btn.dataset.searchClear;
+    if(id === 'shop-search') state.shopSearch = ''; else state.pantrySearch = '';
+    render();
+    const el = document.getElementById(id);
+    if(el) el.focus();
+  }));
   const pantrySearch = document.getElementById('pantry-search');
   if(pantrySearch) pantrySearch.addEventListener('input', e=>{ state.pantrySearch = e.target.value; render(); });
   // "+" di Ricette: stesso modale di "+ Aggiungi ricetta" nel menu ⋯
@@ -8396,8 +8403,7 @@ function attachHandlers(){
     if(el) el.focus();
   });
   const prepSearchClose = document.getElementById('prep-search-close');
-  // Stessa X unica della ricerca in Dispensa (vedi pantry-search-close):
-  // con del testo lo cancella, a campo vuoto chiude la ricerca.
+  // Un'unica X: con del testo lo cancella, a campo vuoto chiude la ricerca.
   if(prepSearchClose) prepSearchClose.addEventListener('click', ()=>{
     if(state.filters.search){
       state.filters.search = '';
@@ -8413,28 +8419,6 @@ function attachHandlers(){
   // (titolo/categoria di ripiego seguono la vista Cibo/Casa aperta).
   const pantryFab = document.getElementById('pantry-fab');
   if(pantryFab) pantryFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
-  const pantrySearchToggle = document.getElementById('pantry-search-toggle');
-  if(pantrySearchToggle) pantrySearchToggle.addEventListener('click', ()=>{
-    state.pantrySearchOpen = true;
-    render();
-    const el = document.getElementById('pantry-search');
-    if(el) el.focus();
-  });
-  const pantrySearchClose = document.getElementById('pantry-search-close');
-  // Un'unica X (quella nativa del campo di ricerca è nascosta in CSS): con
-  // del testo scritto lo cancella e lascia il campo aperto per una nuova
-  // ricerca, a campo vuoto chiude la ricerca.
-  if(pantrySearchClose) pantrySearchClose.addEventListener('click', ()=>{
-    if(state.pantrySearch){
-      state.pantrySearch = '';
-      render();
-      const el = document.getElementById('pantry-search');
-      if(el) el.focus();
-      return;
-    }
-    state.pantrySearchOpen = false;
-    render();
-  });
 
   document.querySelectorAll('.chip-row [data-f]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -9258,6 +9242,10 @@ let dragState = null;
 // Cibo/Casa in Dispensa (interruttore flottante in basso): posate e casetta.
 const FOOD_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
 const HOME_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+// Campo di ricerca sempre visibile in cima a Spesa e Dispensa.
+function listSearchHtml(id, value, placeholder){
+  return `<div class="list-search">${SEARCH_ICON_SVG}<input class="input-search" type="search" id="${id}" placeholder="${escapeAttr(placeholder)}" value="${escapeAttr(value || '')}" autocomplete="off">${value ? `<button type="button" class="list-search-clear" data-search-clear="${id}" aria-label="Cancella ricerca">✕</button>` : ''}</div>`;
+}
 const PENCIL_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M227.31 73.37L182.63 28.68a16 16 0 0 0-22.63 0L36.69 152A15.86 15.86 0 0 0 32 163.31V208a16 16 0 0 0 16 16h44.69a15.86 15.86 0 0 0 11.31-4.69L227.31 96a16 16 0 0 0 0-22.63M92.69 208H48v-44.69l88-88L180.69 120ZM192 108.68L147.31 64l24-24L216 84.68Z"/></svg>';
 const TRASH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg>';
 const SWIPE_REVEAL = 80, SWIPE_AUTO = 170;
