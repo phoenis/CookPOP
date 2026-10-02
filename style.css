@@ -1193,3 +1193,13 @@
 .cookbook-menu-btn svg{ width:1.375rem; height:1.375rem; }
 .cookbook-menu-backdrop{ position:fixed; inset:0; z-index:150; }
 .cookbook-menu{ position:fixed; top:calc(3.5rem + env(safe-area-inset-top)); right:var(--space-medium); }
+
+/* "+ piatto" come un piatto vuoto: cerchietto tratteggiato allineato alle icone dei piatti. */
+.dish-line .dish-add{ padding:0; line-height:0; }
+.dish-add-ic{ display:grid; place-items:center; width:1.5rem; height:1.5rem; border-radius:50%; border:1.5px dashed var(--gold); background:transparent; color:var(--gold); font-size:1rem; font-weight:var(--weight-medium); line-height:1; box-sizing:border-box; }
+.dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border-style:solid; color:var(--gold-dark); border-color:var(--gold-dark); }
+/* Linea tratteggiata anche dall'ultimo piatto al cerchietto "+", tutto nello stesso grigio. */
+.dish-item:last-of-type:has(+ .dish-add)::before{ display:block; }
+.dish-item:last-of-type:has(+ .dish-add){ padding-bottom:var(--space-small); }
+.dish-add-ic{ border:2px dashed var(--line); color:var(--line); font-weight:var(--weight-bold); }
+.dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border-style:dashed; border-color:var(--ink-light); color:var(--ink-light); }

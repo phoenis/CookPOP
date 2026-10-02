@@ -3763,10 +3763,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-01',
+  version: '2026-11-02',
   title: 'Novità',
   items: [
-    'Ricette da Instagram: dal reel tocca Condividi → CookPOP (se non lo vedi, togli l\'app dalla schermata Home e aggiungila di nuovo). Incolla la didascalia: ingredienti e procedimento si compilano da soli. C\'è anche nel menu ⋯ di Ricette: "📥 Importa da un reel o da un testo".'
+    'Menù: per aggiungere un piatto al pasto ora c\'è un cerchietto tratteggiato con il + sotto l\'ultimo piatto.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4341,7 +4341,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         </div>`}
       </div>`;
       }).join('')}
-      <button type="button" class="btn dish-add" data-open-dish-picker="${mk}">+ piatto</button>
+      <button type="button" class="btn dish-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>
     </div>` : '';
 
   // Un pasto vuoto non è mai "cucinato", anche se è rimasta la spunta di una
