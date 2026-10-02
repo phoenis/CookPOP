@@ -3758,10 +3758,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-25',
+  version: '2026-10-26',
   title: 'Novità',
   items: [
-    'Lista spesa più leggera: in alto "Raggruppa per" (Corsia, Giorno, Dalla A alla Z), sezioni come semplici etichette col numero di articoli, e per aggiungere una nota tocca la matita accanto al nome.'
+    'Spesa: quando spunti un articolo va in "Completati", in fondo alla lista, con il bottone "Sposta in dispensa". Se hai sbagliato, togli la spunta e torna al suo posto. La Modalità spesa non serve più.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5689,6 +5689,17 @@ function renderSpesa(){
 
   let body = '';
   let hasFinitiThisView = false;
+  // Le righe spuntate escono dalle loro sezioni e finiscono in "Completati",
+  // in fondo a tutto, con "Sposta in dispensa": togliere la spunta le
+  // rimette al loro posto, così un errore si corregge al volo (ha preso il
+  // posto della vecchia "Modalità spesa", che spostava subito in Dispensa).
+  const completedMap = {};
+  const addCompleted = it => {
+    const k = (it.ingrediente || '').trim().toLowerCase();
+    if(!completedMap[k]) completedMap[k] = { ingrediente: it.ingrediente, qtas: [], keys: [] };
+    completedMap[k].qtas.push(...(it.qtas || [it.qta]));
+    completedMap[k].keys.push(...(it.keys || [it.key]));
+  };
   if(state.shopView === 'reparto' || state.shopView === 'az'){
     // Solo reparto merceologico, niente più negozio: si compra dove capita.
     // I "Finiti in Dispensa" vanno nel loro reparto dedicato invece che in "Altro"
@@ -5722,6 +5733,7 @@ function renderSpesa(){
 
     const byDept = {};
     mergedList.forEach(it=>{
+      if(it.dept !== 'finiti' && isItemChecked(it.keys, it.ingrediente)){ addCompleted(it); return; }
       if(!byDept[it.dept]) byDept[it.dept] = [];
       byDept[it.dept].push(it);
     });
@@ -5731,7 +5743,7 @@ function renderSpesa(){
     let sortedDepts = shopAisleOrder().filter(d => deptsPresent.includes(d));
     // "Dalla A alla Z": una lista sola senza sezioni (i Finiti restano a parte, in fondo).
     if(state.shopView === 'az'){
-      byDept.__az = mergedList.filter(it => it.dept !== 'finiti').sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente));
+      byDept.__az = mergedList.filter(it => it.dept !== 'finiti' && !isItemChecked(it.keys, it.ingrediente)).sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente));
       sortedDepts = (byDept.__az.length ? ['__az'] : []).concat(deptsPresent.includes('finiti') ? ['finiti'] : []);
     }
     hasFinitiThisView = deptsPresent.includes('finiti');
@@ -5763,7 +5775,7 @@ function renderSpesa(){
       return `
       <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
-          ${escapeHtml(DEPT_LABEL[dept])}<span class="dept-count">${items.length}</span>
+          ${escapeHtml(DEPT_LABEL[dept])}
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
         </div>
         <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">${rowsHtml}</div>
@@ -5793,8 +5805,10 @@ function renderSpesa(){
         if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key] };
         else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); }
       });
-      const mergedDayItems = Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
-      giornoMergedAll.push(...mergedDayItems);
+      const allDayItems = Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
+      giornoMergedAll.push(...allDayItems);
+      const mergedDayItems = allDayItems.filter(it => { if(isItemChecked(it.keys, it.ingrediente)){ addCompleted(it); return false; } return true; });
+      if(allDayItems.length && !mergedDayItems.length) return '';
       // Vuota per due motivi ben diversi: la ricetta non ha ingredienti
       // salvati (va aperta dal Menù per aggiungerli) oppure ce li ha tutti,
       // sono solo già "in casa" e quindi filtrati altrove da buildShopFlat —
@@ -5823,7 +5837,8 @@ function renderSpesa(){
       + nonDayItems.filter(it=>isItemChecked([it.key], it.ingrediente)).length;
     displayDoneShoppable = giornoMergedAll.filter(it=>isItemChecked(it.keys, it.ingrediente)).length
       + nonDayItems.filter(it=> it.context !== 'Finiti in Dispensa' && isItemChecked([it.key], it.ingrediente)).length;
-    const genContext = mainFlat.filter(it => it.context === 'Ogni settimana');
+    const notDone = it => { if(isItemChecked([it.key], it.ingrediente)){ addCompleted(it); return false; } return true; };
+    const genContext = mainFlat.filter(it => it.context === 'Ogni settimana').filter(notDone);
     if(genContext.length){
       const genOpen = !state.shopSectionCollapsed['giorno_ogni-settimana'];
       body += `
@@ -5835,7 +5850,7 @@ function renderSpesa(){
         <div class="accordion-body${genOpen ? '' : ' is-collapsed'}">${genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('')}</div>
       </div>`;
     }
-    const extraContext = mainFlat.filter(it => it.context === 'Aggiunti a mano');
+    const extraContext = mainFlat.filter(it => it.context === 'Aggiunti a mano').filter(notDone);
     if(extraContext.length){
       const extraOpen = !state.shopSectionCollapsed['giorno_aggiunti-a-mano'];
       body += `
@@ -5868,6 +5883,20 @@ function renderSpesa(){
         </div>` : ''}
       </div>`;
     }
+  }
+
+  const completedList = Object.values(completedMap).sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente));
+  if(completedList.length){
+    body += `
+      <div class="shop-day-group shop-completed">
+        <div class="dept-title">Completati</div>
+        <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', '', true)).join('')}</div>
+        <div class="shop-completed-actions">
+          <button type="button" class="btn is-text" id="reset-shop">Togli le spunte</button>
+          <button type="button" class="btn is-outline color-delete" id="delete-checked-shop">Elimina</button>
+          <button type="button" class="btn is-solid" id="move-checked-to-pantry">Sposta in dispensa</button>
+        </div>
+      </div>`;
   }
 
   const missingDays = allPlannedShoppingMeals()
@@ -5956,7 +5985,6 @@ function renderSpesa(){
     ${missingBanner}
     <div class="shop-head">
       <div class="shop-head-title">
-        <h2 class="shop-list-title">La tua lista della spesa</h2>
         <span class="shop-head-sub">${displayTotal} ${displayTotal === 1 ? 'articolo' : 'articoli'}${displayDone ? ` · ${displayDone} ${displayDone === 1 ? 'preso' : 'presi'}` : ''}</span>
       </div>
       <label class="shop-group-by"><span>Raggruppa per</span>
@@ -5968,16 +5996,9 @@ function renderSpesa(){
     <div class="shop-list">${body}</div>
           
     <div class="shop-top-actions">
-      <button class="btn is-outline ${state.shopMode ? 'active' : ''}" id="shop-mode-toggle" type="button" title="Se attiva, spuntare una riga la sposta subito in Dispensa"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Modalità spesa${state.shopMode ? ': ON' : ''}</button>
       <button type="button" class="btn is-outline" data-open-cards>💳 Carte</button>
 
- ${displayDoneShoppable ? `
-  <div class="buttons-fixed is-checked">
-      <button class="btn is-outline color-delete" id="delete-checked-shop"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16M96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm96 168H64V64h128Zm-80-104v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0m48 0v64a8 8 0 0 1-16 0v-64a8 8 0 0 1 16 0"></path></svg> Elimina</button>
-      <button class="btn is-outline is-empty" id="reset-shop"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M100 40a12 12 0 0 1 12-12h32a12 12 0 0 1 0 24h-32a12 12 0 0 1-12-12m44 164h-32a12 12 0 0 0 0 24h32a12 12 0 0 0 0-24m64-176h-24a12 12 0 0 0 0 24h20v20a12 12 0 0 0 24 0V48a20 20 0 0 0-20-20m8 72a12 12 0 0 0-12 12v32a12 12 0 0 0 24 0v-32a12 12 0 0 0-12-12m0 72a12 12 0 0 0-12 12v20h-20a12 12 0 0 0 0 24h24a20 20 0 0 0 20-20v-24a12 12 0 0 0-12-12M40 156a12 12 0 0 0 12-12v-32a12 12 0 0 0-24 0v32a12 12 0 0 0 12 12m32 48H52v-20a12 12 0 0 0-24 0v24a20 20 0 0 0 20 20h24a12 12 0 0 0 0-24M40 84a12 12 0 0 0 12-12V52h20a12 12 0 0 0 0-24H48a20 20 0 0 0-20 20v24a12 12 0 0 0 12 12m40-16h96a12 12 0 0 1 12 12v96a12 12 0 0 1-12 12H80a12 12 0 0 1-12-12V80a12 12 0 0 1 12-12m12 96h72V92H92Z"></path></svg> Svuota</button>
-      <button class="btn is-solid is-total" id="move-checked-to-pantry"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M220 151.67V216a12 12 0 0 1-12 12H48a12 12 0 0 1-12-12v-64.33a12 12 0 1 1 24 0v52.23h136v-52.23a12 12 0 1 1 24 0M88 183.81h80a12.06 12.06 0 0 0 0-24.11H88a12.06 12.06 0 0 0 0 24.11M96.2 113l75.17 27.49a12.05 12.05 0 0 0 8.21-22.66l-75.17-27.48A12 12 0 0 0 96.2 113M128 49.29l61.29 51.64a12 12 0 0 0 16.9-1.48a12.09 12.09 0 0 0-1.48-17l-61.27-51.63a12 12 0 0 0-16.91 1.49A12.1 12.1 0 0 0 128 49.29"></path></svg> ${displayDoneShoppable}</button>
-    </div>
-    ` : ''}
+
     </div>
     
   ${addIngModal}
@@ -7061,22 +7082,10 @@ function attachHandlers(){
 
   document.querySelectorAll('.shop-item input[type=checkbox]').forEach(cb=>{
     cb.addEventListener('change', e=>{
-      // Normalmente la spunta segna solo "preso/da tenere d'occhio": non
-      // tocca la Dispensa, ci pensa poi "Sposta in dispensa" per il gruppo
-      // spuntato. In "Modalità spesa" invece ogni spunta sposta subito quella
-      // riga in Dispensa, una alla volta, comoda mentre si è al supermercato.
-      if(state.shopMode && e.target.checked && !e.target.closest('.finished-shop-group')){
-        const snap = snapshotShopRowForUndo(e.target);
-        moveShopRowToPantry(e.target);
-        persist(); render();
-        showUndoToast('Spostato in Dispensa', ()=>{
-          restoreShopRowSnapshot(snap);
-          persist(); render();
-        });
-      } else {
-        e.target.dataset.shopKeys.split(',').forEach(k=>{ state.shopChecked[k] = e.target.checked; });
-        persist(); render();
-      }
+      // La spunta segna solo "preso": la riga passa in "Completati" e la
+      // Dispensa si aggiorna con "Sposta in dispensa" (vedi renderSpesa).
+      e.target.dataset.shopKeys.split(',').forEach(k=>{ state.shopChecked[k] = e.target.checked; });
+      persist(); render();
     });
   });
   document.querySelectorAll('[data-exp-confirm-close]').forEach(el=> el.addEventListener('click', e=>{
