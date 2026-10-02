@@ -1289,6 +1289,24 @@ test('libro di cucina: "Usa nel menù" mette le ricette dell\'album nel pasto sc
   eq(page.errors, [], 'errori JS');
 });
 
+test('importa ricetta: arrivo dal menu Condividi, didascalia letta in ingredienti e procedimento, salvata come le altre', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const p = parseRecipeText(`TORTA DI MELE 🍎\nINGREDIENTI (per 6 persone):\n- 250 g di farina\n- 3 uova\n- zucchero 150 g\n- mezza bustina di lievito\n- cannella q.b.\nPROCEDIMENTO:\n1. Monta le uova con lo zucchero.\n2. Aggiungi farina e lievito.\n#dolci #torta`);
+    return p;
+  });
+  eq(r.name, 'Torta di mele', 'nome');
+  eq(r.ingredienti, [
+    { ingrediente: 'Farina', qta: '250 g' }, { ingrediente: 'Uova', qta: '3' }, { ingrediente: 'Zucchero', qta: '150 g' },
+    { ingrediente: 'Bustina di lievito', qta: '1/2' }, { ingrediente: 'Cannella', qta: 'q.b.' }
+  ], 'ingredienti');
+  eq([r.procedimento.length, r.porzioni], [2, '6 persone'], 'procedimento e porzioni');
+  await page.evaluate(() => { state.recipeImport = { name: '', link: 'https://www.instagram.com/reel/X/', text: 'Crema veloce\nIngredienti:\n200 ml panna\nProcedimento:\nMonta la panna.' }; render(); });
+  await page.click('[data-import-save]');
+  const saved = await page.evaluate(() => ({ edit: state.recipeEditName, ing: getIngredientsFor('Crema veloce'), link: getRecipeDetails('Crema veloce').link, inList: allRecipeMetas().some(m => m.nome === 'Crema veloce') }));
+  eq(saved, { edit: 'Crema veloce', ing: [{ ingrediente: 'Panna', qta: '200 ml' }], link: 'https://www.instagram.com/reel/X/', inList: true });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
