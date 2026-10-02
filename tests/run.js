@@ -1196,6 +1196,23 @@ test('spesa: le righe spuntate vanno in Completati in fondo, togliendo la spunta
   eq(page.errors, [], 'errori JS');
 });
 
+test('dispensa come la spesa: Cibo/Casa restano, Raggruppa per Categoria/Luogo/A-Z; in Spesa "Pasto"', async ({ page }) => {
+  await page.evaluate(() => { upsertPantryItem('Zucchine', 'frigo', 3); upsertPantryItem('Carciofi', 'freezer', 2); state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryGroupBy = 'cat'; render(); });
+  const toggle = await page.evaluate(() => document.querySelectorAll('[data-pantry-view]').length);
+  await page.selectOption('[data-pantry-group]', 'luogo');
+  const luogo = await page.evaluate(() => [...document.querySelectorAll('.pantry-list .dept-title')].map(e => e.textContent.trim()));
+  await page.selectOption('[data-pantry-group]', 'az');
+  const az = await page.evaluate(() => ({ titles: document.querySelectorAll('.pantry-list .dept-title:not(.expiring-group .dept-title)').length, names: [...document.querySelectorAll('.pantry-list .shop-az .inv-name')].map(e => e.textContent.trim()) }));
+  await page.evaluate(() => { state.tab = 'spesa'; render(); });
+  const pasto = await page.evaluate(() => [...document.querySelectorAll('[data-shop-group] option')].map(o => o.textContent));
+  eq(toggle, 2, 'Cibo/Casa');
+  eq(luogo.includes('Frigo') && luogo.includes('Freezer'), true, 'sezioni per luogo');
+  eq(az.titles, 0, 'A-Z senza sezioni');
+  eq(az.names.slice().sort((a, b) => a.localeCompare(b, 'it')), az.names, 'A-Z in ordine');
+  eq(pasto, ['Corsia', 'Pasto', 'Dalla A alla Z']);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
