@@ -1323,6 +1323,31 @@ test('album: Rinomina ed Elimina stanno nel menu ⋯ in alto a destra', async ({
   eq(page.errors, [], 'errori JS');
 });
 
+test('scheda pasto: ⋯ in alto, chi cucina in basso a sinistra, Da cucinare in basso a destra; avanzo con matita al posto di "Nessuna variante"', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const n = allRecipeMetas();
+    const sl = allMealSlots().filter(m => m.weekIdx === 0);
+    const day = sl.filter(m => m.i === sl[sl.length - 1].i);
+    const cena = day.find(m => m.meal === 'cena'), pranzo = day.find(m => m.meal === 'pranzo');
+    writeMealDishes(cena.weekIdx, cena.i, 'cena', n.find(x => x.tipologia === 'primo').nome, []);
+    state.dayLinks[pranzo.key] = cena.key; delete state.dayLinkNotes[pranzo.key];
+    state.showPastDays = true; state.tab = 'menu'; render();
+    const blk = meal => document.querySelector(`.meal-block[data-day-index="${cena.i}"][data-meal="${meal}"]`);
+    const c = blk('cena'), p = blk('pranzo');
+    return {
+      found: !!c && !!p,
+      dotsTop: !!(c && c.querySelector('.day-meal .meal-overflow-btn')),
+      cookBottom: !!(c && c.querySelector('.meal-foot .cook-pill')),
+      eatBottom: !!(c && c.querySelector('.meal-foot .is-eat')),
+      pencil: !!(p && p.querySelector('.avanzo-note-pencil')),
+      noText: !!(p && !p.textContent.includes('Nessuna variante'))
+    };
+  });
+  if(!r.found) return; // giorno passato non visibile: niente da controllare
+  eq(r, { found: true, dotsTop: true, cookBottom: true, eatBottom: true, pencil: true, noText: true });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

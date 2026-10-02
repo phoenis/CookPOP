@@ -3763,10 +3763,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-02',
+  version: '2026-11-03',
   title: 'Novità',
   items: [
-    'Menù: per aggiungere un piatto al pasto ora c\'è un cerchietto tratteggiato con il + sotto l\'ultimo piatto.'
+    'Scheda pasto riordinata: ⋯ in alto a destra, chi cucina in basso a sinistra, "Da cucinare/Cucinata" in basso a destra.',
+    'Negli avanzi la variante si aggiunge con la matita accanto a "Avanzo di…".'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4348,6 +4349,13 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // ricetta che prima c'era (prima la nascondeva per caso il CSS della riga
   // del tempo, che a pasto vuoto spariva insieme alla spunta).
   const isDone = !!name && !!(weekMealsDoneRef(weekIdx)[i] && weekMealsDoneRef(weekIdx)[i][meal]);
+  // Chi cucina: in basso a sinistra nella card, accanto a "Da cucinare".
+  // Un'unica fonte: iniziale sola a blocco chiuso, nome per esteso ad aperto.
+  const cookPillHtml = ()=>{
+    const cook = state.cooks[mk];
+    const cookLabel = cook ? (state.expandedDay === mk ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '?';
+    return `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ' cook-empty'}" data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
+  };
   // Un pasto bloccato non viene toccato da "Rigenera settimana" (vedi
   // generateWeek). Solo sui pasti normali: un pranzo-avanzo segue sempre il
   // principale del collegamento, bloccarlo non avrebbe un effetto chiaro.
@@ -4356,13 +4364,13 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   if(linkSource){
     swapControls = `
     <div class="section-footer">
-      <div class="section-footer-row">
+      <div class="section-footer-row avanzo-note-row">
         ${state.linkNoteEditingKey === mk
           ? `<input type="text" class="avanzo-note-input" placeholder="Variante (facoltativa, es. fatta a frittata)" value="${escapeAttr(state.dayLinkNotes[mk] || '')}" data-link-note="${mk}">`
-          : `<span class="avanzo-note-text" data-link-note-show="${mk}">${state.dayLinkNotes[mk] ? escapeHtml(state.dayLinkNotes[mk]) : 'Nessuna variante'}</span>
-             <button type="button" class="btn is-icon" data-link-note-show="${mk}" aria-label="Modifica variante"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg></button>`}
+          : (state.dayLinkNotes[mk] ? `<span class="avanzo-note-text" data-link-note-show="${mk}">${escapeHtml(state.dayLinkNotes[mk])}</span>` : '')}
       </div>
-      <div class="section-footer-row">
+      <div class="section-footer-row meal-foot">
+      ${cookPillHtml()}
       <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${mk}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Mangiata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da mangiare'}</button>
       </div>
     </div>`;
@@ -4374,9 +4382,9 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     // (data-open-swap), quindi deve poter comparire anche a pasto vuoto.
     const footerButtons = name ? `
     <div class="section-footer">
-      <div class="section-footer-row">
+      <div class="section-footer-row meal-foot">
+        ${cookPillHtml()}
         <button class="btn is-chip is-eat ${isDone ? 'active' : ''}" data-toggle-done="${mk}">${isDone ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--fe" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="m6 10l-2 2l6 6L20 8l-2-2l-8 8z"></path></svg> Cucinata' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Da cucinare'}</button>
-        <button type="button" class="btn is-icon meal-overflow-btn" data-open-meal-overflow="${mk}" aria-label="Altre azioni"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button>
         </div>
     </div>` : '';
     // Le azioni rare (È avanzo di, Torna all'originale, Segna come avanzata,
@@ -4449,22 +4457,19 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // e "Bloccato" è sola lettura (l'annullo sta nel lucchetto/nel foglio "⋯").
   const doneTag = isDone ? `<span class="done-tag">✓ Cucinat${meal==='cena'?'a':'o'}</span>` : '';
   const statusBadges = `
-    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>` : ''}
+    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>${!state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : ''}` : ''}
     ${isLocked ? `<span class="status-badge status-locked">Bloccat${meal==='cena'?'a':'o'}</span>` : ''}
   `;
 
-  const cook = state.cooks[mk];
   const isOpen = state.expandedDay === mk;
   // Un'unica fonte per "chi cucina": iniziale sola a blocco chiuso, nome per
   // esteso a blocco aperto.
-  const cookLabel = cook ? (isOpen ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '?';
-  const cookPill = `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ' cook-empty'}" data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
 
   const mealBlockHtml = `
   <div class="meal-block${isDone ? ' done' : ''}${isOpen ? ' open' : ''}" data-week-idx="${weekIdx}" data-day-index="${i}" data-meal="${meal}">
     <div class="day-meal">
       <div class="meal-block-label">${escapeHtml(MEAL_LABEL[meal])}${timeDisplay ? `<span class="meal-block-time"> · ${escapeHtml(timeDisplay)}</span>` : ''}</div>
-      ${name ? cookPill : ''}
+      ${name && !linkSource ? `<button type="button" class="btn is-icon meal-overflow-btn" data-open-meal-overflow="${mk}" aria-label="Altre azioni"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button>` : ''}
       <div class="day-row-side display-none">
         ${currentCat ? `<span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>` : ''}
       </div>
