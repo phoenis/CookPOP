@@ -1349,14 +1349,14 @@ const state = {
   deptsModalOpen: false, // non persistito: modale "Gestisci categorie" aperta/chiusa
   customDepts: {}, // categorie create dall'utente, condivise tra gli spazi (vedi applyCustomDepts)
   shopSearch: '', // non persistito: filtro testuale della lista Spesa
-  pantryGroupBy: 'cat', // 'cat' | 'luogo' | 'az' — "Raggruppa per" in Dispensa, non persistito come shopView
+  pantryGroupBy: 'cat', // 'cat' | 'luogo' | 'az' — "Ordina per" in Dispensa, non persistito come shopView
   pantryView: 'cibo', // 'cibo' | 'casa' — non persistito (vedi persist()): stesso motivo di shopView
   pantrySearch: '', // non persistito: filtro testuale corrente in Dispensa, si resetta a ogni apertura dell'app
   ingredientManagerOpen: false, // non persistito: modale "Gestisci ingredienti" aperta/chiusa
   ingredientManagerSearch: '', // non persistito: filtro testuale corrente lì dentro
   cookbooks: [], // Libro di cucina: album di ricette [{ id, name, recipes:[nomi] }] (vedi renderCookbooksView)
   prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
-  cookbookOpenId: null, cookbookPickOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
+  cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
@@ -3762,11 +3762,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-10-30',
+  version: '2026-10-31',
   title: 'Novità',
   items: [
-    'Ricette: in basso puoi passare da Ricette al nuovo 📖 Libro di cucina, dove raccogli le ricette in album per le occasioni (es. Menù di Natale). Da una ricetta aperta tocca "📚 Aggiungi a un album".',
-    'La ricerca delle ricette ora è sempre visibile in alto, con i Filtri accanto.'
+    'Libro di cucina: dentro un album c\'è "🍽️ Usa nel menù": scegli il pranzo o la cena e le ricette dell\'album vanno lì (con Annulla se sbagli).',
+    'In Spesa e Dispensa la tendina ora si chiama "Ordina per".'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3948,6 +3948,7 @@ const MODAL_CHECKS = [
   [()=> !!state.avanzoDiPickerOpenDay, ()=>{ state.avanzoDiPickerOpenDay = null; }],
   [()=> !!state.dishPicker, ()=>{ state.dishPicker = null; }],
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
+  [()=> !!state.cookbookUseOpen, ()=>{ state.cookbookUseOpen = false; }],
   [()=> !!state.cookbookPickOpen, ()=>{ state.cookbookPickOpen = false; state.cookbookPickSearch = ''; }],
   [()=> !!state.cookbookOpenId, ()=>{ state.cookbookOpenId = null; }],
   [()=> !!state.expandedDay, ()=>{ state.expandedDay = null; }],
@@ -5999,8 +6000,8 @@ function renderSpesa(){
       <div class="shop-head-title">
         <span class="shop-head-sub">${displayTotal} ${displayTotal === 1 ? 'articolo' : 'articoli'}${displayDone ? ` · ${displayDone} ${displayDone === 1 ? 'preso' : 'presi'}` : ''}</span>
       </div>
-      <label class="shop-group-by"><span>Raggruppa per</span>
-        <select data-shop-group aria-label="Raggruppa per">
+      <label class="shop-group-by"><span>Ordina per</span>
+        <select data-shop-group aria-label="Ordina per">
           ${[['reparto','Corsia'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
@@ -6250,6 +6251,7 @@ function renderPrep(){
     <div class="cookbook-view">${renderCookbooksView()}</div>
     ${renderCookbookPage()}
     ${renderCookbookPicker()}
+    ${renderCookbookUse()}
     ${renderRecipeEditModal()}
     ${recipeDetailScreen}
     ${prepSwitch}
@@ -6999,7 +7001,7 @@ function renderDispensa(){
     body = expiringHtml + (!depts.length
       ? `<p class="ing-empty">${searchTerm ? `Nessun prodotto trovato per "${escapeHtml(state.pantrySearch.trim())}" in ${wantNonFood ? 'Casa' : 'Cibo'}.` : (wantNonFood ? 'Nessun prodotto per la casa, per ora — tocca il + per aggiungerne uno (detersivi, igiene, carta forno...).' : 'Nessun alimento, per ora.')}</p>`
       : pantryGroupsHtml());
-    // Raggruppa per (come la Spesa): categoria, luogo o una lista sola A-Z.
+    // Ordina per (come la Spesa): categoria, luogo o una lista sola A-Z.
     function pantrySection(sectionId, iconHtml, label, list){
       const isOpen = !state.pantrySectionCollapsed[sectionId];
       return `
@@ -7074,8 +7076,8 @@ function renderDispensa(){
     ${listSearchHtml('pantry-search', state.pantrySearch, 'Cerca in Dispensa…')}
     <div class="shop-head">
       <div class="shop-head-title"><span class="shop-head-sub">${pantryShownCount} ${state.pantryView === 'casa' ? (pantryShownCount === 1 ? 'prodotto' : 'prodotti') : (pantryShownCount === 1 ? 'ingrediente' : 'ingredienti')}</span></div>
-      <label class="shop-group-by"><span>Raggruppa per</span>
-        <select data-pantry-group aria-label="Raggruppa per">
+      <label class="shop-group-by"><span>Ordina per</span>
+        <select data-pantry-group aria-label="Ordina per">
           ${[['cat','Categoria'],['luogo','Luogo'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.pantryGroupBy === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
@@ -9869,6 +9871,7 @@ function renderCookbookPage(){
       </div>`).join('');
   const body = `
       ${rs.length ? `<div class="settings-card cookbook-rows">${rows}</div>` : '<p class="settings-note">Album vuoto: aggiungi le ricette che vuoi tenere insieme.</p>'}
+      ${rs.length ? '<button type="button" class="btn is-outline is-block cookbook-use-btn" data-cookbook-use>🍽️ Usa nel menù</button>' : ''}
       <button type="button" class="btn is-solid is-block cookbook-add-btn" data-cookbook-pick>+ Aggiungi ricette</button>
       <div class="cookbook-page-actions">
         <button type="button" class="btn is-text" data-cookbook-rename="${escapeAttr(cb.id)}">Rinomina</button>
@@ -9892,6 +9895,37 @@ function renderCookbookPicker(){
       ${listSearchHtml('cookbook-pick-search', state.cookbookPickSearch, 'Cerca una ricetta…')}
       <div class="settings-card cookbook-pick-list">${rows || '<p class="settings-note">Nessuna ricetta trovata.</p>'}</div>`;
   return managePageHtml({ key: 'cookbook-pick', title: `Aggiungi a “${escapeHtml(cb.name)}”`, closeAttr: 'data-close-cookbook-pick', body, footer: '<button type="button" class="btn is-solid is-block" data-close-cookbook-pick>Fatto</button>' });
+}
+// "Usa nel menù": tutte le ricette dell'album in un pasto (pranzo o cena) dei
+// giorni in programma, da oggi in poi. Il piatto principale è il primo primo/
+// piatto unico/secondo dell'album (o la prima ricetta), le altre vanno accanto.
+function cookbookMealDishes(cb){
+  const rs = cookbookRecipes(cb);
+  const main = rs.find(n => ['primo','unico','secondo'].includes(dishCourse(n))) || rs[0];
+  return { principale: main, contorni: rs.filter(n => n !== main) };
+}
+function renderCookbookUse(){
+  const cb = state.cookbookUseOpen && cookbookById(state.cookbookOpenId);
+  if(!cb) return '';
+  const todayPos = findTodayPos() ?? 0;
+  const slots = allMealSlots().filter(m => m.weekIdx !== 0 || WEEK_DISPLAY_ORDER.indexOf(m.i) >= todayPos);
+  const days = [];
+  slots.forEach(m => {
+    const k = m.weekIdx + '_' + m.i;
+    let d = days.find(x => x.k === k);
+    if(!d){ d = { k, label: `${m.giorno} ${m.dateLabel}`, meals: [] }; days.push(d); }
+    d.meals.push(m);
+  });
+  const body = `
+      <p class="settings-note">Scegli il pasto: le ${cookbookRecipes(cb).length} ricette di «${escapeHtml(cb.name)}» prendono il suo posto.</p>
+      ${days.map(d => `
+      <section class="settings-section">
+        <h3 class="settings-section-title">${escapeHtml(d.label)}</h3>
+        <div class="cookbook-use-meals">
+          ${d.meals.map(m => `<button type="button" class="cookbook-use-meal" data-cookbook-use-slot="${escapeAttr(m.key)}"><span class="cookbook-use-meal-label">${escapeHtml(MEAL_LABEL[m.meal])}</span><span class="cookbook-use-meal-now">${m.name ? escapeHtml(m.name) : 'Vuoto'}</span></button>`).join('')}
+        </div>
+      </section>`).join('')}`;
+  return managePageHtml({ key: 'cookbook-use', title: 'Usa nel menù', closeAttr: 'data-close-cookbook-use', body });
 }
 // Modali globali (sopra anche il dettaglio ricetta): nome album, "Aggiungi a un album".
 function renderCookbookModals(){
@@ -9974,6 +10008,24 @@ document.addEventListener('click', e=>{
   if(open){ state.cookbookOpenId = open.dataset.cookbookOpen; render(); return; }
   const close = t.closest('[data-close-cookbook]');
   if(close){ if(!isCloseTap(e, close)) return; state.cookbookOpenId = null; render(); return; }
+  if(t.closest('[data-cookbook-use]')){ state.cookbookUseOpen = true; render(); return; }
+  const useClose = t.closest('[data-close-cookbook-use]');
+  if(useClose){ if(!isCloseTap(e, useClose)) return; state.cookbookUseOpen = false; render(); return; }
+  const useSlot = t.closest('[data-cookbook-use-slot]');
+  if(useSlot){
+    const cb = cookbookById(state.cookbookOpenId);
+    const { weekIdx, i, meal } = parseMealKey(useSlot.dataset.cookbookUseSlot);
+    if(!cb) return;
+    const { principale, contorni } = cookbookMealDishes(cb);
+    if(!principale) return;
+    const snap = snapshotMealDishes(weekIdx, i, meal);
+    writeMealDishes(weekIdx, i, meal, principale, contorni);
+    state.cookbookUseOpen = false;
+    persist(); render();
+    const slot = allMealSlots().find(m => m.key === useSlot.dataset.cookbookUseSlot);
+    showUndoToast(`«${cb.name}» a ${MEAL_LABEL[meal].toLowerCase()} di ${slot ? slot.giorno.toLowerCase() + ' ' + slot.dateLabel : 'quel giorno'}`, ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
+    return;
+  }
   if(t.closest('[data-cookbook-pick]')){ state.cookbookPickOpen = true; state.cookbookPickSearch = ''; render(); return; }
   const pickClose = t.closest('[data-close-cookbook-pick]');
   if(pickClose){ if(!isCloseTap(e, pickClose)) return; state.cookbookPickOpen = false; state.cookbookPickSearch = ''; render(); return; }
