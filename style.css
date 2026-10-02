@@ -1092,3 +1092,8 @@
 .shop-item.checked .ing-note-pencil{ display:none; }
 .shop-list .accordion-body{ padding-top:0.125rem; padding-bottom:0.25rem; }
 .shop-list .ing-note-text{ color:var(--ink-light); }
+.shop-completed .dept-title{ color:var(--ink-light); }
+.shop-completed-actions{ display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:var(--space-xsmall); padding:var(--space-xsmall) var(--padding-page) var(--space-medium); }
+.shop-completed-actions .is-text{ margin-right:auto; color:var(--ink-light); }
+.shop-head{ align-items:center; padding-top:var(--space-small); }
+.shop-group-by{ flex-direction:row; align-items:center; gap:var(--space-xsmall); }

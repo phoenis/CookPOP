@@ -1155,7 +1155,7 @@ test('ordine corsie: trascinando dalla maniglia la categoria si sposta e l\'ordi
   eq(page.errors, [], 'errori JS');
 });
 
-test('lista spesa leggera: tendina Raggruppa per (Corsia, Giorno, A-Z), sezioni con conteggio, matita per la nota', async ({ page }) => {
+test('lista spesa leggera: tendina Raggruppa per (Corsia, Giorno, A-Z), sezioni senza conteggio, matita per la nota', async ({ page }) => {
   await page.evaluate(() => {
     state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Detersivo piatti', qta: '' } };
     state.ingredientNotes = {};
@@ -1170,10 +1170,29 @@ test('lista spesa leggera: tendina Raggruppa per (Corsia, Giorno, A-Z), sezioni 
   const r2 = await page.evaluate(() => ({ view: state.shopView, sections: document.querySelectorAll('.shop-list .dept-title').length, names: [...document.querySelectorAll('.shop-az .item-name')].map(e => e.textContent.trim()) }));
   await page.click('.shop-az .ing-note-pencil');
   const r3 = await page.evaluate(() => !!document.querySelector('.ing-note-input'));
-  eq([r1.counts, r1.pencil, r1.oldNote], [true, true, false], 'conteggi e matita');
+  eq([r1.counts, r1.pencil, r1.oldNote], [false, true, false], 'niente conteggi, matita');
   eq(r2.view, 'az'); eq(r2.sections, 0, 'A-Z senza sezioni');
   eq(r2.names.slice().sort((a, b) => a.localeCompare(b, 'it')), r2.names, 'in ordine alfabetico');
   eq(r3, true, 'la matita apre la nota');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('spesa: le righe spuntate vanno in Completati in fondo, togliendo la spunta tornano al loro posto; niente più Modalità spesa', async ({ page }) => {
+  await page.evaluate(() => {
+    state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Detersivo piatti', qta: '' } };
+    state.shopChecked = {}; state.tab = 'spesa'; state.shopView = 'reparto'; render();
+  });
+  await page.click('.shop-item input[data-shop-keys="a"]');
+  const r1 = await page.evaluate(() => ({
+    completed: [...document.querySelectorAll('.shop-completed .item-name')].map(e => e.textContent.trim()),
+    last: document.querySelector('.shop-list').lastElementChild.classList.contains('shop-completed'),
+    move: !!document.querySelector('.shop-completed #move-checked-to-pantry'),
+    mode: !!document.getElementById('shop-mode-toggle')
+  }));
+  await page.click('.shop-completed input[data-shop-keys="a"]');
+  const r2 = await page.evaluate(() => ({ completed: !!document.querySelector('.shop-completed'), back: [...document.querySelectorAll('.shop-list .shop-day-group:not(.shop-completed) .item-name')].some(e => e.textContent.trim() === 'Zucchine') }));
+  eq(r1, { completed: ['Zucchine'], last: true, move: true, mode: false });
+  eq(r2, { completed: false, back: true }, 'tolta la spunta torna al suo posto');
   eq(page.errors, [], 'errori JS');
 });
 
