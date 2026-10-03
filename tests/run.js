@@ -1363,6 +1363,23 @@ test('spesa: aggiungere un ingrediente finito in Dispensa tiene la quantità scr
   eq(page.errors, [], 'errori JS');
 });
 
+test('riordino una tantum: ingredienti rimessi nelle categorie nuove, tranne categorie tue, avanzi e casa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.customDepts = Object.assign({}, state.customDepts, { mia: { label: 'Mia', icon: '⭐' } });
+    state.pantryItems['carote'] = { nome: 'Carote', cat: 'dolci', luogo: 'frigo', qty: 1 };
+    state.pantryItems['pinoli'] = { nome: 'Pinoli', cat: 'altro', luogo: 'dispensa', qty: 1 };
+    state.pantryItems['mio mix'] = { nome: 'Mio mix', cat: 'pasta', luogo: 'dispensa', qty: 1 };
+    state.pantryItems['speck'] = { nome: 'Speck', cat: 'mia', luogo: 'frigo', qty: 1 };
+    state.pantryItems['pollo arrosto'] = { nome: 'Pollo arrosto', cat: 'avanzi', luogo: 'frigo', qty: 1 };
+    applyCustomDepts();
+    state.deptsRegrouped3 = false; runMigrations();
+    const c = k => state.pantryItems[k].cat;
+    return [c('carote'), c('pinoli'), c('mio mix'), c('speck'), c('pollo arrosto')];
+  });
+  eq(r, ['verdura', 'dolci', 'pasta', 'mia', 'avanzi']);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
