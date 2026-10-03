@@ -269,8 +269,8 @@ const DEPT_RULES = [
   // Erbe: secche tra le spezie, fresche (rosmarino, salvia, basilico...) con la verdura.
   ['rosmarino secco','base'], ['salvia secca','base'], ['basilico secco','base'], ['prezzemolo secco','base'], ['erbe secche','base'], ['origano','base'], ['timo','base'], ['alloro','base'], ['cannella','base'], ['paprika','base'], ['noce moscata','base'], ['curry','base'],
   ['curcuma','base'], ['cumino','base'], ['zafferano','base'], ['chiodi di garofano','base'],
-  ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipolla','verdura'], ['carota','verdura'], ['aglio','verdura'],
-  ['melone','verdura'], ['anguria','verdura'], ['mela','verdura'], ['pera','verdura'], ['limone','verdura'], ['arancia','verdura'], ['banana','verdura'], ['fragol','verdura'], ['uva','verdura'],
+  ['melanzan','verdura'], ['zucchin','verdura'], ['patat','verdura'], ['insalat','verdura'], ['pomodor','verdura'], ['basilico','verdura'], ['frutta','verdura'], ['verdura','verdura'], ['cipoll','verdura'], ['carot','verdura'], ['aglio','verdura'],
+  ['melone','verdura'], ['anguria','verdura'], ['mela','verdura'], ['pera','verdura'], ['limon','verdura'], ['arancia','verdura'], ['banan','verdura'], ['fragol','verdura'], ['uva','verdura'],
   ['cipoll','verdura'], ['borettan','verdura'], ['scalogno','verdura'], ['porr','verdura'], ['sedano','verdura'], ['finocchi','verdura'],
   ['carciof','verdura'], ['funghi','verdura'], ['broccol','verdura'], ['cavolfior','verdura'], ['verza','verdura'], ['cime di rapa','verdura'],
   ['friariell','verdura'], ['spinaci','verdura'], ['bietol','verdura'], ['asparag','verdura'], ['cetriol','verdura'], ['radicchio','verdura'], ['cicoria','verdura'], ['zenzero','verdura'],
@@ -2085,6 +2085,20 @@ const MIGRATIONS = [
     Object.values(state.pantryItems || {}).forEach(it=>{ if(it && it.cat) it.cat = fix(it.cat, it.nome); });
     Object.values(state.shopExtras || {}).forEach(it=>{ if(it && it.cat) it.cat = fix(it.cat, it.ingrediente); });
     Object.values(state.pantryGroups || {}).forEach(g=>{ if(g && g.cat) g.cat = fix(g.cat, g.matchName || g.label); });
+  }},
+  // 24. Una tantum (richiesta di Mara, ottobre 2026): tutti gli ingredienti
+  // rimessi in categoria con le regole nuove, anche quelli scelti a mano in
+  // una categoria di base. Restano dove sono: le categorie create a mano, gli
+  // avanzi, i prodotti per la casa e ciò che il nome non fa riconoscere.
+  { flag: 'deptsRegrouped3', run(){
+    const fix = (cat, name) => {
+      if(!cat || cat === 'avanzi' || !BASE_DEPT_LABEL[cat] || isNonFoodDept(cat)) return cat;
+      const auto = classifyDept(name || '');
+      return auto === 'altro' || isNonFoodDept(auto) ? cat : auto;
+    };
+    Object.values(state.pantryItems || {}).forEach(it=>{ if(it && it.cat) it.cat = fix(it.cat, it.nome); });
+    Object.values(state.shopExtras || {}).forEach(it=>{ if(it && it.cat) it.cat = fix(it.cat, it.ingrediente); });
+    Object.values(state.pantryGroups || {}).forEach(g=>{ if(g && g.cat) g.cat = fix(g.cat, g.matchName || g.label); });
   }}
 ];
 function runMigrations(){
@@ -3763,10 +3777,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-04',
+  version: '2026-11-05',
   title: 'Novità',
   items: [
-    'Spesa: se aggiungi un ingrediente finito in Dispensa, la quantità che scrivi ora resta in lista.'
+    'Tutti gli ingredienti sono stati rimessi nelle categorie nuove. Restano dove sono quelli nelle categorie create da te, gli avanzi e i prodotti per la casa.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
