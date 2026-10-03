@@ -1348,6 +1348,21 @@ test('scheda pasto: ⋯ in alto, chi cucina in basso a sinistra, Da cucinare in 
   eq(page.errors, [], 'errori JS');
 });
 
+test('spesa: aggiungere un ingrediente finito in Dispensa tiene la quantità scritta', async ({ page }) => {
+  await page.evaluate(() => {
+    upsertPantryItem('Carote', 'frigo', 0); delete state.pantryConfirmedShop['carote'];
+    state.shopExtras = {}; state.tab = 'spesa'; state.shopView = 'reparto'; state.addIngModalOpen = true; state.addIngName = 'Carote'; render();
+  });
+  await page.fill('#shop-add-qta', '3');
+  await page.click('#shop-add-btn');
+  const r = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.shop-item-row')].find(e => e.querySelector('.item-name') && e.querySelector('.item-name').textContent.trim().startsWith('Carote'));
+    return { confirmed: state.pantryConfirmedShop['carote'], qty: row ? row.querySelector('.qty-num').textContent.trim() : null };
+  });
+  eq(r, { confirmed: '3', qty: '3' });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

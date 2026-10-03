@@ -1115,7 +1115,7 @@ function mergeRenamedPantryItems(){
       state.pantryItems[newKey] = Object.assign({}, old, { nome: target });
     }
     delete state.pantryItems[oldKey];
-    if(state.pantryConfirmedShop[oldKey]){ state.pantryConfirmedShop[newKey] = true; delete state.pantryConfirmedShop[oldKey]; }
+    if(state.pantryConfirmedShop[oldKey]){ state.pantryConfirmedShop[newKey] = state.pantryConfirmedShop[oldKey]; delete state.pantryConfirmedShop[oldKey]; }
     delete state.shopDismissed['oos_'+oldKey];
   });
 }
@@ -1188,7 +1188,7 @@ function mergeIngredientInto(fromName, toName){
     }
     delete state.pantryItems[fromKey];
   }
-  if(state.pantryConfirmedShop[fromKey]){ state.pantryConfirmedShop[toKey] = true; delete state.pantryConfirmedShop[fromKey]; }
+  if(state.pantryConfirmedShop[fromKey]){ state.pantryConfirmedShop[toKey] = state.pantryConfirmedShop[fromKey]; delete state.pantryConfirmedShop[fromKey]; }
   if(state.shopDismissed['oos_'+fromKey]){ delete state.shopDismissed['oos_'+fromKey]; }
   if(state.pantrySelected) delete state.pantrySelected[fromKey];
   Object.values(state.shopExtras || {}).forEach(it=>{
@@ -1384,7 +1384,7 @@ const state = {
   pantrySelected: {}, // pantryKey -> true, selezione corrente in Dispensa (qualsiasi riga, non solo Finiti; non persistita)
   shopFinitiOpen: false, // accordion "Finiti", condiviso da Per reparto e Per giorno, chiuso di default
   shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
-  pantryConfirmedShop: {}, // pantryKey -> true, ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
+  pantryConfirmedShop: {}, // pantryKey -> true (o la quantità scritta in "Aggiungi", es. "2 kg"), ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
   recipeHistory: [], // [{ nome, dal: 'AAAA-MM-GG' }]: ricette delle settimane finite, per non ripeterle subito (vedi recentRecipeNames)
   pantryDraft: null, // non persistito: bozza della scheda "Nuovo ingrediente"
@@ -3763,11 +3763,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-03',
+  version: '2026-11-04',
   title: 'Novità',
   items: [
-    'Scheda pasto riordinata: ⋯ in alto a destra, chi cucina in basso a sinistra, "Da cucinare/Cucinata" in basso a destra.',
-    'Negli avanzi la variante si aggiunge con la matita accanto a "Avanzo di…".'
+    'Spesa: se aggiungi un ingrediente finito in Dispensa, la quantità che scrivi ora resta in lista.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5599,7 +5598,8 @@ function buildShopFlat(){
     if(typeof it.qty !== 'number' || it.qty > 0) return;
     if(isLeftoverPantryItem(it)) return; // un avanzo non si ricompra
     if(state.shopDismissed[key]) return;
-    flat.push({ key, ingrediente:it.nome, qta: '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!state.pantryConfirmedShop[pantryKey] });
+    const confirmedShop = state.pantryConfirmedShop[pantryKey];
+    flat.push({ key, ingrediente:it.nome, qta: typeof confirmedShop === 'string' ? confirmedShop : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!confirmedShop });
   });
   return flat;
 }
@@ -7327,18 +7327,20 @@ function attachHandlers(){
       if(!name) return;
       const pantryKey = name.toLowerCase();
       const pantryIt = state.pantryItems[pantryKey];
+      // L'unità dalla select si aggiunge solo se il campo Quantità è un
+      // numero "pulito" (es. "2"): se hai scritto qualcosa di tuo (es.
+      // "1 rotolo") lo rispetto così com'è, senza aggiungere altro in coda.
+      const rawQta = qtaInput.value.trim();
+      const qta = (unitSelect && unitSelect.value && /^[\d.,]*$/.test(rawQta))
+        ? `${rawQta || '1'} ${unitSelect.value}`
+        : rawQta;
       if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
-        state.pantryConfirmedShop[pantryKey] = true;
+        // La quantità scritta resta sulla riga riattivata (prima si perdeva:
+        // la riga dei Finiti non ha quantità sua).
+        state.pantryConfirmedShop[pantryKey] = qta || true;
         delete state.shopDismissed[`oos_${pantryKey}`];
         if(catSelect && catSelect.value) pantryIt.cat = catSelect.value;
       } else {
-        // L'unità dalla select si aggiunge solo se il campo Quantità è un
-        // numero "pulito" (es. "2"): se hai scritto qualcosa di tuo (es.
-        // "1 rotolo") lo rispetto così com'è, senza aggiungere altro in coda.
-        const rawQta = qtaInput.value.trim();
-        const qta = (unitSelect && unitSelect.value && /^[\d.,]*$/.test(rawQta))
-          ? `${rawQta || '1'} ${unitSelect.value}`
-          : rawQta;
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
         // Categoria scelta a mano (facoltativa): un ingrediente nuovo, mai
         // visto prima, non ha modo di essere classificato bene da
