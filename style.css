@@ -226,7 +226,7 @@
   .is-double.is-right svg { height:1.2em; width:1.2em; color: inherit;}
   nav.tabs button:hover{ color:var(--ink); }
   nav.tabs button.active{ color:var(--gold); border-top-color:var(--gold); }
-  nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+  nav.tabs button:focus-visible, button:focus-visible, /* select:focus-visible, */ input:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
 
   /* Impostazioni: pagina a tutto schermo (sopra tab e topbar) con intestazione
      fissa, freccia Indietro e sezioni a schede. L'id resta settings-backdrop
