@@ -1379,6 +1379,7 @@ const state = {
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
+  pantryFinishPicker: null, // ephemeral: chiave della voce di Dispensa arrivata a 0, in attesa di "+" (in lista spesa) o cestino (tra i Finiti)
   pantrySectionCollapsed: {}, // id sezione (luogo_X / cat_X) -> true se chiusa; aperta di default se assente
   pantrySelectMode: false, // true dopo una pressione lunga: un tap semplice seleziona/deseleziona invece di aprire il luogo-picker
   pantrySelected: {}, // pantryKey -> true, selezione corrente in Dispensa (qualsiasi riga, non solo Finiti; non persistita)
@@ -3777,10 +3778,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-05',
+  version: '2026-11-06',
   title: 'Novità',
   items: [
-    'Tutti gli ingredienti sono stati rimessi nelle categorie nuove. Restano dove sono quelli nelle categorie create da te, gli avanzi e i prodotti per la casa.'
+    'Dispensa: quando un ingrediente finisce ti chiedo cosa farne. Con + va dritto in lista spesa, col cestino va tra i Finiti come prima. Tocca fuori per annullare.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3943,6 +3944,7 @@ const MODAL_CHECKS = [
   [()=> !!state.deptsModalOpen && !!state.deptEditId, ()=>{ closeDeptEdit(); }],
   [()=> !!state.deptsModalOpen, ()=>{ state.deptsModalOpen = false; closeDeptEdit(); }],
   [()=> !!state.pantryLuogoPicker, ()=>{ state.pantryLuogoPicker = null; }],
+  [()=> !!state.pantryFinishPicker, ()=>{ state.pantryFinishPicker = null; }],
   [()=> !!state.mergeIngredientFrom, ()=>{ closeMergeIngredient(); }],
   [()=> !!state.pantrySheetPicker && !!(state.pantryEditKey || state.pantryAddModalOpen), ()=>{ state.pantrySheetPicker = null; }],
   [()=> !!state.pantryEditKey, ()=>{ closeIngredientSheet(); }],
@@ -6978,6 +6980,12 @@ function renderDispensa(){
       <div class="luogo-picker">
         ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===it.luogo?' active':''}" data-luogo-set="${escapeAttr(it.key)}" data-luogo-value="${l}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
       </div>` : ''}
+      ${state.pantryFinishPicker === it.key ? `
+      <div class="luogo-picker-backdrop" data-finish-picker-close></div>
+      <div class="luogo-picker finish-picker" role="dialog" aria-label="${escapeAttr(it.nome)} è finito">
+        <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" class="btn is-icon luogo-picker-opt" data-finish-trash="${escapeAttr(it.key)}" title="Metti tra i Finiti" aria-label="Metti tra i Finiti">${TRASH_ICON_SVG}</button>
+      </div>` : ''}
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}</button>
       ${it.unit === 'none'
         ? `<label class="presence-toggle"><input type="checkbox" ${it.qty > 0 ? 'checked' : ''} data-presence-toggle="${escapeAttr(it.key)}"></label>`
@@ -8614,6 +8622,15 @@ function attachHandlers(){
   document.querySelectorAll('.swipe-wrap[data-swipe-pantry]').forEach(wrap=>{
     attachSwipeToDelete(wrap, ()=> finishPantryItemWithUndo(wrap.dataset.swipePantry));
   });
+  document.querySelectorAll('[data-finish-picker-close]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.pantryFinishPicker = null; render(); });
+  });
+  document.querySelectorAll('[data-finish-tolist]').forEach(btn=>{
+    btn.addEventListener('click', e=> confirmPantryFinish(e.currentTarget.dataset.finishTolist, true));
+  });
+  document.querySelectorAll('[data-finish-trash]').forEach(btn=>{
+    btn.addEventListener('click', e=> confirmPantryFinish(e.currentTarget.dataset.finishTrash, false));
+  });
   document.querySelectorAll('[data-luogo-picker-close]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.pantryLuogoPicker = null; render(); });
   });
@@ -8631,7 +8648,9 @@ function attachHandlers(){
       const it = state.pantryItems[key];
       if(!it) return;
       const step = qtyStepFor(it.unit);
-      it.qty = Math.max(0, Math.round(((typeof it.qty === 'number' ? it.qty : 0) - step) * 100) / 100);
+      const next = Math.max(0, Math.round(((typeof it.qty === 'number' ? it.qty : 0) - step) * 100) / 100);
+      if(next <= 0 && !isLeftoverPantryItem(it)){ state.pantryFinishPicker = key; render(); return; }
+      it.qty = next;
       if(finishLeftoverWithUndo(key)) return;
       persist(); render();
     });
@@ -8650,6 +8669,7 @@ function attachHandlers(){
       const key = e.currentTarget.dataset.presenceToggle;
       const it = state.pantryItems[key];
       if(!it) return;
+      if(!e.currentTarget.checked && !isLeftoverPantryItem(it)){ state.pantryFinishPicker = key; render(); return; }
       it.qty = e.currentTarget.checked ? 1 : 0;
       if(it.qty > 0) delete state.pantryConfirmedShop[key];
       if(finishLeftoverWithUndo(key)) return;
@@ -8665,7 +8685,9 @@ function attachHandlers(){
       const it = state.pantryItems[key];
       if(it){
         const n = parseFloat(qtyEditInput.value);
-        it.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+        const next = Number.isNaN(n) ? 0 : Math.max(0, n);
+        if(next <= 0 && !isLeftoverPantryItem(it)) state.pantryFinishPicker = key;
+        else it.qty = next;
         if(it.qty > 0) delete state.pantryConfirmedShop[key];
       }
       state.pantryEditingKey = null;
@@ -9361,6 +9383,29 @@ function finishPantryItemWithUndo(key){
   showUndoToast(`${it.nome} finito: è in Spesa tra i Finiti`, ()=>{
     const cur = state.pantryItems[key];
     if(cur) cur.qty = prevQty;
+    if(wasSelected) state.pantrySelected[key] = true;
+    persist(); render();
+  });
+}
+// Scorta arrivata a 0 con −, spunta o numero scritto: invece di finire
+// subito tra i Finiti chiede con un tooltip sulla riga (come quello del
+// luogo): "+" = in lista spesa nel suo reparto, cestino = tra i Finiti come
+// prima. Toccare fuori annulla: la quantità resta quella di prima.
+function confirmPantryFinish(key, toList){
+  const it = state.pantryItems[key];
+  state.pantryFinishPicker = null;
+  if(!it){ render(); return; }
+  const prevQty = it.qty;
+  const hadConfirmed = key in state.pantryConfirmedShop, prevConfirmed = state.pantryConfirmedShop[key];
+  const wasSelected = !!state.pantrySelected[key];
+  it.qty = 0;
+  delete state.pantrySelected[key];
+  if(toList) state.pantryConfirmedShop[key] = true;
+  persist(); render();
+  showUndoToast(toList ? `${it.nome} aggiunto alla lista spesa` : `${it.nome} finito: è in Spesa tra i Finiti`, ()=>{
+    const cur = state.pantryItems[key];
+    if(cur) cur.qty = prevQty;
+    if(hadConfirmed) state.pantryConfirmedShop[key] = prevConfirmed; else delete state.pantryConfirmedShop[key];
     if(wasSelected) state.pantrySelected[key] = true;
     persist(); render();
   });

@@ -1380,6 +1380,30 @@ test('riordino una tantum: ingredienti rimessi nelle categorie nuove, tranne cat
   eq(page.errors, [], 'errori JS');
 });
 
+test('dispensa: ingrediente finito chiede + (lista spesa) o cestino (Finiti), fuori annulla', async ({ page }) => {
+  await page.evaluate(() => {
+    upsertPantryItem('Burro', 'frigo', 1); state.pantryItems['burro'].unit = 'pz';
+    upsertPantryItem('Zucchero', 'dispensa', 1); state.pantryItems['zucchero'].unit = 'pz';
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'dispensa'; state.pantryView = 'cibo'; render();
+  });
+  await page.click('[data-qty-dec="burro"]');
+  eq(await page.locator('.finish-picker').count(), 1, 'tooltip aperto');
+  await page.click('[data-finish-picker-close]', { position: { x: 5, y: 5 } });
+  eq(await page.evaluate(() => [state.pantryItems['burro'].qty, state.pantryFinishPicker]), [1, null], 'fuori annulla');
+  await page.click('[data-qty-dec="burro"]');
+  await page.click('[data-finish-tolist="burro"]');
+  await page.click('[data-qty-dec="zucchero"]');
+  await page.click('[data-finish-trash="zucchero"]');
+  const r = await page.evaluate(() => {
+    const flat = buildShopFlat();
+    const f = n => flat.find(x => x.ingrediente === n);
+    return [state.pantryItems['burro'].qty, !!f('Burro') && f('Burro').confirmed, state.pantryItems['zucchero'].qty, !!f('Zucchero') && f('Zucchero').confirmed];
+  });
+  eq(r, [0, true, 0, false]);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
