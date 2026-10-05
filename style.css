@@ -670,6 +670,7 @@
      cestino sotto): il menu dei luoghi si apre accanto all'icona, dentro la
      riga, invece che sotto — lì veniva tagliato e non si vedeva più. */
   .swipe-content > .luogo-picker{ top:50%; left:calc(1.875rem + var(--space-small)); margin-top:0; transform:translateY(-50%); }
+  .swipe-content > .luogo-picker.finish-picker{ left:auto; right:0; }
   .luogo-picker.is-category{left: calc((-2 * var(--space-xsmall)) - 30px); max-width: calc(100vw - (2 * var(--padding-block)) - (2 *var(--space-medium))); overflow: auto;}
   .luogo-picker-opt,.data-done-leftover-cat-toggle{ width:1.875rem; height:1.875rem; font-size:var(--text-small); line-height:1; padding: var(--space-xxsmall); background-color: var(--bg);}
   .luogo-picker-opt:hover,.data-done-leftover-cat-toggle:hover{ background:var(--surface-2); }
