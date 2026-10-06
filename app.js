@@ -595,9 +595,10 @@ function paneTabsHtml(paneKey, pane){
   return `<div class="pane-tabs" role="tablist">${tab('ing', 'Ingredienti')}${tab('steps', 'Passaggi')}</div>`;
 }
 // "Per 2 persone": nel pasto con − e + per cambiare il numero (era nel menù ⋯).
-function personeRowHtml(n, mk){
+function personeRowHtml(n, mk, recipeName){
   if(!n) return '';
   const word = n === 1 ? 'persona' : 'persone';
+  if(recipeName) return `<div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-recipe-portions-dec="${escapeAttr(recipeName)}" aria-label="Diminuisci porzioni">−</button><span class="qty-num">${n}</span><button type="button" class="qty-btn" data-recipe-portions-inc="${escapeAttr(recipeName)}" aria-label="Aumenta porzioni">+</button></span><span>${word}</span></div>`;
   if(!mk) return `<div class="persone-row"><span>Per ${n} ${word}</span></div>`;
   return `<div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-portions-dec="${mk}" aria-label="Diminuisci porzioni">−</button><span class="qty-num">${n}</span><button type="button" class="qty-btn" data-portions-inc="${mk}" aria-label="Aumenta porzioni">+</button></span><span>${word}</span></div>`;
 }
@@ -1510,6 +1511,8 @@ const state = {
   prepSuggOpen: {}, // ephemeral: settimana -> suggerimenti di prep aperti
   dishPicker: null, // ephemeral: {key: mealKey, replace: nome del piatto da cambiare o null, tipo, search} per "+ piatto"/"Cambia" del singolo piatto
   cookMode: null, // ephemeral: { name, step } modalità cucina (un passo per schermata)
+  recipePortions: {}, // ephemeral: ricetta -> persone scelte nel dettaglio del Ricettario
+  recipeMenuOpen: false, // ephemeral: menù ⋯ del dettaglio ricetta
   dishPane: {}, // ephemeral: "mealKey|piatto" (o "r|ricetta") -> 'ing' | 'steps', tab dentro il piatto
   dishTab: {}, // ephemeral: mealKey -> nome del piatto attivo nella tab del dettaglio del pasto
   mealDetailMenuOpen: false, // ephemeral: menù ⋯ (porzioni) del dettaglio del pasto
@@ -3926,10 +3929,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-19',
+  version: '2026-11-20',
   title: 'Novità',
   items: [
-    'Dettaglio del pasto: dentro ogni piatto ci sono le tab Ingredienti e Passaggi; il numero di persone si cambia nella tab Ingredienti. Le azioni (Cambia piatto, Modifica ricetta, Togli) sono nel menù ⋯ in alto, e "Cucina" è un bottone fisso in basso.'
+    'Ricette: il dettaglio di una ricetta ora è una pagina, come quello del pasto. Tab Ingredienti/Passaggi, persone da cambiare nella tab, "Aggiungi ingredienti" in alto, gradimento in fondo, impostazioni ⋯ (Modifica, Album) e "Cucina" fisso.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4133,6 +4136,7 @@ const MODAL_CHECKS = [
   [()=> !!state.linkPickerOpenDay, ()=>{ state.linkPickerOpenDay = null; }],
   [()=> !!state.avanzoDiPickerOpenDay, ()=>{ state.avanzoDiPickerOpenDay = null; }],
   [()=> !!state.dishPicker, ()=>{ state.dishPicker = null; }],
+  [()=> !!state.expandedRecipe && !!state.recipeMenuOpen, ()=>{ state.recipeMenuOpen = false; }],
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
   [()=> !!state.cookbookMenuOpen, ()=>{ state.cookbookMenuOpen = false; }],
   [()=> !!state.cookbookUseOpen, ()=>{ state.cookbookUseOpen = false; }],
@@ -6276,8 +6280,10 @@ function renderRecipeDetailScreen(name){
       ${r.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
     </div>`;
   const basePers = det ? parsePortionsBase(det.porzioni) : null;
+  const nPers = basePers ? (state.recipePortions[name] || basePers) : 0;
+  const rRatio = basePers ? nPers / basePers : 1;
   const recPane = state.dishPane['r|' + name] || 'ing';
-  const ingHtml = renderIngredientsSection(ing, 1, undefined, basePers, personeRowHtml(basePers, ''));
+  const ingHtml = renderIngredientsSection(ing, rRatio, { noButton: true, titleHtml: personeRowHtml(nPers, '', name) }, nPers);
   const stepsHtml = det && det.procedimento && det.procedimento.length
     ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
     : '';
@@ -6295,30 +6301,31 @@ function renderRecipeDetailScreen(name){
       <input type="text" placeholder="Quantità" data-rnqta="${escapeAttr(name)}">
       <button class="btn is-solid" data-add-ing-recipe="${escapeAttr(name)}">+ aggiungi ingrediente</button>
     </div>`;
-  const editRecipeBtn = `<button class="btn is-chip" data-open-recipe-edit="${escapeAttr(name)}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="m230.14 70.54l-44.68-44.69a20 20 0 0 0-28.29 0L33.86 149.17A19.85 19.85 0 0 0 28 163.31V208a20 20 0 0 0 20 20h44.69a19.86 19.86 0 0 0 14.14-5.86L230.14 98.82a20 20 0 0 0 0-28.28M91 204H52v-39l84-84l39 39Zm101-101l-39-39l18.34-18.34l39 39Z"></path></svg> Modifica ricetta</button>`;
-  return `
-  <div class="meal-detail-screen">
-  <div class="filters-modal">
-    <div class="meal-detail-header">
-      <div class="meal-detail-header-text">
-        <div class="meal-detail-kicker">Ricetta</div>
-        <div class="meal-detail-title">${escapeHtml(name)}</div>
-      </div>
-      <button type="button" class="btn is-icon meal-detail-close" data-toggle-recipe="${escapeAttr(name)}" aria-label="Chiudi">✕</button>
-    </div>
-    <div class="meal-detail-body${cookFabHtml(name, 1) ? ' has-cook-fab' : ''}">
-      <div class="detail-box">
-        ${recipePhotoHtml(name)}
-        ${tagsHtml}
-        ${gradimentoPickerHtml(name)}
-        ${paneTabsHtml('r|' + name, recPane)}
-        ${recPane === 'ing' ? `${ingHtml}${addFormHtml}` : `${stepsHtml || '<div class="ing-empty">Nessun procedimento salvato per questa ricetta.</div>'}${noteBox}`}
-        <div class="button-wrapper">${editRecipeBtn}<button type="button" class="btn is-chip" data-album-for="${escapeAttr(name)}">📚 ${cookbooksWith(name).length ? `In ${cookbooksWith(name).length} ${cookbooksWith(name).length === 1 ? 'album' : 'album'}` : 'Aggiungi a un album'}</button>${linkHtml}</div>
-      </div>
-      ${cookFabHtml(name, 1)}
-    </div>
-  </div>
-  </div>`;
+  // Impostazioni ⋯ in alto a destra: modifica la ricetta, album.
+  const nAlbum = cookbooksWith(name).length;
+  const menuItems = [
+    { label: '✏️ Modifica ricetta', attrs: `data-open-recipe-edit="${escapeAttr(name)}"` },
+    { label: `📚 ${nAlbum ? `In ${nAlbum} album` : 'Aggiungi a un album'}`, attrs: `data-album-for="${escapeAttr(name)}"` }
+  ];
+  const menuAction = `<button type="button" class="btn is-icon meal-menu-btn" data-recipe-menu aria-label="Impostazioni della ricetta" aria-expanded="${!!state.recipeMenuOpen}">${DOTS_ICON_SVG}</button>`;
+  const menuHtml = state.recipeMenuOpen ? `
+      <div class="meal-menu-backdrop" data-recipe-menu-close></div>
+      <div class="topbar-menu meal-menu" role="menu">
+        ${menuItems.map(it => `<button type="button" class="topbar-menu-item" role="menuitem" ${it.attrs}>${it.label}</button>`).join('')}
+      </div>` : '';
+  // "Aggiungi N ingredienti" in alto nella tab Ingredienti (quantità scalate sulle persone scelte).
+  const mancantiTop = mancantiButtonHtml(missingIngredients(ing, rRatio));
+  const cookFab = cookFabHtml(name, rRatio);
+  return managePageHtml({ key: 'recipe-' + name, title: escapeHtml(name), closeAttr: `data-toggle-recipe="${escapeAttr(name)}"`, action: menuAction, body: `
+    <div class="meal-detail-body${cookFab ? ' has-cook-fab' : ''}">
+      ${recipePhotoHtml(name)}
+      ${tagsHtml}
+      ${paneTabsHtml('r|' + name, recPane)}
+      ${recPane === 'ing' ? `${mancantiTop}${ingHtml}${addFormHtml}` : `${stepsHtml || '<div class="ing-empty">Nessun procedimento salvato per questa ricetta.</div>'}${noteBox}${linkHtml ? `<div class="button-wrapper">${linkHtml}</div>` : ''}`}
+      ${gradimentoPickerHtml(name)}
+      ${menuHtml}
+      ${cookFab}
+    </div>` });
 }
 
 function renderPrep(){
@@ -8452,6 +8459,21 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-recipe-menu]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.recipeMenuOpen = !state.recipeMenuOpen; render(); });
+  });
+  document.querySelectorAll('[data-recipe-menu-close]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.recipeMenuOpen = false; render(); });
+  });
+  const recipePortionsStep = (name, delta)=>{
+    const det = getRecipeDetails(name);
+    const base = det ? parsePortionsBase(det.porzioni) : null;
+    if(!base) return;
+    state.recipePortions[name] = Math.max(1, (state.recipePortions[name] || base) + delta);
+    render();
+  };
+  document.querySelectorAll('[data-recipe-portions-inc]').forEach(el=> el.addEventListener('click', ()=> recipePortionsStep(el.dataset.recipePortionsInc, 1)));
+  document.querySelectorAll('[data-recipe-portions-dec]').forEach(el=> el.addEventListener('click', ()=> recipePortionsStep(el.dataset.recipePortionsDec, -1)));
   document.querySelectorAll('[data-meal-menu]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.mealDetailMenuOpen = !state.mealDetailMenuOpen; render(); });
   });
@@ -8527,6 +8549,7 @@ function attachHandlers(){
     el.addEventListener('click', e=>{
       const name = el.dataset.toggleRecipe;
       state.expandedRecipe = state.expandedRecipe !== name ? name : null;
+      state.recipeMenuOpen = false;
       render();
     });
   });
@@ -9843,7 +9866,7 @@ document.addEventListener('pointercancel', ()=> endDayDrag(false));
 // attachHandlers() — nessuna riga resta senza handler dopo un re-render ravvicinato.
 // Una voce del menù ⋯ del dettaglio chiude il menù prima di fare la sua azione.
 document.addEventListener('click', e=>{
-  if(e.target.closest('.meal-menu .topbar-menu-item')) state.mealDetailMenuOpen = false;
+  if(e.target.closest('.meal-menu .topbar-menu-item')){ state.mealDetailMenuOpen = false; state.recipeMenuOpen = false; }
 }, true);
 document.addEventListener('click', e=>{
   const openEl = e.target.closest('[data-open-dish-picker]');
