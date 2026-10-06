@@ -1481,6 +1481,23 @@ test('carte: con una carta aperta lo schermo resta acceso (wake lock), chiusa si
   eq(page.errors, [], 'errori JS');
 });
 
+test('pasto vuoto: niente blocco né collegamento avanzi; Annulla li rimette', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    isMealPast = () => false; // nessun pasto passato: si rigenera tutta la settimana
+    generateWeek(0);
+    // Lunedì cena (0) fa da avanzo per martedì pranzo (1); la blocco e la svuoto.
+    state.mealLocked['0_0_cena'] = true;
+    const before = [state.dayLinks['0_1_pranzo'], !!state.mealLocked['0_0_cena']];
+    performClearMeal('0_0_cena');
+    const after = [state.dayLinks['0_1_pranzo'] || null, !!state.mealLocked['0_0_cena']];
+    document.querySelector('.undo-toast button').click();
+    const undone = [state.dayLinks['0_1_pranzo'], !!state.mealLocked['0_0_cena']];
+    return { before, after, undone };
+  });
+  eq(r, { before: ['0_0_cena', true], after: [null, false], undone: ['0_0_cena', true] });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

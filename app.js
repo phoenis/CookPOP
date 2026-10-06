@@ -2354,8 +2354,23 @@ function finishLeftoverWithUndo(key){
   });
   return true;
 }
+// Un pasto vuoto non può essere bloccato né essere "avanzo di" un altro, né
+// fare da avanzo per un altro: ogni volta che si salva, blocchi e
+// collegamenti rimasti su un pasto senza ricetta (svuotato, piatto tolto,
+// ricetta eliminata) se ne vanno.
+function dropEmptyMealFlags(){
+  const isEmpty = key => {
+    try{ const { weekIdx, i, meal } = parseMealKey(key); return !effectiveMeal(weekIdx, i, meal).principale; }
+    catch(e){ return false; }
+  };
+  Object.keys(state.mealLocked || {}).forEach(k=>{ if(isEmpty(k)) delete state.mealLocked[k]; });
+  Object.keys(state.dayLinks || {}).forEach(k=>{
+    if(isEmpty(state.dayLinks[k])){ delete state.dayLinks[k]; delete state.dayLinkNotes[k]; }
+  });
+}
 function persist(){
   purgeFinishedLeftovers();
+  dropEmptyMealFlags();
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(runPersist, 350);
 }
@@ -3373,10 +3388,14 @@ function performClearMeal(key){
   const prevDone = mealsDoneMap[i] ? mealsDoneMap[i][meal] : undefined;
   const pickedMap = weekOverridePickedRef(weekIdx);
   const prevPicked = pickedMap[i] ? pickedMap[i][meal] : undefined;
+  const prevLocked = state.mealLocked[key];
+  const prevPointing = Object.keys(state.dayLinks).filter(k => state.dayLinks[k] === key).map(k => ({ k, note: state.dayLinkNotes[k] }));
   clearMealToEmpty(weekIdx, i, meal);
   state.mealOverflowOpen = null;
   persist(); render();
   showUndoToast('Pasto svuotato', ()=>{
+    if(prevLocked) state.mealLocked[key] = prevLocked;
+    prevPointing.forEach(({ k, note })=>{ state.dayLinks[k] = key; if(note !== undefined) state.dayLinkNotes[k] = note; });
     if(prevLink !== undefined) state.dayLinks[key] = prevLink;
     if(prevLinkNote !== undefined) state.dayLinkNotes[key] = prevLinkNote;
     if(prevPortions !== undefined) state.dayPortions[key] = prevPortions;
@@ -3384,6 +3403,11 @@ function performClearMeal(key){
       const om = weekOverridesRef(weekIdx);
       if(!om[i]) om[i] = emptyDaySlot();
       om[i][meal] = prevOverrideSlot;
+    } else {
+      // Prima non c'era override (la ricetta veniva dalla proposta): via il
+      // "vuoto" messo da Svuota, così torna quella.
+      const om = weekOverridesRef(weekIdx);
+      if(om[i]) om[i][meal] = emptyMealSlot();
     }
     if(prevDone !== undefined){
       const md = weekMealsDoneRef(weekIdx);
@@ -3822,10 +3846,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-12',
+  version: '2026-11-13',
   title: 'Novità',
   items: [
-    'Carte fedeltà: finché una carta è aperta, lo schermo non si spegne.'
+    'Menù: un pasto vuoto non resta più bloccato né collegato agli avanzi.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4438,7 +4462,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // Un pasto bloccato non viene toccato da "Rigenera settimana" (vedi
   // generateWeek). Solo sui pasti normali: un pranzo-avanzo segue sempre il
   // principale del collegamento, bloccarlo non avrebbe un effetto chiaro.
-  const isLocked = !!state.mealLocked[mk];
+  const isLocked = !!name && !!state.mealLocked[mk];
   let swapControls;
   if(linkSource){
     swapControls = `
