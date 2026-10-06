@@ -1219,3 +1219,4 @@
 .dish-add-ic{ border:2px dotted var(--line); }
 .dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border-style:dotted; }
 .meal-block .day-meal .meal-overflow-btn{ margin-top:-0.5rem; margin-bottom:-0.5rem; }
+.meal-page-date{ display:block; font-size:var(--text-xsmall); font-weight:normal; color:var(--ink-light); }
