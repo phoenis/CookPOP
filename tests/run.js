@@ -1744,6 +1744,25 @@ test('ricette: ingredienti in ordine fisso, olio/aceto/sale/pepe/spezie per ulti
   eq(r, ['Guanciale', 'Pasta lunga', 'Aglio', 'Pecorino romano', 'Olio EVO', 'Sale fino', 'Pepe nero']);
 });
 
+test('cucina: durata letta dal passo, timer con conto alla rovescia, allarme a fine tempo che si ferma', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = { dur: ['Cuoci 10 minuti.', 'Cuoci 20-25 minuti', 'Lascia riposare mezz\'ora', 'Cuoci 1 ora e mezza', 'Cuoci per 2 ore', 'Taglia il guanciale.'].map(stepDurationSecs) };
+    state.customRecipes['Timer prova'] = { nome: 'Timer prova' };
+    state.recipeEdits['Timer prova'] = { ingredienti: [{ ingrediente: 'Pasta lunga', qta: '100 g' }], procedimento: ['Lessa la pasta per 10 minuti.', 'Servi.'] };
+    state.cookMode = { name: 'Timer prova', step: 0, ratio: 1 }; render();
+    out.btn = (document.querySelector('[data-cook-timer-start]') || {}).textContent;
+    document.querySelector('[data-cook-timer-start]').click();
+    out.bar = (document.getElementById('cook-timer-time') || {}).textContent;
+    state.cookTimer.end = Date.now() - 1000; timerTick();
+    out.alert = !!document.getElementById('timer-alert') && state.cookTimer === null;
+    document.querySelector('[data-timer-stop]').click();
+    out.stopped = !document.getElementById('timer-alert');
+    return out;
+  });
+  eq(r, { dur: [600, 1200, 1800, 5400, 7200, 0], btn: '⏱ Avvia timer 10 min', bar: '10:00', alert: true, stopped: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
