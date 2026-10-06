@@ -1673,6 +1673,17 @@ test('spesa e dispensa: "Ordina per" è testo in grassetto senza bordo né largh
   eq(r, { border: '0px', bold: true, bg: 'rgba(0, 0, 0, 0)' });
 });
 
+test('spesa: "Ordina per" senza contorno al focus e con larghezza sul testo', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'spesa'; render();
+    const s = document.querySelector('[data-shop-group]'); s.focus();
+    const cs = getComputedStyle(s);
+    return { outline: cs.outlineStyle, fit: !CSS.supports('field-sizing', 'content') || cs.fieldSizing === 'content' };
+  });
+  eq(r, { outline: 'none', fit: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

@@ -1299,3 +1299,6 @@
 /* Tooltip della Dispensa (luogo, finito): ombra leggera come le card del Menù, e non più tagliata sopra e sotto dal contenitore dello swipe. */
 .luogo-picker{ box-shadow:var(--shadow-card); }
 .swipe-wrap:has(.luogo-picker){ overflow:visible; }
+
+.shop-group-by select{ field-sizing:content; width:auto; }
+.shop-group-by select:focus, .shop-group-by select:focus-visible{ outline:none; box-shadow:none; }
