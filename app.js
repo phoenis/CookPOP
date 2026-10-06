@@ -721,15 +721,35 @@ document.addEventListener('click', e=>{
   if(phone){
     const secs = parseInt(phone.dataset.cookTimerPhone, 10) || 0;
     if(!secs) return;
+    timerPrimeAudio();
     const msg = encodeURIComponent((state.cookMode && state.cookMode.name) || 'CookPOP');
-    window.location.href = `intent:#Intent;action=android.intent.action.SET_TIMER;i.android.intent.extra.alarm.LENGTH=${secs};S.android.intent.extra.alarm.MESSAGE=${msg};B.android.intent.extra.alarm.SKIP_UI=true;end`;
+    const url = `intent:#Intent;action=android.intent.action.SET_TIMER;i.android.intent.extra.alarm.LENGTH=${secs};S.android.intent.extra.alarm.MESSAGE=${msg};B.android.intent.extra.alarm.SKIP_UI=true;end`;
+    // Se l'Orologio si apre, la pagina passa in secondo piano: niente da fare.
+    // Se dopo un attimo siamo ancora qui, il telefono non l'ha aperto: parte
+    // il timer dell'app, così il tempo non va perso.
+    let left = false;
+    const onLeave = ()=>{ left = true; };
+    document.addEventListener('visibilitychange', onLeave, { once: true });
+    window.addEventListener('pagehide', onLeave, { once: true });
+    window.addEventListener('blur', onLeave, { once: true });
+    const a = document.createElement('a');
+    a.href = url; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>{
+      document.removeEventListener('visibilitychange', onLeave);
+      window.removeEventListener('pagehide', onLeave);
+      window.removeEventListener('blur', onLeave);
+      if(left || document.hidden || state.cookTimer) return;
+      state.cookTimer = { end: Date.now() + secs * 1000, total: secs, label: formatTimerLabel(secs), note: 'Orologio non aperto: timer nell\'app' };
+      render();
+    }, 1500);
   }
 });
 function cookTimerHtml(stepText){
   const secs = stepDurationSecs(stepText);
   const running = state.cookTimer;
   const isAndroid = /android/i.test(navigator.userAgent || '');
-  const bar = running ? `<div class="cook-timer-bar"><span aria-hidden="true">⏱</span><b id="cook-timer-time">${formatTimerClock(Math.ceil((running.end - Date.now()) / 1000))}</b><span class="cook-timer-label">Timer ${escapeHtml(running.label)}</span><button type="button" class="cook-timer-cancel" data-cook-timer-cancel>Annulla</button></div>` : '';
+  const bar = running ? `<div class="cook-timer-bar"><span aria-hidden="true">⏱</span><b id="cook-timer-time">${formatTimerClock(Math.ceil((running.end - Date.now()) / 1000))}</b><span class="cook-timer-label">${escapeHtml(running.note || ('Timer ' + running.label))}</span><button type="button" class="cook-timer-cancel" data-cook-timer-cancel>Annulla</button></div>` : '';
   const btns = secs ? `<div class="cook-timer-row"><button type="button" class="cook-timer-btn" data-cook-timer-start="${secs}">⏱ Avvia timer ${formatTimerLabel(secs)}</button>${isAndroid ? `<button type="button" class="cook-timer-btn is-ghost" data-cook-timer-phone="${secs}">Nell'orologio</button>` : ''}</div>` : '';
   return { bar, btns };
 }
@@ -4091,10 +4111,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-01',
+  version: '2026-12-02',
   title: 'Novità',
   items: [
-    'Modalità Cucina: se un passo dice "10 minuti", "mezz\'ora" ecc. compare "Avvia timer": suona e vibra quando scade (resta aperta l\'app). Su Android c\'è anche "Nell\'orologio", che crea il timer nell\'app Orologio del telefono e suona anche a schermo bloccato.'
+    'Timer in Cucina: se "Nell\'orologio" non riesce ad aprire l\'Orologio del telefono, parte da solo il timer dell\'app.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo

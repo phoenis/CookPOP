@@ -1763,6 +1763,20 @@ test('cucina: durata letta dal passo, timer con conto alla rovescia, allarme a f
   eq(r, { dur: [600, 1200, 1800, 5400, 7200, 0], btn: '⏱ Avvia timer 10 min', bar: '10:00', alert: true, stopped: true });
 });
 
+test('cucina: "Nell\'orologio" che non si apre avvia il timer dell\'app', async ({ page }) => {
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.customRecipes['Timer prova 2'] = { nome: 'Timer prova 2' };
+    state.recipeEdits['Timer prova 2'] = { ingredienti: [{ ingrediente: 'Pasta lunga', qta: '100 g' }], procedimento: ['Cuoci 10 minuti.'] };
+    state.cookMode = { name: 'Timer prova 2', step: 0, ratio: 1 }; state.cookTimer = null; render();
+    const b = document.createElement('button'); b.id = 'fake-phone'; b.dataset.cookTimerPhone = '600'; document.body.appendChild(b);
+    b.click();
+  });
+  await page.waitForTimeout(1900);
+  const r = await page.evaluate(() => ({ t: !!state.cookTimer, note: state.cookTimer && state.cookTimer.note, bar: !!document.getElementById('cook-timer-time') }));
+  eq(r, { t: true, note: 'Orologio non aperto: timer nell\'app', bar: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
