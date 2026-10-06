@@ -1663,6 +1663,16 @@ test('dispensa: tooltip con ombra leggera e non tagliata dal contenitore dello s
   eq(r, { overflow: 'visible', same: true });
 });
 
+test('spesa e dispensa: "Ordina per" è testo in grassetto senza bordo né larghezza fissa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'spesa'; render();
+    const s = document.querySelector('[data-shop-group]'); const cs = getComputedStyle(s);
+    return { border: cs.borderTopWidth, bold: +cs.fontWeight >= 600, bg: cs.backgroundColor };
+  });
+  eq(r, { border: '0px', bold: true, bg: 'rgba(0, 0, 0, 0)' });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

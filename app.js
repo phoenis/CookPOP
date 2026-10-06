@@ -3939,11 +3939,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-24',
+  version: '2026-11-25',
   title: 'Novità',
   items: [
-    'Dispensa: la quantità non è più rossa per i litri e i chili sopra 0,2 (prima 0,7 l di passata era "poca"). Per pezzi, grammi e millilitri il rosso resta sotto 1.',
-    'Dispensa: i tooltip (luogo, finito) hanno un\'ombra più leggera, come le card del Menù, e non è più tagliata sopra e sotto.'
+    'Spesa e Dispensa: "Ordina per" è una scritta in grassetto con la freccetta, senza bordo e senza larghezza fissa.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
