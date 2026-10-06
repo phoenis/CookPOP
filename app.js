@@ -913,11 +913,14 @@ function ensureRecipePhoto(name){
     render();
   }).catch(()=>{ recipePhotoCache[name] = { status:'error' }; render(); });
 }
-function recipePhotoHtml(name){
+// editable = false (dettaglio): solo la foto, se c'è. editable = true (pagina
+// "Modifica ricetta"): anche aggiungi / cambia / rimuovi.
+function recipePhotoHtml(name, editable){
   if(!name || !window.cookpopSync) return '';
   ensureRecipePhoto(name);
   const c = recipePhotoCache[name] || { status:'loading' };
   if(c.status === 'loading') return '';
+  if(!editable) return c.status === 'ok' ? `<figure class="recipe-photo"><img src="${escapeAttr(c.src)}" alt="Foto del piatto: ${escapeAttr(name)}"></figure>` : '';
   const input = label => `<label class="btn is-chip recipe-photo-btn">${label}<input type="file" accept="image/*" hidden data-recipe-photo-input="${escapeAttr(name)}"></label>`;
   if(c.status === 'saving') return `<div class="recipe-photo-actions"><span class="section-sub">Salvataggio della foto…</span></div>`;
   const error = c.message ? `<div class="recipe-photo-error">${escapeHtml(c.message)}</div>` : '';
@@ -3929,10 +3932,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-20',
+  version: '2026-11-21',
   title: 'Novità',
   items: [
-    'Ricette: il dettaglio di una ricetta ora è una pagina, come quello del pasto. Tab Ingredienti/Passaggi, persone da cambiare nella tab, "Aggiungi ingredienti" in alto, gradimento in fondo, impostazioni ⋯ (Modifica, Album) e "Cucina" fisso.'
+    'Modifica ricetta ora è una pagina, non più una modale. La foto del piatto si aggiunge, cambia o toglie da lì: nel dettaglio non c\'è più "Aggiungi una foto".'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3990,6 +3993,27 @@ function syncCardWakeLock(){
 }
 // Il blocco cade da solo quando l'app va in background: al ritorno si riprende.
 document.addEventListener('visibilitychange', syncCardWakeLock);
+// "Modifica ricetta" legge i campi dal DOM al momento di Salva: se un render
+// (foto caricata, avviso, sincronizzazione…) rifacesse la pagina da zero si
+// perderebbe quanto scritto. Si salva quindi il modulo, con i valori messi
+// negli attributi, e lo si rimette dopo il render (la foto si rinfresca).
+function captureRecipeEditForm(){
+  const form = document.getElementById('edit-recipe-form');
+  if(!form || !state.recipeEditName) return null;
+  form.querySelectorAll('input').forEach(i=>{ if(i.type === 'file') return; i.setAttribute('value', i.value); });
+  form.querySelectorAll('textarea').forEach(t=>{ t.textContent = t.value; });
+  form.querySelectorAll('select option').forEach(o=>{ if(o.selected) o.setAttribute('selected', ''); else o.removeAttribute('selected'); });
+  return { name: state.recipeEditName, html: form.innerHTML };
+}
+function restoreRecipeEditForm(snap){
+  if(!snap || state.recipeEditName !== snap.name) return;
+  const form = document.getElementById('edit-recipe-form');
+  if(!form) return;
+  const fresh = (form.querySelector('#edit-photo-area') || {}).innerHTML;
+  form.innerHTML = snap.html;
+  const area = form.querySelector('#edit-photo-area');
+  if(area && fresh !== undefined) area.innerHTML = fresh;
+}
 function render(){
   applyCustomDepts();
   if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
@@ -3999,6 +4023,7 @@ function render(){
   const panel = document.getElementById('panel');
   const focus = captureFocus(panel);
   const scrolls = captureInnerScroll(panel);
+  const editSnap = captureRecipeEditForm();
   dialogOpenerBeforeRender = describeElement(document.activeElement);
   let html = '';
   if(state.tab === 'menu') html = renderMenu();
@@ -4008,6 +4033,7 @@ function render(){
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
   panel.innerHTML = html + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
+  restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
   syncCardWakeLock();
@@ -4345,7 +4371,7 @@ function editStepRowHtml(text){
     </div>`;
 }
 
-// Modale unica "Modifica ricetta", condivisa da Menù e Prep (stessa modale,
+// Pagina "Modifica ricetta" (non più una modale), condivisa da Menù e Prep (stessa pagina,
 // stesso state.recipeEdits): qualsiasi modifica è quindi automaticamente
 // visibile in entrambe le tab, non serve tenerle sincronizzate a mano.
 function renderRecipeEditModal(){
@@ -4364,15 +4390,12 @@ function renderRecipeEditModal(){
   const stepRowsHtml = (procedimento.length ? procedimento : [''])
     .map(s => editStepRowHtml(s)).join('');
 
-  return `
-    <div class="filters-modal-backdrop is-second" data-close-recipe-edit>
-      <div class="filters-modal recipe-edit-modal" data-stop-close>
-        <div class="filters-modal-header">
-          <h3>Modifica ricetta</h3>
-          <button class="btn is-icon filters-close-btn" data-close-recipe-edit>✕</button>
-        </div>
-        <p class="section-sub" style="margin-top:-8px;">${escapeHtml(name)}</p>
-        <div class="filter-groups">
+  const formHtml = `
+        <div class="filter-groups" id="edit-recipe-form">
+          <div class="filter-group">
+            <div class="filter-group-label">Foto del piatto</div>
+            <div id="edit-photo-area">${recipePhotoHtml(name, true)}</div>
+          </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> Tempo (etichetta mostrata)</div>
             <input type="text" id="edit-tempo" value="${escapeAttr(rec.tempo || '')}">
@@ -4470,14 +4493,13 @@ function renderRecipeEditModal(){
             <div class="filter-group-label">🔗 Link fonte</div>
             <input type="text" id="edit-link" value="${escapeAttr((det && det.link) || '')}">
           </div>
-        </div>
-        <div class="filters-modal-footer">
-          <button class="btn is-ghost is-danger reset-btn" id="edit-recipe-delete" data-delete-recipe="${escapeAttr(name)}">Elimina</button>
-          <button class="btn is-ghost reset-btn" data-close-recipe-edit>Annulla</button>
-          <button class="btn is-solid mini-add-btn" id="edit-recipe-save" data-save-recipe-edit="${escapeAttr(name)}">Salva</button>
-        </div>
-      </div>
+        </div>`;
+  const footer = `
+    <div class="edit-footer">
+      <button type="button" class="btn is-outline is-danger" id="edit-recipe-delete" data-delete-recipe="${escapeAttr(name)}">Elimina</button>
+      <button type="button" class="btn is-solid" id="edit-recipe-save" data-save-recipe-edit="${escapeAttr(name)}">Salva</button>
     </div>`;
+  return managePageHtml({ key: 'recipe-edit-' + name, title: 'Modifica ricetta', closeAttr: 'data-close-recipe-edit', body: `<p class="section-sub edit-recipe-name">${escapeHtml(name)}</p>${formHtml}`, footer, extraClass: 'recipe-edit-page' });
 }
 
 // Un giorno di una qualunque settimana (weekIdx 0 = corrente, >=1 = extra).
@@ -6721,9 +6743,9 @@ function endPageRender(){
 }
 const BACK_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="100%" height="100%"><path fill="currentColor" d="M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z"></path></svg>';
 // Guscio comune: intestazione con freccia Indietro, corpo, piede opzionale.
-function managePageHtml({ key, title, closeAttr, body, footer, action }){
+function managePageHtml({ key, title, closeAttr, body, footer, action, extraClass }){
   return `
-  <div class="sheet-page${pageEntering(key) ? ' is-entering' : ''}" data-page="${key}">
+  <div class="sheet-page${extraClass ? ' ' + extraClass : ''}${pageEntering(key) ? ' is-entering' : ''}" data-page="${escapeAttr(key)}">
     <header class="settings-header">
       <button class="btn is-icon settings-back" type="button" ${closeAttr} aria-label="Indietro">${BACK_ICON_SVG}</button>
       <h2 class="settings-title">${title}</h2>
