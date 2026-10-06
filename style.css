@@ -1262,3 +1262,10 @@
    minuscolo e senza righe nere, carte con bordo leggero e ombra morbida. */
 .week-title, .shop-day-title, .dept-title{ text-transform:none; font-size:var(--text-medium); border-top:0; border-bottom:var(--border) solid var(--line); margin-top:0; }
 .meal-block{ border:var(--border) solid var(--line); box-shadow:var(--shadow-card); }
+
+/* Dettaglio pasto: tab dei piatti a sinistra, "+" tondo fisso a destra */
+.dish-tabs-row{ display:flex; align-items:center; gap:var(--space-small); border-bottom:1px solid var(--line); }
+.dish-tabs-row .dish-tabs{ flex:1; min-width:0; border-bottom:0; }
+.dish-tabs-row .dish-tab{ margin-bottom:0; }
+.dish-tabs-add{ flex:0 0 auto; align-self:center; padding:0; background:transparent; border:0; line-height:0; cursor:pointer; }
+.dish-tabs-add .dish-add-ic{ width:2rem; height:2rem; font-size:1.25rem; }

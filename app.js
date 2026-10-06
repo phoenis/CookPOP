@@ -3910,11 +3910,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-17',
+  version: '2026-11-18',
   title: 'Novità',
   items: [
-    'Modalità cucina: sotto il procedimento tocca "Cucina" per vedere un passo alla volta, a caratteri grandi, con gli ingredienti che servono in quel passo. Vai avanti con "Fatto!" o scorrendo col dito, e lo schermo resta acceso.',
-    'Nuovo stile: sfondo bianco, titoli di sezione senza righe nere né maiuscolo, angoli più morbidi e linee leggere.'
+    'Dettaglio del pasto: "Aggiungi piatto" è il cerchio + fisso a destra, accanto alle tab dei piatti.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4737,7 +4736,10 @@ function renderMealDetailScreen(weekIdx, i, meal){
   const activeName = state.dishTab[mk];
   const activeIdx = Math.max(0, dishInfos.findIndex(x => x.dsh.name === activeName));
   const seenCourse = {};
-  const tabsHtml = dishInfos.length > 1 ? `
+  // A destra, fisso, il cerchio tratteggiato "+" come nella card del pasto.
+  const addDishBtn = `<button type="button" class="btn dish-add dish-tabs-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>`;
+  const tabsHtml = `
+    <div class="dish-tabs-row">
     <div class="dish-tabs" role="tablist">
       ${dishInfos.map(({ dsh }, idx)=>{
         const label = courseLabel(dsh.tipo);
@@ -4745,7 +4747,9 @@ function renderMealDetailScreen(weekIdx, i, meal){
         const text = seenCourse[label] > 1 ? `${label} ${seenCourse[label]}` : label;
         return `<button type="button" class="dish-tab${idx === activeIdx ? ' active' : ''}" role="tab" aria-selected="${idx === activeIdx}" data-dish-tab="${mk}" data-dish-tab-name="${escapeAttr(dsh.name)}"><span class="dish-ic" aria-hidden="true">${tipoIcon(dsh.tipo)}</span><span class="dish-tab-label">${escapeHtml(text)}</span></button>`;
       }).join('')}
-    </div>` : '';
+    </div>
+    ${addDishBtn}
+    </div>`;
   const act = dishInfos[activeIdx];
   const dishesHtml = act ? renderDishAccordion(act.dsh, act.ratio, act.ctx, true, !!linkSource && act.dsh.role === 'p', true) : '';
   const dayMetaHtml = metaLines.length ? `<div class="day-meta">${metaLines.map(l=>`<div>${l}</div>`).join('')}</div>` : '';
@@ -4762,8 +4766,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
       ${name ? `
       ${mealTop}
       ${tabsHtml}
-      <div class="dish-acc-list">${dishesHtml}</div>
-      <button type="button" class="btn is-outline dish-add-wide" data-open-dish-picker="${mk}">+ Aggiungi piatto</button>` : `
+      <div class="dish-acc-list">${dishesHtml}</div>` : `
       <div class="ing-empty">Nessuna ricetta scelta per questo pasto.</div>
       <button type="button" class="btn is-outline dish-add-wide" data-open-swap="${mk}">Scegli una ricetta</button>`}
       ${portionsMenuHtml}
