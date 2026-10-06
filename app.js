@@ -579,6 +579,60 @@ function mancantiButtonHtml(mancanti){
   if(!mancanti.length) return '';
   return `<div class="button-wrapper"><button class="btn is-small" data-mancanti-in-spesa="${escapeAttr(JSON.stringify(mancanti))}"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Aggiungi ${mancanti.length} ingredient${mancanti.length===1?'e':'i'}</button></div>`;
 }
+// --- Modalità cucina ------------------------------------------------------
+// Un passo del procedimento per schermata, a caratteri grandi, con Indietro e
+// Avanti (anche scorrendo col dito). Lo schermo resta acceso finché è aperta.
+function cookButtonHtml(name, ratio){
+  return `<button type="button" class="btn is-solid is-block cook-start-btn" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}">🍳 Cucina</button>`;
+}
+// Ingredienti che servono in un passo: quelli il cui nome (una parola
+// significativa, senza l'ultima vocale per reggere singolare/plurale) compare
+// nel testo del passo. Euristica semplice: nessun abbinamento = nessun elenco.
+const COOK_SKIP_WORDS = new Set(['fresco','fresca','freschi','fresche','tritato','tritata','grattugiato','grattugiata','polvere','intero','intera','medio','media','grande','piccolo','piccola','circa','sodo','maturo','matura','extra','vergine','extravergine']);
+function cookStepIngredients(name, stepText, ratio){
+  const text = (stepText || '').toLowerCase();
+  return getIngredientsFor(name).filter(it=>{
+    const words = (it.ingrediente || '').toLowerCase().split(/[^a-zàèéìòù]+/).filter(w => w.length >= 4 && !COOK_SKIP_WORDS.has(w));
+    return words.some(w => text.includes(w.length > 4 ? w.slice(0, -1) : w));
+  }).map(it => ({ nome: it.ingrediente, qta: scaleQtyText(it.qta, ratio) || '' }));
+}
+function renderCookModePage(){
+  const cm = state.cookMode;
+  if(!cm) return '';
+  const det = getRecipeDetails(cm.name);
+  const steps = (det && det.procedimento) || [];
+  if(!steps.length) return '';
+  const total = steps.length;
+  const step = Math.min(Math.max(0, cm.step || 0), total - 1);
+  const isFirst = step === 0, isLast = step === total - 1;
+  const ings = cookStepIngredients(cm.name, steps[step], cm.ratio || 1);
+  const ingHtml = ings.length ? `
+    <section class="cook-section">
+      <h3 class="cook-section-title">Ingredienti</h3>
+      <ul class="cook-ings">${ings.map(i => `<li>${i.qta ? `<b>${escapeHtml(i.qta)}</b> ` : ''}${escapeHtml(i.nome.charAt(0).toLowerCase() + i.nome.slice(1))}</li>`).join('')}</ul>
+    </section>` : '';
+  return `
+  <div class="sheet-page cook-page${pageEntering('cook') ? ' is-entering' : ''}" data-page="cook">
+    <header class="cook-head">
+      <button type="button" class="cook-end" data-close-cook>Termina</button>
+      <h2 class="cook-title">${escapeHtml(cm.name)}</h2>
+    </header>
+    <div class="cook-bar" role="progressbar" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${step + 1}"><span style="width:${Math.round((step + 1) / total * 100)}%"></span></div>
+    <div class="cook-body" data-cook-swipe>
+      <section class="cook-section cook-step">
+        <div class="cook-step-count">Passaggio ${step + 1}/${total}</div>
+        <p class="cook-step-text">${escapeHtml(steps[step])}</p>
+      </section>
+      ${ingHtml}
+    </div>
+    <div class="cook-footer">
+      <div class="cook-nav">
+        <button type="button" class="cook-nav-back" data-cook-prev aria-label="Passo precedente" ${isFirst ? 'disabled' : ''}>←</button>
+        <button type="button" class="cook-nav-next" ${isLast ? 'data-close-cook' : 'data-cook-next'}>Fatto!</button>
+      </div>
+    </div>
+  </div>`;
+}
 function renderIngredientsSection(ing, ratio, ctx, persone){
   ratio = ratio || 1;
   persone = persone || (ctx && ctx.persone) || 0;
@@ -616,7 +670,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
       ${rec.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
     </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
   const stepsHtml = det && det.procedimento && det.procedimento.length
-    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol>${cookButtonHtml(name, typeof ratio === 'number' ? ratio : 1)}</div>`
     : '';
   const noteExtra = det ? [
       det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
@@ -1440,6 +1494,7 @@ const state = {
   freezerDishes: {}, // { mealKey: [nomi] } piatti presi dal freezer: niente Spesa, porzioni scalate a pasto cucinato
   prepSuggOpen: {}, // ephemeral: settimana -> suggerimenti di prep aperti
   dishPicker: null, // ephemeral: {key: mealKey, replace: nome del piatto da cambiare o null, tipo, search} per "+ piatto"/"Cambia" del singolo piatto
+  cookMode: null, // ephemeral: { name, step } modalità cucina (un passo per schermata)
   dishTab: {}, // ephemeral: mealKey -> nome del piatto attivo nella tab del dettaglio del pasto
   mealDetailMenuOpen: false, // ephemeral: menù ⋯ (porzioni) del dettaglio del pasto
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
@@ -3855,10 +3910,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-15',
+  version: '2026-11-17',
   title: 'Novità',
   items: [
-    'Sistemato: il menù ⋯ in alto nel dettaglio del pasto (e negli album) ora si richiude. I puntini sono più grandi e le icone a destra stanno alla stessa distanza dal bordo della freccia a sinistra.'
+    'Modalità cucina: sotto il procedimento tocca "Cucina" per vedere un passo alla volta, a caratteri grandi, con gli ingredienti che servono in quel passo. Vai avanti con "Fatto!" o scorrendo col dito, e lo schermo resta acceso.',
+    'Nuovo stile: sfondo bianco, titoli di sezione senza righe nere né maiuscolo, angoli più morbidi e linee leggere.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3897,15 +3953,15 @@ function renderWhatsNewModal(){
     </div>
   </div>`;
 }
-// Carta fedeltà aperta: lo schermo resta acceso (Screen Wake Lock) finché
-// la carta è a video. La luminosità invece un'app web non può alzarla.
+// Carta fedeltà o modalità cucina aperte: lo schermo resta acceso (Screen Wake
+// Lock) finché sono a video. La luminosità invece un'app web non può alzarla.
 let cardWakeLock = null;
 function syncCardWakeLock(){
-  const want = !!state.cardViewId && document.visibilityState === 'visible';
+  const want = !!(state.cardViewId || state.cookMode) && document.visibilityState === 'visible';
   if(want && !cardWakeLock && navigator.wakeLock){
     cardWakeLock = 'pending';
     navigator.wakeLock.request('screen').then(lock=>{
-      if(!state.cardViewId){ lock.release().catch(()=>{}); cardWakeLock = null; return; }
+      if(!(state.cardViewId || state.cookMode)){ lock.release().catch(()=>{}); cardWakeLock = null; return; }
       cardWakeLock = lock;
       lock.addEventListener('release', ()=>{ if(cardWakeLock === lock) cardWakeLock = null; });
     }).catch(()=>{ cardWakeLock = null; });
@@ -3933,7 +3989,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
   endPageRender();
   attachHandlers();
   syncCardWakeLock();
@@ -4026,6 +4082,7 @@ function closeTopbarMenu(){
   if(el) el.classList.remove('open');
 }
 const MODAL_CHECKS = [
+  [()=> !!state.cookMode, ()=>{ state.cookMode = null; }],
   [()=> !!state.cookbookNameDraft, ()=>{ state.cookbookNameDraft = null; }],
   [()=> !!state.recipeImport, ()=>{ state.recipeImport = null; }],
   [()=> !!state.albumForRecipe, ()=>{ state.albumForRecipe = null; }],
@@ -6199,7 +6256,7 @@ function renderRecipeDetailScreen(name){
     </div>`;
   const ingHtml = renderIngredientsSection(ing, 1, undefined, det ? parsePortionsBase(det.porzioni) : null);
   const stepsHtml = det && det.procedimento && det.procedimento.length
-    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol>${cookButtonHtml(name, typeof ratio === 'number' ? ratio : 1)}</div>`
     : '';
   const noteExtra = det ? [
       det.porzioni ? `<b>Porzioni:</b> ${escapeHtml(det.porzioni)}` : '',
@@ -8378,6 +8435,34 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-meal-menu-close]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.mealDetailMenuOpen = false; render(); });
+  });
+  document.querySelectorAll('[data-cook-start]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.cookMode = { name: el.dataset.cookStart, step: 0, ratio: parseFloat(el.dataset.cookRatio) || 1 }; render(); });
+  });
+  document.querySelectorAll('[data-close-cook]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.cookMode = null; render(); });
+  });
+  const cookGo = delta=>{
+    const cm = state.cookMode; if(!cm) return;
+    const det = getRecipeDetails(cm.name);
+    const total = ((det && det.procedimento) || []).length;
+    const next = Math.min(Math.max(0, (cm.step || 0) + delta), total - 1);
+    if(next === cm.step) return;
+    cm.step = next;
+    render();
+  };
+  document.querySelectorAll('[data-cook-prev]').forEach(el=> el.addEventListener('click', ()=> cookGo(-1)));
+  document.querySelectorAll('[data-cook-next]').forEach(el=> el.addEventListener('click', ()=> cookGo(1)));
+  // Scorrere con il dito: a sinistra passo avanti, a destra indietro.
+  document.querySelectorAll('[data-cook-swipe]').forEach(el=>{
+    let x0 = null, y0 = null;
+    el.addEventListener('touchstart', e=>{ const t = e.changedTouches[0]; x0 = t.clientX; y0 = t.clientY; }, { passive: true });
+    el.addEventListener('touchend', e=>{
+      if(x0 === null) return;
+      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+      x0 = null;
+      if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) cookGo(dx < 0 ? 1 : -1);
+    }, { passive: true });
   });
   document.querySelectorAll('[data-dish-tab]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.dishTab[el.dataset.dishTab] = el.dataset.dishTabName; render(); });
