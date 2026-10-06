@@ -1311,3 +1311,42 @@
 .pantry-check.active .pantry-check-box{ background:var(--gold); border-color:var(--gold); }
 .pantry-check.active .pantry-check-box::after{ content:''; width:0.3rem; height:0.6rem; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg) translate(-1px,-1px); }
 .pantry-check:focus, .pantry-check:focus-visible{ outline:none; }
+
+/* Ricette: ritmo verticale uniforme (12/16 px), tab in sentence case, Cucina più ordinata */
+.meal-detail-body{ gap:0; margin-bottom:0; }
+.meal-detail-body > .detail-tags{ margin:0 0 var(--space-small); }
+.meal-detail-body > .pane-tabs, .dish-acc-body .pane-tabs{ margin-top:0; }
+.pane-tab{ text-transform:none; letter-spacing:0; font-size:var(--text-body); padding:0.625rem var(--space-xsmall); }
+.meal-detail-body > .button-wrapper, .dish-acc-body > .button-wrapper{ margin:var(--space-small) 0 0; }
+.meal-detail-body > .button-wrapper .btn{ width:100%; justify-content:center; }
+.meal-detail-body > .detail-section{ padding:var(--space-xsmall) 0 0; border-top:0; }
+.persone-row{ justify-content:space-between; padding:var(--space-xsmall) 0 var(--space-xsmall); font-size:var(--text-body); color:var(--ink-light); }
+.persone-row .qty-stepper{ gap:0.25rem; }
+.persone-row .qty-num{ min-width:1.5rem; text-align:center; color:var(--ink); font-weight:var(--weight-bold); }
+.ing-list li{ padding:0.625rem 0; font-size:var(--text-body); }
+.ing-list li > span:last-child{ min-width:4.5rem; text-align:right; }
+.meal-detail-body > .grad-picker{ margin:var(--space-large) 0 0; padding-top:var(--space-medium); border-top:1px solid var(--line); }
+.has-cook-fab{ padding-bottom:6rem; }
+/* Modalità cucina: niente bande grigie, tutto bianco con filetti leggeri */
+.cook-page{ background:var(--bg); }
+.cook-head{ gap:var(--space-small); padding-top:calc(0.75rem + env(safe-area-inset-top)); justify-content:space-between; }
+.cook-end{ order:2; font-size:var(--text-body); font-weight:var(--weight-bold); padding:var(--space-xsmall) 0.25rem; }
+.cook-title{ order:1; font-size:var(--text-medium); font-weight:var(--weight-bold); }
+.cook-bar{ background:var(--line); }
+.cook-body{ gap:0; padding-top:0; }
+.cook-section{ background:transparent; }
+.cook-step{ display:flex; flex-direction:column; justify-content:center; padding:var(--space-large) var(--space-medium); }
+.cook-step-count{ font-size:var(--text-small); font-weight:var(--weight-bold); color:var(--gold-dark); margin-bottom:var(--space-small); }
+.cook-section:not(.cook-step){ border-top:1px solid var(--line); padding:var(--space-medium); }
+.cook-section-title{ font-size:var(--text-small); color:var(--ink-light); font-weight:var(--weight-medium); margin-bottom:var(--space-xsmall); }
+.cook-ings{ font-size:var(--text-body); gap:0.375rem; }
+.cook-footer{ background:var(--bg); border-top:1px solid var(--line); }
+.cook-nav-back{ display:inline-flex; align-items:center; justify-content:center; border-color:var(--ink-light); }
+/* Pagina Modifica ricetta: etichette in sentence case come il resto */
+.recipe-edit-page .filter-group-label{ text-transform:none; font-size:var(--text-small); font-weight:var(--weight-medium); color:var(--ink); }
+.recipe-edit-page .filter-groups{ gap:var(--space-medium); }
+.persone-row{ justify-content:flex-start; gap:var(--space-xsmall); }
+.recipe-edit-page .filter-group-label{ font-weight:var(--weight-normal); color:var(--ink-light); gap:0.5rem; }
+.recipe-edit-page input, .recipe-edit-page select{ border-radius:var(--form-border-radius); box-sizing:border-box; min-height:2.75rem; }
+.dish-acc-body > .button-wrapper .btn{ width:100%; justify-content:center; }
+.dish-acc-body .detail-section{ padding:var(--space-xsmall) 0 0; }
