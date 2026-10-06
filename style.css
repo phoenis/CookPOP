@@ -1281,3 +1281,4 @@
 .has-cook-fab{ padding-bottom:5.5rem; }
 .dish-acc-body .pane-tabs + .detail-section, .dish-acc-body .pane-tabs + .ing-empty{ border-top:0; }
 .persone-row{ gap:var(--space-xsmall); }
+.button-wrapper + .detail-section{ border-top:0; }

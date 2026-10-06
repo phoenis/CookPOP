@@ -1284,6 +1284,7 @@ test('ricette: interruttore Ricette/Libro di cucina, ricerca in alto, album crea
   await page.click('.sheet-footer [data-close-cookbook-pick]');
   const inAlbum = await page.evaluate(() => [...document.querySelectorAll('[data-page="cookbook"] .cookbook-row-name')].map(e => e.textContent.trim()));
   await page.evaluate(n => { state.cookbookOpenId = null; state.expandedRecipe = n; render(); }, first);
+  await page.click('[data-recipe-menu]');
   await page.click('[data-album-for]');
   await page.click('.album-for-row[data-album-for-toggle]');
   const removed = await page.evaluate(() => state.cookbooks[0].recipes.length);
@@ -1572,6 +1573,42 @@ test('modalità cucina: un passo per schermata, avanti e indietro, Fatto in fond
   await page.click('[data-cook-start]');
   await page.goBack();
   eq(await page.evaluate(() => [state.cookMode, !!state.expandedDay]), [null, true], 'Indietro chiude la modalità cucina');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('Ricettario: dettaglio ricetta come pagina (tab, persone, Aggiungi in alto, gradimento in fondo, menù ⋯, Cucina)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render();
+    const pg = () => document.querySelector('[data-page^="recipe-"]');
+    const out = { page: !!pg(), modal: !!document.querySelector('.meal-detail-screen'), title: pg().querySelector('.settings-title').textContent.trim() };
+    out.tabs = [...pg().querySelectorAll('.pane-tab')].map(e => e.textContent.trim());
+    const kids = [...pg().querySelector('.meal-detail-body').children].map(e => e.className.split(' ')[0] || e.tagName);
+    out.addBeforeList = kids.indexOf('button-wrapper') >= 0 && kids.indexOf('button-wrapper') < kids.indexOf('detail-section');
+    out.gradLast = kids.filter(k => k !== 'cook-fab').pop() === 'grad-picker';
+    out.fab = !!pg().querySelector('.cook-fab');
+    const qty0 = pg().querySelector('.ing-list li:last-child, .ing-list li').textContent;
+    const n0 = parseInt(pg().querySelector('.persone-row .qty-num').textContent, 10);
+    pg().querySelector('[data-recipe-portions-inc]').click();
+    out.persone = [n0, parseInt(pg().querySelector('.persone-row .qty-num').textContent, 10)];
+    out.qtyChanged = pg().querySelector('.ing-list li').textContent !== qty0;
+    pg().querySelector('[data-recipe-menu]').click();
+    out.menu = [...pg().querySelectorAll('.meal-menu .topbar-menu-item')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    return out;
+  });
+  eq([r.page, r.modal, r.title], [true, false, 'Carbonara'], 'pagina, non modale');
+  eq(r.tabs, ['Ingredienti', 'Passaggi']);
+  assert(r.addBeforeList, '"Aggiungi N ingredienti" sopra l\'elenco');
+  assert(r.gradLast, 'gradimento a fondo pagina');
+  assert(r.fab, 'Cucina fisso');
+  eq(r.persone[1], r.persone[0] + 1, 'persone +1');
+  eq(r.qtyChanged, true, 'quantità scalate');
+  eq(r.menu.length, 2, 'menù: modifica, album');
+  assert(/Modifica ricetta/.test(r.menu[0]) && /album/i.test(r.menu[1]), r.menu.join(' | '));
+  await page.goBack();
+  eq(await page.evaluate(() => [!!state.recipeMenuOpen, state.expandedRecipe]), [false, 'Carbonara'], 'Indietro chiude prima il menù');
+  await page.goBack();
+  eq(await page.evaluate(() => state.expandedRecipe), null, 'poi la pagina');
   eq(page.errors, [], 'errori JS');
 });
 
