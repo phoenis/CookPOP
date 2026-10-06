@@ -1466,6 +1466,21 @@ test('con quello che ho: genera e cambia un pasto con le ricette per cui hai gli
   eq(page.errors, [], 'errori JS');
 });
 
+test('carte: con una carta aperta lo schermo resta acceso (wake lock), chiusa si rilascia', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const log = [];
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: async () => { log.push('req'); const l = new EventTarget(); l.release = async () => { log.push('rel'); }; return l; } } });
+    state.cards = [{ id: 'c1', name: 'Prova', number: '123456' }];
+    state.cardViewId = 'c1'; render();
+    await new Promise(res => setTimeout(res, 50));
+    state.cardViewId = null; render();
+    await new Promise(res => setTimeout(res, 50));
+    return log;
+  });
+  eq(r, ['req', 'rel']);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
