@@ -1534,6 +1534,36 @@ test('menù ⋯ del dettaglio pasto: si richiude toccando fuori e con Indietro; 
   eq(page.errors, [], 'errori JS');
 });
 
+test('modalità cucina: un passo per schermata, avanti e indietro, Fatto in fondo; Indietro del telefono chiude', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    isMealPast = () => false; generateWeek(0);
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const k = ['0_5_cena', '0_6_cena', '0_0_cena', '0_1_cena'].find(k => { const m = parseMealKey(k); const n = effectiveMeal(m.weekIdx, m.i, m.meal).principale; return n && getRecipeDetails(n) && (getRecipeDetails(n).procedimento || []).length > 2; });
+    state.tab = 'menu'; state.expandedDay = k; render();
+    const name = effectiveMeal(0, +parseMealKey(k).i, parseMealKey(k).meal).principale;
+    return { name, steps: getRecipeDetails(name).procedimento, startBtn: !!document.querySelector('[data-page^="meal-"] [data-cook-start]') };
+  });
+  assert(r.startBtn, 'bottone Cucina sotto il procedimento');
+  await page.click('[data-cook-start]');
+  const text = () => page.locator('.cook-step-text').textContent();
+  const count = () => page.locator('.cook-step-count').textContent();
+  eq([await text(), await count()], [r.steps[0], `Passaggio 1/${r.steps.length}`], 'primo passo');
+  eq(await page.locator('[data-cook-prev]').isDisabled(), true, 'indietro spento al primo');
+  await page.click('[data-cook-next]');
+  eq([await text(), await count()], [r.steps[1], `Passaggio 2/${r.steps.length}`], 'secondo passo');
+  await page.click('[data-cook-prev]');
+  eq(await text(), r.steps[0], 'si torna indietro');
+  for(let i = 1; i < r.steps.length; i++) await page.click('[data-cook-next]');
+  eq(await text(), r.steps[r.steps.length - 1], 'ultimo passo');
+  eq(await page.locator('.cook-nav-next').textContent(), 'Fatto!', 'Fatto! avanza e all\'ultimo chiude');
+  await page.click('.cook-nav-next');
+  eq(await page.evaluate(() => [state.cookMode, !!state.expandedDay]), [null, true], 'Fatto chiude e resta il pasto');
+  await page.click('[data-cook-start]');
+  await page.goBack();
+  eq(await page.evaluate(() => [state.cookMode, !!state.expandedDay]), [null, true], 'Indietro chiude la modalità cucina');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
