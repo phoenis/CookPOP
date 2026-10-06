@@ -488,9 +488,11 @@ test('spesa: swipe a destra toglie la riga (lungo subito, breve col cestino), co
   eq(page.errors, [], 'errori JS');
 });
 
-test('dispensa: swipe a destra segna la voce come finita (quantità 0, in Spesa tra i Finiti) con Annulla', async ({ page }) => {
+test('dispensa: swipe a destra chiede + o cestino; cestino = finita (quantità 0, in Spesa tra i Finiti) con Annulla', async ({ page }) => {
   await page.evaluate(() => { upsertPantryItem('Carciofi', 'frigo', 3); state.pantryItems['carciofi'].unit = 'pz'; state.tab = 'dispensa'; state.pantryView = 'cibo'; render(); });
   await swipeRight(page, '.swipe-wrap[data-swipe-pantry="carciofi"] .swipe-content', 220);
+  eq(await page.evaluate(() => [state.pantryFinishPicker, state.pantryItems['carciofi'].qty, !!document.querySelector('.finish-picker')]), ['carciofi', 3, true], 'tooltip dopo lo swipe');
+  await page.click('[data-finish-trash="carciofi"]');
   eq(await page.evaluate(() => ({ qty: state.pantryItems['carciofi'].qty, unit: state.pantryItems['carciofi'].unit, visible: !!document.querySelector('[data-swipe-pantry="carciofi"]'), finiti: buildShopFlat().some(it => it.context === 'Finiti in Dispensa' && it.ingrediente === 'Carciofi'), select: !!state.pantrySelectMode, edit: state.pantryEditKey })),
     { qty: 0, unit: 'pz', visible: false, finiti: true, select: false, edit: null });
   await page.click('.undo-toast button');
