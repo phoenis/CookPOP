@@ -1441,6 +1441,31 @@ test('rigenera settimana: i pasti già passati restano com\'erano (ricetta, porz
   eq(page.errors, [], 'errori JS');
 });
 
+test('con quello che ho: genera e cambia un pasto con le ricette per cui hai gli ingredienti', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    // In Dispensa tutto quello che serve per una ricetta qualsiasi con ingredienti.
+    state.weekTempoBase = 'progetto'; state.weekTempoExceptions = {};
+    const target = allRecipeMetas().filter(isMainDish).find(x => getIngredientsFor(x.nome).length >= 3);
+    state.pantryItems = {};
+    getIngredientsFor(target.nome).forEach(it => upsertPantryItem(it.ingrediente, 'dispensa', 100));
+    const m = recipePantryMatch(target.nome, {});
+    const pool = pantryOnlyPool(allRecipeMetas().filter(isMainDish), 1, {});
+    state.genPantryOnly = true;
+    const used = generateWeek(0);
+    const names = [];
+    for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => names.push(effectiveMeal(0, i, m).principale));
+    return { missing: m.missing.length, inPool: pool.some(x => x.nome === target.nome), poolAllComplete: pool.every(x => !recipePantryMatch(x.nome, {}).missing.length), picked: (() => { const p10 = new Set(pantryOnlyPool(allRecipeMetas().filter(isMainDish), weekPlanSlots().length, {}).map(x => x.nome)); return names.filter((n, k) => n && !state.dayLinks['0_' + Math.floor(k / 2) + '_' + (k % 2 ? 'cena' : 'pranzo')]).every(n => p10.has(n)); })(), short: typeof used.pantryShort };
+  });
+  eq(r, { missing: 0, inPool: true, poolAllComplete: true, picked: true, short: 'number' });
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.genSettingsOpen = null; state.tab = 'menu'; state.swapOpenDay = '0_4_cena'; render();
+  });
+  await page.click('[data-swap-cat="pantry"]');
+  eq(await page.locator('.swap-result-missing').first().textContent(), 'hai tutto', 'prima chi ha tutto');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

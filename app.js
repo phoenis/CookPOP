@@ -1407,6 +1407,7 @@ const state = {
   // base, chiave "i_meal" (es. "5_cena", "5_pranzo" — così ven/sab/dom
   // possono avere un tetto diverso tra pranzo e cena dello stesso giorno).
   weekTempoBase: 'normale',
+  genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
   userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "tocca a te cucinare" già chiuso per quel pasto
@@ -3082,6 +3083,16 @@ function expiringUsedByPlan(picks, ctx){
   picks.forEach((r, i)=> ctx.recipeInfo(r).exp.forEach(e=>{ if(ctx.slotOffset[i] >= 0 && ctx.slotOffset[i] <= e.d) used.add(e.key); }));
   return [...used].sort((a, b) => ctx.expiring[a] - ctx.expiring[b]).map(k => state.pantryItems[k].nome);
 }
+// "Solo con quello che ho": le ricette (con ingredienti salvati) a cui manca
+// meno, partendo da quelle a cui non manca niente. Se non bastano per i
+// pasti da riempire si allarga a quelle a cui manca 1 cosa, poi 2, ecc.
+function pantryOnlyPool(list, need, expiring){
+  const scored = list.map(r => ({ r, m: recipePantryMatch(r.nome, expiring) })).filter(x => x.m.total);
+  if(!scored.length) return list;
+  let k = 0;
+  while(scored.filter(x => x.m.missing.length <= k).length < need && k < 50) k++;
+  return scored.filter(x => x.m.missing.length <= k).map(x => x.r);
+}
 function pickWeekRecipes(fixed, weekIdx){
   fixed = fixed || {};
   const season = currentSeasonKey();
@@ -3104,6 +3115,12 @@ function pickWeekRecipes(fixed, weekIdx){
   const pantryCtx = buildPantryPlanContext(weekIdx, slots);
   const fixedAt = slots.map(s => fixed[`${s.day}_${s.meal}`] || null);
   const fixedNames = new Set(fixedAt.filter(Boolean).map(r => r.nome));
+  const pantryOnly = !!state.genPantryOnly;
+  if(pantryOnly){
+    // Con quello che ho, la stagione conta meno: si parte da tutte le ricette.
+    const need = fixedAt.filter(f => !f).length;
+    pool = pantryOnlyPool(allRecipeMetas().filter(isMainDish).filter(r => !fixedNames.has(r.nome)), need, pantryCtx.expiring);
+  }
   const recent = recentRecipeNames(weekIdx);
   const recentScore = picks => picks.reduce((sum, r) => sum + (recent.has(r.nome) && !fixedNames.has(r.nome) ? RECENT_PENALTY : 0), 0);
   const totalScore = picks => weekPlanScore(picks, slots, seq) + recentScore(picks) + pantryPlanScore(picks, pantryCtx);
@@ -3166,7 +3183,9 @@ function pickWeekRecipes(fixed, weekIdx){
     if(recipeGivesVeg(m.principale)) return;
     // prima i contorni con una verdura che scade entro questo pasto
     const urgent = r => pantryCtx.recipeInfo(r).exp.some(e => pantryCtx.slotOffset[si] >= 0 && pantryCtx.slotOffset[si] <= e.d) ? 1 : 0;
-    const fits = withinCap(shuffledContorni, s.day, s.meal).slice().sort((a, b) => urgent(b) - urgent(a));
+    const fitsAll = withinCap(shuffledContorni, s.day, s.meal).slice().sort((a, b) => urgent(b) - urgent(a));
+    // Solo con quello che ho: un contorno solo se c'è tutto, altrimenti niente.
+    const fits = pantryOnly ? fitsAll.filter(r => { const m = recipePantryMatch(r.nome, pantryCtx.expiring); return m.total && !m.missing.length; }) : fitsAll;
     const contorno = fits.find(r => !usedContorni.has(r.nome)) || fits[0];
     if(!contorno) return; // nessun contorno di stagione: va bene comunque
     usedContorni.add(contorno.nome);
@@ -3175,6 +3194,8 @@ function pickWeekRecipes(fixed, weekIdx){
   const allPicks = slots.map(s => days[s.day][s.meal]).flatMap(m => [m.principale, ...m.contorni]);
   const allOffsets = slots.flatMap(s => { const m = days[s.day][s.meal]; return Array(1 + m.contorni.length).fill(pantryCtx.slotOffset[slots.indexOf(s)]); });
   days.expiringUsed = expiringUsedByPlan(allPicks, Object.assign({}, pantryCtx, { slotOffset: allOffsets }));
+  // Pasti generati (non bloccati) a cui manca ancora qualcosa da comprare.
+  days.pantryShort = pantryOnly ? slots.filter((s, i) => !fixedAt[i] && recipePantryMatch(picks[i].nome, pantryCtx.expiring).missing.length).length : 0;
   return days;
 }
 
@@ -3682,7 +3703,9 @@ function generateWeek(weekIdx){
   state.genSettingsOpen = null;
   persist();
   render();
-  return days.expiringUsed || [];
+  const used = (days.expiringUsed || []).slice();
+  used.pantryShort = days.pantryShort || 0;
+  return used;
 }
 function addWeek(){
   generateWeek(state.extraWeeks.length + 1);
@@ -3799,10 +3822,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-09',
+  version: '2026-11-10',
   title: 'Novità',
   items: [
-    'Menù: rigenerando la settimana i pasti già passati restano com\'erano, come quelli bloccati.'
+    'Menù con quello che hai: nelle Regole di generazione attiva "Solo con quello che ho in casa" prima di rigenerare.',
+    'Per un pasto solo: tocca Cambia e scegli il filtro "Con quello che ho". Vedi subito se hai tutto o cosa manca.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4641,10 +4665,21 @@ function renderSwapScreen(weekIdx, i, meal){
   let results = allRecipeMetas();
   if(f.cat === 'same' && currentCat) results = results.filter(r=>r.categoriaNew === currentCat);
   if(f.search) results = results.filter(r=>r.nome.toLowerCase().includes(f.search.toLowerCase()));
+  // "Con quello che ho": piatti da pasto per cui hai tutto in casa, poi
+  // quelli a cui manca poco (almeno metà degli ingredienti), dal meno al più.
+  const swapMatches = {};
+  if(f.cat === 'pantry'){
+    const expiring = pantryExpiringMap();
+    results = results.filter(isMainDish);
+    results.forEach(r=>{ swapMatches[r.nome] = recipePantryMatch(r.nome, expiring); });
+    results = results.filter(r => swapMatches[r.nome].total && (!swapMatches[r.nome].missing.length || swapMatches[r.nome].cov >= 0.5));
+    results.sort((a, b) => (swapMatches[a.nome].missing.length - swapMatches[b.nome].missing.length) || (swapMatches[b.nome].exp.length - swapMatches[a.nome].exp.length) || IT_COLLATOR_BASE.compare(a.nome, b.nome));
+  }
+  const swapMissingHtml = m => !m ? '' : `<span class="swap-result-missing">${m.missing.length ? `manca ${m.missing.slice(0, 2).map(escapeHtml).join(', ')}${m.missing.length > 2 ? ` e altri ${m.missing.length - 2}` : ''}` : 'hai tutto'}</span>`;
   const resultsHtml = results.slice(0, 60).map(r=>`
     <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${mk}">
       <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
-      <span class="swap-result-name">${escapeHtml(r.nome)}</span>
+      <span class="swap-result-name">${escapeHtml(r.nome)}${swapMissingHtml(swapMatches[r.nome])}</span>
       <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
     </div>`).join('');
   // "Un'altra proposta" chiede suggerimenti diversi da quelli già mostrati in
@@ -4681,9 +4716,10 @@ function renderSwapScreen(weekIdx, i, meal){
           <div class="swap-cat-chips">
             ${currentCat ? `<button class="btn is-chip ${f.cat==='same'?'active':''}" data-swap-cat="same" data-swap-day="${mk}">${catIcon(currentCat)} Stessa categoria</button>` : ''}
             <button class="btn is-chip ${f.cat==='all'?'active':''}" data-swap-cat="all" data-swap-day="${mk}">Tutte le categorie</button>
+            <button class="btn is-chip ${f.cat==='pantry'?'active':''}" data-swap-cat="pantry" data-swap-day="${mk}">🧺 Con quello che ho</button>
           </div>
           <div class="swap-results">
-            ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+            ${resultsHtml || `<div class="ing-empty">${f.cat === 'pantry' ? 'Con quello che hai in Dispensa non trovo ricette: prova "Tutte le categorie".' : 'Nessuna ricetta trovata.'}</div>`}
             ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
           </div>
           <div class="swap-panel-footer">
@@ -5505,6 +5541,13 @@ function renderMenu(){
               ${TEMPO_ORDER.map(t=>`<button type="button" class="tempo-base-row${state.weekTempoBase===t?' active':''}" data-set-tempo-base="${t}"><span>${escapeHtml(TEMPO_LABEL[t])}</span>${state.weekTempoBase===t?'<span class="tempo-base-check">✓</span>':''}</button>`).join('')}
             </div>
           </div>
+          ${genSettingsTargetWeek !== null ? `<div class="filter-group">
+            <div class="filter-group-label">Ingredienti</div>
+            <div class="tempo-base-list">
+              <button type="button" class="tempo-base-row${state.genPantryOnly ? ' active' : ''}" data-toggle-gen-pantry aria-pressed="${!!state.genPantryOnly}"><span>🧺 Solo con quello che ho in casa</span>${state.genPantryOnly ? '<span class="tempo-base-check">✓</span>' : ''}</button>
+            </div>
+            ${state.genPantryOnly ? '<p class="section-sub" style="margin:0.5rem 0 0;">Prima le ricette per cui hai tutto. Se non bastano, quelle a cui manca meno.</p>' : ''}
+          </div>` : ''}
           <div class="filter-group">
             <div class="filter-group-label">Eccezioni</div>
             ${excRowsHtml || '<p class="section-sub" style="margin:0;">Nessuna: tutti i giorni seguono il valore di base.</p>'}
@@ -7804,11 +7847,15 @@ function attachHandlers(){
       const snap = snapshotPlanningState();
       const used = generateWeek(weekIdx);
       const usedText = used.length ? ` · usa ${used.slice(0, 2).join(' e ')}${used.length > 2 ? ` e altri ${used.length - 2}` : ''} prima che scada${used.length > 1 ? 'no' : ''}` : '';
-      showUndoToast('Menù rigenerato' + usedText, ()=>{
+      const pantryText = state.genPantryOnly ? (used.pantryShort ? ` · per ${used.pantryShort} past${used.pantryShort === 1 ? 'o' : 'i'} manca qualcosa` : ' · hai già tutto') : '';
+      showUndoToast((state.genPantryOnly ? 'Menù con quello che hai' : 'Menù rigenerato') + pantryText + usedText, ()=>{
         restorePlanningState(snap);
         persist(); render();
       });
     });
+  });
+  document.querySelectorAll('[data-toggle-gen-pantry]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.genPantryOnly = !state.genPantryOnly; render(); });
   });
   document.querySelectorAll('[data-remove-week]').forEach(btn=>{
     btn.addEventListener('click', e=>{ removeWeek(parseInt(e.currentTarget.dataset.removeWeek,10)); });
