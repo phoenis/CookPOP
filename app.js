@@ -3855,10 +3855,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-14',
+  version: '2026-11-15',
   title: 'Novità',
   items: [
-    'Dettaglio del pasto: i piatti sono in tab (Primo, Secondo…) e si vede solo quello attivo. Le porzioni sono nel menù ⋯ in alto; nella ricetta leggi "Ingredienti per X persone".'
+    'Sistemato: il menù ⋯ in alto nel dettaglio del pasto (e negli album) ora si richiude. I puntini sono più grandi e le icone a destra stanno alla stessa distanza dal bordo della freccia a sinistra.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4099,7 +4099,11 @@ function describeElement(el){
   return tag + attrs.map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join('');
 }
 function dialogOf(layer){
-  return layer.querySelector('.filters-modal, .topbar-menu, .settings-page') || layer;
+  // Il menù ⋯ dentro una pagina (porzioni, album) non è una finestra a sé: se
+  // lo fosse, la pagina e il suo sfondo diventerebbero inerti e il menù non
+  // si potrebbe più chiudere. Solo il menù della topbar ha il suo strato.
+  if(layer.id === 'topbar-menu-backdrop') return layer.querySelector('.topbar-menu') || layer;
+  return layer.querySelector('.filters-modal, .settings-page') || layer;
 }
 function openDialogLayers(){
   const layers = [...document.querySelectorAll(DIALOG_LAYER_SELECTOR)].filter(el => el.getClientRects().length);

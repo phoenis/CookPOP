@@ -1510,6 +1510,30 @@ test('pasto vuoto: niente blocco né collegamento avanzi; Annulla li rimette', a
   eq(page.errors, [], 'errori JS');
 });
 
+test('menù ⋯ del dettaglio pasto: si richiude toccando fuori e con Indietro; i puntini hanno la dimensione di quelli della topbar', async ({ page }) => {
+  await page.evaluate(() => {
+    isMealPast = () => false; generateWeek(0);
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const k = ['0_5_cena', '0_6_cena', '0_0_cena', '0_1_cena'].find(k => { const m = parseMealKey(k); return effectiveMeal(m.weekIdx, m.i, m.meal).principale; });
+    state.tab = 'menu'; state.expandedDay = k; render();
+  });
+  const dots = await page.evaluate(() => { const r = document.querySelector('[data-page^="meal-"] .meal-menu-btn svg').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
+  eq(dots, [24, 24], 'puntini 24px come in topbar');
+  await page.click('[data-meal-menu]');
+  eq(await page.evaluate(() => !!state.mealDetailMenuOpen && !!document.querySelector('.meal-menu')), true, 'menù aperto');
+  // lo sfondo del menù deve poter ricevere i tocchi (non inerte)
+  eq(await page.evaluate(() => { const e = document.elementFromPoint(100, 400); return e && e.className; }), 'meal-menu-backdrop', 'sfondo toccabile');
+  await page.mouse.click(100, 400);
+  eq(await page.evaluate(() => !!state.mealDetailMenuOpen), false, 'chiuso toccando fuori');
+  await page.click('[data-meal-menu]');
+  await page.goBack();
+  eq(await page.evaluate(() => [!!state.mealDetailMenuOpen, !!state.expandedDay]), [false, true], 'Indietro chiude prima il menù');
+  // a destra l'icona sta alla stessa distanza dal bordo della freccia a sinistra
+  const gap = await page.evaluate(() => { const c = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; }; const back = document.querySelector('[data-page^="meal-"] .settings-back svg'); const dots = document.querySelector('[data-page^="meal-"] .meal-menu-btn svg'); return [Math.round(c(back)), Math.round(innerWidth - c(dots))]; });
+  eq(gap[0], gap[1], 'distanza dai bordi uguale');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
