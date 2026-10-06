@@ -1424,6 +1424,23 @@ test('dispensa +: suggerisce gli ingredienti che hai già e ne copia luogo/unit�
   eq(page.errors, [], 'errori JS');
 });
 
+test('rigenera settimana: i pasti già passati restano com\'erano (ricetta, porzioni, cucinato)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    // Oggi = martedì (pos 3), dopo le 15: passati sab, dom, lun e il pranzo di martedì.
+    findTodayPos = () => 3; isTodayLunchPast = () => true;
+    const before = {};
+    [[5,'cena'],[6,'pranzo'],[0,'cena'],[1,'pranzo']].forEach(([i, m]) => { before[i+'_'+m] = JSON.stringify(effectiveMeal(0, i, m)); });
+    state.dayPortions['0_0_cena'] = 5;
+    state.mealsDone = { 0: { cena: true } };
+    generateWeek(0);
+    const after = {};
+    Object.keys(before).forEach(k => { const [i, m] = k.split('_'); after[k] = JSON.stringify(effectiveMeal(0, +i, m)); });
+    return { same: Object.keys(before).every(k => before[k] === after[k]), portions: state.dayPortions['0_0_cena'], done: !!(state.mealsDone[0] && state.mealsDone[0].cena), past: [isMealPast(0,1,'pranzo'), isMealPast(0,1,'cena'), isMealPast(1,5,'cena')] };
+  });
+  eq(r, { same: true, portions: 5, done: true, past: [true, false, false] });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

@@ -3567,6 +3567,16 @@ function restorePlanningState(snap){
   state.dayPortions = snap.dayPortions;
   state.mealLocked = snap.mealLocked;
 }
+// Pasto già passato (solo settimana corrente): i giorni prima di oggi, e il
+// pranzo di oggi dalle 15. Rigenerare la settimana non lo tocca, come un
+// pasto bloccato: ormai è andato.
+function isMealPast(weekIdx, i, meal){
+  if(weekIdx !== 0) return false;
+  const todayPos = findTodayPos();
+  if(todayPos === null) return false;
+  const pos = WEEK_DISPLAY_ORDER.indexOf(i);
+  return pos < todayPos || (pos === todayPos && meal === 'pranzo' && isTodayLunchPast());
+}
 function generateWeek(weekIdx){
   // Settimana extra nuova (non ancora esistente): qualunque stato rimasto con
   // il suo numero (blocchi, avanzi, porzioni... di una settimana eliminata in
@@ -3582,8 +3592,10 @@ function generateWeek(weekIdx){
   for(let li=0; li<7; li++){
     ['pranzo','cena'].forEach(lm=>{
       const lkey = `${weekIdx}_${li}_${lm}`;
-      if(state.mealLocked[lkey]){
-        lockedMeals.push({ i: li, meal: lm, data: effectiveMeal(weekIdx, li, lm), link: linkedSourceMealKey(weekIdx, li, lm) });
+      const past = isMealPast(weekIdx, li, lm);
+      if(state.mealLocked[lkey] || past){
+        lockedMeals.push({ i: li, meal: lm, past, data: effectiveMeal(weekIdx, li, lm), link: linkedSourceMealKey(weekIdx, li, lm),
+          portions: state.dayPortions[lkey], done: !!(state.mealsDone[li] && state.mealsDone[li][lm]) && weekIdx === 0 });
       }
     });
   }
@@ -3643,8 +3655,17 @@ function generateWeek(weekIdx){
   // rigenerazione. Stesso controllo sui contorni, uno per uno.
   if(lockedMeals.length){
     const targetBaseline = weekIdx === 0 ? state.weekBaseline : state.extraWeeks[weekIdx-1].baseline;
-    lockedMeals.forEach(({i, meal, data, link})=>{
+    lockedMeals.forEach(({i, meal, past, data, link, portions, done})=>{
       const lkey = `${weekIdx}_${i}_${meal}`;
+      // Pasto passato: resta tale e quale, anche vuoto, con porzioni,
+      // avanzo e "cucinato".
+      if(past){
+        targetBaseline[i][meal] = { principale: data.principale || '', contorni: (data.contorni || []).slice() };
+        if(link) state.dayLinks[lkey] = link; else delete state.dayLinks[lkey];
+        if(portions !== undefined) state.dayPortions[lkey] = portions;
+        if(done){ if(!state.mealsDone[i]) state.mealsDone[i] = {}; state.mealsDone[i][meal] = true; }
+        return;
+      }
       // Blocco su un pasto vuoto, o su una ricetta che non esiste più: non
       // c'è niente da preservare, si sblocca e resta la ricetta appena generata.
       if(!data.principale || !getRecipeMeta(data.principale)){
@@ -3778,10 +3799,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-08',
+  version: '2026-11-09',
   title: 'Novità',
   items: [
-    'Dispensa: col + in basso, mentre scrivi il nome ti suggerisco gli ingredienti che hai già. Scegline uno e luogo, unità e categoria si compilano da soli: la quantità si aggiunge a quella che hai.'
+    'Menù: rigenerando la settimana i pasti già passati restano com\'erano, come quelli bloccati.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5457,16 +5478,18 @@ function renderMenu(){
     let regenNote = '';
     let regenCount = 0;
     if(genSettingsTargetWeek !== null){
-      let lockedCount = 0, totalMeals = 0;
+      let lockedCount = 0, pastCount = 0, totalMeals = 0;
       for(let d = 0; d < 7; d++){
         ['pranzo','cena'].forEach(m=>{
           if(m === 'pranzo' && !(d===4||d===5||d===6)) return;
           totalMeals++;
-          if(state.mealLocked[`${genSettingsTargetWeek}_${d}_${m}`]) lockedCount++;
+          if(isMealPast(genSettingsTargetWeek, d, m)) pastCount++;
+          else if(state.mealLocked[`${genSettingsTargetWeek}_${d}_${m}`]) lockedCount++;
         });
       }
-      regenCount = totalMeals - lockedCount;
-      regenNote = lockedCount > 0 ? `Rigenerare sostituisce <b>${regenCount} pasti</b> e conserva i <b>${lockedCount} bloccati</b>.` : '';
+      regenCount = totalMeals - lockedCount - pastCount;
+      const kept = [lockedCount ? `i <b>${lockedCount} bloccati</b>` : '', pastCount ? `i <b>${pastCount} già passati</b>` : ''].filter(Boolean).join(' e ');
+      regenNote = kept ? `Rigenerare sostituisce <b>${regenCount} pasti</b> e conserva ${kept}.` : '';
     }
     return `
     <div class="filters-modal-backdrop" data-close-gen-settings>
