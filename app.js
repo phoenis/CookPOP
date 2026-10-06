@@ -3778,10 +3778,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-06',
+  version: '2026-11-07',
   title: 'Novità',
   items: [
-    'Dispensa: quando un ingrediente finisce ti chiedo cosa farne. Con + va dritto in lista spesa, col cestino va tra i Finiti come prima. Tocca fuori per annullare.'
+    'Dispensa: anche con lo swipe ti chiedo cosa fare dell\'ingrediente finito. Con + va dritto in lista spesa, col cestino va tra i Finiti. Tocca fuori per annullare.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -8620,7 +8620,12 @@ function attachHandlers(){
     attachSwipeToDelete(wrap, ()=> removeShopRowWithUndo(wrap.dataset.swipeShop, wrap.dataset.swipeLabel));
   });
   document.querySelectorAll('.swipe-wrap[data-swipe-pantry]').forEach(wrap=>{
-    attachSwipeToDelete(wrap, ()=> finishPantryItemWithUndo(wrap.dataset.swipePantry));
+    attachSwipeToDelete(wrap, ()=>{
+      const key = wrap.dataset.swipePantry;
+      // Come col "−" a zero: chiede "+" (lista spesa) o cestino (Finiti).
+      if(isLeftoverPantryItem(state.pantryItems[key])) finishPantryItemWithUndo(key);
+      else { state.pantryFinishPicker = key; render(); }
+    });
   });
   document.querySelectorAll('[data-finish-picker-close]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.pantryFinishPicker = null; render(); });
