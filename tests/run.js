@@ -1700,6 +1700,21 @@ test('app: Carte nella barra in alto (solo Spesa), titolo Menù, ricerca alta ug
   eq(r, { title: 'Menù', cardsMenu: true, cardsSpesa: false, noOldBtn: true, hSpesa: 44, hPrep: 44, check: true, menuExtras: [false, false] });
 });
 
+test('ricette: ritmo uniforme nel dettaglio, Cucina bianca senza bande, modifica con etichette in minuscolo', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const nome = allRecipeMetas().find(x => getRecipeDetails(x.nome) && (getRecipeDetails(x.nome).procedimento || []).length).nome;
+    state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = nome; render();
+    const body = document.querySelector('.meal-detail-body');
+    const out = { gap: getComputedStyle(body).rowGap, tab: getComputedStyle(document.querySelector('.pane-tab')).textTransform };
+    state.expandedRecipe = null; state.cookMode = { name: nome, step: 0, ratio: 1 }; render();
+    const cp = document.querySelector('.cook-page');
+    out.cookBg = getComputedStyle(cp).backgroundColor; out.cookEndRight = getComputedStyle(document.querySelector('.cook-end')).order === '2';
+    return out;
+  });
+  eq(r, { gap: '0px', tab: 'none', cookBg: 'rgb(255, 255, 255)', cookEndRight: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

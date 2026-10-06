@@ -737,9 +737,9 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
       ${freezerInfo}
       ${paneTabsHtml(paneKey, pane)}
       ${pane === 'ing' ? `
+      ${ctx.mancantiHtml || ''}
       ${ingHtml}
-      ${addFormHtml}
-      ${ctx.mancantiHtml || ''}` : `
+      ${addFormHtml}` : `
       ${stepsHtml || '<div class="ing-empty">Nessun procedimento salvato per questa ricetta.</div>'}
       ${noteBox}
       ${rec ? gradimentoPickerHtml(name) : ''}
@@ -3939,12 +3939,13 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-27',
+  version: '2026-11-28',
   title: 'Novità',
   items: [
-    'Spesa: il tasto Carte è nella barra in alto, accanto ai tre puntini.',
-    'Ricette: sotto la ricerca c\'è la stessa riga di Spesa e Dispensa, con il numero a sinistra e "Con quello che ho" come spunta a destra.',
-    'Menù ha il suo titolo, la ricerca ha sempre la stessa altezza e le voci "+ Aggiungi" doppie sono sparite dai tre puntini.'
+    'Ricette riordinate: spazi uguali tra tag, tab, "Aggiungi ingredienti", persone e ingredienti; tab in minuscolo come il resto.',
+    'Modalità Cucina più pulita: tutto bianco con filetti leggeri, titolo in evidenza, "Termina" a destra e freccia indietro ben visibile.',
+    'Nel pasto "Aggiungi N ingredienti" è in cima, come nel Ricettario.',
+    'Modifica ricetta: etichette in minuscolo e spazi più regolari.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4412,7 +4413,7 @@ function renderRecipeEditModal(){
             <input type="text" id="edit-tempo" value="${escapeAttr(rec.tempo || '')}">
           </div>
           <div class="filter-group">
-            <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> Fascia di tempo (usata per filtrare in Prep)</div>
+            <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> Fascia di tempo (usata per filtrare in Ricette)</div>
             <select id="edit-tempo-bucket">
               ${TEMPO_ORDER.map(t=>`<option value="${t}" ${rec.tempoBucket===t?'selected':''}>${escapeHtml(TEMPO_LABEL[t])}</option>`).join('')}
             </select>
