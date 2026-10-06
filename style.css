@@ -1269,3 +1269,15 @@
 .dish-tabs-row .dish-tab{ margin-bottom:0; }
 .dish-tabs-add{ flex:0 0 auto; align-self:center; padding:0; background:transparent; border:0; line-height:0; cursor:pointer; }
 .dish-tabs-add .dish-add-ic{ width:2rem; height:2rem; font-size:1.25rem; }
+
+/* Tab Ingredienti | Passaggi dentro il piatto */
+.pane-tabs{ display:flex; border-bottom:1px solid var(--line); margin-top:var(--space-small); }
+.pane-tab{ flex:1; padding:var(--space-small) var(--space-xsmall); border:0; border-bottom:2px solid transparent; margin-bottom:-1px; background:none; font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-bold); letter-spacing:0.04em; text-transform:uppercase; color:var(--ink-light); cursor:pointer; }
+.pane-tab.active{ color:var(--gold); border-bottom-color:var(--gold); }
+.persone-row{ display:flex; align-items:center; gap:var(--space-small); padding:var(--space-small) 0; font-size:var(--text-body); }
+.persone-row .qty-stepper{ margin:0; }
+/* "Cucina": flottante fisso, qualunque tab sia aperta */
+.cook-fab{ position:fixed; right:var(--space-medium); bottom:calc(1rem + env(safe-area-inset-bottom)); z-index:60; display:inline-flex; align-items:center; gap:var(--space-xsmall); height:3.25rem; padding:0 var(--space-large); border:0; border-radius:var(--radius-pill); background:var(--gold); color:#fff; font-family:var(--font-family); font-size:var(--text-medium); font-weight:var(--weight-medium); box-shadow:var(--shadow-fab); cursor:pointer; }
+.has-cook-fab{ padding-bottom:5.5rem; }
+.dish-acc-body .pane-tabs + .detail-section, .dish-acc-body .pane-tabs + .ing-empty{ border-top:0; }
+.persone-row{ gap:var(--space-xsmall); }

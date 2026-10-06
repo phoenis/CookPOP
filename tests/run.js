@@ -864,29 +864,40 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
   eq(r.toast, 'Piatto tolto', 'annulla');
   await page.click('.undo-toast button');
   eq(await page.evaluate(() => effectiveMeal(1, 1, 'cena').principale), n.primo, 'annullato');
-  // Dettaglio: una tab per piatto (nell'ordine di portata), si vede solo l'attivo; le porzioni stanno nel menù ⋯.
+  // Dettaglio: una tab per piatto (nell'ordine di portata), si vede solo l'attivo; dentro, Ingredienti | Passaggi;
+  // le porzioni stanno nella tab Ingredienti; le azioni nel menù ⋯; "Cucina" è un bottone fisso.
   const d = await page.evaluate(() => {
     state.expandedDay = '1_1_cena'; render();
     const page = () => document.querySelector('[data-page^="meal-"]');
     const tabs = () => [...page().querySelectorAll('.dish-tab-label')].map(e => e.textContent.trim());
     const out = { tabs: tabs(), shown: page().querySelectorAll('.dish-acc').length, active: page().querySelector('.dish-tab.active .dish-tab-label').textContent.trim(), buttons: page().querySelectorAll('[data-mancanti-in-spesa]').length };
-    out.noPortionsInBody = !page().querySelector('.meal-detail-body .portions-row') && !page().querySelector('[data-portions-inc]');
-    page().querySelectorAll('.dish-tab')[2].click();
-    out.afterActive = page().querySelector('.dish-tab.active .dish-tab-label').textContent.trim();
-    out.afterShown = page().querySelectorAll('.dish-acc').length;
-    out.title = page().querySelector('.detail-section-title').textContent.replace(/\s+/g, ' ').trim();
-    page().querySelector('[data-meal-menu]').click();
-    out.menuPortions = !!page().querySelector('.meal-menu [data-portions-inc]');
+    page().querySelectorAll('.dish-tab')[1].click(); // Primo: ha ingredienti e procedimento
+    out.paneTabs = [...page().querySelectorAll('.pane-tab')].map(e => e.textContent.trim());
+    out.paneActive = page().querySelector('.pane-tab.active').textContent.trim();
+    out.persone = page().querySelector('.persone-row').textContent.replace(/\s+/g, ' ').trim();
+    out.stepperInRow = !!page().querySelector('.persone-row [data-portions-inc]');
+    out.noTitleInIng = !page().querySelector('.dish-acc .detail-section-title');
     const before = state.dayPortions['1_1_cena'];
-    page().querySelector('[data-portions-inc]').click();
-    out.portionsUp = state.dayPortions['1_1_cena'] !== before && !!state.mealDetailMenuOpen;
-    out.titleAfter = page().querySelector('.detail-section-title').textContent.replace(/\s+/g, ' ').trim();
+    page().querySelector('.persone-row [data-portions-inc]').click();
+    out.portionsUp = state.dayPortions['1_1_cena'] !== before;
+    out.fab = !!page().querySelector('.cook-fab');
+    page().querySelector('[data-dish-pane-value="steps"]').click();
+    out.stepsShown = !!page().querySelector('.steps-list') && !page().querySelector('.persone-row');
+    out.fabInSteps = !!page().querySelector('.cook-fab');
+    page().querySelector('[data-meal-menu]').click();
+    out.menu = [...page().querySelectorAll('.meal-menu .topbar-menu-item')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    out.addInRow = !!page().querySelector('.dish-tabs-row .dish-tabs-add');
     return out;
   });
   eq(d.tabs, ['Antipasto', 'Primo', 'Contorno', 'Contorno 2', 'Dolce'], 'tab per portata');
-  eq([d.shown, d.active, d.afterShown, d.afterActive], [1, 'Antipasto', 1, 'Contorno'], 'visibile solo la tab attiva');
-  assert(d.noPortionsInBody && d.menuPortions && d.portionsUp, 'porzioni nel menù ⋯');
-  assert(/^Ingredienti per \d+ person[ae]$/.test(d.title) && d.titleAfter !== d.title, `titolo ingredienti: ${d.title} → ${d.titleAfter}`);
+  eq([d.shown, d.active], [1, 'Antipasto'], 'visibile solo la tab attiva');
+  eq(d.paneTabs, ['Ingredienti', 'Passaggi'], 'tab Ingredienti/Passaggi');
+  eq(d.paneActive, 'Ingredienti', 'parte da Ingredienti');
+  assert(/^Per.*\d+.*person[ae]$/.test(d.persone) && d.stepperInRow && d.noTitleInIng && d.portionsUp, `porzioni nella tab: ${d.persone}`);
+  assert(d.fab && d.stepsShown && d.fabInSteps, 'Cucina fisso in entrambe le tab');
+  eq(d.menu.length, 3, 'menù ⋯: cambia, modifica, togli');
+  assert(/Cambia piatto/.test(d.menu[0]) && /Modifica ricetta/.test(d.menu[1]) && /Togli/.test(d.menu[2]), `voci: ${d.menu.join(' | ')}`);
+  assert(d.addInRow, '+ piatto a destra delle tab');
   assert(d.buttons <= 1, 'un solo "Aggiungi ingredienti" per tutto il pasto');
   eq(page.errors, [], 'errori JS');
 });
