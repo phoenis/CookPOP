@@ -1357,6 +1357,18 @@ function allIngredientNamesForManager(){
 // scritto nelle altre righe. Suggerisce ingredienti e gruppi noti mentre
 // scrivi; se quello che hai scritto non esiste, propone di "crearlo" — un
 // tocco esplicito, così un nome nuovo è una scelta voluta e non un refuso.
+// Chiave per confrontare i nomi degli ingredienti: minuscolo, senza accenti né
+// spazi doppi. Lo "stem" toglie l'ultima vocale, così "pomodori" trova "pomodoro".
+function ingMatchKey(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); }
+function ingMatchStem(k){ return k.length > 3 ? k.replace(/[aeiou]$/, '') : k; }
+// Se il nome scritto coincide (a meno di maiuscole/accenti) con uno esistente si
+// usa quello esistente, per non creare doppioni; altrimenti resta come scritto.
+function canonicalIngredientName(name){
+  const k = ingMatchKey(name);
+  if(!k) return name;
+  const hit = allKnownIngredientNamesWithGroups().find(n => ingMatchKey(n) === k);
+  return hit || name;
+}
 function attachIngredientCombobox(input){
   if(!input || input.dataset.comboAttached) return;
   input.dataset.comboAttached = '1';
@@ -1370,13 +1382,17 @@ function attachIngredientCombobox(input){
   wrapper.appendChild(list);
 
   function renderSuggestions(){
-    const q = input.value.trim().toLowerCase();
+    const raw = input.value.trim();
+    const q = ingMatchKey(raw);
     if(!q){ list.innerHTML = ''; return; }
     const pool = allKnownIngredientNamesWithGroups();
-    const matches = pool.filter(n => n.toLowerCase().includes(q)).slice(0, 8);
-    const exact = pool.some(n => n.toLowerCase() === q);
+    const stem = ingMatchStem(q);
+    const matches = pool.filter(n => { const k = ingMatchKey(n); return k.includes(q) || (stem.length >= 3 && k.includes(stem)); })
+      .sort((x, y) => (ingMatchKey(y).startsWith(q) ? 1 : 0) - (ingMatchKey(x).startsWith(q) ? 1 : 0))
+      .slice(0, 8);
+    const exact = pool.some(n => ingMatchKey(n) === q);
     let html = matches.map(n=>`<button type="button" class="add-ing-suggestion" data-combo-pick>${escapeHtml(n)}</button>`).join('');
-    if(!exact) html += `<button type="button" class="add-ing-suggestion add-ing-suggestion-new" data-combo-create>+ Crea "${escapeHtml(input.value.trim())}" come nuovo ingrediente</button>`;
+    if(!exact) html += `<button type="button" class="add-ing-suggestion add-ing-suggestion-new" data-combo-create>+ Crea "${escapeHtml(raw)}" come nuovo ingrediente</button>`;
     list.innerHTML = html;
   }
   input.addEventListener('input', renderSuggestions);
@@ -3939,13 +3955,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-28',
+  version: '2026-11-29',
   title: 'Novità',
   items: [
-    'Ricette riordinate: spazi uguali tra tag, tab, "Aggiungi ingredienti", persone e ingredienti; tab in minuscolo come il resto.',
-    'Modalità Cucina più pulita: tutto bianco con filetti leggeri, titolo in evidenza, "Termina" a destra e freccia indietro ben visibile.',
-    'Nel pasto "Aggiungi N ingredienti" è in cima, come nel Ricettario.',
-    'Modifica ricetta: etichette in minuscolo e spazi più regolari.'
+    'Modifica ricetta: "+ aggiungi ingrediente" (e passaggio) funziona di nuovo, e così le ✕ e le stagioni.',
+    'Gli ingredienti suggeriscono quelli esistenti anche con plurali e accenti ("pomodori" trova "pomodoro"), e se scrivi un nome già esistente si usa quello, senza doppioni. Se non c\'è, lo crei nuovo.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4021,6 +4035,13 @@ function restoreRecipeEditForm(snap){
   if(!form) return;
   const fresh = (form.querySelector('#edit-photo-area') || {}).innerHTML;
   form.innerHTML = snap.html;
+  // L'istantanea contiene i campi ingrediente già "avvolti" dall'autocompletamento
+  // (senza i suoi ascoltatori): si toglie l'involucro, lo ricrea attachHandlers.
+  form.querySelectorAll('.add-ing-combo').forEach(w=>{
+    const inp = w.querySelector('input');
+    if(inp){ delete inp.dataset.comboAttached; w.parentNode.insertBefore(inp, w); }
+    w.remove();
+  });
   const area = form.querySelector('#edit-photo-area');
   if(area && fresh !== undefined) area.innerHTML = fresh;
 }
@@ -8611,7 +8632,7 @@ function attachHandlers(){
       render();
     });
   });
-  const recipeEditModal = document.querySelector('.recipe-edit-modal');
+  const recipeEditModal = document.querySelector('.recipe-edit-page');
   if(recipeEditModal){
     // Aggiungere/rimuovere righe o attivare una stagione non richiede un render
     // completo: si manipola solo il DOM del form, per non perdere il testo che
@@ -8643,7 +8664,7 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.saveRecipeEdit;
       const ingredienti = Array.from(document.querySelectorAll('#edit-ing-list .edit-ing-row')).map(row=>({
-        ingrediente: row.querySelector('.edit-ing-name').value.trim(),
+        ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()),
         qta: row.querySelector('.edit-ing-qta').value.trim()
       })).filter(it=>it.ingrediente);
       const procedimento = Array.from(document.querySelectorAll('#edit-step-list .edit-step-text'))
