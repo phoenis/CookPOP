@@ -1229,3 +1229,8 @@
 .dish-acc.is-panel{ border:0; background:transparent; border-radius:0; }
 .dish-acc-head.is-static{ cursor:default; padding-left:0; padding-right:0; }
 .dish-acc.is-panel .dish-acc-body{ padding-left:0; padding-right:0; }
+
+/* Menù ⋯ nelle pagine: i puntini grandi come quelli della topbar, e l'azione a
+   destra alla stessa distanza dal bordo della freccia Indietro a sinistra. */
+.btn.is-icon.meal-menu-btn svg, .btn.is-icon.cookbook-menu-btn svg{ width:1.5rem; height:1.5rem; }
+.settings-header .settings-action, .settings-header .cookbook-menu-btn, .settings-header .meal-menu-btn{ width:2.25rem; height:2.25rem; margin-left:auto; margin-right:calc(-1 * var(--space-xsmall)); display:inline-flex; align-items:center; justify-content:center; }
