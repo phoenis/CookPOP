@@ -1684,6 +1684,22 @@ test('spesa: "Ordina per" senza contorno al focus e con larghezza sul testo', as
   eq(r, { outline: 'none', fit: true });
 });
 
+test('app: Carte nella barra in alto (solo Spesa), titolo Menù, ricerca alta uguale, riga uguale in Ricette, niente "+ Aggiungi" nel ⋯', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    const at = tab => { state.tab = tab; render(); };
+    at('menu'); out.title = document.getElementById('topbar-title').textContent; out.cardsMenu = document.getElementById('topbar-cards-btn').hidden;
+    at('spesa'); out.cardsSpesa = document.getElementById('topbar-cards-btn').hidden; out.noOldBtn = !document.querySelector('.shop-top-actions');
+    out.hSpesa = Math.round(document.querySelector('.list-search').getBoundingClientRect().height);
+    at('prep'); out.hPrep = Math.round(document.querySelector('.list-search').getBoundingClientRect().height);
+    out.check = !!document.querySelector('.shop-head .pantry-check[data-toggle-pantry-mode]');
+    out.menuExtras = ['dispensa', 'prep'].map(t => TAB_MENU_ITEMS[t].some(i => /Aggiungi/.test(i.label)));
+    return out;
+  });
+  eq(r, { title: 'Menù', cardsMenu: true, cardsSpesa: false, noOldBtn: true, hSpesa: 44, hPrep: 44, check: true, menuExtras: [false, false] });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

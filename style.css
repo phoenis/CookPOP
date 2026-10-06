@@ -1302,3 +1302,12 @@
 
 .shop-group-by select{ field-sizing:content; width:auto; }
 .shop-group-by select:focus, .shop-group-by select:focus-visible{ outline:none; box-shadow:none; }
+
+.topbar-cards-btn{ margin-left:auto; margin-right:0.125rem; display:inline-flex; align-items:center; justify-content:center; color:var(--ink); padding:0.5rem; box-sizing:border-box; border-radius:var(--radius-pill); cursor:pointer; }
+.topbar-cards-btn[hidden]{ display:none; }
+.list-search, .prep-search-row .list-search, .prep-search-row .btn.prep-filters-btn{ box-sizing:border-box; height:2.75rem; }
+.pantry-check{ display:inline-flex; align-items:center; gap:0.5rem; border:0; background:none; padding:0.25rem 0; font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-bold); color:var(--ink); cursor:pointer; }
+.pantry-check-box{ width:1.25rem; height:1.25rem; box-sizing:border-box; border:2px solid var(--line); border-radius:0.375rem; background:var(--bg); display:inline-flex; align-items:center; justify-content:center; }
+.pantry-check.active .pantry-check-box{ background:var(--gold); border-color:var(--gold); }
+.pantry-check.active .pantry-check-box::after{ content:''; width:0.3rem; height:0.6rem; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg) translate(-1px,-1px); }
+.pantry-check:focus, .pantry-check:focus-visible{ outline:none; }

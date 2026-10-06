@@ -3924,7 +3924,7 @@ function swapDayRecipes(weekIdxA, i, mealA, weekIdxB, j, mealB){
 
 // Titolo nella barra in alto: il nome della tab al posto di "CookPOP",
 // tranne nel Menù (resta il nome dell'app — è la schermata principale).
-const TOPBAR_TITLE = { menu:'CookPOP', spesa:'Spesa', prep:'Ricette', dispensa:'Dispensa' };
+const TOPBAR_TITLE = { menu:'Menù', spesa:'Spesa', prep:'Ricette', dispensa:'Dispensa' };
 // X per cancellare il testo di un campo di ricerca: stesso tratto
 // dell'icona di ricerca qui sotto, dimensionata in em (segue il font del
 // campo) e in currentColor (il colore del testo).
@@ -3939,10 +3939,12 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-26',
+  version: '2026-11-27',
   title: 'Novità',
   items: [
-    '"Ordina per" si adatta alla larghezza del testo scelto e non ha più il bordo nero quando lo tocchi.'
+    'Spesa: il tasto Carte è nella barra in alto, accanto ai tre puntini.',
+    'Ricette: sotto la ricerca c\'è la stessa riga di Spesa e Dispensa, con il numero a sinistra e "Con quello che ho" come spunta a destra.',
+    'Menù ha il suo titolo, la ricerca ha sempre la stessa altezza e le voci "+ Aggiungi" doppie sono sparite dai tre puntini.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4027,6 +4029,8 @@ function render(){
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
+  const topbarCards = document.getElementById('topbar-cards-btn');
+  if(topbarCards) topbarCards.hidden = state.tab !== 'spesa';
   const panel = document.getElementById('panel');
   const focus = captureFocus(panel);
   const scrolls = captureInnerScroll(panel);
@@ -6273,11 +6277,6 @@ function renderSpesa(){
     </div>
     <div class="shop-list">${body}</div>
           
-    <div class="shop-top-actions">
-      <button type="button" class="btn is-outline" data-open-cards>💳 Carte</button>
-
-
-    </div>
     
   ${addIngModal}
   ${renderExpiryConfirmModal()}
@@ -6537,9 +6536,10 @@ function renderPrep(){
     </div>
 
     ${filtersModal}
-    <div class="prep-toolbar">
-      <button type="button" class="btn is-chip pantry-mode-chip${pantryMode ? ' active' : ''}" data-toggle-pantry-mode aria-pressed="${pantryMode}">🧺 Con quello che ho</button>
-      <div class="shop-progress">${list.length} ricette trovate</div>
+    <div class="shop-head">
+      <div class="shop-head-title"><span class="shop-head-sub">${list.length} ${list.length === 1 ? 'ricetta' : 'ricette'}</span></div>
+      <button type="button" class="pantry-check${pantryMode ? ' active' : ''}" data-toggle-pantry-mode role="checkbox" aria-checked="${pantryMode}"><span class="pantry-check-box" aria-hidden="true"></span>Con quello che ho</button>
+    </div>
     </div>
     ${pantryMode ? `<p class="pantry-mode-note">Ricette con almeno metà degli ingredienti in Dispensa, prima quelle che usano cose in scadenza. Sale, olio e spezie non contano.</p>` : ''}
     <div class="accordion-body">${cards || (pantryMode
@@ -9550,15 +9550,13 @@ const TAB_MENU_ITEMS = {
   dispensa: [
     { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } },
     { label: '🗂️ Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
-    { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } },
-    { label: '+ Aggiungi ingrediente', action: ()=>{ state.pantryAddModalOpen = true; } }
+    { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
   ],
   spesa: [
     { label: '↕️ Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
   ],
   prep: [
-    { label: '📥 Importa da un reel o da un testo', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } },
-    { label: '+ Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; } }
+    { label: '📥 Importa da un reel o da un testo', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } }
   ]
 };
 

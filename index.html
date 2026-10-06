@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=111">
+<link rel="stylesheet" href="style.css?v=112">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -55,6 +55,7 @@
 <header class="topbar">
   <div class="topbar-inner">
     <span class="topbar-title" id="topbar-title">CookPOP</span>
+    <button class="btn-settings topbar-cards-btn" id="topbar-cards-btn" type="button" data-open-cards aria-label="Carte fedeltà" hidden><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/></svg></button>
     <button class="btn-settings" id="topbar-menu-btn" type="button" aria-label="Menu"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M112 60a16 16 0 1 1 16 16a16 16 0 0 1-16-16m16 52a16 16 0 1 0 16 16a16 16 0 0 0-16-16m0 68a16 16 0 1 0 16 16a16 16 0 0 0-16-16"></path></svg></button>
     <div class="topbar-menu-backdrop" id="topbar-menu-backdrop">
       <div class="topbar-menu" id="topbar-menu" data-stop-close></div>
@@ -139,6 +140,6 @@
 });
 </script>
 <script src="catalog.js?v=9"></script>
-<script src="app.js?v=167"></script>
+<script src="app.js?v=168"></script>
 </body>
 </html>
