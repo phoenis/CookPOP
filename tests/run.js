@@ -1777,6 +1777,23 @@ test('cucina: "Nell\'orologio" che non si apre avvia il timer dell\'app', async 
   eq(r, { t: true, note: 'Orologio non aperto: timer nell\'app', bar: true });
 });
 
+test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, tab e ingredienti', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const gaps = root => { const q = s => root.querySelector(s); const bw = q('.button-wrapper'), pt = q('.pane-tabs'), ps = q('.persone-row'), li = q('.ing-list li');
+      const cs = getComputedStyle(bw), top = e => e.getBoundingClientRect().top, bot = e => e.getBoundingClientRect().bottom;
+      return { btnTop: Math.round(top(bw) - bot(pt)), btnToPersone: Math.round(top(ps) - bot(bw)), liPad: getComputedStyle(li).paddingTop }; };
+    state.extraWeeks = []; generateWeek(1);
+    writeMealDishes(1, 1, 'cena', 'Amatriciana', []); state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
+    const meal = gaps(document.querySelector('[data-page^="meal-"] .dish-acc-body'));
+    state.expandedDay = null; state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = 'Amatriciana'; render();
+    const rec = gaps(document.querySelector('[data-page^="recipe-"] .meal-detail-body'));
+    return { meal, rec };
+  });
+  eq(r.meal, r.rec);
+  eq(r.rec.btnTop >= 16 && r.rec.btnToPersone >= 16, true);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

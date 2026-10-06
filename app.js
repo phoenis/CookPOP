@@ -4111,10 +4111,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-02',
+  version: '2026-12-03',
   title: 'Novità',
   items: [
-    'Timer in Cucina: se "Nell\'orologio" non riesce ad aprire l\'Orologio del telefono, parte da solo il timer dell\'app.'
+    'Ricetta (dal Menù e dal Ricettario): più spazio attorno a "Aggiungi ingredienti", ai tag, alle tab, a "Per N persone" e agli ingredienti, uguale nelle due pagine.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo

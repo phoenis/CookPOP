@@ -1362,3 +1362,14 @@
 .timer-alert{ position:fixed; left:var(--space-medium); right:var(--space-medium); top:calc(1rem + env(safe-area-inset-top)); z-index:400; display:flex; align-items:center; gap:var(--space-small); padding:var(--space-small) var(--space-medium); border-radius:var(--radius-modal, 1rem); background:var(--ink); color:var(--bg); box-shadow:var(--shadow-card); }
 .timer-alert-text{ flex:1; font-weight:var(--weight-bold); }
 .timer-alert-stop{ height:2.5rem; padding:0 var(--space-medium); border:0; border-radius:var(--radius-pill); background:var(--gold); color:#fff; font-family:var(--font-family); font-weight:var(--weight-bold); cursor:pointer; }
+
+/* Dettaglio ricetta: più aria, uguale dal Menù e dal Ricettario */
+.meal-detail-body > .detail-tags, .dish-acc-body .detail-tags{ margin:0 0 var(--space-medium); }
+.meal-detail-body > .button-wrapper, .dish-acc-body > .button-wrapper{ margin:var(--space-medium) 0 var(--space-xsmall); }
+.meal-detail-body > .detail-section, .dish-acc-body .detail-section{ padding:var(--space-xsmall) 0 0; }
+.persone-row{ padding:var(--space-xsmall) 0; }
+.ing-list li{ padding:0.75rem 0; }
+.meal-detail-body > .grad-picker, .dish-acc-body .grad-picker{ margin:var(--space-xlarge, 2rem) 0 0; padding-top:var(--space-medium); }
+.dish-acc-body .note-box, .dish-acc-body .steps-list{ margin-top:var(--space-medium); }
+.dish-acc-body{ row-gap:0; }
+.dish-acc-body > .freezer-info, .dish-acc-body > .soak-note, .dish-acc-body > .recipe-photo{ margin-bottom:var(--space-small); }
