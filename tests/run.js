@@ -1715,6 +1715,23 @@ test('ricette: ritmo uniforme nel dettaglio, Cucina bianca senza bande, modifica
   eq(r, { gap: '0px', tab: 'none', cookBg: 'rgb(255, 255, 255)', cookEndRight: true });
 });
 
+test('modifica ricetta: si aggiungono ingredienti, il campo suggerisce gli esistenti (plurali/accenti) e il nome esistente evita doppioni', async ({ page }) => {
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.customRecipes['Prova nuova'] = { nome: 'Prova nuova' }; state.tab = 'prep'; state.recipeEditName = 'Prova nuova'; render();
+  });
+  await page.click('#edit-add-ing-row');
+  const rows = await page.evaluate(() => document.querySelectorAll('#edit-ing-list .edit-ing-row').length);
+  await page.evaluate(() => render()); // un ri-render non deve rompere il campo
+  const name = page.locator('#edit-ing-list .edit-ing-name').first();
+  await name.click(); await page.keyboard.type('pomodor');
+  const sugg = await page.evaluate(() => [...document.querySelectorAll('.add-ing-suggestion[data-combo-pick]')].map(e => e.textContent));
+  const target = await page.evaluate(() => allKnownIngredientNamesWithGroups().find(n => /pomodor/i.test(n)));
+  const canon = await page.evaluate(n => canonicalIngredientName(n.toUpperCase()), target);
+  await page.evaluate(() => { const l = document.querySelectorAll('#edit-ing-list .edit-ing-name'); l[0].value = 'Pomodoro'; l[0].dispatchEvent(new Event('input', { bubbles: true })); });
+  eq({ rows, hasSugg: sugg.length > 0, canon }, { rows: 2, hasSugg: true, canon: target });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
