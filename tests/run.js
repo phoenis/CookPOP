@@ -1636,6 +1636,33 @@ test('menù: card dei pasti senza bordo e con ombra leggera; le card vuote senza
   eq(r, { fullBorder: '0px', fullShadow: true, emptyBorder: '0px', emptyShadow: 'none' });
 });
 
+test('dispensa: la quantità è rossa solo se la scorta è poca per quell\'unità (0,7 l no, 0,1 l sì, mezzo pezzo sì)', async ({ page }) => {
+  const r = await page.evaluate(() => [
+    pantryQtyIsLow({ qty: 0.7, unit: 'l' }), pantryQtyIsLow({ qty: 0.1, unit: 'l' }), pantryQtyIsLow({ qty: 0.5, unit: 'kg' }),
+    pantryQtyIsLow({ qty: 0.5, unit: '' }), pantryQtyIsLow({ qty: 1, unit: '' }), pantryQtyIsLow({ qty: 300, unit: 'g' }), pantryQtyIsLow({ qty: 0, unit: 'none' })
+  ]);
+  eq(r, [false, true, false, true, false, false, false]);
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    upsertPantryItem('Passata di pomodoro', 'dispensa', 0.7, 'l'); state.tab = 'dispensa'; state.pantryView = 'cibo'; render();
+  });
+  eq(await page.locator('[data-qty-show="passata di pomodoro"]').evaluate(el => el.classList.contains('low')), false, 'passata 0,7 l non rossa');
+});
+
+test('dispensa: tooltip con ombra leggera e non tagliata dal contenitore dello swipe', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    upsertPantryItem('Burro', 'frigo', 2, 'pz'); state.tab = 'dispensa'; state.pantryView = 'cibo';
+    state.pantryLuogoPicker = 'burro'; render();
+    const pk = document.querySelector('.luogo-picker');
+    const wrap = pk.closest('.swipe-wrap');
+    const probe = document.createElement('div'); probe.style.boxShadow = 'var(--shadow-card)'; document.body.appendChild(probe);
+    const card = getComputedStyle(probe).boxShadow; probe.remove();
+    return { overflow: getComputedStyle(wrap).overflow, same: getComputedStyle(pk).boxShadow === card };
+  });
+  eq(r, { overflow: 'visible', same: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

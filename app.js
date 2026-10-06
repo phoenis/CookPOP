@@ -201,6 +201,13 @@ const PANTRY_UNIT_BY_NAME = {
   'passata di pomodoro':'ml', 'passata':'ml'
 };
 // Passo dello stepper +/- in Dispensa, adeguato all'unità (1g o 1ml alla volta non avrebbe senso).
+// Scorta "bassa" (numero in rosso in Dispensa): per pezzi, g e ml sotto 1;
+// per kg e litri, che si contano a decimi, sotto 0,2 (0,7 l di passata è
+// una scorta normale, non poca).
+function pantryQtyIsLow(it){
+  if(!it || typeof it.qty !== 'number' || it.unit === 'none') return false;
+  return it.qty < ((it.unit === 'kg' || it.unit === 'l') ? 0.2 : 1);
+}
 function qtyStepFor(unit){
   if(unit === 'g' || unit === 'ml') return 50;
   if(unit === 'kg' || unit === 'l') return 0.1;
@@ -3932,10 +3939,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-22',
+  version: '2026-11-24',
   title: 'Novità',
   items: [
-    'Menù: le card dei pasti non hanno più il bordo ma un\'ombra leggera; quelle vuote non hanno né bordo né ombra.'
+    'Dispensa: la quantità non è più rossa per i litri e i chili sopra 0,2 (prima 0,7 l di passata era "poca"). Per pezzi, grammi e millilitri il rosso resta sotto 1.',
+    'Dispensa: i tooltip (luogo, finito) hanno un\'ombra più leggera, come le card del Menù, e non è più tagliata sopra e sotto.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -7267,7 +7275,7 @@ function renderDispensa(){
         <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
         ${editing
           ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">${it.unit ? `<span class="qty-unit">${escapeHtml(it.unit)}</span>` : ''}`
-          : `<span class="qty-num${it.qty < 1 ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>`}
+          : `<span class="qty-num${pantryQtyIsLow(it) ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>`}
       </span>`}
     </div>
     </div>

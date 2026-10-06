@@ -1295,3 +1295,7 @@
 .sheet-footer .edit-footer .btn{ display:inline-flex; justify-content:center; max-width:none; margin:0; }
 .edit-footer .btn.is-solid{ flex:1; }
 .recipe-edit-page .recipe-photo{ margin:0 0 var(--space-small); }
+
+/* Tooltip della Dispensa (luogo, finito): ombra leggera come le card del Menù, e non più tagliata sopra e sotto dal contenitore dello swipe. */
+.luogo-picker{ box-shadow:var(--shadow-card); }
+.swipe-wrap:has(.luogo-picker){ overflow:visible; }
