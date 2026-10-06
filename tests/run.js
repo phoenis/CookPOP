@@ -1732,6 +1732,18 @@ test('modifica ricetta: si aggiungono ingredienti, il campo suggerisce gli esist
   eq({ rows, hasSugg: sugg.length > 0, canon }, { rows: 2, hasSugg: true, canon: target });
 });
 
+test('ricette: ingredienti in ordine fisso, olio/aceto/sale/pepe/spezie per ultimi', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.customRecipes['Ordine prova'] = { nome: 'Ordine prova' };
+    state.recipeEdits['Ordine prova'] = { ingredienti: [
+      { ingrediente: 'Olio EVO', qta: 'q.b.' }, { ingrediente: 'Sale', qta: 'q.b.' }, { ingrediente: 'Pecorino romano', qta: '50 g' },
+      { ingrediente: 'Pepe nero', qta: 'q.b.' }, { ingrediente: 'Guanciale', qta: '100 g' }, { ingrediente: 'Pasta lunga', qta: '200 g' }, { ingrediente: 'Aglio', qta: '1' }
+    ] };
+    return getIngredientsFor('Ordine prova').map(i => i.ingrediente);
+  });
+  eq(r, ['Guanciale', 'Pasta lunga', 'Aglio', 'Pecorino romano', 'Olio EVO', 'Sale fino', 'Pepe nero']);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
