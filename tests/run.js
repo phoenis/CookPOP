@@ -339,11 +339,18 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
     };
     state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render();
   });
+  // nel dettaglio non c'è più "Aggiungi una foto": si carica da Modifica ricetta
+  await page.waitForTimeout(200);
+  eq(await page.locator('[data-recipe-photo-input]').count(), 0, 'nessun comando foto nel dettaglio');
+  await page.evaluate(() => { state.recipeEditName = 'Carbonara'; render(); });
   await page.waitForSelector('[data-recipe-photo-input]', { state: 'attached' });
+  eq(await page.evaluate(() => [!!document.querySelector('.filters-modal-backdrop.is-second'), !!document.querySelector('[data-page="recipe-edit-Carbonara"]')]), [false, true], 'pagina, non modale');
+  await page.fill('#edit-tempo', 'scritto a mano');
   // immagine di prova 3000x2000 generata nel browser
   const png = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 3000; c.height = 2000; const x = c.getContext('2d'); x.fillStyle = '#c33'; x.fillRect(0, 0, 3000, 2000); return c.toDataURL('image/png').split(',')[1]; });
   await page.setInputFiles('[data-recipe-photo-input]', { name: 'piatto.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await page.waitForSelector('.recipe-photo img');
+  eq(await page.inputValue('#edit-tempo'), 'scritto a mano', 'il render della foto non cancella quanto scritto');
   const saved = await page.evaluate(() => { const v = Object.values(window.__photos)[0]; const img = document.querySelector('.recipe-photo img'); return { keys: Object.keys(window.__photos), jpeg: v.data.startsWith('data:image/jpeg'), size: v.data.length, w: img.naturalWidth }; });
   eq(saved.keys, ['recipe-photos/Carbonara'], 'percorso');
   assert(saved.jpeg && saved.size < 300000, `foto troppo grande: ${saved.size}`);
@@ -351,8 +358,12 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
   await page.click('[data-recipe-photo-remove]');
   await page.waitForSelector('.recipe-photo img', { state: 'detached' });
   eq(await page.evaluate(() => Object.keys(window.__photos)), [], 'foto rimossa');
+  eq(await page.inputValue('#edit-tempo'), 'scritto a mano', 'neanche dopo la rimozione');
   await page.click('.undo-toast button');
   await page.waitForSelector('.recipe-photo img');
+  // chiusa la pagina di modifica, nel dettaglio la foto si vede ma senza comandi
+  await page.evaluate(() => { state.recipeEditName = null; render(); });
+  eq(await page.evaluate(() => [!!document.querySelector('[data-page^="recipe-Carbonara"] .recipe-photo img'), document.querySelectorAll('[data-recipe-photo-input], [data-recipe-photo-remove]').length]), [true, 0], 'foto senza comandi nel dettaglio');
   eq(page.errors, [], 'errori JS');
 });
 
