@@ -3778,10 +3778,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-07',
+  version: '2026-11-08',
   title: 'Novità',
   items: [
-    'Dispensa: anche con lo swipe ti chiedo cosa fare dell\'ingrediente finito. Con + va dritto in lista spesa, col cestino va tra i Finiti. Tocca fuori per annullare.'
+    'Dispensa: col + in basso, mentre scrivi il nome ti suggerisco gli ingredienti che hai già. Scegline uno e luogo, unità e categoria si compilano da soli: la quantità si aggiunge a quella che hai.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -6516,6 +6516,41 @@ function managePageHtml({ key, title, closeAttr, body, footer, action }){
     ${footer ? `<div class="sheet-footer">${footer}</div>` : ''}
   </div>`;
 }
+// Aggiungi in Dispensa: il nome può essere di una voce che c'è già (anche
+// finita). Scelta dai suggerimenti, la bozza prende luogo, unità, categoria,
+// gruppo e scadenza di quella voce, e "Aggiungi" ne aumenta la quantità.
+function existingPantryFor(nome){
+  return state.pantryItems[(nome || '').trim().toLowerCase()] || null;
+}
+function pantryHaveHintHtml(nome){
+  const ex = existingPantryFor(nome);
+  if(!ex) return '';
+  const q = typeof ex.qty === 'number' ? ex.qty : 0;
+  const txt = q <= 0 ? 'finito' : ex.unit === 'none' ? 'ce l\'hai già' : `ne hai già ${q}${ex.unit && ex.unit !== 'none' ? ' ' + (UNIT_SHORT[ex.unit] || ex.unit) : ''}`;
+  return `<span class="sheet-hint-inline sheet-have-hint">${escapeHtml(txt.charAt(0).toUpperCase() + txt.slice(1))}</span>`;
+}
+function fillDraftFromPantry(d, nome){
+  const ex = existingPantryFor(nome);
+  d.nome = ex ? ex.nome : nome;
+  if(!ex) return;
+  d.luogo = ex.luogo || 'dispensa';
+  d.unit = ex.unit || '';
+  d.cat = ex.cat || '';
+  d.group = ex.group || '';
+  d.scadenza = (typeof ex.qty === 'number' && ex.qty > 0 && ex.scadenza) || '';
+  if(d.unit === 'none') d.qty = 1;
+  d.home = isNonFoodDept(knownDept(d.cat) || classifyDept(d.nome));
+}
+function pantryAddSuggestions(q){
+  q = (q || '').trim().toLowerCase();
+  if(!q) return [];
+  const rank = n => n.toLowerCase().startsWith(q) ? 0 : 1;
+  const inPantry = Object.values(state.pantryItems).map(it => it.nome).filter(n => n && n.toLowerCase().includes(q));
+  const seen = new Set(inPantry.map(n => n.toLowerCase()));
+  const others = allKnownIngredientNames().filter(n => n.toLowerCase().includes(q) && !seen.has(n.toLowerCase()));
+  const sort = arr => arr.sort((a, b) => rank(a) - rank(b) || IT_COLLATOR.compare(a, b));
+  return sort(inPantry).concat(sort(others)).slice(0, 8);
+}
 function renderIngredientSheet(it, isNew){
   const sheetKey = 'sheet-' + (isNew ? 'new' : state.pantryEditKey);
   const entering = pageEntering(sheetKey);
@@ -6575,14 +6610,14 @@ function renderIngredientSheet(it, isNew){
   <div class="sheet-page${entering ? ' is-entering' : ''}" data-sheet-page>
     <header class="settings-header">
       <button class="btn is-icon settings-back" type="button" ${closeAttr} aria-label="Indietro"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="100%" height="100%"><path fill="currentColor" d="M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z"></path></svg></button>
-      <h2 class="settings-title">${isNew ? `Nuovo ${noun}` : `Modifica ${noun}`}</h2>
+      <h2 class="settings-title">${isNew ? (existingPantryFor(it.nome) ? `Aggiungi ${noun}` : `Nuovo ${noun}`) : `Modifica ${noun}`}</h2>
     </header>
     <div class="settings-body sheet-body">
       <section class="settings-section">
         <div class="settings-card">
-          <input type="text" class="sheet-name" id="${isNew ? 'pantry-add-name' : 'pantry-edit-name'}" value="${escapeAttr(it.nome)}" placeholder="${home ? 'Es. Detersivo piatti' : 'Es. Zucchine'}" aria-label="Nome" autocomplete="off">
+          ${isNew ? '<div class="add-ing-combo">' : ''}<input type="text" class="sheet-name" id="${isNew ? 'pantry-add-name' : 'pantry-edit-name'}" value="${escapeAttr(it.nome)}" placeholder="${home ? 'Es. Detersivo piatti' : 'Es. Zucchine'}" aria-label="Nome" autocomplete="off">${isNew ? '<div class="add-ing-suggestions" id="pantry-add-suggest"></div></div>' : ''}
           <div class="settings-field sheet-qty-row">
-            <div class="settings-field-label">${unit === 'none' ? 'Ce l\'hai?' : 'Quantità'}</div>
+            <div class="settings-field-label">${unit === 'none' ? 'Ce l\'hai?' : (isNew && existingPantryFor(it.nome) ? 'Quanto ne aggiungi' : 'Quantità')}${isNew ? pantryHaveHintHtml(it.nome) : ''}</div>
             ${qtyHtml}
           </div>
           <div class="settings-field">
@@ -9002,10 +9037,48 @@ function attachHandlers(){
   // si aggiorna solo la categoria automatica mostrata.
   const addNameInput = document.getElementById('pantry-add-name');
   if(addNameInput && state.pantryDraft){
+    const suggestEl = document.getElementById('pantry-add-suggest');
+    const showSuggest = ()=>{
+      if(!suggestEl) return;
+      const q = addNameInput.value.trim().toLowerCase();
+      const list = pantryAddSuggestions(q);
+      // Già scritto per intero: niente elenco con la sola voce uguale.
+      suggestEl.innerHTML = list.length === 1 && list[0].toLowerCase() === q ? '' : list.map(n=>{
+        const ex = existingPantryFor(n);
+        const meta = ex ? `<span class="sheet-hint-inline">${LUOGO_ICON[ex.luogo || 'dispensa'] || ''} ${typeof ex.qty === 'number' && ex.qty > 0 ? 'in Dispensa' : 'finito'}</span>` : '';
+        return `<button type="button" class="add-ing-suggestion" data-pantry-suggest="${escapeAttr(n)}">${escapeHtml(n)} ${meta}</button>`;
+      }).join('');
+    };
     addNameInput.addEventListener('input', e=>{
       state.pantryDraft.nome = e.target.value;
       const v = document.getElementById('sheet-cat-value');
       if(v) v.innerHTML = sheetDeptLabelHtml(state.pantryDraft, !!state.pantryDraft.home);
+      showSuggest();
+    });
+    addNameInput.addEventListener('focus', showSuggest);
+    addNameInput.addEventListener('blur', ()=>{ setTimeout(()=>{ if(suggestEl) suggestEl.innerHTML = ''; }, 150); });
+    // Scritto a mano per intero il nome di una voce che c'è già: stessi
+    // dati che se l'avessi scelta dall'elenco.
+    addNameInput.addEventListener('change', ()=>{
+      const d = state.pantryDraft;
+      if(!d || !existingPantryFor(d.nome)) return;
+      fillDraftFromPantry(d, d.nome.trim());
+      render();
+    });
+    // pointerdown, non click: precede il blur del campo, che altrimenti
+    // svuoterebbe l'elenco prima del tocco.
+    if(suggestEl) suggestEl.addEventListener('pointerdown', e=>{
+      const btn = e.target.closest('[data-pantry-suggest]');
+      if(!btn) return;
+      e.preventDefault();
+      fillDraftFromPantry(state.pantryDraft, btn.dataset.pantrySuggest);
+      state.pantrySheetPicker = null;
+      render();
+      // Scelto: via la tastiera e l'elenco, si passa a quantità e luogo.
+      const inp = document.getElementById('pantry-add-name');
+      if(inp) inp.blur();
+      const sug = document.getElementById('pantry-add-suggest');
+      if(sug) sug.innerHTML = '';
     });
     addNameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') addNameInput.blur(); });
   }
@@ -9089,14 +9162,21 @@ function attachHandlers(){
     let cat = d.cat || '';
     if(!cat && d.home && !isNonFoodDept(classifyDept(nome))) cat = 'altro-casa';
     const key = nome.toLowerCase();
+    const prevItem = state.pantryItems[key] ? Object.assign({}, state.pantryItems[key]) : null;
     upsertPantryItem(nome, d.luogo, d.unit === 'none' ? (d.qty > 0 ? 1 : 0) : d.qty, d.unit || '', cat, d.group || '');
-    if(d.scadenza && state.pantryItems[key] && !state.pantryItems[key].scadenza) state.pantryItems[key].scadenza = d.scadenza;
+    const added = state.pantryItems[key];
+    if(added){
+      // Voce che c'era già: vale quello scelto nella scheda (es. il luogo).
+      added.luogo = d.luogo || added.luogo;
+      if(d.unit === 'none') added.qty = d.qty > 0 ? 1 : 0;
+      if(d.scadenza) added.scadenza = d.scadenza;
+    }
     // Se è finito nell'altra vista (es. "Detersivo" aggiunto da Cibo), ci
     // si sposta lì: altrimenti sembrerebbe non essere stato aggiunto.
     state.pantryView = isNonFoodDept(knownDept(cat) || classifyDept(nome)) ? 'casa' : 'cibo';
     closeIngredientSheet();
     persist(); render();
-    showUndoToast(`${nome} aggiunto`, ()=>{ delete state.pantryItems[key]; persist(); render(); });
+    showUndoToast(`${nome} aggiunto`, ()=>{ if(prevItem) state.pantryItems[key] = prevItem; else delete state.pantryItems[key]; persist(); render(); });
   });
   const editDeleteBtn = document.getElementById('pantry-edit-delete');
   if(editDeleteBtn){

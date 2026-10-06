@@ -463,6 +463,8 @@
   .add-ing-suggestion:hover, .add-ing-suggestion:focus{ background:var(--surface-2); }
   .add-ing-suggestion + .add-ing-suggestion{ border-top:1px solid var(--line-light); }
   .add-ing-suggestion-new{ font-style:italic; color:var(--gold-dark); }
+  .add-ing-suggestions:empty{ display:none; }
+  .sheet-have-hint{ display:block; font-weight:normal; }
 
   .done-ing-list{ display:flex; flex-direction:column; gap:0.125rem; }
   .done-ing-row{ display:flex; align-items:center; justify-content:space-between; gap:0.5625rem; font-size:var(--text-small); padding:var(--space-xsmall) 0.125rem; border-bottom:1px dashed var(--line); }
