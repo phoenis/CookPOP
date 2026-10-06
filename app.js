@@ -3822,10 +3822,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-11',
+  version: '2026-11-12',
   title: 'Novità',
   items: [
-    'Menù: il dettaglio di un pasto ora si apre come pagina, con la freccia Indietro in alto (come la scheda di un ingrediente in Dispensa).'
+    'Carte fedeltà: finché una carta è aperta, lo schermo non si spegne.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -3864,6 +3864,25 @@ function renderWhatsNewModal(){
     </div>
   </div>`;
 }
+// Carta fedeltà aperta: lo schermo resta acceso (Screen Wake Lock) finché
+// la carta è a video. La luminosità invece un'app web non può alzarla.
+let cardWakeLock = null;
+function syncCardWakeLock(){
+  const want = !!state.cardViewId && document.visibilityState === 'visible';
+  if(want && !cardWakeLock && navigator.wakeLock){
+    cardWakeLock = 'pending';
+    navigator.wakeLock.request('screen').then(lock=>{
+      if(!state.cardViewId){ lock.release().catch(()=>{}); cardWakeLock = null; return; }
+      cardWakeLock = lock;
+      lock.addEventListener('release', ()=>{ if(cardWakeLock === lock) cardWakeLock = null; });
+    }).catch(()=>{ cardWakeLock = null; });
+  } else if(!want && cardWakeLock && cardWakeLock !== 'pending'){
+    cardWakeLock.release().catch(()=>{});
+    cardWakeLock = null;
+  }
+}
+// Il blocco cade da solo quando l'app va in background: al ritorno si riprende.
+document.addEventListener('visibilitychange', syncCardWakeLock);
 function render(){
   applyCustomDepts();
   if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
@@ -3884,6 +3903,7 @@ function render(){
   panel.innerHTML = html + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderUndoToast() + renderWhatsNewModal();
   endPageRender();
   attachHandlers();
+  syncCardWakeLock();
   restoreInnerScroll(panel, scrolls);
   restoreFocus(panel, focus);
   reconcileModalHistory();
