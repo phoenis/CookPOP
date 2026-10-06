@@ -1219,10 +1219,29 @@ function getIngredientsFor(name){
     return split ? split.map(part => Object.assign({}, it, part)) : [it];
   });
   const renames = Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
-  return list.map(it=>{
+  return sortRecipeIngredients(list.map(it=>{
     const displayName = resolveIngredientName(it.ingrediente, renames);
     return displayName === it.ingrediente ? it : Object.assign({}, it, { ingrediente: displayName });
-  });
+  }));
+}
+// Ordine fisso degli ingredienti in ogni ricetta: prima gli ingredienti
+// principali (carne, pesce, salumi, pasta, legumi, pane), poi verdura,
+// latticini e uova, conserve e il resto; per ultimi i condimenti (olio, aceto,
+// sale, pepe, spezie). A parità di gruppo resta l'ordine scritto nella ricetta.
+const RECIPE_ING_ORDER = ['carne','pesce','salumi','pasta','legumi','pane','verdura','latticini','conserve','salse','dolci','surgelati','bibite','altro'];
+function recipeIngredientRank(name){
+  const dept = classifyDept(name);
+  if(dept === 'base'){
+    const n = String(name || '').toLowerCase();
+    const sub = /\bolio\b/.test(n) ? 0 : /\baceto\b/.test(n) ? 1 : /\bsale\b/.test(n) ? 2 : 3;
+    return 100 + sub;
+  }
+  const i = RECIPE_ING_ORDER.indexOf(dept);
+  return i < 0 ? RECIPE_ING_ORDER.length : i;
+}
+function sortRecipeIngredients(list){
+  return list.map((it, idx) => ({ it, idx, r: recipeIngredientRank(it.ingrediente) }))
+    .sort((x, y) => x.r - y.r || x.idx - y.idx).map(x => x.it);
 }
 // Nome finale di un ingrediente seguendo i sinonimi (quelli curati e quelli
 // creati dall'app, che hanno la precedenza), con protezione dai giri chiusi.
@@ -3955,11 +3974,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-29',
+  version: '2026-11-30',
   title: 'Novità',
   items: [
-    'Modifica ricetta: "+ aggiungi ingrediente" (e passaggio) funziona di nuovo, e così le ✕ e le stagioni.',
-    'Gli ingredienti suggeriscono quelli esistenti anche con plurali e accenti ("pomodori" trova "pomodoro"), e se scrivi un nome già esistente si usa quello, senza doppioni. Se non c\'è, lo crei nuovo.'
+    'Ricette: gli ingredienti hanno sempre lo stesso ordine — prima carne, pesce, pasta e verdura, poi latticini e conserve, e per ultimi olio, aceto, sale, pepe e spezie.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
