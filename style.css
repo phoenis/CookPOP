@@ -89,7 +89,7 @@
     --blur-modal: 3px;
 
     /* box-shadow: un valore per ogni effetto, offset/blur in rem + colore in rgba */
-    --shadow-card: 0 0.125rem 0.625rem rgba(var(--shadow-rgb), 0.06); /* carte bianche su sfondo bianco: un'ombra leggera e un filo di bordo */
+    --shadow-card: 0 0.125rem 0.75rem rgba(var(--shadow-rgb), 0.1); /* carte bianche su sfondo bianco: un'ombra leggera e un filo di bordo */
     --shadow-fab: 0 0.125rem 0.75rem rgba(var(--shadow-rgb), 0.07); /* morbida e leggera, come la reference */
     --shadow-today: inset 0.1875rem 0 0 var(--gold);
     --shadow-drag-over: 0 0 0 0.125rem var(--gold) inset;
@@ -1261,7 +1261,12 @@
 /* Stile più morbido (reference Moulinex): sfondo bianco, titoli di sezione in
    minuscolo e senza righe nere, carte con bordo leggero e ombra morbida. */
 .week-title, .shop-day-title, .dept-title{ text-transform:none; font-size:var(--text-medium); border-top:0; border-bottom:var(--border) solid var(--line); margin-top:0; }
-.meal-block{ border:var(--border) solid var(--line); box-shadow:var(--shadow-card); }
+/* Card dei pasti nel Menù: niente bordo, un'ombra leggera (sul contenitore, che ha overflow:hidden per lo swipe); le card vuote non hanno né bordo né ombra. */
+.meal-block{ border:0; }
+.meal-block-swipe-wrap{ box-shadow:var(--shadow-card); background:transparent; }
+.meal-block-trash{ background-color:var(--tomato); visibility:hidden; }
+.meal-block-swipe-wrap:has(.meal-block[style*="translate"], .meal-block.swiping) .meal-block-trash{ visibility:visible; }
+.meal-block.is-empty{ border:0; box-shadow:none; }
 
 /* Dettaglio pasto: tab dei piatti a sinistra, "+" tondo fisso a destra */
 .dish-tabs-row{ display:flex; align-items:center; gap:var(--space-small); border-bottom:1px solid var(--line); }
