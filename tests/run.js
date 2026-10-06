@@ -1406,6 +1406,24 @@ test('dispensa: ingrediente finito chiede + (lista spesa) o cestino (Finiti), fu
   eq(page.errors, [], 'errori JS');
 });
 
+test('dispensa +: suggerisce gli ingredienti che hai già e ne copia luogo/unità/categoria; Aggiungi somma la quantità', async ({ page }) => {
+  await page.evaluate(() => {
+    upsertPantryItem('Parmigiano', 'frigo', 200, 'g', 'latticini');
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryAddModalOpen = true; render();
+  });
+  await page.fill('#pantry-add-name', 'parm');
+  eq(await page.locator('[data-pantry-suggest="Parmigiano"]').count(), 1, 'suggerito');
+  await page.locator('[data-pantry-suggest="Parmigiano"]').dispatchEvent('pointerdown');
+  eq(await page.evaluate(() => { const d = state.pantryDraft; return [d.nome, d.luogo, d.unit, d.cat, document.getElementById('pantry-add-name').value]; }), ['Parmigiano', 'frigo', 'g', 'latticini', 'Parmigiano'], 'bozza compilata');
+  await page.click('[data-sheet-luogo="freezer"]');
+  await page.fill('#pantry-edit-qty', '100');
+  await page.locator('#pantry-edit-qty').dispatchEvent('change');
+  await page.click('#pantry-add-btn');
+  eq(await page.evaluate(() => { const it = state.pantryItems['parmigiano']; return [it.qty, it.luogo, it.unit, it.cat]; }), [300, 'freezer', 'g', 'latticini']);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
