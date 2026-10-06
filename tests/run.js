@@ -867,9 +867,9 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
   // Dettaglio: un piatto sotto l'altro, aperto solo il primo; un tocco apre gli altri.
   const d = await page.evaluate(() => {
     state.expandedDay = '1_1_cena'; render();
-    const heads = () => [...document.querySelectorAll('.meal-detail-screen .dish-acc')].map(e => e.classList.contains('open'));
-    const out = { before: heads(), buttons: document.querySelectorAll('.meal-detail-screen [data-mancanti-in-spesa]').length };
-    document.querySelectorAll('.meal-detail-screen .dish-acc-head')[2].click();
+    const heads = () => [...document.querySelectorAll('[data-page^="meal-"] .dish-acc')].map(e => e.classList.contains('open'));
+    const out = { before: heads(), buttons: document.querySelectorAll('[data-page^="meal-"] [data-mancanti-in-spesa]').length };
+    document.querySelectorAll('[data-page^="meal-"] .dish-acc-head')[2].click();
     out.after = heads();
     return out;
   });
@@ -890,7 +890,7 @@ test('ammollo: promemoria sotto la cena del giorno prima, solo per legumi da met
     const out = { mon: noteIn(0), tue: noteIn(1) };
     writeMealDishes(1, 1, 'cena', 'Pasta e lenticchie', []); render(); // lenticchie già cotte: niente ammollo
     out.monCanned = noteIn(0);
-    out.inCard = !!document.querySelector('.meal-detail-screen .soak-note');
+    out.inCard = !!document.querySelector('[data-page^="meal-"] .soak-note');
     return out;
   });
   assert(r.mon && r.mon.includes('Stasera, per domani') && r.mon.includes('Ammollo dei legumi: Pasta e ceci (cena)'), `lunedì: ${r.mon}`);

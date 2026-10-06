@@ -3822,11 +3822,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-10',
+  version: '2026-11-11',
   title: 'Novità',
   items: [
-    'Menù con quello che hai: nelle Regole di generazione attiva "Solo con quello che ho in casa" prima di rigenerare.',
-    'Per un pasto solo: tocca Cambia e scegli il filtro "Con quello che ho". Vedi subito se hai tutto o cosa manca.'
+    'Menù: il dettaglio di un pasto ora si apre come pagina, con la freccia Indietro in alto (come la scheda di un ingrediente in Dispensa).'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4626,16 +4625,9 @@ function renderMealDetailScreen(weekIdx, i, meal){
         ${mancantiButtonHtml(missing)}
       </div>` : '';
 
-  return `
-  <div class="meal-detail-screen">
-  <div class="filters-modal">
-    <div class="meal-detail-header">
-      <div class="meal-detail-header-text">
-        <div class="meal-detail-kicker">${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)}</div>
-        <div class="meal-detail-title">${escapeHtml(MEAL_LABEL[meal])}</div>
-      </div>
-      <button type="button" class="btn is-icon meal-detail-close" data-close-meal-detail aria-label="Chiudi">✕</button>
-    </div>
+  // Pagina a tutto schermo con freccia Indietro, come la scheda ingrediente
+  // della Dispensa (prima era una modale).
+  return managePageHtml({ key: 'meal-' + mk, title: `${escapeHtml(MEAL_LABEL[meal])} <span class="meal-page-date">${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)}</span>`, closeAttr: 'data-close-meal-detail', body: `
     <div class="meal-detail-body">
       ${name ? `
       ${mealTop}
@@ -4643,9 +4635,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
       <button type="button" class="btn is-outline dish-add-wide" data-open-dish-picker="${mk}">+ Aggiungi piatto</button>` : `
       <div class="ing-empty">Nessuna ricetta scelta per questo pasto.</div>
       <button type="button" class="btn is-outline dish-add-wide" data-open-swap="${mk}">Scegli una ricetta</button>`}
-    </div>
-  </div>
-  </div>`;
+    </div>` });
 }
 
 // Le 4 schermate di scelta ricetta ("Cambia", "È avanzata", "È avanzo di",
