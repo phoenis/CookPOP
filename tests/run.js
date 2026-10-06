@@ -864,17 +864,29 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
   eq(r.toast, 'Piatto tolto', 'annulla');
   await page.click('.undo-toast button');
   eq(await page.evaluate(() => effectiveMeal(1, 1, 'cena').principale), n.primo, 'annullato');
-  // Dettaglio: un piatto sotto l'altro, aperto solo il primo; un tocco apre gli altri.
+  // Dettaglio: una tab per piatto (nell'ordine di portata), si vede solo l'attivo; le porzioni stanno nel menù ⋯.
   const d = await page.evaluate(() => {
     state.expandedDay = '1_1_cena'; render();
-    const heads = () => [...document.querySelectorAll('[data-page^="meal-"] .dish-acc')].map(e => e.classList.contains('open'));
-    const out = { before: heads(), buttons: document.querySelectorAll('[data-page^="meal-"] [data-mancanti-in-spesa]').length };
-    document.querySelectorAll('[data-page^="meal-"] .dish-acc-head')[2].click();
-    out.after = heads();
+    const page = () => document.querySelector('[data-page^="meal-"]');
+    const tabs = () => [...page().querySelectorAll('.dish-tab-label')].map(e => e.textContent.trim());
+    const out = { tabs: tabs(), shown: page().querySelectorAll('.dish-acc').length, active: page().querySelector('.dish-tab.active .dish-tab-label').textContent.trim(), buttons: page().querySelectorAll('[data-mancanti-in-spesa]').length };
+    out.noPortionsInBody = !page().querySelector('.meal-detail-body .portions-row') && !page().querySelector('[data-portions-inc]');
+    page().querySelectorAll('.dish-tab')[2].click();
+    out.afterActive = page().querySelector('.dish-tab.active .dish-tab-label').textContent.trim();
+    out.afterShown = page().querySelectorAll('.dish-acc').length;
+    out.title = page().querySelector('.detail-section-title').textContent.replace(/\s+/g, ' ').trim();
+    page().querySelector('[data-meal-menu]').click();
+    out.menuPortions = !!page().querySelector('.meal-menu [data-portions-inc]');
+    const before = state.dayPortions['1_1_cena'];
+    page().querySelector('[data-portions-inc]').click();
+    out.portionsUp = state.dayPortions['1_1_cena'] !== before && !!state.mealDetailMenuOpen;
+    out.titleAfter = page().querySelector('.detail-section-title').textContent.replace(/\s+/g, ' ').trim();
     return out;
   });
-  eq(d.before, [true, false, false, false, false], 'aperto solo il primo');
-  eq(d.after, [true, false, true, false, false], 'aperto anche il terzo');
+  eq(d.tabs, ['Antipasto', 'Primo', 'Contorno', 'Contorno 2', 'Dolce'], 'tab per portata');
+  eq([d.shown, d.active, d.afterShown, d.afterActive], [1, 'Antipasto', 1, 'Contorno'], 'visibile solo la tab attiva');
+  assert(d.noPortionsInBody && d.menuPortions && d.portionsUp, 'porzioni nel menù ⋯');
+  assert(/^Ingredienti per \d+ person[ae]$/.test(d.title) && d.titleAfter !== d.title, `titolo ingredienti: ${d.title} → ${d.titleAfter}`);
   assert(d.buttons <= 1, 'un solo "Aggiungi ingredienti" per tutto il pasto');
   eq(page.errors, [], 'errori JS');
 });

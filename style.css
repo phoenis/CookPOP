@@ -1193,10 +1193,10 @@
 .import-qta{ color:var(--ink-light); white-space:nowrap; }
 .import-steps{ margin:0; padding-left:1.25rem; font-size:var(--text-small); display:flex; flex-direction:column; gap:0.375rem; }
 /* Album: ⋯ in alto a destra con Rinomina / Elimina. */
-.cookbook-menu-btn{ margin-left:auto; width:2.5rem; height:2.5rem; color:var(--ink); }
-.cookbook-menu-btn svg{ width:1.375rem; height:1.375rem; }
-.cookbook-menu-backdrop{ position:fixed; inset:0; z-index:150; }
-.cookbook-menu{ position:fixed; top:calc(3.5rem + env(safe-area-inset-top)); right:var(--space-medium); }
+.cookbook-menu-btn, .meal-menu-btn{ margin-left:auto; width:2.5rem; height:2.5rem; color:var(--ink); }
+.cookbook-menu-btn svg, .meal-menu-btn svg{ width:1.375rem; height:1.375rem; }
+.cookbook-menu-backdrop, .meal-menu-backdrop{ position:fixed; inset:0; z-index:150; }
+.cookbook-menu, .meal-menu{ position:fixed; top:calc(3.5rem + env(safe-area-inset-top)); right:var(--space-medium); }
 
 /* "+ piatto" come un piatto vuoto: cerchietto tratteggiato allineato alle icone dei piatti. */
 .dish-line .dish-add{ padding:0; line-height:0; }
@@ -1220,3 +1220,12 @@
 .dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border-style:dotted; }
 .meal-block .day-meal .meal-overflow-btn{ margin-top:-0.5rem; margin-bottom:-0.5rem; }
 .meal-page-date{ display:block; font-size:var(--text-xsmall); font-weight:normal; color:var(--ink-light); }
+
+.meal-menu-portions{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-large); padding:var(--space-xsmall) var(--space-small); }
+.dish-tabs{ display:flex; gap:var(--space-xxsmall); overflow-x:auto; border-bottom:1px solid var(--line); scrollbar-width:none; }
+.dish-tabs::-webkit-scrollbar{ display:none; }
+.dish-tab{ flex:0 0 auto; display:inline-flex; align-items:center; gap:var(--space-xxsmall); padding:var(--space-xsmall) var(--space-small); border:0; border-bottom:2px solid transparent; margin-bottom:-1px; background:none; font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-bold); color:var(--ink-light); cursor:pointer; white-space:nowrap; }
+.dish-tab.active{ color:var(--ink); border-bottom-color:var(--gold); }
+.dish-acc.is-panel{ border:0; background:transparent; border-radius:0; }
+.dish-acc-head.is-static{ cursor:default; padding-left:0; padding-right:0; }
+.dish-acc.is-panel .dish-acc-body{ padding-left:0; padding-right:0; }
