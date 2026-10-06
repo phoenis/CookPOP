@@ -620,6 +620,119 @@ function cookStepIngredients(name, stepText, ratio){
     return words.some(w => text.includes(w.length > 4 ? w.slice(0, -1) : w));
   }).map(it => ({ nome: it.ingrediente, qta: scaleQtyText(it.qta, ratio) || '' }));
 }
+// --- Timer in modalità cucina --------------------------------------------
+// Durata scritta nel passo ("10 minuti", "mezz'ora", "1 ora e mezza"): se c'è,
+// il passo mostra "Avvia timer" (suona e vibra qui nell'app, finché resta
+// aperta) e, su Android, "Nell'orologio" (timer vero del telefono, suona anche
+// a schermo bloccato). Con un intervallo ("20-25 minuti") vale il minimo.
+function stepDurationSecs(text){
+  const t = String(text || '').toLowerCase();
+  const num = s => parseFloat(String(s).replace(',', '.'));
+  let m;
+  if((m = /(\d+(?:[.,]\d+)?)\s*(?:[-–]\s*\d+(?:[.,]\d+)?\s*)?(?:ore|ora|h)\b(?:\s*e\s*(\d+)\s*(?:minut[oi]|min)\b|\s*e\s*mezza\b)?/.exec(t))){
+    const extra = m[2] ? num(m[2]) * 60 : /e\s*mezza/.test(m[0]) ? 1800 : 0;
+    return Math.round(num(m[1]) * 3600 + extra);
+  }
+  if(/un['’]?\s*ora\s*e\s*mezza/.test(t)) return 5400;
+  if(/un['’]\s*ora\b|\buna\s+ora\b/.test(t)) return 3600;
+  if(/mezz['’]?\s*ora/.test(t)) return 1800;
+  if(/quarto\s+d['’]\s*ora/.test(t)) return 900;
+  if((m = /(\d+(?:[.,]\d+)?)\s*(?:[-–]\s*\d+(?:[.,]\d+)?\s*)?(?:minut[oi]|min)\b/.exec(t))) return Math.round(num(m[1]) * 60);
+  return 0;
+}
+function formatTimerClock(secs){
+  secs = Math.max(0, Math.round(secs));
+  const h = Math.floor(secs / 3600), mi = Math.floor((secs % 3600) / 60), s = secs % 60;
+  const p = n => String(n).padStart(2, '0');
+  return h ? `${h}:${p(mi)}:${p(s)}` : `${p(mi)}:${p(s)}`;
+}
+function formatTimerLabel(secs){
+  if(secs >= 3600){ const h = Math.floor(secs / 3600), mi = Math.round((secs % 3600) / 60); return mi ? `${h} h ${mi} min` : `${h} h`; }
+  return `${Math.round(secs / 60)} min`;
+}
+let timerAudioCtx = null, timerRingTimer = null;
+function timerPrimeAudio(){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    if(!timerAudioCtx) timerAudioCtx = new AC();
+    if(timerAudioCtx.state === 'suspended') timerAudioCtx.resume();
+  }catch(e){}
+}
+function timerBeepOnce(){
+  try{
+    if(!timerAudioCtx) return;
+    [0, 0.25, 0.5].forEach(off=>{
+      const o = timerAudioCtx.createOscillator(), g = timerAudioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, timerAudioCtx.currentTime + off);
+      g.gain.exponentialRampToValueAtTime(0.5, timerAudioCtx.currentTime + off + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, timerAudioCtx.currentTime + off + 0.2);
+      o.connect(g); g.connect(timerAudioCtx.destination);
+      o.start(timerAudioCtx.currentTime + off); o.stop(timerAudioCtx.currentTime + off + 0.22);
+    });
+  }catch(e){}
+  try{ if(navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); }catch(e){}
+}
+function timerStopRinging(){
+  if(timerRingTimer){ clearInterval(timerRingTimer); timerRingTimer = null; }
+  try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){}
+  const el = document.getElementById('timer-alert'); if(el) el.remove();
+}
+function timerStartRinging(label){
+  timerStopRinging();
+  const el = document.createElement('div');
+  el.id = 'timer-alert'; el.className = 'timer-alert'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-label', 'Timer finito');
+  el.innerHTML = `<div class="timer-alert-text">⏱ Timer finito${label ? ` · ${escapeHtml(label)}` : ''}</div><button type="button" class="timer-alert-stop" data-timer-stop>Ferma</button>`;
+  document.body.appendChild(el);
+  timerBeepOnce();
+  let n = 0;
+  timerRingTimer = setInterval(()=>{ if(++n > 40) return timerStopRinging(); timerBeepOnce(); }, 1500);
+}
+function timerTick(){
+  const t = state.cookTimer;
+  if(!t) return;
+  const left = Math.ceil((t.end - Date.now()) / 1000);
+  if(left <= 0){
+    const label = t.label;
+    state.cookTimer = null;
+    timerStartRinging(label);
+    render();
+    return;
+  }
+  const el = document.getElementById('cook-timer-time');
+  if(el) el.textContent = formatTimerClock(left);
+}
+setInterval(timerTick, 1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) timerTick(); });
+document.addEventListener('click', e=>{
+  const start = e.target.closest('[data-cook-timer-start]');
+  if(start){
+    const secs = parseInt(start.dataset.cookTimerStart, 10) || 0;
+    if(!secs) return;
+    timerPrimeAudio();
+    state.cookTimer = { end: Date.now() + secs * 1000, total: secs, label: formatTimerLabel(secs) };
+    render();
+    return;
+  }
+  if(e.target.closest('[data-cook-timer-cancel]')){ state.cookTimer = null; render(); return; }
+  if(e.target.closest('[data-timer-stop]')){ timerStopRinging(); return; }
+  const phone = e.target.closest('[data-cook-timer-phone]');
+  if(phone){
+    const secs = parseInt(phone.dataset.cookTimerPhone, 10) || 0;
+    if(!secs) return;
+    const msg = encodeURIComponent((state.cookMode && state.cookMode.name) || 'CookPOP');
+    window.location.href = `intent:#Intent;action=android.intent.action.SET_TIMER;i.android.intent.extra.alarm.LENGTH=${secs};S.android.intent.extra.alarm.MESSAGE=${msg};B.android.intent.extra.alarm.SKIP_UI=true;end`;
+  }
+});
+function cookTimerHtml(stepText){
+  const secs = stepDurationSecs(stepText);
+  const running = state.cookTimer;
+  const isAndroid = /android/i.test(navigator.userAgent || '');
+  const bar = running ? `<div class="cook-timer-bar"><span aria-hidden="true">⏱</span><b id="cook-timer-time">${formatTimerClock(Math.ceil((running.end - Date.now()) / 1000))}</b><span class="cook-timer-label">Timer ${escapeHtml(running.label)}</span><button type="button" class="cook-timer-cancel" data-cook-timer-cancel>Annulla</button></div>` : '';
+  const btns = secs ? `<div class="cook-timer-row"><button type="button" class="cook-timer-btn" data-cook-timer-start="${secs}">⏱ Avvia timer ${formatTimerLabel(secs)}</button>${isAndroid ? `<button type="button" class="cook-timer-btn is-ghost" data-cook-timer-phone="${secs}">Nell'orologio</button>` : ''}</div>` : '';
+  return { bar, btns };
+}
 function renderCookModePage(){
   const cm = state.cookMode;
   if(!cm) return '';
@@ -635,17 +748,20 @@ function renderCookModePage(){
       <h3 class="cook-section-title">Ingredienti</h3>
       <ul class="cook-ings">${ings.map(i => `<li>${i.qta ? `<b>${escapeHtml(i.qta)}</b> ` : ''}${escapeHtml(i.nome.charAt(0).toLowerCase() + i.nome.slice(1))}</li>`).join('')}</ul>
     </section>` : '';
+  const timerUi = cookTimerHtml(steps[step]);
   return `
   <div class="sheet-page cook-page${pageEntering('cook') ? ' is-entering' : ''}" data-page="cook">
     <header class="cook-head">
       <button type="button" class="cook-end" data-close-cook>Termina</button>
       <h2 class="cook-title">${escapeHtml(cm.name)}</h2>
     </header>
+    ${timerUi.bar}
     <div class="cook-bar" role="progressbar" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${step + 1}"><span style="width:${Math.round((step + 1) / total * 100)}%"></span></div>
     <div class="cook-body" data-cook-swipe>
       <section class="cook-section cook-step">
         <div class="cook-step-count">Passaggio ${step + 1}/${total}</div>
         <p class="cook-step-text">${escapeHtml(steps[step])}</p>
+        ${timerUi.btns}
       </section>
       ${ingHtml}
     </div>
@@ -1555,6 +1671,7 @@ const state = {
   freezerDishes: {}, // { mealKey: [nomi] } piatti presi dal freezer: niente Spesa, porzioni scalate a pasto cucinato
   prepSuggOpen: {}, // ephemeral: settimana -> suggerimenti di prep aperti
   dishPicker: null, // ephemeral: {key: mealKey, replace: nome del piatto da cambiare o null, tipo, search} per "+ piatto"/"Cambia" del singolo piatto
+  cookTimer: null, // ephemeral: { end (ms), total (s), label } timer del passo in modalità cucina
   cookMode: null, // ephemeral: { name, step } modalità cucina (un passo per schermata)
   recipePortions: {}, // ephemeral: ricetta -> persone scelte nel dettaglio del Ricettario
   recipeMenuOpen: false, // ephemeral: menù ⋯ del dettaglio ricetta
@@ -3974,10 +4091,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-11-30',
+  version: '2026-12-01',
   title: 'Novità',
   items: [
-    'Ricette: gli ingredienti hanno sempre lo stesso ordine — prima carne, pesce, pasta e verdura, poi latticini e conserve, e per ultimi olio, aceto, sale, pepe e spezie.'
+    'Modalità Cucina: se un passo dice "10 minuti", "mezz\'ora" ecc. compare "Avvia timer": suona e vibra quando scade (resta aperta l\'app). Su Android c\'è anche "Nell\'orologio", che crea il timer nell\'app Orologio del telefono e suona anche a schermo bloccato.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
