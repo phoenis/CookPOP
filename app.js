@@ -594,10 +594,10 @@ function mancantiButtonHtml(mancanti){
 // Avanti (anche scorrendo col dito). Lo schermo resta acceso finché è aperta.
 // Bottone "Cucina" flottante e fisso, qualunque tab (Ingredienti/Passaggi) sia
 // aperta: solo se la ricetta ha un procedimento.
-function cookFabHtml(name, ratio){
+function cookFabHtml(name, ratio, mk){
   const det = getRecipeDetails(name);
   if(!det || !det.procedimento || !det.procedimento.length) return '';
-  return `<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}">Cucina</button>`;
+  return `<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}"${mk ? ` data-cook-meal="${escapeAttr(mk)}"` : ''}>Cucina</button>`;
 }
 // Tab Ingredienti | Passaggi dentro il piatto (stato in state.dishPane).
 function paneTabsHtml(paneKey, pane){
@@ -762,7 +762,7 @@ function renderCookModePage(){
     <div class="cook-footer">
       <div class="cook-nav">
         <button type="button" class="cook-nav-back" data-cook-prev aria-label="Passo precedente" ${isFirst ? 'disabled' : ''}>←</button>
-        <button type="button" class="cook-nav-next" ${isLast ? 'data-close-cook' : 'data-cook-next'}>Fatto!</button>
+        <button type="button" class="cook-nav-next" ${isLast ? 'data-cook-finish' : 'data-cook-next'}>${isLast ? 'Fatto' : 'Avanti'}</button>
       </div>
     </div>
   </div>`;
@@ -4221,10 +4221,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-05',
+  version: '2027-01-06',
   title: 'Novità',
   items: [
-    'Modifica ricetta: ingredienti e passaggi hanno lo stesso stile degli altri campi (bordi arrotondati, stessa altezza e testo) e tutte le etichette hanno un\'icona SVG.'
+    'Modalità cucina: "Avanti" per il passaggio successivo, "Fatto" all\'ultimo. Con "Fatto" il pasto si segna come cucinato e l\'app chiede quali ingredienti sono finiti.',
+    'Modifica ricetta: ingredienti e passaggi come gli altri campi, etichette con icone SVG.'
   ]
 };
 
@@ -5106,7 +5107,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
       <div class="topbar-menu meal-menu" role="menu">
         ${menuItems.map(it => `<button type="button" class="topbar-menu-item${it.danger ? ' color-delete' : ''}" role="menuitem" ${it.attrs}>${it.label}</button>`).join('')}
       </div>` : '';
-  const cookFab = act ? cookFabHtml(act.dsh.name, act.ratio) : '';
+  const cookFab = act ? cookFabHtml(act.dsh.name, act.ratio, mk) : '';
 
   // Pagina a tutto schermo con freccia Indietro, come la scheda ingrediente
   // della Dispensa (prima era una modale).
@@ -8444,9 +8445,7 @@ function attachHandlers(){
     });
   });
 
-  document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
-    btn.addEventListener('click', e=>{
-      const key = e.currentTarget.dataset.toggleDone;
+  toggleMealDoneFn = key=>{
       const { weekIdx, i, meal } = parseMealKey(key);
       const mealsDone = weekMealsDoneRef(weekIdx);
       if(mealsDone[i] && mealsDone[i][meal]){
@@ -8500,7 +8499,9 @@ function attachHandlers(){
         state.doneModalLeftoverCatPickerOpen = false;
         render();
       }
-    });
+  };
+  document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
+    btn.addEventListener('click', e=>toggleMealDoneFn(e.currentTarget.dataset.toggleDone));
   });
   document.querySelectorAll('[data-toggle-lock]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -8761,7 +8762,20 @@ function attachHandlers(){
     el.addEventListener('click', ()=>{ state.mealDetailMenuOpen = false; render(); });
   });
   document.querySelectorAll('[data-cook-start]').forEach(el=>{
-    el.addEventListener('click', ()=>{ state.cookMode = { name: el.dataset.cookStart, step: 0, ratio: parseFloat(el.dataset.cookRatio) || 1 }; render(); });
+    el.addEventListener('click', ()=>{ state.cookMode = { name: el.dataset.cookStart, step: 0, ratio: parseFloat(el.dataset.cookRatio) || 1, mk: el.dataset.cookMeal || '' }; render(); });
+  });
+  // "Fatto" all'ultimo passo: chiude la modalità cucina e, se la ricetta è un
+  // pasto del Menù non ancora segnato, apre "Ricetta fatta!" per chiedere
+  // quali ingredienti sono finiti.
+  document.querySelectorAll('[data-cook-finish]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const mk = state.cookMode && state.cookMode.mk;
+      state.cookMode = null; render();
+      if(!mk) return;
+      const { weekIdx, i, meal } = parseMealKey(mk);
+      const md = weekMealsDoneRef(weekIdx);
+      if(!(md[i] && md[i][meal]) && toggleMealDoneFn) toggleMealDoneFn(mk);
+    });
   });
   document.querySelectorAll('[data-close-cook]').forEach(el=>{
     el.addEventListener('click', ()=>{ state.cookMode = null; render(); });
@@ -10028,6 +10042,7 @@ function confirmPantryFinish(key, toList){
     persist(); render();
   });
 }
+let toggleMealDoneFn = null; // segna/apre "Ricetta fatta!" per un pasto (definita in attachHandlers)
 let revealedMealKey = null;
 // card è già il .meal-block (niente più maniglia dedicata da cui risalire
 // con .closest): chiamata dal timer di pressione lunga in attachHandlers(),
