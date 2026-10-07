@@ -1700,7 +1700,7 @@ const state = {
   pantryEditingKey: null,
   linkNoteEditingKey: null, // dayKey della nota "Variante" attualmente in modifica (Menù, giorni avanzo)
   pantryLuogoPicker: null,
-  pantryFinishPicker: null, // ephemeral: chiave della voce di Dispensa arrivata a 0, in attesa di "+" (in lista spesa) o cestino (tra i Finiti)
+  pantryFinishPicker: null, // ephemeral: chiave della voce di Dispensa arrivata a 0, in attesa del carrello (in lista spesa) o cestino (tra i Finiti)
   pantrySectionCollapsed: {}, // id sezione (luogo_X / cat_X) -> true se chiusa; aperta di default se assente
   pantrySelectMode: false, // true dopo una pressione lunga: un tap semplice seleziona/deseleziona invece di aprire il luogo-picker
   pantrySelected: {}, // pantryKey -> true, selezione corrente in Dispensa (qualsiasi riga, non solo Finiti; non persistita)
@@ -1709,7 +1709,7 @@ const state = {
   pantryConfirmedShop: {}, // pantryKey -> true (o la quantità scritta in "Aggiungi", es. "2 kg"), ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
   pantryEditKey: null,
   recipeHistory: [], // [{ nome, dal: 'AAAA-MM-GG' }]: ricette delle settimane finite, per non ripeterle subito (vedi recentRecipeNames)
-  pantryDraft: null, // non persistito: bozza della scheda "Nuovo ingrediente"
+  pantryDraft: null, // non persistito: bozza della scheda "Aggiungi ingrediente"
   pantrySheetPicker: null, // non persistito: 'cat' | 'group', elenco aperto nella scheda ingrediente
   pantrySheetMore: false, // non persistito: sezione "Altro" della scheda aperta
   mergeIngredientFrom: null, // non persistito: "Unisci con…" aperto per questo nome (vedi mergeIngredientInto)
@@ -4194,10 +4194,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-18',
+  version: '2026-12-19',
   title: 'Novità',
   items: [
-    'Menù: i pasti precedenti si vedono direttamente toccando le iconcine dell\'equilibrio, senza altro bottone.'
+    'Dispensa: quando una scorta finisce, il suggerimento mostra carrello e cestino (il carrello la mette in lista spesa).',
+    'Dispensa: il + in basso apre sempre "Aggiungi ingrediente".'
   ]
 };
 
@@ -7085,7 +7086,7 @@ function renderIngredientSheet(it, isNew){
   <div class="sheet-page${entering ? ' is-entering' : ''}" data-sheet-page>
     <header class="settings-header">
       <button class="btn is-icon settings-back" type="button" ${closeAttr} aria-label="Indietro"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="100%" height="100%"><path fill="currentColor" d="M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z"></path></svg></button>
-      <h2 class="settings-title">${isNew ? (existingPantryFor(it.nome) ? `Aggiungi ${noun}` : `Nuovo ${noun}`) : `Modifica ${noun}`}</h2>
+      <h2 class="settings-title">${isNew ? `Aggiungi ${noun}` : `Modifica ${noun}`}</h2>
     </header>
     <div class="settings-body sheet-body">
       <section class="settings-section">
@@ -7493,7 +7494,7 @@ function renderDispensa(){
       ${state.pantryFinishPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-finish-picker-close></div>
       <div class="luogo-picker finish-picker" role="dialog" aria-label="${escapeAttr(it.nome)} è finito">
-        <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 4h2.5l2 10h10l2-7.5H6.5"/><circle cx="9" cy="19" r="1.4" fill="currentColor"/><circle cx="17" cy="19" r="1.4" fill="currentColor"/></svg></button>
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-trash="${escapeAttr(it.key)}" title="Metti tra i Finiti" aria-label="Metti tra i Finiti">${TRASH_ICON_SVG}</button>
       </div>` : ''}
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}</button>
