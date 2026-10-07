@@ -1423,3 +1423,15 @@
 .meal-block-swipe-wrap{ overflow:visible; border-radius:0; box-shadow:none; background:transparent; position:relative; }
 .meal-block-swipe-wrap .meal-block{ box-shadow:var(--shadow-card); }
 body{ overflow-x:clip; }
+/* Coerenza: margini laterali, campi di testo e ricerche uguali in tutte le schermate */
+.inv-item, .recipe-card{ padding-left:0; }
+.inv-item{ padding-right:0; }
+.import-form{ padding:var(--space-medium); }
+.import-label input, .import-label textarea, #new-recipe-name, .manage-edit input[type=text], .manage-edit input[type=search], .manage-edit select{ box-sizing:border-box; border:1px solid var(--line); border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-body); font-weight:var(--weight-normal); color:var(--ink); background:var(--surface); padding:0 var(--space-small); min-height:2.75rem; }
+.import-label textarea{ padding:var(--space-xsmall) var(--space-small); min-height:8rem; }
+#new-recipe-name{ width:100%; height:2.75rem; }
+.manage-toolbar .input-search{ font-size:var(--text-small); }
+/* Nelle pagine a schermo intero i contenuti stanno sul margine di 16px come le liste: le "card" non aggiungono altro rientro (in chiaro erano invisibili, in scuro no) */
+.sheet-page .settings-card:not(.is-links){ background:transparent; padding:var(--space-xsmall) 0; }
+.sheet-page .import-form{ padding:var(--space-xsmall) 0; }
+.sheet-page .settings-section-title, .sheet-page .manage-intro, .sheet-page .settings-note{ margin-left:0; margin-right:0; padding-left:0; padding-right:0; }
