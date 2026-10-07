@@ -1399,3 +1399,13 @@
 .settings-backdrop{ z-index:185; }
 .settings-card .settings-search{ background:var(--bg); border-color:var(--ink-light); }
 .week-balance .past-days-row{ margin-top:var(--space-small); padding:0; }
+/* Icone SVG nelle impostazioni e nei menù ⋯ */
+.ui-ico{ width:1.125rem; height:1.125rem; flex:none; vertical-align:-0.2em; }
+.btn .ui-ico{ margin-right:0.25rem; }
+.topbar-menu-item .ui-ico{ margin-right:0; }
+.settings-link-ico{ display:inline-flex; flex:none; color:var(--ink-light); }
+.settings-link-ico .ui-ico{ width:1.375rem; height:1.375rem; vertical-align:middle; }
+.settings-link{ justify-content:flex-start; }
+.settings-link-text{ flex:1; }
+.settings-link::after{ margin-left:auto; }
+.ui-ico-wrap{ display:inline-flex; vertical-align:-0.2em; }

@@ -4184,6 +4184,34 @@ const TOPBAR_TITLE = { menu:'Menù', spesa:'Spesa', prep:'Ricette', dispensa:'Di
 // dell'icona di ricerca qui sotto, dimensionata in em (segue il font del
 // campo) e in currentColor (il colore del testo).
 const CLEAR_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6 6 18M6 6l12 12"></path></svg>';
+// Icone SVG delle impostazioni e dei menù ⋯ (stile unico, tratto 2). La
+// rotellina è la stessa del titolo settimana nel Menù.
+const UI_ICONS = {
+  'palette': '<path d="M12 21a9 9 0 0 1 0-18c4.97 0 9 3.582 9 8c0 1.06-.474 2.078-1.318 2.828c-.844.75-1.989 1.172-3.182 1.172h-2.5a2 2 0 0 0-1 3.75a1.3 1.3 0 0 1-1 2.25"/><path d="M8.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3-3a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3 3a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/>',
+  'plus': '<path d="M12 5v14M5 12h14"/>',
+  'download': '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="m7 11l5 5l5-5M12 4v12"/>',
+  'upload': '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="m7 9l5-5l5 5M12 4v12"/>',
+  'database': '<path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0-16 0"/><path d="M4 6v6a8 3 0 0 0 16 0V6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/>',
+  'tag': '<path d="M7.5 7.5a.5.5 0 1 0 1 0a.5.5 0 1 0-1 0"/><path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592-5.592a2.41 2.41 0 0 0 0-3.408l-7.71-7.71A2 2 0 0 0 11.172 3H6a3 3 0 0 0-3 3"/>',
+  'sort': '<path d="m3 9l4-4l4 4M7 5v14m14-4l-4 4l-4-4m4 4V5"/>',
+  'refresh': '<path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4m-4 4a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>',
+  'clipboard-list': '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2m0 7h.01M13 12h2M9 16h.01M13 16h2"/>',
+  'clipboard': '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2"/>',
+  'list-details': '<path d="M13 5h8m-8 4h5m-5 6h8m-8 4h5"/><path d="M3 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm0 10a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
+  'category': '<path d="M4 4h6v6H4zm0 10h6v6H4zm10-10h6v6h-6z"/><path d="M14 17a3 3 0 1 0 6 0a3 3 0 1 0-6 0"/>',
+  'power': '<path d="M7 6a7.75 7.75 0 1 0 10 0M12 4v8"/>',
+  'camera': '<path d="M5 7h1a2 2 0 0 0 2-2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2"/><path d="M9 13a3 3 0 1 0 6 0a3 3 0 1 0-6 0"/>',
+  'photo': '<path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="m3 16l5-5c.928-.893 2.072-.893 3 0l5 5"/><path d="m14 14l1-1c.928-.893 2.072-.893 3 0l3 3"/>',
+  'link': '<path d="m9 15l6-6"/><path d="m11 6l.463-.536a5 5 0 0 1 7.071 7.072L18 13m-5 5l-.397.534a5.07 5.07 0 0 1-7.127 0a4.97 4.97 0 0 1 0-7.071L6 11"/>',
+  'calendar': '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm12-4v4M8 3v4m-4 4h16"/>',
+  'wand': '<path d="m6 21l15-15l-3-3L3 18z"/><path d="m15 6l3 3M9 3a2 2 0 0 0 2 2a2 2 0 0 0-2 2a2 2 0 0 0-2-2a2 2 0 0 0 2-2m10 11a2 2 0 0 0 2 2a2 2 0 0 0-2 2a2 2 0 0 0-2-2a2 2 0 0 0 2-2"/>',
+  'swap': '<path d="M21 7H3m15-3l3 3l-3 3M3 17h18M6 14l-3 3l3 3"/>',
+  'cards': '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>'};
+const UI_GEAR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="ui-ico" preserveAspectRatio="xMidYMid meet" viewBox="0 0 32 32"><path fill="currentColor" d="M27 16.76v-1.53l1.92-1.68A2 2 0 0 0 29.3 11l-2.36-4a2 2 0 0 0-1.73-1a2 2 0 0 0-.64.1l-2.43.82a11 11 0 0 0-1.31-.75l-.51-2.52a2 2 0 0 0-2-1.61h-4.68a2 2 0 0 0-2 1.61l-.51 2.52a11.5 11.5 0 0 0-1.32.75l-2.38-.86A2 2 0 0 0 6.79 6a2 2 0 0 0-1.73 1L2.7 11a2 2 0 0 0 .41 2.51L5 15.24v1.53l-1.89 1.68A2 2 0 0 0 2.7 21l2.36 4a2 2 0 0 0 1.73 1a2 2 0 0 0 .64-.1l2.43-.82a11 11 0 0 0 1.31.75l.51 2.52a2 2 0 0 0 2 1.61h4.72a2 2 0 0 0 2-1.61l.51-2.52a11.5 11.5 0 0 0 1.32-.75l2.42.82a2 2 0 0 0 .64.1a2 2 0 0 0 1.73-1l2.28-4a2 2 0 0 0-.41-2.51ZM25.21 24l-3.43-1.16a8.9 8.9 0 0 1-2.71 1.57L18.36 28h-4.72l-.71-3.55a9.4 9.4 0 0 1-2.7-1.57L6.79 24l-2.36-4l2.72-2.4a8.9 8.9 0 0 1 0-3.13L4.43 12l2.36-4l3.43 1.16a8.9 8.9 0 0 1 2.71-1.57L13.64 4h4.72l.71 3.55a9.4 9.4 0 0 1 2.7 1.57L25.21 8l2.36 4l-2.72 2.4a8.9 8.9 0 0 1 0 3.13L27.57 20Z"></path><path fill="currentColor" d="M16 22a6 6 0 1 1 6-6a5.94 5.94 0 0 1-6 6m0-10a3.91 3.91 0 0 0-4 4a3.91 3.91 0 0 0 4 4a3.91 3.91 0 0 0 4-4a3.91 3.91 0 0 0-4-4"></path></svg>';
+function uiIcon(name){
+  if(name === 'gear') return UI_GEAR_SVG;
+  return `<svg class="ui-ico" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${UI_ICONS[name] || ''}</svg>`;
+}
 const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></g></svg>';
 
 // Modale "Novità": compare una volta sola per persona al prossimo caricamento
@@ -4194,10 +4222,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-21',
+  version: '2026-12-22',
   title: 'Novità',
   items: [
-    'Spesa: l\'icona per aprire/chiudere le sezioni ora parte nel verso giusto (le sezioni sono aperte, quindi propone di chiuderle).'
+    'Impostazioni e menù ⋯: tutte le emoji sostituite da icone SVG, con lo stesso stile (la rotellina è quella del Menù).'
   ]
 };
 
@@ -7052,7 +7080,7 @@ function renderIngredientSheet(it, isNew){
             <button type="button" class="btn is-chip" data-scadenza-quick="3">+3 giorni</button>
             <button type="button" class="btn is-chip" data-scadenza-quick="7">+1 settimana</button>
             <button type="button" class="btn is-chip" data-scadenza-quick="30">+1 mese</button>
-            <label class="btn is-chip sheet-date-chip">📅 Data…<input type="date" id="pantry-edit-scadenza" value="${escapeAttr(it.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
+            <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} Data…<input type="date" id="pantry-edit-scadenza" value="${escapeAttr(it.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
           </div>
         </div>`;
   // Righe che si aprono in un elenco (categoria, gruppo), una alla volta.
@@ -7067,17 +7095,17 @@ function renderIngredientSheet(it, isNew){
   const autoDept = classifyDept(it.nome || '');
   const catPicker = picker !== 'cat' ? '' : `
         <div class="sheet-options" role="listbox" aria-label="Categoria">
-          <button type="button" class="sheet-option${it.cat ? '' : ' active'}" data-sheet-cat="">✨ Automatica <span class="sheet-hint-inline">(${escapeHtml(DEPT_LABEL[home && !isNonFoodDept(autoDept) ? 'altro-casa' : autoDept])})</span></button>
+          <button type="button" class="sheet-option${it.cat ? '' : ' active'}" data-sheet-cat="">${uiIcon('wand')} Automatica <span class="sheet-hint-inline">(${escapeHtml(DEPT_LABEL[home && !isNonFoodDept(autoDept) ? 'altro-casa' : autoDept])})</span></button>
           ${deptList.map(d => `<button type="button" class="sheet-option${it.cat === d ? ' active' : ''}" data-sheet-cat="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</button>`).join('')}
-          <button type="button" class="sheet-option is-muted" data-sheet-cat="${home ? 'altro' : 'altro-casa'}">↔ ${home ? 'È un alimento (sposta in Cibo)' : 'È un prodotto per la casa (sposta in Casa)'}</button>
-          <button type="button" class="sheet-option is-link" data-open-depts>🏷️ Gestisci categorie…</button>
+          <button type="button" class="sheet-option is-muted" data-sheet-cat="${home ? 'altro' : 'altro-casa'}">${uiIcon('swap')} ${home ? 'È un alimento (sposta in Cibo)' : 'È un prodotto per la casa (sposta in Casa)'}</button>
+          <button type="button" class="sheet-option is-link" data-open-depts>${uiIcon('tag')} Gestisci categorie…</button>
         </div>`;
   const groups = Object.entries(state.pantryGroups);
   const groupPicker = picker !== 'group' ? '' : `
         <div class="sheet-options" role="listbox" aria-label="Gruppo">
           <button type="button" class="sheet-option${it.group ? '' : ' active'}" data-sheet-group="">Nessuno</button>
           ${groups.map(([id, g]) => `<button type="button" class="sheet-option${it.group === id ? ' active' : ''}" data-sheet-group="${escapeAttr(id)}">${escapeHtml(g.label)}</button>`).join('')}
-          <button type="button" class="sheet-option is-link" data-open-pantry-groups>🗂️ Gestisci gruppi…</button>
+          <button type="button" class="sheet-option is-link" data-open-pantry-groups>${uiIcon('category')} Gestisci gruppi…</button>
         </div>`;
   const units = home ? HOME_UNITS.concat(unit && !HOME_UNITS.includes(unit) ? [unit] : []) : UNIT_ORDER;
   const more = !!state.pantrySheetMore;
@@ -7122,7 +7150,7 @@ function renderIngredientSheet(it, isNew){
           </div>
           ${isNew ? '' : `
           <div class="settings-field">
-            <button type="button" class="btn is-outline is-block" data-open-merge="${escapeAttr(it.nome)}">🔗 Unisci con un doppione…</button>
+            <button type="button" class="btn is-outline is-block" data-open-merge="${escapeAttr(it.nome)}">${uiIcon('link')} Unisci con un doppione…</button>
             <button type="button" class="btn is-outline is-block color-delete" id="pantry-edit-delete">Elimina dalla Dispensa</button>
           </div>`}
         </div>` : ''}
@@ -9768,21 +9796,21 @@ function regenerateAllWeeks(){
 const TAB_MENU_ITEMS = {
   // Scorciatoie alle stesse voci che stanno anche in Impostazioni.
   dispensa: [
-    { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } },
-    { label: '🗂️ Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
-    { label: '🧺 Gruppi', action: ()=>{ state.pantryGroupsModalOpen = true; } },
-    { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
+    { label: uiIcon('clipboard-list') + ' Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } },
+    { label: uiIcon('list-details') + ' Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
+    { label: uiIcon('category') + ' Gruppi', action: ()=>{ state.pantryGroupsModalOpen = true; } },
+    { label: uiIcon('tag') + ' Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
   ],
   spesa: [
-    { label: '↕️ Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
+    { label: uiIcon('sort') + ' Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
   ],
   menu: [
-    { label: '🔄 Rigenera menu', action: ()=>{ regenerateAllWeeks(); } },
-    { label: '🍽️ Regole di generazione', action: ()=>{ state.genSettingsOpen = 'plain'; } }
+    { label: uiIcon('refresh') + ' Rigenera menu', action: ()=>{ regenerateAllWeeks(); } },
+    { label: uiIcon('gear') + ' Regole di generazione', action: ()=>{ state.genSettingsOpen = 'plain'; } }
   ],
   prep: [
-    { label: '➕ Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); } },
-    { label: '📥 Importa ricetta', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } }
+    { label: uiIcon('plus') + ' Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); } },
+    { label: uiIcon('download') + ' Importa ricetta', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } }
   ]
 };
 
@@ -9828,7 +9856,7 @@ const TAB_MENU_ITEMS = {
     const extraHtml = currentExtraItems.length
       ? `<div class="topbar-menu-sep"></div>` + currentExtraItems.map((it,idx)=>`<button type="button" class="topbar-menu-item" data-topbar-menu-action="${idx}">${it.label}</button>`).join('')
       : '';
-    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>⚙️ Impostazioni</button>${extraHtml}`;
+    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>${uiIcon('gear')} Impostazioni</button>${extraHtml}`;
   };
   const openTopbarMenu = ()=>{
     renderTopbarMenuContent();
@@ -10907,7 +10935,7 @@ function renderRecipeImportPage(){
           <label class="import-label">Testo della ricetta
             <textarea id="import-text" rows="7" placeholder="Apri il reel, tocca la didascalia, copiala e incollala qui">${escapeHtml(d.text || '')}</textarea>
           </label>
-          <button type="button" class="btn is-outline" data-import-paste>📋 Incolla dagli appunti</button>
+          <button type="button" class="btn is-outline" data-import-paste>${uiIcon('clipboard')} Incolla dagli appunti</button>
         </div>
       </section>
       ${preview}`;
@@ -11037,13 +11065,13 @@ function cardsPageHtml(){
           <label class="settings-field-label" for="card-number">Numero della carta</label>
           <div class="card-number-row">
             <input type="text" id="card-number" class="input-search" inputmode="text" placeholder="Il numero sotto il codice a barre" value="${escapeAttr(d.number)}" data-card-field="number" autocomplete="off">
-            ${canScan ? `<label class="btn is-outline card-scan">📷 Scansiona<input type="file" accept="image/*" capture="environment" id="card-scan-input" hidden></label>` : ''}
+            ${canScan ? `<label class="btn is-outline card-scan">${uiIcon('camera')} Scansiona<input type="file" accept="image/*" capture="environment" id="card-scan-input" hidden></label>` : ''}
           </div>
           ${state.cardScanMsg ? `<p class="settings-note">${escapeHtml(state.cardScanMsg)}</p>` : ''}
           <div class="settings-field-label">Logo</div>
           <div class="card-logo-row">
             ${d.logo ? `<img class="card-manage-logo is-big" src="${escapeAttr(d.logo)}" alt="" style="background:${escapeAttr(d.color || CARD_COLORS[0])}">` : ''}
-            <label class="btn is-outline card-scan">🖼️ ${d.logo ? 'Cambia' : 'Scegli immagine'}<input type="file" accept="image/*" id="card-logo-input" hidden></label>
+            <label class="btn is-outline card-scan">${uiIcon('photo')} ${d.logo ? 'Cambia' : 'Scegli immagine'}<input type="file" accept="image/*" id="card-logo-input" hidden></label>
             ${d.logo ? '<button type="button" class="btn is-ghost" data-card-logo-remove>Togli</button>' : ''}
           </div>
           <div class="settings-field-label">Colore</div>
@@ -11351,8 +11379,8 @@ function renderBackupPage(){
         <div class="settings-card">
           <p class="settings-card-text" id="backup-status">${backupStatusHtml()}</p>
           <div class="backup-row">
-            <button class="btn is-outline" id="backup-download" type="button">⬇ Scarica backup</button>
-            <label class="btn is-outline backup-restore-label">⬆ Ripristina da file<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
+            <button class="btn is-outline" id="backup-download" type="button">${uiIcon('download')} Scarica backup</button>
+            <label class="btn is-outline backup-restore-label">${uiIcon('upload')} Ripristina da file<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
           </div>
         </div>
       </section>
@@ -11448,6 +11476,7 @@ document.addEventListener('click', e=>{
   else if(what === 'backup'){ state.backupOpen = true; refreshAutoBackupCache(); }
   render();
 });
+document.querySelectorAll('[data-ico]').forEach(el=>{ el.innerHTML = uiIcon(el.dataset.ico); });
 (function(){
   const input = document.getElementById('settings-search');
   if(!input) return;
@@ -11468,7 +11497,7 @@ document.addEventListener('click', e=>{
   if(!btn) return;
   btn.addEventListener('click', async ()=>{
     btn.disabled = true;
-    btn.textContent = '↻ Aggiornamento…';
+    btn.innerHTML = uiIcon('refresh') + ' Aggiornamento…';
     try{
       if(window.caches && caches.keys){
         const keys = await caches.keys();
