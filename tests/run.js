@@ -1842,11 +1842,11 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
     try{ localStorage.removeItem(AUTO_BACKUP_OFF_KEY); }catch(e){}
     return out;
   });
-  eq(r.titles, ['Aspetto', 'Il mio menù', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
+  eq(r.titles, ['Aspetto', 'Il mio menù', 'Ricette', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
   eq(r.visible, ['Ingredienti e Dispensa']);
   eq(r.visibleLinks, ['aisles']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 1, spesa: 0, menu: 1, prep: 1 });
+  eq(r.menus, { dispensa: 1, spesa: 0, menu: 1, prep: 0 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -1964,6 +1964,35 @@ test('regole di generazione: porzioni di partenza configurabili, salvate e usate
     return out;
   });
   eq(r, { start: '2', after: 4, payload: 4, cena: 4, apripista: 5, pranzo: 4 });
+});
+
+test('ricette: "Aggiungi ricetta" è una pagina dalle Impostazioni, "Importa ricetta" anche, senza + né voce nei ⋯', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'prep'; state.prepView = 'ricette'; render();
+    const out = { noFab: !document.getElementById('prep-fab'), noMenu: TAB_MENU_ITEMS.prep.length === 0 };
+    state.tab = 'spesa'; render();
+    document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
+    out.links = [...document.querySelectorAll('#settings-backdrop [data-settings-go="newrecipe"], #settings-backdrop [data-settings-go="import"]')].length;
+    document.querySelector('[data-settings-go="newrecipe"]').click();
+    out.page = !!document.querySelector('[data-page="new-recipe"]') && document.getElementById('settings-backdrop').classList.contains('open');
+    const inp = document.getElementById('new-recipe-name');
+    document.querySelector('[data-new-recipe-create]').click();
+    out.empty = state.newRecipeError === 'Inserisci un nome.';
+    const inp2 = document.getElementById('new-recipe-name'); inp2.value = 'Torta di prova'; inp2.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-new-recipe-create]').click();
+    out.created = !!state.customRecipes['Torta di prova'] && state.recipeEditName === 'Torta di prova' && !state.newRecipeModalOpen && !!document.querySelector('.recipe-edit-page');
+    state.recipeEditName = null; render();
+    out.backInSettings = document.getElementById('settings-backdrop').classList.contains('open');
+    document.querySelector('[data-settings-go="import"]').click();
+    out.import = !!state.recipeImport && !!document.querySelector('[data-page^="import"], .sheet-page');
+    state.recipeImport = null; render();
+    document.getElementById('settings-close').click();
+    out.tabBack = state.tab === 'spesa';
+    delete state.customRecipes['Torta di prova']; persist();
+    return out;
+  });
+  eq(r, { noFab: true, noMenu: true, links: 2, page: true, empty: true, created: true, backInSettings: true, import: true, tabBack: true });
 });
 
 (async () => {

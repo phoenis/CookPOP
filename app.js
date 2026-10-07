@@ -1714,6 +1714,7 @@ const state = {
   hiddenRecipes: {}, // nome -> true: ricette del catalogo "eliminate" (DATA.recipes è statico, quindi si nascondono invece di rimuoverle)
   newRecipeModalOpen: false,
   newRecipeError: '',
+  newRecipeName: '', // ephemeral: nome scritto nella pagina "Aggiungi ricetta"
   expandedDay: null,
   expandedRecipe: null,
   swapOpenDay: null,
@@ -4124,10 +4125,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-11',
+  version: '2026-12-12',
   title: 'Novità',
   items: [
-    'Regole di generazione: puoi scegliere le porzioni di partenza dei pasti (da 1 a 12). Valgono dalla prossima generazione; le cene da cui avanza il pranzo dopo partono con una in più.'
+    'In Impostazioni c\'è la sezione "Ricette": "Aggiungi ricetta" (ora è una pagina, non più una finestra) e "Importa ricetta". Il + rosso e la voce nei tre puntini di Ricette non ci sono più.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4233,7 +4234,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderBackupPage() + renderAppearancePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -6669,25 +6670,6 @@ function renderPrep(){
 
   const totalCount = DATA.recipes.length + Object.keys(state.customRecipes).length;
 
-  const newRecipeModal = state.newRecipeModalOpen ? `
-    <div class="filters-modal-backdrop" data-close-new-recipe-modal>
-      <div class="filters-modal" data-stop-close>
-        <div class="filters-modal-header">
-          <h3>Nuova ricetta</h3>
-          <button class="btn is-icon filters-close-btn" data-close-new-recipe-modal>✕</button>
-        </div>
-        <div class="filter-groups">
-          <div class="filter-group">
-            <div class="filter-group-label">Nome</div>
-            <input type="text" id="new-recipe-name" placeholder="Es. Pasta al pesto">
-          </div>
-        </div>
-        ${state.newRecipeError ? `<p class="section-sub" style="color:var(--tomato); margin-top:-8px;">${escapeHtml(state.newRecipeError)}</p>` : ''}
-        <div class="filters-modal-footer">
-          <button class="btn is-solid mini-add-btn" id="new-recipe-create-btn" type="button">Crea</button>
-        </div>
-      </div>
-    </div>` : '';
 /*           <button class="btn is-ghost reset-btn" data-close-new-recipe-modal>Annulla</button>
  */
   const recipeDetailScreen = state.expandedRecipe ? renderRecipeDetailScreen(state.expandedRecipe) : '';
@@ -6729,12 +6711,8 @@ function renderPrep(){
       ? '<p class="pantry-mode-empty">Nessuna ricetta si fa con quello che c\'è in Dispensa. Aggiungi quello che hai in casa, o togli qualche filtro.</p>'
       : '<p style="color:var(--sage);font-size:13px;">Nessuna ricetta corrisponde ai filtri.</p>')}</div>
     ${renderRecipeEditModal()}
-    ${newRecipeModal}
     ${recipeDetailScreen}
     ${prepSwitch}
-    <div class="buttons-fixed">
-      <button class="btn is-fixed" id="prep-fab" type="button" aria-label="Aggiungi ricetta"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
-    </div>
   `;
 }
 
@@ -8917,34 +8895,6 @@ function attachHandlers(){
     render();
   });
 
-  document.querySelectorAll('[data-close-new-recipe-modal]').forEach(el=>{
-    el.addEventListener('click', e=>{
-      if(!isCloseTap(e, el)) return;
-      state.newRecipeModalOpen = false;
-      state.newRecipeError = '';
-      render();
-    });
-  });
-  const newRecipeCreateBtn = document.getElementById('new-recipe-create-btn');
-  if(newRecipeCreateBtn){
-    const nameInput = document.getElementById('new-recipe-name');
-    const doCreate = ()=>{
-      const name = nameInput.value.trim();
-      if(!name){ state.newRecipeError = 'Inserisci un nome.'; render(); return; }
-      const nameLower = name.toLowerCase();
-      const exists = Object.keys(recipeByName).some(n=>n.toLowerCase()===nameLower)
-        || Object.keys(state.customRecipes).some(n=>n.toLowerCase()===nameLower);
-      if(exists){ state.newRecipeError = 'Esiste già una ricetta con questo nome.'; render(); return; }
-      state.customRecipes[name] = { nome: name };
-      state.newRecipeModalOpen = false;
-      state.newRecipeError = '';
-      state.recipeEditName = name;
-      persist(); render();
-    };
-    newRecipeCreateBtn.addEventListener('click', doCreate);
-    nameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doCreate(); });
-  }
-
   const fSearch = document.getElementById('f-search');
   if(fSearch) fSearch.addEventListener('input', e=>{ state.filters.search = e.target.value; render(); });
   const shopSearch = document.getElementById('shop-search');
@@ -8961,10 +8911,6 @@ function attachHandlers(){
   }));
   const pantrySearch = document.getElementById('pantry-search');
   if(pantrySearch) pantrySearch.addEventListener('input', e=>{ state.pantrySearch = e.target.value; render(); });
-  // "+" di Ricette: stesso modale di "+ Aggiungi ricetta" nel menu ⋯
-  // (nascosto mentre la ricerca è aperta, come in Dispensa).
-  const prepFab = document.getElementById('prep-fab');
-  if(prepFab) prepFab.addEventListener('click', ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; render(); });
   document.querySelectorAll('[data-dismiss-expiry-banner]').forEach(btn=> btn.addEventListener('click', ()=>{
     try{ localStorage.setItem(EXPIRY_BANNER_KEY, isoLocalDate(new Date())); }catch(e){}
     render();
@@ -9755,9 +9701,7 @@ const TAB_MENU_ITEMS = {
   menu: [
     { label: '🔄 Rigenera menu', action: ()=>{ regenerateAllWeeks(); } }
   ],
-  prep: [
-    { label: '📥 Importa da un reel o da un testo', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } }
-  ]
+  prep: []
 };
 
 (function(){
@@ -10379,6 +10323,47 @@ function sortedCards(){ return (state.loyaltyCards || []).slice().sort((a, b) =>
 // I reparti della Spesa nell'ordine in cui si gira il proprio supermercato:
 // si trascinano dalla maniglia ⠿ (la riga si sposta nel DOM mentre il dito
 // scorre, l'ordine si salva al rilascio) oppure con le frecce su/giù.
+// "Aggiungi ricetta" (da Impostazioni → Ricette): pagina col nome; "Crea" apre
+// subito la pagina Modifica ricetta della nuova ricetta.
+function renderNewRecipePage(){
+  if(!state.newRecipeModalOpen) return '';
+  const body = `
+      <section class="settings-section">
+        <h3 class="settings-section-title">Nome</h3>
+        <div class="settings-card">
+          <input type="text" id="new-recipe-name" class="input-search settings-search" placeholder="Es. Pasta al pesto" value="${escapeAttr(state.newRecipeName || '')}" autocomplete="off">
+        </div>
+        ${state.newRecipeError ? `<p class="settings-note" style="color:var(--tomato);">${escapeHtml(state.newRecipeError)}</p>` : '<p class="settings-note">Poi potrai aggiungere ingredienti, passaggi, foto e tutto il resto.</p>'}
+      </section>`;
+  return managePageHtml({ key: 'new-recipe', title: 'Aggiungi ricetta', closeAttr: 'data-close-new-recipe', body,
+    footer: `<button type="button" class="btn is-solid is-block" data-new-recipe-create>Crea</button>` });
+}
+function createNewRecipeFromPage(){
+  const name = (state.newRecipeName || '').trim();
+  if(!name){ state.newRecipeError = 'Inserisci un nome.'; render(); return; }
+  const nameLower = name.toLowerCase();
+  const exists = Object.keys(recipeByName).some(n=>n.toLowerCase()===nameLower)
+    || Object.keys(state.customRecipes).some(n=>n.toLowerCase()===nameLower);
+  if(exists){ state.newRecipeError = 'Esiste già una ricetta con questo nome.'; render(); return; }
+  state.customRecipes[name] = { nome: name };
+  state.newRecipeModalOpen = false;
+  state.newRecipeError = ''; state.newRecipeName = '';
+  // La pagina Modifica ricetta sta nella scheda Ricette.
+  if(state.tab !== 'prep'){ if(!state.settingsReturnTab) state.settingsReturnTab = state.tab; state.tab = 'prep'; }
+  state.recipeEditName = name;
+  persist(); render();
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  const closeEl = t.closest('[data-close-new-recipe]');
+  if(closeEl){
+    if(!isCloseTap(e, closeEl)) return;
+    state.newRecipeModalOpen = false; state.newRecipeError = ''; state.newRecipeName = ''; render(); return;
+  }
+  if(t.closest('[data-new-recipe-create]')) createNewRecipeFromPage();
+});
+document.addEventListener('input', e=>{ if(e.target.id === 'new-recipe-name') state.newRecipeName = e.target.value; });
+document.addEventListener('keydown', e=>{ if(e.target.id === 'new-recipe-name' && e.key === 'Enter'){ e.preventDefault(); createNewRecipeFromPage(); } });
 // Pagina "Tema e colori" (dalle Impostazioni): chiaro/scuro e colore d'accento,
 // validi solo su questo telefono.
 function renderAppearancePage(){
@@ -11375,6 +11360,8 @@ document.addEventListener('click', e=>{
   else if(what === 'depts') state.deptsModalOpen = true;
   else if(what === 'aisles') state.aisleOrderOpen = true;
   else if(what === 'appearance') state.appearanceOpen = true;
+  else if(what === 'newrecipe'){ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); }
+  else if(what === 'import'){ if(state.tab !== 'prep' && !state.settingsReturnTab) state.settingsReturnTab = state.tab; state.recipeImport = { name: '', link: '', text: '' }; }
   else if(what === 'backup'){ state.backupOpen = true; refreshAutoBackupCache(); }
   render();
 });

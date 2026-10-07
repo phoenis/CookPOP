@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=122">
+<link rel="stylesheet" href="style.css?v=123">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -95,6 +95,13 @@
         </div>
       </section>
       <section class="settings-section">
+        <h3 class="settings-section-title">Ricette</h3>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="newrecipe"><span class="settings-link-text">➕ Aggiungi ricetta<small>Scrivi una ricetta da zero</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="import"><span class="settings-link-text">📥 Importa ricetta<small>Da un reel, un sito o un testo</small></span></button>
+        </div>
+      </section>
+      <section class="settings-section">
         <h3 class="settings-section-title">Ingredienti e Dispensa</h3>
         <div class="settings-card is-links">
           <button type="button" class="settings-link" data-settings-go="ingredients"><span class="settings-link-text">🗂️ Gestisci ingredienti<small>Nomi, sinonimi, unione dei doppioni</small></span></button>
@@ -134,6 +141,6 @@
 });
 </script>
 <script src="catalog.js?v=10"></script>
-<script src="app.js?v=182"></script>
+<script src="app.js?v=183"></script>
 </body>
 </html>
