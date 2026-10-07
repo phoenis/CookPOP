@@ -1377,3 +1377,5 @@
 /* "Cucina": al centro in basso, con margine dai bordi, uguale nel pasto e nel Ricettario */
 .cook-fab{ left:50%; right:auto; transform:translateX(-50%); bottom:calc(1.5rem + env(safe-area-inset-bottom)); max-width:calc(100vw - 2 * var(--space-medium)); white-space:nowrap; }
 .has-cook-fab{ padding-bottom:7rem; }
+.cook-fab{ bottom:calc(2.75rem + env(safe-area-inset-bottom)); }
+.has-cook-fab{ padding-bottom:8rem; }
