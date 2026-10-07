@@ -1398,3 +1398,4 @@
 
 .settings-backdrop{ z-index:185; }
 .settings-card .settings-search{ background:var(--bg); border-color:var(--ink-light); }
+.week-balance .past-days-row{ margin-top:var(--space-small); padding:0; }
