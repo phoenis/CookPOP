@@ -1618,6 +1618,7 @@ const state = {
   prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
+  appearanceOpen: false, // non persistito: pagina "Tema e colori"
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
@@ -4111,12 +4112,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-06',
+  version: '2026-12-07',
   title: 'Novità',
   items: [
-    'Impostazioni riordinate: Io, Aspetto, Il mio menù, Ingredienti e Dispensa (ingredienti, gruppi, categorie, ordine corsie), Carte fedeltà, Backup, App. In alto c\'è una ricerca.',
-    'Backup automatico: una volta al mese l\'app salva da sola una copia su questo telefono (le ultime 3), da ripristinare da Impostazioni. Si può spegnere.',
-    'I tre puntini sono più leggeri: Dispensa (Inventario veloce), Ricette (Importa), Menù (Rigenera la settimana). Il resto è in Impostazioni.'
+    'Impostazioni: tema e colore d\'accento sono in una pagina a parte ("Tema e colori"), così in Impostazioni resta solo l\'elenco.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4222,7 +4221,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderAppearancePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -4340,6 +4339,7 @@ const MODAL_CHECKS = [
   // Sotto la scheda ingrediente (che si apre da qui): si chiude dopo di lei.
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
+  [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
@@ -10374,6 +10374,41 @@ function sortedCards(){ return (state.loyaltyCards || []).slice().sort((a, b) =>
 // I reparti della Spesa nell'ordine in cui si gira il proprio supermercato:
 // si trascinano dalla maniglia ⠿ (la riga si sposta nel DOM mentre il dito
 // scorre, l'ordine si salva al rilascio) oppure con le frecce su/giù.
+// Pagina "Tema e colori" (dalle Impostazioni): chiaro/scuro e colore d'accento,
+// validi solo su questo telefono.
+function renderAppearancePage(){
+  if(!state.appearanceOpen) return '';
+  const theme = currentTheme();
+  const accent = localStorage.getItem(ACCENT_KEY) || USER_COLOR_PRESETS[0];
+  const themes = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']];
+  const body = `
+      <section class="settings-section">
+        <h3 class="settings-section-title">Tema</h3>
+        <div class="settings-card">
+          <div class="theme-toggle-row">${themes.map(([v, l]) => `<button type="button" class="btn is-outline theme-btn${theme === v ? ' active' : ''}" data-theme-choice="${v}">${l}</button>`).join('')}</div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Colore d'accento</h3>
+        <div class="settings-card">
+          <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${accent === c ? ' active' : ''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('')}</div>
+        </div>
+        <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
+      </section>`;
+  return managePageHtml({ key: 'appearance', title: 'Tema e colori', closeAttr: 'data-close-appearance', body });
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  const closeEl = t.closest('[data-close-appearance]');
+  if(closeEl){
+    if(!isCloseTap(e, closeEl)) return;
+    state.appearanceOpen = false; render(); return;
+  }
+  const th = t.closest('[data-theme-choice]');
+  if(th){ applyTheme(th.dataset.themeChoice); render(); return; }
+  const ac = t.closest('[data-accent-color]');
+  if(ac){ applyAccent(ac.dataset.accentColor); render(); }
+});
 function renderAislesPage(){
   if(!state.aisleOrderOpen) return '';
   const list = shopAisles();
@@ -11291,6 +11326,7 @@ document.addEventListener('click', e=>{
   else if(what === 'groups'){ state.tab = 'dispensa'; state.pantryGroupsModalOpen = true; }
   else if(what === 'depts'){ state.tab = 'dispensa'; state.deptsModalOpen = true; }
   else if(what === 'aisles'){ state.aisleOrderOpen = true; }
+  else if(what === 'appearance'){ state.appearanceOpen = true; }
   render();
 });
 (function(){
