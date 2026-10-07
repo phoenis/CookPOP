@@ -4195,10 +4195,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-16',
+  version: '2026-12-17',
   title: 'Novità',
   items: [
-    'Album: tolto il + in basso a destra, si crea dal riquadro "Nuovo album" in alto.'
+    'Menù: il bottone "Mostra pasti precedenti" ora si trova toccando le iconcine dell\'equilibrio della settimana.'
   ]
 };
 
@@ -5617,9 +5617,9 @@ function weekBalance(weekIdx){
 // troppe (rosso) o poche (giallo), e in fondo ✓ a settimana equilibrata o
 // "8/14" se mancano ancora pasti. Un tocco apre/chiude la spiegazione a parole.
 const PROTEINA_ICON = { legumi:'🫘', pesce:'🐟', 'carne-bianca':'🍗', 'carne-rossa':'🥩', salumi:'🥓', uova:'🥚', formaggi:'🧀' };
-function renderWeekBalance(weekIdx){
+function renderWeekBalance(weekIdx, pastToggle){
   const bal = weekBalance(weekIdx);
-  if(!bal.planned) return '';
+  if(!bal.planned && !pastToggle) return '';
   const label = it => (PROTEINA_LABEL[it.key] || 'Pasta').toLowerCase();
   const shown = bal.items.concat(bal.pasta.status === 'high' ? [bal.pasta] : []);
   const pills = shown.map(it => `<span class="balance-pill is-${it.status}" aria-label="${escapeAttr(`${PROTEINA_LABEL[it.key] || 'Pasta'}: ${it.count}`)}">${it.key === 'pasta' ? '🍝' : PROTEINA_ICON[it.key]}<b>${it.count}</b></span>`).join('');
@@ -5633,7 +5633,8 @@ function renderWeekBalance(weekIdx){
   const detail = warn ? notes.join('. ') : (bal.checkLow ? 'Settimana equilibrata.' : `${bal.planned} pasti su 14 decisi: quello che manca si valuta a settimana quasi piena.`);
   const open = !!state.balanceDetailsOpen;
   return `<div class="week-balance">
-      <button type="button" class="balance-pills" data-toggle-balance-details aria-expanded="${open}" aria-label="Equilibrio della settimana">${pills}${end}</button>
+      <button type="button" class="balance-pills" data-toggle-balance-details aria-expanded="${open}" aria-label="Equilibrio della settimana">${bal.planned ? pills + end : '<span class="balance-end">Equilibrio</span>'}</button>
+      ${open && pastToggle ? `<div class="past-days-row">${pastToggle}</div>` : ''}
       ${open ? `<p class="balance-verdict${warn ? ' is-warn' : ''}">${escapeHtml(detail)} <span class="balance-legend">${Object.keys(PROTEINA_ICON).map(k => `${PROTEINA_ICON[k]} ${escapeHtml(PROTEINA_LABEL[k].toLowerCase())}`).concat(['🍝 pasta (solo se è troppa)']).join(' · ')}</span></p>` : ''}
     </div>`;
 }
@@ -5674,15 +5675,12 @@ function renderWeekSection(weekIdx){
   // Il bottone compare anche se non ci sono giorni passati, quando serve solo
   // a rivelare il pranzo di oggi nascosto dopo le 15 (vedi isTodayLunchPast).
   const todayLunchHidden = weekIdx === 0 && isTodayLunchPast();
-  const pastToggle = (pastPositions.length || todayLunchHidden) ? `
-  <div class="past-days-row">
-    <button type="button" class="btn is-chip past-days-toggle" data-toggle-past-days="${weekIdx}">${state.showPastDays ? 'Nascondi' : 'Mostra'} pasti precedenti ${state.showPastDays ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M251 123.13c-.37-.81-9.13-20.26-28.48-39.61C196.63 57.67 164 44 128 44S59.37 57.67 33.51 83.52C14.16 102.87 5.4 122.32 5 123.13a12.08 12.08 0 0 0 0 9.75c.37.82 9.13 20.26 28.49 39.61C59.37 198.34 92 212 128 212s68.63-13.66 94.48-39.51c19.36-19.35 28.12-38.79 28.49-39.61a12.08 12.08 0 0 0 .03-9.75m-46.06 33C183.47 177.27 157.59 188 128 188s-55.47-10.73-76.91-31.88A130.4 130.4 0 0 1 29.52 128a130.5 130.5 0 0 1 21.57-28.11C72.54 78.73 98.41 68 128 68s55.46 10.73 76.91 31.89A130.4 130.4 0 0 1 226.48 128a130.5 130.5 0 0 1-21.57 28.12ZM128 84a44 44 0 1 0 44 44a44.05 44.05 0 0 0-44-44m0 64a20 20 0 1 1 20-20a20 20 0 0 1-20 20"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M234.42 162a12 12 0 1 1-20.84 12l-16.86-29.5a127.2 127.2 0 0 1-30.17 13.86l5.29 31.64a12 12 0 0 1-9.87 13.8a11 11 0 0 1-2 .17a12 12 0 0 1-11.82-10l-5.15-30.8a136.5 136.5 0 0 1-30.06 0l-5.1 30.83A12 12 0 0 1 96 204a11 11 0 0 1-2-.17A12 12 0 0 1 84.16 190l5.29-31.72a127.2 127.2 0 0 1-30.17-13.86L42.42 174a12 12 0 1 1-20.84-12L40 129.85a160 160 0 0 1-17.31-18.31a12 12 0 0 1 18.65-15.08C57.38 116.32 85.44 140 128 140s70.62-23.68 86.66-43.54a12 12 0 0 1 18.67 15.08A160 160 0 0 1 216 129.85Z"></path></svg>'}</button>
-  </div>` : '';
+  const pastToggle = (pastPositions.length || todayLunchHidden) ? `<button type="button" class="btn is-chip past-days-toggle" data-toggle-past-days="${weekIdx}">${state.showPastDays ? 'Nascondi' : 'Mostra'} pasti precedenti ${state.showPastDays ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M251 123.13c-.37-.81-9.13-20.26-28.48-39.61C196.63 57.67 164 44 128 44S59.37 57.67 33.51 83.52C14.16 102.87 5.4 122.32 5 123.13a12.08 12.08 0 0 0 0 9.75c.37.82 9.13 20.26 28.49 39.61C59.37 198.34 92 212 128 212s68.63-13.66 94.48-39.51c19.36-19.35 28.12-38.79 28.49-39.61a12.08 12.08 0 0 0 .03-9.75m-46.06 33C183.47 177.27 157.59 188 128 188s-55.47-10.73-76.91-31.88A130.4 130.4 0 0 1 29.52 128a130.5 130.5 0 0 1 21.57-28.11C72.54 78.73 98.41 68 128 68s55.46 10.73 76.91 31.89A130.4 130.4 0 0 1 226.48 128a130.5 130.5 0 0 1-21.57 28.12ZM128 84a44 44 0 1 0 44 44a44.05 44.05 0 0 0-44-44m0 64a20 20 0 1 1 20-20a20 20 0 0 1-20 20"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M234.42 162a12 12 0 1 1-20.84 12l-16.86-29.5a127.2 127.2 0 0 1-30.17 13.86l5.29 31.64a12 12 0 0 1-9.87 13.8a11 11 0 0 1-2 .17a12 12 0 0 1-11.82-10l-5.15-30.8a136.5 136.5 0 0 1-30.06 0l-5.1 30.83A12 12 0 0 1 96 204a11 11 0 0 1-2-.17A12 12 0 0 1 84.16 190l5.29-31.72a127.2 127.2 0 0 1-30.17-13.86L42.42 174a12 12 0 1 1-20.84-12L40 129.85a160 160 0 0 1-17.31-18.31a12 12 0 0 1 18.65-15.08C57.38 116.32 85.44 140 128 140s70.62-23.68 86.66-43.54a12 12 0 0 1 18.67 15.08A160 160 0 0 1 216 129.85Z"></path></svg>'}</button>` : '';
   const pastDays = (state.showPastDays && pastPositions.length)
     ? pastPositions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates, true)).join('')
     : '';
 
-  const days = pastToggle + pastDays + positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
+  const days = pastDays + positions.map(pos=> renderDayCard(weekIdx, WEEK_DISPLAY_ORDER[pos], pos, weekDates)).join('');
 
   // Genera/Rigenera ed Elimina vivono ora nella modale impostazioni, aperta
   // dal bottoncino sul titolo della settimana (vedi genSettingsModal in renderMenu).
@@ -5690,7 +5688,7 @@ function renderWeekSection(weekIdx){
     <section class="week-section">
       <h2 class="week-title is-menu">Settimana del ${weekLabelFor(weekIdx)} ${genSettingsButton(weekIdx)}</h2>
       <div class="balance-strip">${strip}</div>
-      ${renderWeekBalance(weekIdx)}
+      ${renderWeekBalance(weekIdx, pastToggle)}
       ${days}
     </section>`;
 }
