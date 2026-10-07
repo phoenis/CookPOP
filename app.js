@@ -4222,10 +4222,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-22',
+  version: '2026-12-23',
   title: 'Novità',
   items: [
-    'Impostazioni e menù ⋯: tutte le emoji sostituite da icone SVG, con lo stesso stile (la rotellina è quella del Menù).'
+    'Icone dei luoghi più piccole.',
+    'Swipe col cestino in Spesa e Dispensa: box rosso con bordi arrotondati e icona più piccola, uguale in entrambe.'
   ]
 };
 

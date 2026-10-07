@@ -1409,3 +1409,13 @@
 .settings-link-text{ flex:1; }
 .settings-link::after{ margin-left:auto; }
 .ui-ico-wrap{ display:inline-flex; vertical-align:-0.2em; }
+/* Icone dei luoghi più piccole (riga Dispensa, tooltip, scheda ingrediente) */
+.btn.luogo-picker-opt svg, .btn.data-done-leftover-cat-toggle svg{ width:1rem !important; height:1rem !important; }
+.btn.inv-q-luogo svg{ width:1rem; height:1rem; }
+.sheet-luogo-icon svg{ width:1.2rem; height:1.2rem; }
+/* Box rosso dello swipe (cestino): bordi arrotondati e icona piccola, uguale in Spesa, Dispensa e Menù. Il rosso si vede solo mentre si scorre. */
+.swipe-wrap{ border-radius:var(--radius-modal); background:transparent; }
+.swipe-content{ border-radius:var(--radius-modal); }
+.swipe-trash, .meal-block-trash{ width:4rem; font-size:1rem; background-color:var(--tomato); visibility:hidden; }
+.swipe-wrap:has(.swipe-content[style*="translate"], .swipe-content.swiping) .swipe-trash{ visibility:visible; }
+.swipe-trash svg, .meal-block-trash svg{ width:1.125rem; height:1.125rem; }
