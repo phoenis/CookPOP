@@ -4200,6 +4200,10 @@ const UI_ICONS = {
   'calendar': '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm12-4v4M8 3v4m-4 4h16"/>',
   'wand': '<path d="m6 21l15-15l-3-3L3 18z"/><path d="m15 6l3 3M9 3a2 2 0 0 0 2 2a2 2 0 0 0-2 2a2 2 0 0 0-2-2a2 2 0 0 0 2-2m10 11a2 2 0 0 0 2 2a2 2 0 0 0-2 2a2 2 0 0 0-2-2a2 2 0 0 0 2-2"/>',
   'swap': '<path d="M21 7H3m15-3l3 3l-3 3M3 17h18M6 14l-3 3l3 3"/>',
+  'pencil': '<path d="M4 20h4L18.5 9.5a2.828 2.828 0 1 0-4-4L4 16zm9.5-13.5l4 4"/>',
+  'heart': '<path d="M19.5 12.572L12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.572"/>',
+  'egg': '<path d="M12 3C8.5 3 5.5 9 5.5 13.5a6.5 6.5 0 0 0 13 0C18.5 9 15.5 3 12 3"/>',
+  'wheat': '<path d="M12 21V9m0 0c0-2.5 1.2-4 3.5-5c0 2.5-1.2 4-3.5 5m0 0c0-2.5-1.2-4-3.5-5c0 2.5 1.2 4 3.5 5m0 6c0-2.5 1.2-4 3.5-5c0 2.5-1.2 4-3.5 5m0 0c0-2.5-1.2-4-3.5-5c0 2.5 1.2 4 3.5 5"/>',
   'user': '<path d="M8 7a4 4 0 1 0 8 0a4 4 0 1 0-8 0M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>',
   'cards': '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>'};
 const UI_GEAR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="ui-ico" preserveAspectRatio="xMidYMid meet" viewBox="0 0 32 32"><path fill="currentColor" d="M27 16.76v-1.53l1.92-1.68A2 2 0 0 0 29.3 11l-2.36-4a2 2 0 0 0-1.73-1a2 2 0 0 0-.64.1l-2.43.82a11 11 0 0 0-1.31-.75l-.51-2.52a2 2 0 0 0-2-1.61h-4.68a2 2 0 0 0-2 1.61l-.51 2.52a11.5 11.5 0 0 0-1.32.75l-2.38-.86A2 2 0 0 0 6.79 6a2 2 0 0 0-1.73 1L2.7 11a2 2 0 0 0 .41 2.51L5 15.24v1.53l-1.89 1.68A2 2 0 0 0 2.7 21l2.36 4a2 2 0 0 0 1.73 1a2 2 0 0 0 .64-.1l2.43-.82a11 11 0 0 0 1.31.75l.51 2.52a2 2 0 0 0 2 1.61h4.72a2 2 0 0 0 2-1.61l.51-2.52a11.5 11.5 0 0 0 1.32-.75l2.42.82a2 2 0 0 0 .64.1a2 2 0 0 0 1.73-1l2.28-4a2 2 0 0 0-.41-2.51ZM25.21 24l-3.43-1.16a8.9 8.9 0 0 1-2.71 1.57L18.36 28h-4.72l-.71-3.55a9.4 9.4 0 0 1-2.7-1.57L6.79 24l-2.36-4l2.72-2.4a8.9 8.9 0 0 1 0-3.13L4.43 12l2.36-4l3.43 1.16a8.9 8.9 0 0 1 2.71-1.57L13.64 4h4.72l.71 3.55a9.4 9.4 0 0 1 2.7 1.57L25.21 8l2.36 4l-2.72 2.4a8.9 8.9 0 0 1 0 3.13L27.57 20Z"></path><path fill="currentColor" d="M16 22a6 6 0 1 1 6-6a5.94 5.94 0 0 1-6 6m0-10a3.91 3.91 0 0 0-4 4a3.91 3.91 0 0 0 4 4a3.91 3.91 0 0 0 4-4a3.91 3.91 0 0 0-4-4"></path></svg>';
@@ -4217,12 +4221,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-04',
+  version: '2027-01-05',
   title: 'Novità',
   items: [
-    'Cucina: tolto "Nell\'orologio" dal timer (resta il timer dell\'app).',
-    'Passaggi: tolto il titolo "Procedimento" e testo grande come negli ingredienti.',
-    'Ingredienti: "Per X persone" in una pillola grigia a destra, come il tempo.'
+    'Modifica ricetta: ingredienti e passaggi hanno lo stesso stile degli altri campi (bordi arrotondati, stessa altezza e testo) e tutte le etichette hanno un\'icona SVG.'
   ]
 };
 
@@ -4699,11 +4701,11 @@ function renderRecipeEditModal(){
   const formHtml = `
         <div class="filter-groups" id="edit-recipe-form">
           <div class="filter-group">
-            <div class="filter-group-label">Nome</div>
+            <div class="filter-group-label">${uiIcon('pencil')} Nome</div>
             <input type="text" id="edit-name" value="${escapeAttr(name)}" autocomplete="off">
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">Foto del piatto</div>
+            <div class="filter-group-label">${uiIcon('photo')} Foto del piatto</div>
             <div id="edit-photo-area">${recipePhotoHtml(name, true)}</div>
           </div>
           <div class="filter-group">
@@ -4727,26 +4729,26 @@ function renderRecipeEditModal(){
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">🍽️ Tipologia (portata)</div>
+            <div class="filter-group-label">${uiIcon('tag')} Tipologia (portata)</div>
             <select id="edit-tipologia">
               ${TIPO_ORDER.map(t=>`<option value="${t}" ${(rec.tipologia||'primo')===t?'selected':''}>${tipoIcon(t)} ${escapeHtml(TIPO_LABEL[t])}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">❤️ Gradimento</div>
+            <div class="filter-group-label">${uiIcon('heart')} Gradimento</div>
             <select id="edit-gradimento">
               ${GRAD_ORDER.includes(rec.gradimento) ? '' : '<option value="" selected>—</option>'}
               ${GRAD_ORDER.map(g=>`<option value="${g}" ${rec.gradimento===g?'selected':''}>${escapeHtml(GRAD_LABEL[g])}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">🌾 Base di carboidrati</div>
+            <div class="filter-group-label">${uiIcon('wheat')} Base di carboidrati</div>
             <select id="edit-base">
               ${BASE_ORDER.map(b=>`<option value="${b}" ${recipeBase(rec)===b?'selected':''}>${escapeHtml(BASE_LABEL[b])}</option>`).join('')}
             </select>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">🥚 Fonte di proteine</div>
+            <div class="filter-group-label">${uiIcon('egg')} Fonte di proteine</div>
             <select id="edit-proteina">
               ${PROTEINA_ORDER.map(p=>`<option value="${p}" ${recipeProteina(rec)===p?'selected':''}>${escapeHtml(PROTEINA_LABEL[p])}</option>`).join('')}
             </select>
@@ -4794,7 +4796,7 @@ function renderRecipeEditModal(){
             <input type="text" id="edit-freezer-note" value="${escapeAttr((det && det.freezer) || '')}">
           </div>
           <div class="filter-group">
-            <div class="filter-group-label">🔗 Link fonte</div>
+            <div class="filter-group-label">${uiIcon('link')} Link fonte</div>
             <input type="text" id="edit-link" value="${escapeAttr((det && det.link) || '')}">
           </div>
         </div>`;
