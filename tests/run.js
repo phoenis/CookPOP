@@ -1630,7 +1630,8 @@ test('menù: card dei pasti senza bordo e con ombra leggera; le card vuote senza
   const r = await page.evaluate(() => {
     isMealPast = () => false; generateWeek(0);
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
-    clearMealToEmpty(0, 1, 'cena'); state.tab = 'menu'; render();
+    const di = WEEK_DISPLAY_ORDER[Math.min(findTodayPos() + 1, WEEK_DISPLAY_ORDER.length - 1)];
+    clearMealToEmpty(0, di, 'cena'); state.tab = 'menu'; render();
     const cs = el => getComputedStyle(el);
     const full = document.querySelector('.meal-block-swipe-wrap .meal-block:not(.is-empty)');
     const empty = document.querySelector('.meal-block.is-empty');
