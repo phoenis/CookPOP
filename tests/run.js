@@ -1807,6 +1807,49 @@ test('cucina: il bottone è al centro in basso, uguale nel pasto e nel Ricettari
   eq({ meal, rec: await pos() }, { meal: { centered: true, gap: true }, rec: { centered: true, gap: true } });
 });
 
+test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, backup automatico mensile', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'spesa'; render();
+    document.querySelector('[data-topbar-menu-settings]') || document.getElementById('topbar-menu-btn').click();
+    document.querySelector('[data-topbar-menu-settings]').click();
+    const out = { titles: [...document.querySelectorAll('#settings-backdrop .settings-section-title')].map(e => e.textContent.trim()) };
+    // ricerca
+    const s = document.getElementById('settings-search'); s.value = 'corsie'; s.dispatchEvent(new Event('input', { bubbles: true }));
+    out.visible = [...document.querySelectorAll('#settings-backdrop .settings-section')].filter(x => !x.hidden).map(x => x.querySelector('.settings-section-title').textContent.trim());
+    out.visibleLinks = [...document.querySelectorAll('#settings-backdrop .settings-link')].filter(x => !x.hidden).map(x => x.dataset.settingsGo);
+    s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true }));
+    // voci
+    document.querySelector('[data-settings-go="aisles"]').click();
+    out.aisles = state.aisleOrderOpen === true && !document.getElementById('settings-backdrop').classList.contains('open');
+    state.aisleOrderOpen = false; render();
+    document.getElementById('topbar-menu-btn').click();
+    document.querySelector('[data-topbar-menu-settings]').click();
+    document.querySelector('[data-settings-go="ingredients"]').click();
+    out.ingr = state.ingredientManagerOpen === true && state.tab === 'dispensa';
+    state.ingredientManagerOpen = false; render();
+    // ⋯ più leggeri
+    out.menus = { dispensa: TAB_MENU_ITEMS.dispensa.length, spesa: (TAB_MENU_ITEMS.spesa || []).length, menu: TAB_MENU_ITEMS.menu.length, prep: TAB_MENU_ITEMS.prep.length };
+    // backup automatico: uno al mese
+    try{ localStorage.removeItem(LAST_AUTO_BACKUP_KEY); localStorage.removeItem(AUTO_BACKUP_OFF_KEY); }catch(e){}
+    out.first = await maybeAutoBackup();
+    out.second = await maybeAutoBackup();
+    const list = await autoBackupList();
+    out.saved = list.length >= 1 && list[0].data.format === BACKUP_FORMAT;
+    out.restored = restoreBackup(list[0].data, () => true);
+    try{ localStorage.setItem(AUTO_BACKUP_OFF_KEY, '1'); localStorage.removeItem(LAST_AUTO_BACKUP_KEY); }catch(e){}
+    out.off = await maybeAutoBackup();
+    try{ localStorage.removeItem(AUTO_BACKUP_OFF_KEY); }catch(e){}
+    return out;
+  });
+  eq(r.titles, ['Io', 'Aspetto', 'Il mio menù', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
+  eq(r.visible, ['Ingredienti e Dispensa']);
+  eq(r.visibleLinks, ['aisles']);
+  eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
+  eq(r.menus, { dispensa: 1, spesa: 0, menu: 1, prep: 1 });
+  eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
