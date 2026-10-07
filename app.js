@@ -4310,11 +4310,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-12',
+  version: '2027-01-13',
   title: 'Novità',
   items: [
-    'Modalità cucina: i selettori delle ricette mostrano la portata (Primo, Secondo, Contorno…) con la sua icona, al posto del nome lungo.',
-    'Ricetta fatta!: una sola lista di ingredienti, ognuno con la spunta "finito": gli spuntati vanno tra i Finiti della Spesa.'
+    'Ricetta fatta!: gli ingredienti sono come in Dispensa. Quanto ne resta (− / +) o la spunta, e scorri per segnarli finiti: vanno tra i Finiti della Spesa.'
   ]
 };
 
@@ -5924,25 +5923,33 @@ function renderMenu(){
       if(!pantryIt){
         return `<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`;
       }
-      const finished = !!finishedMap[name];
-      const tracked = Object.prototype.hasOwnProperty.call(qtyMap, name) && pantryIt.unit !== 'none';
-      let stepperHtml = '';
-      if(tracked){
+      // Come in Dispensa: con unità di misura il contatore di quanto ne resta
+      // (−/+ o tocco sul numero), senza unità la spunta "c'è". Swipe = finito.
+      // Internamente resta "quanto ne hai usato" (doneModalQty): qui si mostra
+      // e si modifica la scorta che rimane dopo il pasto.
+      const hasQty = Object.prototype.hasOwnProperty.call(qtyMap, name) && pantryIt.unit !== 'none';
+      let controlHtml;
+      if(hasQty){
         const unit = pantryIt.unit || '';
         const step = qtyStepFor(unit);
+        const left = Math.max(0, Math.round(((pantryIt.qty || 0) - qtyMap[name]) * 100) / 100);
         const editingThis = state.doneQtyEditingKey === name;
-        stepperHtml = `
-        <span class="qty-stepper${finished ? ' is-dim' : ''}">
+        controlHtml = `
+        <span class="qty-stepper">
           <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
           ${editingThis
-            ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qtyMap[name]}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
-            : `<span class="qty-num" data-done-qty-show="${escapeAttr(name)}">${qtyMap[name]}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
+            ? `<input type="number" min="0" step="${step}" class="qty-input" value="${left}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
+            : `<span class="qty-num${left <= 0 ? ' low' : ''}" data-done-qty-show="${escapeAttr(name)}">${left}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
           <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
         </span>`;
+      } else {
+        const present = (typeof pantryIt.qty !== 'number' || pantryIt.qty > 0) && !finishedMap[name];
+        controlHtml = `<label class="presence-toggle"><input type="checkbox" ${present ? 'checked' : ''} data-done-finished-toggle="${escapeAttr(name)}" aria-label="${escapeAttr(name)}: c'è ancora"></label>`;
       }
-      const canFinish = typeof pantryIt.qty !== 'number' || pantryIt.qty > 0;
-      const checkHtml = canFinish ? `<label class="presence-toggle done-finished-check" title="Finito: va tra i Finiti della Spesa"><input type="checkbox" ${finished ? 'checked' : ''} data-done-finished-toggle="${escapeAttr(name)}" aria-label="${escapeAttr(name)}: finito"></label>` : '';
-      return `<div class="done-ing-row"><span>${escapeHtml(name)}</span><span class="done-ing-right">${stepperHtml}${checkHtml}</span></div>`;
+      return `<div class="swipe-wrap" data-swipe-id="done:${escapeAttr(name)}" data-swipe-done="${escapeAttr(name)}">
+        <button type="button" class="swipe-trash" tabindex="-1" aria-label="${escapeAttr(name)}: finito">${TRASH_ICON_SVG}</button>
+        <div class="done-ing-row swipe-content"><span>${escapeHtml(name)}</span>${controlHtml}</div>
+      </div>`;
     }).join('');
     const finishedSectionHtml = '';
     const breadIt = breadPantryItem();
@@ -5966,7 +5973,7 @@ function renderMenu(){
           <h3>Ricetta fatta! 🎉</h3>
           <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
         </div>
-        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Spunta gli ingredienti che hai finito: vanno tra i Finiti della Spesa.</p>
+        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Come in Dispensa: cambia quanto ne resta, togli la spunta o scorri per segnarlo finito: va tra i Finiti della Spesa.</p>
         ${doneName && getRecipeMeta(doneName) ? `<div class="done-grad">${gradimentoPickerHtml(doneName)}</div>` : ''}
         ${breadRowHtml}
         ${uniqueIng.length ? `
@@ -8646,16 +8653,20 @@ function attachHandlers(){
   document.querySelectorAll('[data-done-finished-toggle]').forEach(cb=>{
     cb.addEventListener('change', e=>{
       const name = e.currentTarget.dataset.doneFinishedToggle;
-      state.doneModalFinished[name] = e.currentTarget.checked;
+      state.doneModalFinished[name] = !e.currentTarget.checked;
       render();
     });
   });
+  const doneUsedSet = (name, used)=>{
+    const pantryIt = resolvePantryItem(name);
+    const max = (pantryIt && pantryIt.qty) || 0;
+    state.doneModalQty[name] = Math.min(max, Math.max(0, Math.round(used * 100) / 100));
+  };
   document.querySelectorAll('[data-done-qty-dec]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.doneQtyDec;
       const pantryIt = resolvePantryItem(name);
-      const step = qtyStepFor(pantryIt && pantryIt.unit);
-      state.doneModalQty[name] = Math.max(0, Math.round(((state.doneModalQty[name]||0) - step) * 100) / 100);
+      doneUsedSet(name, (state.doneModalQty[name]||0) + qtyStepFor(pantryIt && pantryIt.unit));
       render();
     });
   });
@@ -8663,8 +8674,16 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.doneQtyInc;
       const pantryIt = resolvePantryItem(name);
-      const step = qtyStepFor(pantryIt && pantryIt.unit);
-      state.doneModalQty[name] = Math.round(((state.doneModalQty[name]||0) + step) * 100) / 100;
+      doneUsedSet(name, (state.doneModalQty[name]||0) - qtyStepFor(pantryIt && pantryIt.unit));
+      render();
+    });
+  });
+  document.querySelectorAll('.swipe-wrap[data-swipe-done]').forEach(wrap=>{
+    attachSwipeToDelete(wrap, ()=>{
+      const name = wrap.dataset.swipeDone;
+      const pantryIt = resolvePantryItem(name);
+      if(Object.prototype.hasOwnProperty.call(state.doneModalQty, name) && pantryIt && pantryIt.unit !== 'none') doneUsedSet(name, pantryIt.qty || 0);
+      else state.doneModalFinished[name] = true;
       render();
     });
   });
@@ -8681,7 +8700,8 @@ function attachHandlers(){
     const commitDoneQtyEdit = ()=>{
       const name = doneQtyEditInput.dataset.doneQtyEdit;
       const n = parseFloat(doneQtyEditInput.value);
-      state.doneModalQty[name] = Number.isNaN(n) ? 0 : Math.max(0, n);
+      const pIt = resolvePantryItem(name);
+      doneUsedSet(name, Number.isNaN(n) ? 0 : ((pIt && pIt.qty) || 0) - n);
       state.doneQtyEditingKey = null;
       render();
     };
