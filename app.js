@@ -4222,11 +4222,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-24',
+  version: '2026-12-25',
   title: 'Novità',
   items: [
-    'Swipe col cestino come Gmail: il box rosso parte stretto e si allarga seguendo il dito, con bordi arrotondati (Spesa, Dispensa e Menù).',
-    'Menù: nello swipe si sposta tutta la card, senza tagliare il contenuto.'
+    'Pulizia di margini e campi: tutte le pagine hanno lo stesso margine laterale e i campi di testo (Aggiungi ricetta, Importa, modifica categorie e gruppi) hanno lo stesso stile.',
+    'Aggiungi ricetta: il campo del nome era schiacciato, ora è normale.'
   ]
 };
 
