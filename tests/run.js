@@ -1928,13 +1928,13 @@ test('backup in pagina dedicata e "Rigenera menu" rigenera tutte le settimane at
     // Rigenera menu: week 0 + una extra
     state.extraWeeks = []; generateWeek(0); generateWeek(1);
     const b0 = state.weekBaseline, b1 = state.extraWeeks[0].baseline;
-    out.menuItems = TAB_MENU_ITEMS.menu.map(i => i.label);
+    out.menuItems = TAB_MENU_ITEMS.menu.map(i => i.label.replace(/<[^>]*>/g, '').trim());
     TAB_MENU_ITEMS.menu[0].action();
     out.regen = state.weekBaseline !== b0 && state.extraWeeks[0].baseline !== b1;
     out.toast = /2 settimane/.test((document.querySelector('.undo-toast') || {}).textContent || '');
     return out;
   });
-  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['🔄 Rigenera menu', '🍽️ Regole di generazione'], regen: true, toast: true });
+  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['Rigenera menu', 'Regole di generazione'], regen: true, toast: true });
 });
 
 test('catalogo: nove dolci dal ricettario, con ingredienti, procedimento e reparti giusti', async ({ page }) => {
@@ -1970,7 +1970,7 @@ test('ricette: "Aggiungi ricetta" è una pagina dalle Impostazioni, "Importa ric
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.tab = 'prep'; state.prepView = 'ricette'; render();
-    const out = { noFab: !document.getElementById('prep-fab'), noMenu: TAB_MENU_ITEMS.prep.map(i => i.label).join('|') === '➕ Aggiungi ricetta|📥 Importa ricetta' };
+    const out = { noFab: !document.getElementById('prep-fab'), noMenu: TAB_MENU_ITEMS.prep.map(i => i.label.replace(/<[^>]*>/g, '').trim()).join('|') === 'Aggiungi ricetta|Importa ricetta' && TAB_MENU_ITEMS.prep.every(i => i.label.includes('<svg')) };
     state.tab = 'spesa'; render();
     document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
     out.links = [...document.querySelectorAll('#settings-backdrop [data-settings-go="newrecipe"], #settings-backdrop [data-settings-go="import"]')].length;
@@ -2010,7 +2010,7 @@ test('catalogo: otto ricette dal ricettario (pesce, polpo, polpette, buccette, p
 
 test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardano', async ({ page }) => {
   const r = await page.evaluate(() => {
-    const labels = k => TAB_MENU_ITEMS[k].map(i => i.label.replace(/^\S+\s/, ''));
+    const labels = k => TAB_MENU_ITEMS[k].map(i => i.label.replace(/<[^>]*>/g, '').trim());
     const out = { dispensa: labels('dispensa'), spesa: labels('spesa'), menu: labels('menu'), prep: labels('prep') };
     TAB_MENU_ITEMS.prep[0].action(); out.newPage = state.newRecipeModalOpen === true; state.newRecipeModalOpen = false;
     TAB_MENU_ITEMS.prep[1].action(); out.imp = !!state.recipeImport; state.recipeImport = null;
