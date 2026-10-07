@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=121">
+<link rel="stylesheet" href="style.css?v=122">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -111,16 +111,8 @@
       </section>
       <section class="settings-section">
         <h3 class="settings-section-title">Backup dei dati</h3>
-        <div class="settings-card">
-          <p class="settings-card-text">Una copia di Dispensa, menù, spesa e ricette, da ripristinare se qualcosa va storto. Le foto dei piatti non sono incluse.</p>
-          <p class="settings-card-text" id="backup-status"></p>
-          <label class="settings-toggle"><input type="checkbox" id="auto-backup-toggle"><span>Backup automatico ogni mese</span></label>
-          <p class="settings-note" id="auto-backup-note">Ogni mese l'app salva da sola una copia su questo telefono (tiene le ultime 3). Per averne una anche fuori dal telefono, scarica il file.</p>
-          <div id="auto-backup-list" class="auto-backup-list"></div>
-          <div class="backup-row">
-            <button class="btn is-outline" id="backup-download" type="button">⬇ Scarica backup</button>
-            <label class="btn is-outline backup-restore-label">⬆ Ripristina da file<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
-          </div>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="backup"><span class="settings-link-text">💾 Backup<small>Scarica e ripristina, backup automatico mensile</small></span></button>
         </div>
       </section>
       <section class="settings-section">
@@ -142,6 +134,6 @@
 });
 </script>
 <script src="catalog.js?v=9"></script>
-<script src="app.js?v=179"></script>
+<script src="app.js?v=180"></script>
 </body>
 </html>

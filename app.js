@@ -1619,6 +1619,7 @@ const state = {
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
+  backupOpen: false, // non persistito: pagina "Backup"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
@@ -4113,11 +4114,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-08',
+  version: '2026-12-09',
   title: 'Novità',
   items: [
-    'Uscendo da una pagina delle Impostazioni (Tema e colori, Ingredienti, Gruppi, Categorie, Ordine corsie, Regole, Carte) si torna all\'elenco delle Impostazioni, non a un\'altra pagina dell\'app.',
-    'Il colore dei tuoi turni di cucina è ora in "Tema e colori". In Impostazioni non ci sono più "Io" e il prossimo turno.'
+    'Backup in una pagina a parte, dalle Impostazioni.',
+    'Nei tre puntini del Menù c\'è "Rigenera menu": rigenera tutte le settimane attive (i pasti bloccati e quelli già passati restano), con "Annulla". "Rigenera la settimana" non serve più: c\'è già per ogni settimana vicino al titolo.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4223,7 +4224,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderAppearancePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderBackupPage() + renderAppearancePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -4344,6 +4345,7 @@ const MODAL_CHECKS = [
   // Sotto la scheda ingrediente (che si apre da qui): si chiude dopo di lei.
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
+  [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
@@ -9713,12 +9715,24 @@ function goToTab(delta){
 // Voci aggiuntive del menu "tre puntini" specifiche della tab aperta in quel
 // momento — vedi TAB_MENU_ITEMS più sotto. "Impostazioni" c'è sempre, in
 // testa, indipendentemente dalla tab.
+// "Rigenera menu" (⋯ del Menù): rigenera tutte le settimane attive, ognuna come
+// col suo "Rigenera" (pasti bloccati e già passati restano), con "Annulla".
+function regenerateAllWeeks(){
+  const snap = snapshotPlanningState();
+  const idxs = [0];
+  (state.extraWeeks || []).forEach((w, i) => { if(w) idxs.push(i + 1); });
+  idxs.forEach(i => generateWeek(i));
+  showUndoToast(`Menù rigenerato: ${idxs.length} ${idxs.length === 1 ? 'settimana' : 'settimane'}`, ()=>{
+    restorePlanningState(snap);
+    persist(); render();
+  });
+}
 const TAB_MENU_ITEMS = {
   dispensa: [
     { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } }
   ],
   menu: [
-    { label: '🔄 Rigenera la settimana', action: ()=>{ state.genSettingsOpen = 0; } }
+    { label: '🔄 Rigenera menu', action: ()=>{ regenerateAllWeeks(); } }
   ],
   prep: [
     { label: '📥 Importa da un reel o da un testo', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } }
@@ -11225,20 +11239,43 @@ async function maybeAutoBackup(){
     return true;
   }catch(e){ return false; }
 }
-async function refreshAutoBackupList(){
-  const el = document.getElementById('auto-backup-list');
-  if(!el) return;
+let autoBackupCache = [];
+async function refreshAutoBackupCache(){
   const all = await autoBackupList();
-  el.innerHTML = all.length
-    ? `<div class="settings-field-label">Copie automatiche su questo telefono</div>` + all.map(s => `<div class="auto-backup-row"><span>${escapeHtml(backupDateLabel(s.id))}</span><button type="button" class="btn is-chip" data-auto-backup-restore="${escapeAttr(s.id)}">Ripristina</button></div>`).join('')
-    : '';
+  const sig = all.map(s => s.id).join(',');
+  if(sig !== autoBackupCache.map(s => s.id).join(',')){
+    autoBackupCache = all;
+    if(state.backupOpen) render();
+  }
 }
 function refreshBackupStatus(){
-  const el = document.getElementById('backup-status');
-  if(el) el.innerHTML = backupStatusHtml();
-  const tg = document.getElementById('auto-backup-toggle');
-  if(tg) tg.checked = autoBackupEnabled();
-  refreshAutoBackupList();
+  refreshAutoBackupCache();
+  if(state.backupOpen) render();
+}
+function renderBackupPage(){
+  if(!state.backupOpen) return '';
+  const rows = autoBackupCache.map(s => `<div class="auto-backup-row"><span>${escapeHtml(backupDateLabel(s.id))}</span><button type="button" class="btn is-chip" data-auto-backup-restore="${escapeAttr(s.id)}">Ripristina</button></div>`).join('');
+  const body = `
+      <p class="settings-note manage-intro">Una copia di Dispensa, menù, spesa e ricette, da ripristinare se qualcosa va storto. Le foto dei piatti non sono incluse.</p>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Backup su file</h3>
+        <div class="settings-card">
+          <p class="settings-card-text" id="backup-status">${backupStatusHtml()}</p>
+          <div class="backup-row">
+            <button class="btn is-outline" id="backup-download" type="button">⬇ Scarica backup</button>
+            <label class="btn is-outline backup-restore-label">⬆ Ripristina da file<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Backup automatico</h3>
+        <div class="settings-card">
+          <label class="settings-toggle"><input type="checkbox" id="auto-backup-toggle" ${autoBackupEnabled() ? 'checked' : ''}><span>Backup automatico ogni mese</span></label>
+          <p class="settings-note">Ogni mese l'app salva da sola una copia su questo telefono (tiene le ultime ${AUTO_BACKUP_KEEP}). Per averne una anche fuori dal telefono, scarica il file.</p>
+          ${rows ? `<div class="auto-backup-list"><div class="settings-field-label">Copie automatiche su questo telefono</div>${rows}</div>` : ''}
+        </div>
+      </section>`;
+  return managePageHtml({ key: 'backup', title: 'Backup', closeAttr: 'data-close-backup', body });
 }
 function downloadBackup(){
   try{ localStorage.setItem(LAST_BACKUP_KEY, isoLocalDate(new Date())); }catch(e){}
@@ -11265,41 +11302,43 @@ function restoreBackup(data, confirmFn){
   showUndoToast('Backup ripristinato', ()=>{ applyBackupParts(before.personal, before.catalog); persist(); render(); });
   return null;
 }
-(function(){
-  const dl = document.getElementById('backup-download');
-  if(dl) dl.addEventListener('click', downloadBackup);
-  const input = document.getElementById('backup-restore-input');
-  if(input) input.addEventListener('change', async ()=>{
-    const file = input.files && input.files[0];
-    input.value = '';
-    if(!file) return;
-    let data = null;
-    try{ data = JSON.parse(await file.text()); }catch(e){ /* non è JSON */ }
-    const err = restoreBackup(data);
-    if(err) window.alert(err);
-    else closeSettingsBackdrop();
-  });
-})();
-
-(function(){
-  const tg = document.getElementById('auto-backup-toggle');
-  if(tg) tg.addEventListener('change', ()=>{
-    try{ if(tg.checked) localStorage.removeItem(AUTO_BACKUP_OFF_KEY); else localStorage.setItem(AUTO_BACKUP_OFF_KEY, '1'); }catch(e){}
-    if(tg.checked) maybeAutoBackup();
-  });
-  const list = document.getElementById('auto-backup-list');
-  if(list) list.addEventListener('click', async e=>{
-    const b = e.target.closest('[data-auto-backup-restore]');
-    if(!b) return;
-    const snap = (await autoBackupList()).find(s => s.id === b.dataset.autoBackupRestore);
+document.addEventListener('click', async e=>{
+  const t = e.target;
+  const closeEl = t.closest('[data-close-backup]');
+  if(closeEl){
+    if(!isCloseTap(e, closeEl)) return;
+    state.backupOpen = false; render(); return;
+  }
+  if(t.closest('#backup-download')){ downloadBackup(); render(); return; }
+  const rb = t.closest('[data-auto-backup-restore]');
+  if(rb){
+    const snap = (await autoBackupList()).find(s => s.id === rb.dataset.autoBackupRestore);
     if(!snap) return;
     const err = restoreBackup(snap.data);
-    if(err) window.alert(err); else closeSettingsBackdrop();
-  });
-  // Copia del mese: poco dopo l'avvio (a dati caricati) e quando si torna all'app.
-  setTimeout(maybeAutoBackup, 10000);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setTimeout(maybeAutoBackup, 3000); });
-})();
+    if(err) window.alert(err); else { state.backupOpen = false; closeSettingsBackdrop(); render(); }
+  }
+});
+document.addEventListener('change', async e=>{
+  const t = e.target;
+  if(t.id === 'auto-backup-toggle'){
+    try{ if(t.checked) localStorage.removeItem(AUTO_BACKUP_OFF_KEY); else localStorage.setItem(AUTO_BACKUP_OFF_KEY, '1'); }catch(err){}
+    if(t.checked) maybeAutoBackup();
+    return;
+  }
+  if(t.id === 'backup-restore-input'){
+    const file = t.files && t.files[0];
+    t.value = '';
+    if(!file) return;
+    let data = null;
+    try{ data = JSON.parse(await file.text()); }catch(err){ /* non è JSON */ }
+    const err = restoreBackup(data);
+    if(err) window.alert(err);
+    else { state.backupOpen = false; closeSettingsBackdrop(); render(); }
+  }
+});
+// Copia del mese: poco dopo l'avvio (a dati caricati) e quando si torna all'app.
+setTimeout(maybeAutoBackup, 10000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setTimeout(maybeAutoBackup, 3000); });
 
 // Impostazioni: voci che aprono le pagine di gestione, e ricerca.
 document.addEventListener('click', e=>{
@@ -11315,6 +11354,7 @@ document.addEventListener('click', e=>{
   else if(what === 'depts') state.deptsModalOpen = true;
   else if(what === 'aisles') state.aisleOrderOpen = true;
   else if(what === 'appearance') state.appearanceOpen = true;
+  else if(what === 'backup'){ state.backupOpen = true; refreshAutoBackupCache(); }
   render();
 });
 (function(){
