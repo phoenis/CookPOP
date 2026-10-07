@@ -1501,3 +1501,9 @@ body{ overflow-x:clip; }
 .cook-switch-chip.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
 .cook-switch-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:var(--weight-medium); }
 .cook-switch-step{ flex:none; font-size:var(--text-xsmall); opacity:0.7; }
+.cook-switch-chip .dish-ic{ display:inline-flex; flex:none; }
+.cook-switch-chip .dish-ic svg, .cook-switch-chip .dish-ic img{ width:1.25rem; height:1.25rem; }
+/* "Ricetta fatta!": una riga per ingrediente, con la spunta "finito" a destra */
+.done-ing-right{ display:inline-flex; align-items:center; gap:var(--space-small); }
+.done-ing-right .qty-stepper.is-dim{ opacity:0.4; }
+.done-finished-check{ display:inline-flex; }

@@ -628,10 +628,17 @@ function cookSwitcherHtml(cm){
   const list = state.cookSession;
   if(!list || list.length < 2) return '';
   const total = n => ((getRecipeDetails(n) || {}).procedimento || []).length;
+  // Come nelle schede del pasto: portata (Primo, Secondo, Contorno…) con la sua
+  // icona, numerata se ce ne sono due uguali, invece del nome lungo.
+  const seen = {};
   return `<div class="cook-switch" role="tablist" aria-label="Ricette in cucina">${list.map(x=>{
     const active = x.name === cm.name;
     const step = active ? (cm.step || 0) : (x.step || 0);
-    return `<button type="button" class="cook-switch-chip${active ? ' active' : ''}" role="tab" aria-selected="${active}" data-cook-switch="${escapeAttr(x.name)}"><span class="cook-switch-name">${escapeHtml(x.name)}</span><span class="cook-switch-step">${step + 1}/${total(x.name)}</span></button>`;
+    const tipo = dishCourse(x.name);
+    const label = courseLabel(tipo);
+    seen[label] = (seen[label] || 0) + 1;
+    const text = seen[label] > 1 ? `${label} ${seen[label]}` : label;
+    return `<button type="button" class="cook-switch-chip${active ? ' active' : ''}" role="tab" aria-selected="${active}" aria-label="${escapeAttr(x.name)}" title="${escapeAttr(x.name)}" data-cook-switch="${escapeAttr(x.name)}"><span class="dish-ic" aria-hidden="true">${tipoIcon(tipo)}</span><span class="cook-switch-name">${escapeHtml(text)}</span><span class="cook-switch-step">${step + 1}/${total(x.name)}</span></button>`;
   }).join('')}</div>`;
 }
 function cookFabHtml(name, ratio, mk){
@@ -4303,10 +4310,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-11',
+  version: '2027-01-12',
   title: 'Novità',
   items: [
-    'Modalità cucina: se il pasto ha più piatti con il procedimento (es. primo e contorno) puoi passare da una ricetta all\'altra in alto, restando al passo a cui eri in ciascuna.'
+    'Modalità cucina: i selettori delle ricette mostrano la portata (Primo, Secondo, Contorno…) con la sua icona, al posto del nome lungo.',
+    'Ricetta fatta!: una sola lista di ingredienti, ognuno con la spunta "finito": gli spuntati vanno tra i Finiti della Spesa.'
   ]
 };
 
@@ -5907,42 +5915,36 @@ function renderMenu(){
     // dispensa" (ci sono, semplicemente non si conta quanto). Finiscono in
     // una sezione a parte più sotto, "L'hai finito?" — di default non
     // spuntata, perché usarne un po' non vuol dire averla esaurita.
-    const finishableNames = [];
+    // Una riga sola per ingrediente, come in Dispensa: nome, quantità usata
+    // (se si conta) e la spunta "finito" per tutti quelli che hai in Dispensa.
+    // Spuntato = scorta a 0, quindi finisce tra i Finiti della Spesa.
     const normalRowsHtml = uniqueIng.map(it=>{
       const name = it.ingrediente;
       const pantryIt = resolvePantryItem(name);
-      if(pantryIt && pantryIt.unit === 'none'){
-        if(typeof pantryIt.qty === 'number' && pantryIt.qty > 0) finishableNames.push(name);
-        return '';
-      }
-      const tracked = Object.prototype.hasOwnProperty.call(qtyMap, name);
-      if(!tracked){
+      if(!pantryIt){
         return `<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`;
       }
-      const unit = pantryIt.unit || '';
-      const step = qtyStepFor(unit);
-      const editingThis = state.doneQtyEditingKey === name;
-      return `
-      <div class="done-ing-row">
-        <span>${escapeHtml(name)}</span>
-        <span class="qty-stepper">
+      const finished = !!finishedMap[name];
+      const tracked = Object.prototype.hasOwnProperty.call(qtyMap, name) && pantryIt.unit !== 'none';
+      let stepperHtml = '';
+      if(tracked){
+        const unit = pantryIt.unit || '';
+        const step = qtyStepFor(unit);
+        const editingThis = state.doneQtyEditingKey === name;
+        stepperHtml = `
+        <span class="qty-stepper${finished ? ' is-dim' : ''}">
           <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
           ${editingThis
             ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qtyMap[name]}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
             : `<span class="qty-num" data-done-qty-show="${escapeAttr(name)}">${qtyMap[name]}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
           <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
-        </span>
-      </div>`;
+        </span>`;
+      }
+      const canFinish = typeof pantryIt.qty !== 'number' || pantryIt.qty > 0;
+      const checkHtml = canFinish ? `<label class="presence-toggle done-finished-check" title="Finito: va tra i Finiti della Spesa"><input type="checkbox" ${finished ? 'checked' : ''} data-done-finished-toggle="${escapeAttr(name)}" aria-label="${escapeAttr(name)}: finito"></label>` : '';
+      return `<div class="done-ing-row"><span>${escapeHtml(name)}</span><span class="done-ing-right">${stepperHtml}${checkHtml}</span></div>`;
     }).join('');
-    const finishedSectionHtml = finishableNames.length ? `
-      <div class="filter-group-label done-finished-title">L'hai finito? Se sì, lo aggiungo alla lista della spesa.</div>
-      <div class="done-ing-list">
-        ${finishableNames.map(name=>`
-        <label class="done-ing-row presence-toggle done-finished-row">
-          <span>${escapeHtml(name)}</span>
-          <input type="checkbox" ${finishedMap[name] ? 'checked' : ''} data-done-finished-toggle="${escapeAttr(name)}">
-        </label>`).join('')}
-      </div>` : '';
+    const finishedSectionHtml = '';
     const breadIt = breadPantryItem();
     const showBread = mealHasBread(di, doneMeal) && !recipeListsBread(uniqueIng);
     const breadRowHtml = !showBread ? '' : (breadCountable(breadIt) ? `
@@ -5964,7 +5966,7 @@ function renderMenu(){
           <h3>Ricetta fatta! 🎉</h3>
           <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
         </div>
-        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa — il resto degli ingredienti non cambia.</p>
+        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Spunta gli ingredienti che hai finito: vanno tra i Finiti della Spesa.</p>
         ${doneName && getRecipeMeta(doneName) ? `<div class="done-grad">${gradimentoPickerHtml(doneName)}</div>` : ''}
         ${breadRowHtml}
         ${uniqueIng.length ? `
@@ -8744,19 +8746,12 @@ function attachHandlers(){
         const pantryIt = resolvePantryItem(ingrediente);
         if(pantryIt) pantryIt.qty = Math.max(0, Math.round(((pantryIt.qty||0) - qtyMap[ingrediente]) * 100) / 100);
       });
-      // Ingredienti "a spanne" spuntati "L'hai finito?": segnati assenti in
-      // Dispensa (stesso stato della spunta tolta a mano, vedi presence-toggle)
-      // e aggiunti direttamente in Spesa, senza quantità — sono quelli che
-      // "si ricomprano e basta", non si scrive mai quanto prenderne.
+      // Ingredienti spuntati "finito" (con o senza quantità): scorta a 0, così
+      // la Spesa li mostra tra i Finiti in Dispensa, pronti da rimettere in lista.
       Object.entries(state.doneModalFinished || {}).forEach(([ingrediente, checked])=>{
         if(!checked) return;
         const pantryIt = resolvePantryItem(ingrediente);
         if(pantryIt) pantryIt.qty = 0;
-        const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === ingrediente.trim().toLowerCase());
-        if(!already){
-          const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-          state.shopExtras[id] = { ingrediente, qta: '' };
-        }
       });
       // Avanzo fisico segnalato dall'utente: voce a sé in Dispensa, come
       // presenza/assenza (nessuna quantità da tracciare) nel luogo scelto —
