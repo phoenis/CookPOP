@@ -4194,11 +4194,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-19',
+  version: '2026-12-21',
   title: 'Novità',
   items: [
-    'Dispensa: quando una scorta finisce, il suggerimento mostra carrello e cestino (il carrello la mette in lista spesa).',
-    'Dispensa: il + in basso apre sempre "Aggiungi ingrediente".'
+    'Spesa: l\'icona per aprire/chiudere le sezioni ora parte nel verso giusto (le sezioni sono aperte, quindi propone di chiuderle).'
   ]
 };
 
@@ -6535,7 +6534,7 @@ function renderSpesa(){
   ${addIngModal}
   ${renderExpiryConfirmModal()}
     <div class="buttons-fixed">
-      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_')) || (hasFinitiThisView && !state.shopFinitiOpen)) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
+      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
       <button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
         ${displayDoneShoppable ? `
 
@@ -7494,7 +7493,7 @@ function renderDispensa(){
       ${state.pantryFinishPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-finish-picker-close></div>
       <div class="luogo-picker finish-picker" role="dialog" aria-label="${escapeAttr(it.nome)} è finito">
-        <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 4h2.5l2 10h10l2-7.5H6.5"/><circle cx="9" cy="19" r="1.4" fill="currentColor"/><circle cx="17" cy="19" r="1.4" fill="currentColor"/></svg></button>
+        <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M17 17H6V3H4"/><path d="m6 5l14 1l-1 7H6"/></g></svg></button>
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-trash="${escapeAttr(it.key)}" title="Metti tra i Finiti" aria-label="Metti tra i Finiti">${TRASH_ICON_SVG}</button>
       </div>` : ''}
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}</button>
@@ -7973,7 +7972,7 @@ function attachHandlers(){
       // presenti) invece di ricalcolare la stessa logica una seconda volta qui.
       const sectionEls = document.querySelectorAll('[data-toggle-shop-section]');
       const finitiEls = document.querySelectorAll('[data-toggle-shop-finiti]');
-      const anyCollapsed = Array.from(sectionEls).some(el=>!el.classList.contains('open')) || (finitiEls.length > 0 && !state.shopFinitiOpen);
+      const anyCollapsed = sectionEls.length ? Array.from(sectionEls).some(el=>!el.classList.contains('open')) : (finitiEls.length > 0 && !state.shopFinitiOpen);
       sectionEls.forEach(el=>{
         const id = el.dataset.toggleShopSection;
         if(anyCollapsed) delete state.shopSectionCollapsed[id];
