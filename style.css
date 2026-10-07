@@ -37,7 +37,7 @@
     --text-medium:1.125rem;
     --text-large:1.3rem;
 
-    --user-color-mara:#ff3b1d; --user-color-ste:#ff2d6f; /* default = --gold/--tomato, sovrascritti inline per-utente da applyUserColors() */
+    --user-color-mara:#ff7a66; --user-color-ste:#ff6f9c; /* default = --gold/--tomato, sovrascritti inline per-utente da applyUserColors() */
 
     --luogo-dispensa: #eeb844;
     --luogo-ripostiglio: #df7150;
@@ -1489,3 +1489,8 @@ body{ overflow-x:clip; }
 .recipe-edit-page .filter-group-label .ui-ico{ margin:0; }
 .recipe-edit-page .section-sub{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); margin:var(--space-xxsmall) 0 0; }
 .edit-step-row .edit-step-text{ resize:none; }
+/* Colori dei turni chiari: testo scuro sopra, e scurito quando il colore fa da testo */
+.cook-pill.cook-mara, .cook-pill.cook-ste{ color:#2a1d1a; }
+.shop-assignee-btn.assignee-mara{ color:color-mix(in srgb, var(--user-color-mara) 60%, #000); }
+.shop-assignee-btn.assignee-ste{ color:color-mix(in srgb, var(--user-color-ste) 60%, #000); }
+.settings-avatar{ color:#2a1d1a; }
