@@ -1507,3 +1507,7 @@ body{ overflow-x:clip; }
 .done-ing-right{ display:inline-flex; align-items:center; gap:var(--space-small); }
 .done-ing-right .qty-stepper.is-dim{ opacity:0.4; }
 .done-finished-check{ display:inline-flex; }
+
+.done-ing-list .swipe-wrap{ border-bottom:1px solid var(--line); }
+.done-ing-list .swipe-wrap:last-child{ border-bottom:none; }
+.done-ing-list .swipe-content{ background:var(--surface); border-radius:0; border-bottom:none; }
