@@ -1482,3 +1482,10 @@ body{ overflow-x:clip; }
 .detail-section .steps-list li{ margin-bottom:var(--space-small); line-height:1.5; }
 .detail-section > .persone-row{ display:flex; width:fit-content; margin:var(--space-xsmall) 0 var(--space-xsmall) auto; padding:var(--space-xxsmall) var(--space-small); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-xsmall); font-weight:var(--weight-medium); color:var(--ink); gap:var(--space-xsmall); }
 .detail-section > .persone-row .qty-btn{ width:1.25rem; height:1.25rem; }
+/* Modifica ricetta: ingredienti e passaggi come gli altri campi */
+.edit-ing-row .edit-ing-name, .edit-ing-row .edit-ing-qta, .edit-step-row .edit-step-text{ box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); border-radius:var(--form-border-radius); padding:var(--space-xsmall) var(--space-small); color:var(--ink); }
+.edit-step-row .edit-step-text{ line-height:1.4; }
+.recipe-edit-page .filter-group-label{ display:flex; align-items:center; gap:var(--space-xsmall); }
+.recipe-edit-page .filter-group-label .ui-ico{ margin:0; }
+.recipe-edit-page .section-sub{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); margin:var(--space-xxsmall) 0 0; }
+.edit-step-row .edit-step-text{ resize:none; }
