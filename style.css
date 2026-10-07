@@ -1435,3 +1435,6 @@ body{ overflow-x:clip; }
 .sheet-page .settings-card:not(.is-links){ background:transparent; padding:var(--space-xsmall) 0; }
 .sheet-page .import-form{ padding:var(--space-xsmall) 0; }
 .sheet-page .settings-section-title, .sheet-page .manage-intro, .sheet-page .settings-note{ margin-left:0; margin-right:0; padding-left:0; padding-right:0; }
+/* Niente barra di scorrimento che toglie larghezza alle pagine a schermo intero: ricetta dal Menù e dal Ricettario hanno gli stessi margini */
+.sheet-page, .meal-detail-body{ scrollbar-width:none; }
+.sheet-page::-webkit-scrollbar, .meal-detail-body::-webkit-scrollbar{ display:none; }
