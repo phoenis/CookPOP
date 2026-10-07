@@ -1413,9 +1413,13 @@
 .btn.luogo-picker-opt svg, .btn.data-done-leftover-cat-toggle svg{ width:1rem !important; height:1rem !important; }
 .btn.inv-q-luogo svg{ width:1rem; height:1rem; }
 .sheet-luogo-icon svg{ width:1.2rem; height:1.2rem; }
-/* Box rosso dello swipe (cestino): bordi arrotondati e icona piccola, uguale in Spesa, Dispensa e Menù. Il rosso si vede solo mentre si scorre. */
-.swipe-wrap{ border-radius:var(--radius-modal); background:transparent; }
+/* Swipe col cestino, come Gmail: il box rosso parte con larghezza 0 e si allarga seguendo la riga (o la card) che scorre; bordi arrotondati, icona piccola, uguale in Spesa, Dispensa e Menù. */
+.swipe-wrap{ border-radius:0; background:transparent; }
 .swipe-content{ border-radius:var(--radius-modal); }
-.swipe-trash, .meal-block-trash{ width:4rem; font-size:1rem; background-color:var(--tomato); visibility:hidden; }
-.swipe-wrap:has(.swipe-content[style*="translate"], .swipe-content.swiping) .swipe-trash{ visibility:visible; }
-.swipe-trash svg, .meal-block-trash svg{ width:1.125rem; height:1.125rem; }
+.swipe-trash, .meal-block-trash{ position:absolute; left:0; top:0; bottom:0; width:0; min-width:0; padding:0; border:0; overflow:hidden; display:flex; align-items:center; justify-content:flex-start; background-color:var(--tomato); border-radius:var(--radius-modal); visibility:visible; font-size:1rem; transition:width .2s ease; }
+.swipe-trash svg, .meal-block-trash svg{ flex:none; margin-left:1.125rem; width:1.125rem; height:1.125rem; }
+.swipe-wrap:has(.swipe-content.swiping) .swipe-trash, .meal-block-swipe-wrap:has(.meal-block.swiping) .meal-block-trash{ transition:none; }
+/* Menù: scorre tutta la card (ombra compresa), senza tagliarla */
+.meal-block-swipe-wrap{ overflow:visible; border-radius:0; box-shadow:none; background:transparent; position:relative; }
+.meal-block-swipe-wrap .meal-block{ box-shadow:var(--shadow-card); }
+body{ overflow-x:clip; }

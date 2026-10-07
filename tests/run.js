@@ -1631,7 +1631,7 @@ test('menù: card dei pasti senza bordo e con ombra leggera; le card vuote senza
     const cs = el => getComputedStyle(el);
     const full = document.querySelector('.meal-block-swipe-wrap .meal-block:not(.is-empty)');
     const empty = document.querySelector('.meal-block.is-empty');
-    return { fullBorder: cs(full).borderTopWidth, fullShadow: cs(full.parentElement).boxShadow !== 'none', emptyBorder: cs(empty).borderTopWidth, emptyShadow: cs(empty).boxShadow };
+    return { fullBorder: cs(full).borderTopWidth, fullShadow: cs(full).boxShadow !== 'none', emptyBorder: cs(empty).borderTopWidth, emptyShadow: cs(empty).boxShadow };
   });
   eq(r, { fullBorder: '0px', fullShadow: true, emptyBorder: '0px', emptyShadow: 'none' });
 });
