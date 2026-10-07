@@ -597,7 +597,7 @@ function mancantiButtonHtml(mancanti){
 function cookFabHtml(name, ratio){
   const det = getRecipeDetails(name);
   if(!det || !det.procedimento || !det.procedimento.length) return '';
-  return `<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}"><span aria-hidden="true">🍳</span> Cucina</button>`;
+  return `<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}">Cucina</button>`;
 }
 // Tab Ingredienti | Passaggi dentro il piatto (stato in state.dishPane).
 function paneTabsHtml(paneKey, pane){
@@ -828,9 +828,8 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
   const ingHtml = renderIngredientsSection(ing, ratio, Object.assign({ noButton: true, titleHtml: personeRowHtml(ctx.persone, ctx.canPortions ? mk : '') }, ctx));
   const tagsHtml = rec ? `
     <div class="detail-tags">
-      <span class="tag">${catIcon(rec.categoriaNew)} ${escapeHtml(CAT_LABEL[rec.categoriaNew])}</span>
+      ${gradTagHtml(name)}
       <span class="tag tempo">${det ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> ' + escapeHtml(det.tempo) : escapeHtml(TEMPO_LABEL[rec.tempoBucket])}</span>
-      <span class="tag season">${rec.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
       ${(rec.freezerNew && rec.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[rec.freezerNew]}</span>` : ''}
       ${rec.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
     </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
@@ -880,7 +879,6 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
       ${addFormHtml}` : `
       ${stepsHtml || '<div class="ing-empty">Nessun procedimento salvato per questa ricetta.</div>'}
       ${noteBox}
-      ${rec ? gradimentoPickerHtml(name) : ''}
       ${linkHtml ? `<div class="button-wrapper">${linkHtml}</div>` : ''}`}
     </div>` : ''}
   </div>`;
@@ -1127,7 +1125,7 @@ function recipePhotoHtml(name, editable){
   if(c.status === 'ok') return `
     <figure class="recipe-photo"><img src="${escapeAttr(c.src)}" alt="Foto del piatto: ${escapeAttr(name)}"></figure>
     <div class="recipe-photo-actions">${input('📷 Cambia foto')}<button type="button" class="btn is-chip" data-recipe-photo-remove="${escapeAttr(name)}">Rimuovi foto</button></div>${error}`;
-  return `<div class="recipe-photo-actions">${input('📷 Aggiungi una foto del piatto')}</div>${error}`;
+  return `<label class="recipe-photo-drop">+ Aggiungi foto<input type="file" accept="image/*" hidden data-recipe-photo-input="${escapeAttr(name)}"></label>${error}`;
 }
 function loadImageFile(file){
   return new Promise((resolve, reject)=>{
@@ -1282,6 +1280,22 @@ document.addEventListener('input', e=>{
 // (prima solo come filtro, e cambiarlo voleva dire passare da "Modifica
 // ricetta"). Si salva come le altre modifiche al catalogo (state.recipeEdits),
 // aggiungendosi a quelle già fatte invece di sostituirle.
+// Etichetta di gradimento nei dettagli ricetta: al tocco apre un piccolo
+// menu per cambiarlo; se vuoto dice "Ti piace?".
+function gradTagHtml(name){
+  const r = getRecipeMeta(name);
+  if(!r) return '';
+  const label = GRAD_LABEL[r.gradimento] || 'Ti piace?';
+  const open = state.gradPicker === name;
+  return `<span class="grad-tag-wrap"><button type="button" class="tag grad-tag${r.gradimento ? '' : ' is-empty'}" data-grad-open="${escapeAttr(name)}" aria-expanded="${open}">${label}</button>${open ? `
+    <div class="grad-pop-backdrop" data-grad-close></div>
+    <div class="grad-pop" role="menu">${GRAD_ORDER.map(g=>`<button type="button" class="grad-pop-opt${r.gradimento===g?' active':''}" role="menuitem" data-set-gradimento="${escapeAttr(name)}" data-grad="${g}">${GRAD_LABEL[g]}</button>`).join('')}</div>` : ''}</span>`;
+}
+document.addEventListener('click', e=>{
+  const o = e.target.closest && e.target.closest('[data-grad-open]');
+  if(o){ const n = o.dataset.gradOpen; state.gradPicker = state.gradPicker === n ? null : n; render(); return; }
+  if(e.target.closest && e.target.closest('[data-grad-close]')){ state.gradPicker = null; render(); }
+});
 function gradimentoPickerHtml(name){
   const r = getRecipeMeta(name);
   if(!r) return '';
@@ -1296,7 +1310,8 @@ document.addEventListener('click', e=>{
   if(!chip) return;
   const name = chip.dataset.setGradimento;
   const grad = chip.dataset.grad;
-  if(!GRAD_ORDER.includes(grad) || (getRecipeMeta(name) || {}).gradimento === grad) return;
+  state.gradPicker = null;
+  if(!GRAD_ORDER.includes(grad) || (getRecipeMeta(name) || {}).gradimento === grad){ render(); return; }
   state.recipeEdits[name] = Object.assign({}, state.recipeEdits[name], { gradimento: grad });
   persist(); render();
 }, true); // in cattura: dentro le finestre (es. "Ricetta fatta!") il primo [data-stop-close] ferma la risalita
@@ -1679,6 +1694,7 @@ const state = {
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
   backupOpen: false, // non persistito: pagina "Backup"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
+  gradPicker: null, // ephemeral: nome della ricetta con il menu del gradimento aperto
   profileOpen: false, // non persistito: pagina "Profilo"
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
@@ -4230,10 +4246,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-31',
+  version: '2027-01-01',
   title: 'Novità',
   items: [
-    'Ricette: tolta la scelta "Ottima per il pranzo dopo / Buona il giorno dopo / Meglio appena fatta" (etichetta, modifica e filtro). Resta la nota libera "Avanzi".'
+    'Dettaglio ricetta: l\'etichetta di gradimento (tocca per cambiarla, "Ti piace?" se vuota) prende il posto di categoria e stagione nel Menù; nelle Ricette si aggiungono categoria e gradimento.',
+    'Modifica ricetta: "+ Aggiungi foto" in un riquadro tratteggiato. Il bottone Cucina non ha più l\'emoji.'
   ]
 };
 
@@ -4465,6 +4482,7 @@ const MODAL_CHECKS = [
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
+  [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
   [()=> !!state.profileOpen, ()=>{ state.profileOpen = false; }],
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
@@ -6586,6 +6604,8 @@ function renderRecipeDetailScreen(name){
   const ing = getIngredientsFor(name);
   const tagsHtml = `
     <div class="detail-tags">
+      <span class="tag">${catIcon(r.categoriaNew)} ${escapeHtml(CAT_LABEL[r.categoriaNew])}</span>
+      ${gradTagHtml(name)}
       <span class="tag season">${r.stagioni.map(s=>escapeHtml(STAGIONE_LABEL[s])).join(', ')}</span>
       ${(r.freezerNew && r.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[r.freezerNew]}</span>` : ''}
       ${r.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[r.pianificazione])}</span>` : ''}
@@ -6633,7 +6653,6 @@ function renderRecipeDetailScreen(name){
       ${tagsHtml}
       ${paneTabsHtml('r|' + name, recPane)}
       ${recPane === 'ing' ? `${mancantiTop}${ingHtml}${addFormHtml}` : `${stepsHtml || '<div class="ing-empty">Nessun procedimento salvato per questa ricetta.</div>'}${noteBox}${linkHtml ? `<div class="button-wrapper">${linkHtml}</div>` : ''}`}
-      ${gradimentoPickerHtml(name)}
       ${menuHtml}
       ${cookFab}
     </div>` });

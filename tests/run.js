@@ -369,10 +369,11 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
 
 test('ricette: gradimento visibile e modificabile con un tocco, senza perdere altre modifiche', async ({ page }) => {
   await page.evaluate(() => { state.recipeEdits['Carbonara'] = { ricordare: 'nota mia' }; state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render(); });
-  eq(await page.evaluate(() => ({ active: !!document.querySelector('.grad-chip.active'), grad: getRecipeMeta('Carbonara').gradimento })), { active: false, grad: '' }, 'senza gradimento di partenza');
+  eq(await page.evaluate(() => ({ tag: document.querySelector('.grad-tag').textContent.trim(), grad: getRecipeMeta('Carbonara').gradimento })), { tag: 'Ti piace?', grad: '' }, 'senza gradimento di partenza');
+  await page.click('[data-grad-open="Carbonara"]');
   await page.click('[data-set-gradimento="Carbonara"][data-grad="preferita"]');
-  const r = await page.evaluate(() => ({ grad: getRecipeMeta('Carbonara').gradimento, nota: getRecipeDetails('Carbonara').ricordare, active: document.querySelector('.grad-chip.active').dataset.grad }));
-  eq(r, { grad: 'preferita', nota: 'nota mia', active: 'preferita' });
+  const r = await page.evaluate(() => ({ grad: getRecipeMeta('Carbonara').gradimento, nota: getRecipeDetails('Carbonara').ricordare, tag: document.querySelector('.grad-tag').textContent.trim(), menuClosed: !document.querySelector('.grad-pop') }));
+  eq(r, { grad: 'preferita', nota: 'nota mia', tag: '❤️ Preferita', menuClosed: true });
   await page.evaluate(() => { state.expandedRecipe = null; render(); });
   eq(await page.$eval('[data-toggle-recipe="Carbonara"] .grad-icon', el => el.textContent), '❤️', 'icona nella card');
   await page.evaluate(() => { state.recipeEditName = 'Carbonara'; render(); });
@@ -1596,7 +1597,7 @@ test('Ricettario: dettaglio ricetta come pagina (tab, persone, Aggiungi in alto,
     out.tabs = [...pg().querySelectorAll('.pane-tab')].map(e => e.textContent.trim());
     const kids = [...pg().querySelector('.meal-detail-body').children].map(e => e.className.split(' ')[0] || e.tagName);
     out.addBeforeList = kids.indexOf('button-wrapper') >= 0 && kids.indexOf('button-wrapper') < kids.indexOf('detail-section');
-    out.gradLast = kids.filter(k => k !== 'cook-fab').pop() === 'grad-picker';
+    out.gradLast = !!pg().querySelector('.detail-tags .grad-tag') && !pg().querySelector('.grad-picker') && /Ti piace\?/.test(pg().querySelector('.grad-tag').textContent) && !!pg().querySelector('.detail-tags .tag:not(.grad-tag):not(.season)');
     out.fab = !!pg().querySelector('.cook-fab');
     const qty0 = pg().querySelector('.ing-list li:last-child, .ing-list li').textContent;
     const n0 = parseInt(pg().querySelector('.persone-row .qty-num').textContent, 10);
@@ -1610,7 +1611,7 @@ test('Ricettario: dettaglio ricetta come pagina (tab, persone, Aggiungi in alto,
   eq([r.page, r.modal, r.title], [true, false, 'Carbonara'], 'pagina, non modale');
   eq(r.tabs, ['Ingredienti', 'Passaggi']);
   assert(r.addBeforeList, '"Aggiungi N ingredienti" sopra l\'elenco');
-  assert(r.gradLast, 'gradimento a fondo pagina');
+  assert(r.gradLast, 'etichetta di gradimento (Ti piace?) e categoria nei tag');
   assert(r.fab, 'Cucina fisso');
   eq(r.persone[1], r.persone[0] + 1, 'persone +1');
   eq(r.qtyChanged, true, 'quantità scalate');

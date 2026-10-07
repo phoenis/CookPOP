@@ -1463,3 +1463,13 @@ body{ overflow-x:clip; }
 #settings-backdrop .settings-link-text{ gap:0; font-weight:500; }
 #settings-backdrop .settings-link-text small{ line-height:1.25; }
 .topbar-menu-item{ padding:var(--space-small) var(--space-small); line-height:1.5; }
+/* Gradimento come etichetta con piccolo menu; foto nella modifica; titoli più compatti */
+.grad-tag-wrap{ position:relative; display:inline-flex; }
+.grad-tag{ border:0; cursor:pointer; }
+.grad-tag.is-empty{ color:var(--ink-light); border:1px dashed var(--line); background:transparent; }
+.grad-pop-backdrop{ position:fixed; inset:0; z-index:150; background:transparent; }
+.grad-pop{ position:absolute; top:100%; left:0; margin-top:var(--space-xxsmall); z-index:151; display:flex; flex-direction:column; min-width:11rem; padding:var(--space-xxsmall); background:var(--surface); border:1px solid var(--line); border-radius:var(--form-border-radius); box-shadow:var(--shadow-card); }
+.grad-pop-opt{ text-align:left; border:0; background:none; padding:var(--space-xsmall) var(--space-small); border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-small); color:var(--ink); cursor:pointer; }
+.grad-pop-opt.active{ background:rgba(var(--gold-rgb),0.12); font-weight:var(--weight-bold); }
+.recipe-photo-drop{ display:flex; align-items:center; justify-content:center; box-sizing:border-box; min-height:5rem; margin-bottom:var(--space-small); border:2px dashed var(--line); border-radius:var(--radius-modal); color:var(--ink-light); font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-medium); cursor:pointer; text-align:center; }
+.settings-title{ line-height:1.2; }
