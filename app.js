@@ -1034,6 +1034,61 @@ function allRecipeMetas(){
 // del codice legge senza controllo di esistenza (liste/filtri).
 // Una ricetta "eliminata" (state.hiddenRecipes) sparisce ovunque: DATA.recipes
 // è statico e non si può rimuovere davvero, quindi la si nasconde soltanto.
+// Rinomina una ricetta ovunque: dati, pasti già pianificati, album e foto.
+// Il nome è la chiave di tutto, e le ricette del catalogo (statico) non si
+// possono rinominare davvero: diventano una copia propria col nuovo nome e
+// l'originale si nasconde.
+function renameStringsInTree(node, from, to){
+  if(Array.isArray(node)){
+    node.forEach((v, i)=>{ if(v === from) node[i] = to; else renameStringsInTree(v, from, to); });
+  } else if(node && typeof node === 'object'){
+    Object.keys(node).forEach(k=>{ const v = node[k]; if(v === from) node[k] = to; else renameStringsInTree(v, from, to); });
+  }
+}
+function renameRecipeRefs(from, to){
+  ['weekBaseline','weekOverrides','weekOverridePicked','extraWeeks','dishPlan','freezerDishes'].forEach(f=>{ if(state[f]) renameStringsInTree(state[f], from, to); });
+  (state.cookbooks || []).forEach(cb=>{ if(Array.isArray(cb.recipes)) cb.recipes = cb.recipes.map(n => n === from ? to : n); });
+  if(state.expandedRecipe === from) state.expandedRecipe = to;
+}
+function moveRecipeKeys(from, to){
+  ['recipeEdits','recipeIngredients'].forEach(f=>{
+    const dict = state[f];
+    if(dict && Object.prototype.hasOwnProperty.call(dict, from)){ dict[to] = dict[from]; delete dict[from]; }
+  });
+}
+function recipeNameTaken(name){
+  const k = name.trim().toLowerCase();
+  return Object.keys(recipeByName).concat(Object.keys(state.customRecipes)).some(n => n.toLowerCase() === k);
+}
+async function moveRecipePhoto(from, to){
+  if(!window.cookpopSync || !window.cookpopSync.load) return;
+  try{
+    const val = await window.cookpopSync.load(recipePhotoPath(from));
+    if(!val || !val.data) return;
+    await window.cookpopSync.save(recipePhotoPath(to), { data: val.data, updatedAt: val.updatedAt || Date.now(), by: val.by || whatsNewViewerKey() });
+    await window.cookpopSync.save(recipePhotoPath(from), null);
+    delete recipePhotoCache[from]; delete recipePhotoCache[to];
+    render();
+  }catch(e){ /* la foto resta col vecchio nome: non è grave */ }
+}
+function renameRecipe(from, to){
+  if(!from || !to || from === to) return;
+  const staticMeta = recipeByName[from];
+  if(staticMeta){
+    state.customRecipes[to] = Object.assign({}, staticMeta, { nome: to });
+    state.recipeEdits[to] = Object.assign({}, DATA.recipeDetails[from] || {}, state.recipeEdits[from] || {});
+    delete state.recipeEdits[from];
+    if(state.recipeIngredients[from]){ state.recipeIngredients[to] = state.recipeIngredients[from]; delete state.recipeIngredients[from]; }
+    state.hiddenRecipes[from] = true;
+  } else {
+    state.customRecipes[to] = Object.assign({}, state.customRecipes[from], { nome: to });
+    delete state.customRecipes[from];
+    moveRecipeKeys(from, to);
+  }
+  delete state.hiddenRecipes[to];
+  renameRecipeRefs(from, to);
+  moveRecipePhoto(from, to);
+}
 function getRecipeMeta(name){
   if(state.hiddenRecipes[name]) return null;
   const base = recipeByName[name] || state.customRecipes[name];
@@ -1593,6 +1648,7 @@ const state = {
   pantryGroupMigrated3: false,
   shopKeysByName1: false,
   baseDeptMigrated1: false,
+  ricettarioDupes1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -2150,6 +2206,19 @@ const MIGRATIONS = [
   // confluisce qui: le voci/gruppi che la usavano passano a 'base', l'emoji
   // scelta resta come personalizzazione. In più sale, pepe, olio, aceto,
   // spezie messi a mano in "Dispensa e condimenti" passano a Base.
+  // Le tre paste del ricettario (Pasta e zucca / patate / lenticchie) hanno preso
+  // il posto delle versioni del catalogo con lo stesso nome: via le modifiche e gli
+  // "eliminata" rimasti alle vecchie, e quelle col "(ricettario)" nel nome passano
+  // al nome semplice (pasti, album, modifiche comprese).
+  { flag: 'ricettarioDupes1', run(){
+    [['Pasta e zucca', 'Pasta e zucca (ricettario)'], ['Pasta e patate', 'Pasta e patate (ricettario)'], ['Pasta e lenticchie', 'Pasta e lenticchie (ricettario)']].forEach(([plain, tagged])=>{
+      delete state.recipeEdits[plain]; delete state.recipeIngredients[plain]; delete state.hiddenRecipes[plain];
+      if(state.hiddenRecipes[tagged]){ state.hiddenRecipes[plain] = true; delete state.hiddenRecipes[tagged]; }
+      if(state.customRecipes[tagged]){ state.customRecipes[plain] = Object.assign({}, state.customRecipes[tagged], { nome: plain }); delete state.customRecipes[tagged]; }
+      moveRecipeKeys(tagged, plain);
+      renameRecipeRefs(tagged, plain);
+    });
+  } },
   { flag: 'baseDeptMigrated1', run(){
     const custom = state.customDepts || {};
     const oldIds = Object.keys(custom).filter(id => !BASE_DEPT_LABEL[id] && custom[id] && !custom[id].nonFood && (custom[id].label || '').trim().toLowerCase() === 'base');
@@ -4126,12 +4195,14 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-14',
+  version: '2026-12-15',
   title: 'Novità',
   items: [
-    'Dieci nuove ricette dal ricettario: Casatiello, Impasto pizza, Pasta e zucca, Pasta e lenticchie, Pasta e patate, Stracciatella, Pastella per frittelle, Migliaccio rustico, Gnocchi alla farina e Besciamella. Le porzioni sono stimate e dove il ricettario non dà le quantità c\'è "q.b.".'
+    'Modifica ricetta: ora puoi cambiare il nome della ricetta. Si aggiorna ovunque (pasti, album, foto).',
+    'Pasta e zucca, Pasta e patate e Pasta e lenticchie: restano solo quelle del ricettario, senza "(ricettario)" nel nome.'
   ]
 };
+
 
 
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4602,6 +4673,10 @@ function renderRecipeEditModal(){
 
   const formHtml = `
         <div class="filter-groups" id="edit-recipe-form">
+          <div class="filter-group">
+            <div class="filter-group-label">Nome</div>
+            <input type="text" id="edit-name" value="${escapeAttr(name)}" autocomplete="off">
+          </div>
           <div class="filter-group">
             <div class="filter-group-label">Foto del piatto</div>
             <div id="edit-photo-area">${recipePhotoHtml(name, true)}</div>
@@ -8811,7 +8886,14 @@ function attachHandlers(){
   }
   document.querySelectorAll('[data-save-recipe-edit]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const name = e.currentTarget.dataset.saveRecipeEdit;
+      let name = e.currentTarget.dataset.saveRecipeEdit;
+      const newName = ((document.getElementById('edit-name') || {}).value || '').trim();
+      if(!newName){ window.alert('Il nome non può essere vuoto.'); return; }
+      if(newName !== name){
+        if(recipeNameTaken(newName)){ window.alert('Esiste già una ricetta con questo nome.'); return; }
+        renameRecipe(name, newName);
+        name = newName;
+      }
       const ingredienti = Array.from(document.querySelectorAll('#edit-ing-list .edit-ing-row')).map(row=>({
         ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()),
         qta: row.querySelector('.edit-ing-qta').value.trim()

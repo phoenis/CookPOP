@@ -2026,15 +2026,68 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
 
 test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
   const r = await page.evaluate(() => {
-    const nomi = ['Casatiello', 'Impasto pizza', 'Pasta e zucca (ricettario)', 'Stracciatella', 'Pastella per frittelle', 'Migliaccio rustico', 'Pasta e lenticchie (ricettario)', 'Pasta e patate (ricettario)', 'Gnocchi alla farina', 'Besciamella'];
+    const nomi = ['Casatiello', 'Impasto pizza', 'Pasta e zucca', 'Stracciatella', 'Pastella per frittelle', 'Migliaccio rustico', 'Pasta e lenticchie', 'Pasta e patate', 'Gnocchi alla farina', 'Besciamella'];
     return {
       ok: nomi.every(n => { const m = getRecipeMeta(n), d = getRecipeDetails(n); return m && d && d.link === 'ricettario' && d.procedimento.length >= 1 && getIngredientsFor(n).length >= 3; }),
       basi: ['Impasto pizza', 'Pastella per frittelle', 'Besciamella'].map(n => getRecipeMeta(n).tipologia),
-      originali: ['Pasta e zucca', 'Pasta e patate', 'Pasta e lenticchie'].every(n => !!getRecipeMeta(n)),
+      senzaTag: !DATA.recipes.some(r => /\(ricettario\)/.test(r.nome)),
       reparti: ['Pastina', 'Scarola', 'Grasso a scelta (meglio con la cotica)'].map(classifyDept)
     };
   });
-  eq(r, { ok: true, basi: ['antipasto', 'antipasto', 'antipasto'], originali: true, reparti: ['pasta', 'verdura', 'salumi'] });
+  eq(r, { ok: true, basi: ['antipasto', 'antipasto', 'antipasto'], senzaTag: true, reparti: ['pasta', 'verdura', 'salumi'] });
+});
+
+test('ricette: si può rinominare (custom e catalogo) e il nome si aggiorna in pasti, album e modifiche', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    // ricetta creata a mano
+    state.customRecipes['Prova vecchia'] = { nome: 'Prova vecchia' };
+    state.recipeEdits['Prova vecchia'] = { porzioni: '2 porzioni', ingredienti: [{ ingrediente: 'Farina', qta: '100 g' }], procedimento: ['Mescola.'] };
+    state.cookbooks = [{ id: 'c1', name: 'Album', recipes: ['Prova vecchia'] }];
+    state.extraWeeks = []; generateWeek(1); writeMealDishes(1, 1, 'cena', 'Prova vecchia', []);
+    out.nameTaken = recipeNameTaken('pasta e patate') && !recipeNameTaken('Nome nuovo e libero');
+    renameRecipe('Prova vecchia', 'Prova nuova');
+    out.custom = !!getRecipeMeta('Prova nuova') && !getRecipeMeta('Prova vecchia') && getRecipeDetails('Prova nuova').procedimento[0] === 'Mescola.';
+    out.album = state.cookbooks[0].recipes[0] === 'Prova nuova';
+    out.menu = effectiveMeal(1, 1, 'cena').principale === 'Prova nuova';
+    // ricetta del catalogo
+    const orig = 'Besciamella';
+    const nIng = getIngredientsFor(orig).length;
+    renameRecipe(orig, 'Besciamella di casa');
+    out.catalogo = !getRecipeMeta(orig) && !!getRecipeMeta('Besciamella di casa') && getIngredientsFor('Besciamella di casa').length === nIng && getRecipeDetails('Besciamella di casa').link === 'ricettario';
+    // dalla pagina Modifica: il campo Nome
+    state.tab = 'prep'; state.recipeEditName = 'Prova nuova'; render();
+    out.campo = (document.getElementById('edit-name') || {}).value === 'Prova nuova';
+    document.getElementById('edit-name').value = 'Prova finale';
+    document.querySelector('[data-save-recipe-edit]').click();
+    out.salvato = !!getRecipeMeta('Prova finale') && !state.recipeEditName && state.cookbooks[0].recipes[0] === 'Prova finale';
+    delete state.customRecipes['Prova finale']; delete state.recipeEdits['Prova finale']; delete state.hiddenRecipes[orig]; delete state.customRecipes['Besciamella di casa']; delete state.recipeEdits['Besciamella di casa']; state.cookbooks = [];
+    return out;
+  });
+  eq(r, { nameTaken: true, custom: true, album: true, menu: true, catalogo: true, campo: true, salvato: true });
+});
+
+test('migrazione: le paste del ricettario prendono il nome semplice, via i resti delle vecchie', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    // stato "vecchio": la vecchia Pasta e zucca eliminata, modifiche sulla vecchia Pasta e patate, un album con il nome col tag
+    state.ricettarioDupes1 = false;
+    state.hiddenRecipes['Pasta e zucca'] = true;
+    state.recipeEdits['Pasta e patate'] = { gradimento: 'preferita-vecchia' };
+    state.recipeEdits['Pasta e patate (ricettario)'] = { porzioni: '6 porzioni' };
+    state.cookbooks = [{ id: 'c2', name: 'Inverno', recipes: ['Pasta e lenticchie (ricettario)', 'Pasta e zucca (ricettario)'] }];
+    runMigrations();
+    const out = {
+      zuccaVisibile: !!getRecipeMeta('Pasta e zucca'),
+      vecchiaEditPersa: !state.recipeEdits['Pasta e patate'] || state.recipeEdits['Pasta e patate'].gradimento !== 'preferita-vecchia',
+      editSpostata: state.recipeEdits['Pasta e patate'] && state.recipeEdits['Pasta e patate'].porzioni === '6 porzioni',
+      album: state.cookbooks[0].recipes.join('|'),
+      flag: state.ricettarioDupes1 === true
+    };
+    delete state.recipeEdits['Pasta e patate']; state.cookbooks = [];
+    return out;
+  });
+  eq(r, { zuccaVisibile: true, vecchiaEditPersa: true, editSpostata: true, album: 'Pasta e lenticchie|Pasta e zucca', flag: true });
 });
 
 (async () => {
