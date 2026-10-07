@@ -233,7 +233,7 @@
      fissa, freccia Indietro e sezioni a schede. L'id resta settings-backdrop
      e si apre con la classe "open", come prima (Indietro/Esc via MODAL_CHECKS). */
   .settings-backdrop{ display:none; position:fixed; inset:0; z-index:200; background:var(--bg); overflow-y:auto; overscroll-behavior:contain; }
-  .settings-backdrop.open{ display:block; animation:settings-in 0.18s ease-out; }
+  .settings-backdrop.open{ display:block; }
   @keyframes settings-in{ from{ opacity:0; transform:translateX(1.5rem); } to{ opacity:1; transform:none; } }
   @media (prefers-reduced-motion: reduce){ .settings-backdrop.open{ animation:none; } }
   .settings-page{ min-height:100%; outline:none; }
@@ -851,7 +851,6 @@
 /* Scheda ingrediente (renderIngredientSheet): pagina intera sopra Dispensa,
    sotto le finestre che apre (categorie, gruppi, unisci: z-index 200). */
 .sheet-page{ position:fixed; inset:0; z-index:190; background:var(--bg); overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; outline:none; }
-.sheet-page.is-entering{ animation:settings-in 0.18s ease-out; }
 @media (prefers-reduced-motion: reduce){ .sheet-page.is-entering{ animation:none; } }
 .sheet-body{ flex:1; width:100%; }
 .sheet-footer{ position:sticky; bottom:0; padding:var(--space-small) var(--space-medium) calc(var(--space-small) + env(safe-area-inset-bottom)); background:var(--bg); border-top:1px solid var(--line); }
