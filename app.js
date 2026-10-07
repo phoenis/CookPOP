@@ -4246,10 +4246,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-02',
+  version: '2027-01-03',
   title: 'Novità',
   items: [
-    'Dettaglio ricetta: l\'etichetta di gradimento è sempre l\'ultima. Tolta l\'animazione di dissolvenza quando si aprono le pagine.'
+    'Ricetta aperta dal Menù: margini bilanciati come nelle Ricette (una card sporgeva e allargava la pagina).',
+    'Bottone Cucina: stessa posizione da Menù e da Ricette, un po\' più in basso.'
   ]
 };
 
