@@ -1680,6 +1680,7 @@ const state = {
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
   backupOpen: false, // non persistito: pagina "Backup"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
+  profileOpen: false, // non persistito: pagina "Profilo"
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
@@ -1836,7 +1837,7 @@ const firebaseReady = (async ()=>{
   try{
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js");
     const { getDatabase, ref, set: fbSet, update: fbUpdate, onValue, get: fbGet } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js");
-    const { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js");
+    const { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js");
     const firebaseConfig = {
       apiKey: "AIzaSyDVlyYgyJ1rTtyitMc3xoNhvBm3HPpC0g8",
       authDomain: "cookpop-c91d6.firebaseapp.com",
@@ -1866,6 +1867,7 @@ const firebaseReady = (async ()=>{
     window.cookpopAuth = {
       signIn(email, password){ return signInWithEmailAndPassword(auth, email, password); },
       signOut(){ return signOut(auth); },
+      updateName(name){ return auth.currentUser ? updateProfile(auth.currentUser, { displayName: name }) : Promise.reject(new Error('non connesso')); },
       onAuthStateChanged(cb){ onAuthStateChanged(auth, cb); }
     };
   }catch(e){
@@ -1894,6 +1896,7 @@ function decodeKeysFromFirebase(obj){
 // subito se Firebase non è raggiungibile (offline: si procede con la sola
 // cache locale, coerente col fallback già previsto in loadState/persist).
 let loggedInEmail = null;
+let loggedInName = ''; // nome del profilo (Firebase Auth displayName), se impostato
 function waitForAuth(){
   return new Promise((resolve)=>{
     if(!window.cookpopAuth){ resolve(); return; }
@@ -1907,6 +1910,8 @@ function waitForAuth(){
 
     window.cookpopAuth.onAuthStateChanged((user)=>{
       loggedInEmail = user ? user.email : null;
+      loggedInName = user && user.displayName ? user.displayName : '';
+      if(typeof refreshProfileLink === 'function') refreshProfileLink();
       gate.style.display = user ? 'none' : 'flex';
       if(logoutBtn) logoutBtn.style.display = user ? 'block' : 'none';
       if(user && !resolved){ resolved = true; resolve(); }
@@ -4206,6 +4211,7 @@ const UI_ICONS = {
   'calendar': '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm12-4v4M8 3v4m-4 4h16"/>',
   'wand': '<path d="m6 21l15-15l-3-3L3 18z"/><path d="m15 6l3 3M9 3a2 2 0 0 0 2 2a2 2 0 0 0-2 2a2 2 0 0 0-2-2a2 2 0 0 0 2-2m10 11a2 2 0 0 0 2 2a2 2 0 0 0-2 2a2 2 0 0 0-2-2a2 2 0 0 0 2-2"/>',
   'swap': '<path d="M21 7H3m15-3l3 3l-3 3M3 17h18M6 14l-3 3l3 3"/>',
+  'user': '<path d="M8 7a4 4 0 1 0 8 0a4 4 0 1 0-8 0M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>',
   'cards': '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>'};
 const UI_GEAR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="ui-ico" preserveAspectRatio="xMidYMid meet" viewBox="0 0 32 32"><path fill="currentColor" d="M27 16.76v-1.53l1.92-1.68A2 2 0 0 0 29.3 11l-2.36-4a2 2 0 0 0-1.73-1a2 2 0 0 0-.64.1l-2.43.82a11 11 0 0 0-1.31-.75l-.51-2.52a2 2 0 0 0-2-1.61h-4.68a2 2 0 0 0-2 1.61l-.51 2.52a11.5 11.5 0 0 0-1.32.75l-2.38-.86A2 2 0 0 0 6.79 6a2 2 0 0 0-1.73 1L2.7 11a2 2 0 0 0 .41 2.51L5 15.24v1.53l-1.89 1.68A2 2 0 0 0 2.7 21l2.36 4a2 2 0 0 0 1.73 1a2 2 0 0 0 .64-.1l2.43-.82a11 11 0 0 0 1.31.75l.51 2.52a2 2 0 0 0 2 1.61h4.72a2 2 0 0 0 2-1.61l.51-2.52a11.5 11.5 0 0 0 1.32-.75l2.42.82a2 2 0 0 0 .64.1a2 2 0 0 0 1.73-1l2.28-4a2 2 0 0 0-.41-2.51ZM25.21 24l-3.43-1.16a8.9 8.9 0 0 1-2.71 1.57L18.36 28h-4.72l-.71-3.55a9.4 9.4 0 0 1-2.7-1.57L6.79 24l-2.36-4l2.72-2.4a8.9 8.9 0 0 1 0-3.13L4.43 12l2.36-4l3.43 1.16a8.9 8.9 0 0 1 2.71-1.57L13.64 4h4.72l.71 3.55a9.4 9.4 0 0 1 2.7 1.57L25.21 8l2.36 4l-2.72 2.4a8.9 8.9 0 0 1 0 3.13L27.57 20Z"></path><path fill="currentColor" d="M16 22a6 6 0 1 1 6-6a5.94 5.94 0 0 1-6 6m0-10a3.91 3.91 0 0 0-4 4a3.91 3.91 0 0 0 4 4a3.91 3.91 0 0 0 4-4a3.91 3.91 0 0 0-4-4"></path></svg>';
 function uiIcon(name){
@@ -4222,10 +4228,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-26',
+  version: '2026-12-27',
   title: 'Novità',
   items: [
-    'Ricetta aperta dal Menù e dal Ricettario: stessa larghezza e stessi margini (la barra di scorrimento toglieva spazio a una delle due).'
+    'Impostazioni: nuova voce Profilo con il tuo nome (lo scegli tu), l\'email dell\'account e il pulsante Esci.'
   ]
 };
 
@@ -4334,7 +4340,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderProfilePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -4457,6 +4463,7 @@ const MODAL_CHECKS = [
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
+  [()=> !!state.profileOpen, ()=>{ state.profileOpen = false; }],
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
@@ -10479,6 +10486,66 @@ document.addEventListener('input', e=>{ if(e.target.id === 'new-recipe-name') st
 document.addEventListener('keydown', e=>{ if(e.target.id === 'new-recipe-name' && e.key === 'Enter'){ e.preventDefault(); createNewRecipeFromPage(); } });
 // Pagina "Tema e colori" (dalle Impostazioni): chiaro/scuro e colore d'accento,
 // validi solo su questo telefono.
+// Profilo: nome (salvato sull'account, quindi su tutti i telefoni), email
+// dell'account e uscita.
+function profileDisplayName(){
+  if(loggedInName) return loggedInName;
+  const u = getCurrentUser();
+  return u ? u.charAt(0).toUpperCase() + u.slice(1) : '';
+}
+function refreshProfileLink(){
+  const el = document.getElementById('settings-profile-text');
+  if(!el) return;
+  const name = profileDisplayName();
+  el.innerHTML = `${escapeHtml(name || 'Il tuo profilo')}<small>${escapeHtml(loggedInEmail || 'Nome, email, esci')}</small>`;
+}
+function renderProfilePage(){
+  if(!state.profileOpen) return '';
+  const body = `
+      <section class="settings-section">
+        <h3 class="settings-section-title">Il tuo nome</h3>
+        <div class="settings-card">
+          <input type="text" id="profile-name" value="${escapeAttr(profileDisplayName())}" placeholder="Come ti chiami" autocomplete="off" maxlength="40">
+          <p class="settings-note" id="profile-status"></p>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Email</h3>
+        <div class="settings-card">
+          <p class="settings-card-text" id="profile-email">${escapeHtml(loggedInEmail || 'Non hai fatto l\'accesso')}</p>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="settings-card">
+          <button class="btn is-outline is-block settings-item-danger" type="button" data-logout>${uiIcon('power')} Esci</button>
+        </div>
+      </section>`;
+  return managePageHtml({ key: 'profile', title: 'Profilo', closeAttr: 'data-close-profile', body });
+}
+document.addEventListener('click', e=>{
+  const closeEl = e.target.closest('[data-close-profile]');
+  if(closeEl){
+    if(!isCloseTap(e, closeEl)) return;
+    state.profileOpen = false; render(); return;
+  }
+  if(e.target.closest('[data-logout]') && window.cookpopAuth){
+    state.profileOpen = false; closeSettingsBackdrop(); window.cookpopAuth.signOut();
+  }
+});
+document.addEventListener('change', async e=>{
+  if(e.target.id !== 'profile-name') return;
+  const name = e.target.value.trim();
+  const status = document.getElementById('profile-status');
+  if(!window.cookpopAuth || !window.cookpopAuth.updateName){ if(status) status.textContent = 'Non connesso: riprova più tardi.'; return; }
+  try{
+    await window.cookpopAuth.updateName(name);
+    loggedInName = name;
+    refreshProfileLink();
+    if(status) status.textContent = 'Nome salvato.';
+  }catch(err){
+    if(status) status.textContent = 'Non sono riuscito a salvare il nome.';
+  }
+});
 function renderAppearancePage(){
   if(!state.appearanceOpen) return '';
   const theme = currentTheme();
@@ -11473,12 +11540,14 @@ document.addEventListener('click', e=>{
   else if(what === 'depts') state.deptsModalOpen = true;
   else if(what === 'aisles') state.aisleOrderOpen = true;
   else if(what === 'appearance') state.appearanceOpen = true;
+  else if(what === 'profile') state.profileOpen = true;
   else if(what === 'newrecipe'){ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); }
   else if(what === 'import'){ if(state.tab !== 'prep' && !state.settingsReturnTab) state.settingsReturnTab = state.tab; state.recipeImport = { name: '', link: '', text: '' }; }
   else if(what === 'backup'){ state.backupOpen = true; refreshAutoBackupCache(); }
   render();
 });
 document.querySelectorAll('[data-ico]').forEach(el=>{ el.innerHTML = uiIcon(el.dataset.ico); });
+refreshProfileLink();
 (function(){
   const input = document.getElementById('settings-search');
   if(!input) return;
