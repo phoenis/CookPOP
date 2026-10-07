@@ -2114,6 +2114,26 @@ test('impostazioni: Profilo con nome, email ed Esci', async ({ page }) => {
   eq(r, { linkSub: 'mara@esempio.it', linkName: 'Mara', page: true, email: 'mara@esempio.it', defaultName: 'Mara', saved: 'Mara C.', linkAfter: 'Mara C.', loggedOut: true });
 });
 
+test('profilo: emoji come immagine, sfondo col colore del turno di cucina', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    loggedInEmail = 'mara@esempio.it'; loggedInName = '';
+    refreshProfileLink();
+    const av = () => document.getElementById('settings-avatar');
+    out.initial = av().textContent;
+    document.querySelector('[data-settings-go="profile"]').click();
+    document.querySelector('[data-profile-emoji="🍝"]').click();
+    out.emoji = av().textContent; out.stored = state.userEmojis.mara;
+    state.userColors.mara = '#2e7d6b'; applyUserColors();
+    out.bg = av().style.background.replace(/\s/g, '');
+    out.big = document.querySelector('.settings-avatar.is-big').textContent;
+    document.querySelector('[data-profile-emoji=""]').click();
+    out.back = av().textContent; out.cleared = state.userEmojis.mara === undefined;
+    return out;
+  });
+  eq(r, { initial: 'M', emoji: '🍝', stored: '🍝', bg: 'rgb(46,125,107)', big: '🍝', back: 'M', cleared: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

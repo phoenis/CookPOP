@@ -1447,3 +1447,13 @@ body{ overflow-x:clip; }
 .settings-profile .settings-link-text{ font-size:var(--text-medium); }
 .settings-profile .settings-link-text small{ font-size:var(--text-small); }
 #profile-name{ box-sizing:border-box; width:100%; border:1px solid var(--line); border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-body); font-weight:var(--weight-normal); color:var(--ink); background:var(--surface); padding:0 var(--space-small); min-height:2.75rem; }
+/* Impostazioni: linee solo tra argomenti, contenuti allineati al margine della pagina */
+#settings-backdrop .settings-link{ border-top:0; padding-left:0; padding-right:0; }
+#settings-backdrop .settings-card:not(.is-links){ background:transparent; padding:var(--space-xsmall) 0; }
+#settings-backdrop .settings-section + .settings-section{ border-top:1px solid var(--line); padding-top:var(--space-xsmall); margin-top:var(--space-xsmall); }
+.settings-avatar.is-big{ width:5rem; height:5rem; font-size:2.5rem; }
+.profile-hero{ display:flex; justify-content:center; padding:var(--space-medium) 0; }
+.emoji-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:var(--space-xsmall); }
+.emoji-opt{ aspect-ratio:1; border:1px solid var(--line); border-radius:var(--form-border-radius); background:var(--surface); font-size:1.25rem; line-height:1; cursor:pointer; color:var(--ink); font-family:var(--font-family); }
+.emoji-opt.active{ border-color:var(--gold); background:rgba(var(--gold-rgb),0.12); }
+#profile-emoji-custom{ box-sizing:border-box; width:100%; border:1px solid var(--line); border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-body); color:var(--ink); background:var(--surface); padding:0 var(--space-small); min-height:2.75rem; }
