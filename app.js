@@ -1636,6 +1636,7 @@ const state = {
   ricettarioDupes1: false,
   freezerMerge1: false,
   userColorsBright1: false,
+  userColorsLight1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -1721,7 +1722,7 @@ const state = {
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
   userEmojis: {}, // emoji del profilo scelta da ciascun utente (vuota = iniziale del nome)
-  userColors: { mara:'#ff3b1d', ste:'#ff2d6f' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
+  userColors: { mara:'#ff7a66', ste:'#ff6f9c' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "tocca a te cucinare" già chiuso per quel pasto
   mealsDoneReminderDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel pasto (senza segnarlo mangiato)
   genSettingsOpen: null, // null = chiuso; 'plain' = solo impostazioni (da "Aggiungi settimana"); un numero = impostazioni + genera/rigenera per quella settimana (dal titolo settimana)
@@ -1982,13 +1983,14 @@ const COOK_LABEL = { mara:'Mara', ste:'Ste' };
 // Tavolozza di colori preimpostati tra cui scegliere il proprio "colore identità"
 // (profilo in Impostazioni): solo toni abbastanza scuri/saturi da restare leggibili
 // col testo chiaro sopra (--bg) del cook-pill.
-const USER_COLOR_PRESETS = ['#ff3b1d','#ff2d6f','#ff8a00','#ffb800','#2fd24f','#00c2a8','#2d8cff','#a75cff'];
+const USER_COLOR_PRESETS = ['#ff7a66','#ff6f9c','#ffae42','#ffd23f','#6fe07a','#3fe0c8','#6bb6ff','#c293ff'];
+const USER_COLOR_PRESETS_BRIGHT = ['#ff3b1d','#ff2d6f','#ff8a00','#ffb800','#2fd24f','#00c2a8','#2d8cff','#a75cff'];
 const USER_COLOR_PRESETS_OLD = ['#e03c1e','#87282b','#c9702e','#b08d2b','#5a7517','#2e7d6b','#546e7a','#7a5a8a'];
 // Colore d'accento dell'app: tavolozza a sé (non cambia con quella dei turni di cucina).
 const ACCENT_PRESETS = USER_COLOR_PRESETS_OLD;
 function applyUserColors(){
-  document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#ff3b1d');
-  document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#ff2d6f');
+  document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#ff7a66');
+  document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#ff6f9c');
   if(typeof refreshProfileLink === 'function') refreshProfileLink();
 }
 
@@ -2222,6 +2224,14 @@ const MIGRATIONS = [
   // (il catalogo è già aggiornato in catalog.js).
   // 23. Una tantum: colori dei turni di cucina più saturi e luminosi; quelli
   // già scelti passano al corrispondente della nuova tavolozza.
+  // 24. Una tantum: colori dei turni più chiari; chi aveva la versione "luminosa"
+  // di poco fa passa a quella chiara corrispondente.
+  { flag: 'userColorsLight1', run(){
+    Object.keys(state.userColors || {}).forEach(u=>{
+      const i = USER_COLOR_PRESETS_BRIGHT.indexOf(state.userColors[u]);
+      if(i >= 0) state.userColors[u] = USER_COLOR_PRESETS[i];
+    });
+  } },
   { flag: 'userColorsBright1', run(){
     Object.keys(state.userColors || {}).forEach(u=>{
       const i = USER_COLOR_PRESETS_OLD.indexOf(state.userColors[u]);
@@ -4251,10 +4261,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-09',
+  version: '2027-01-10',
   title: 'Novità',
   items: [
-    'Il colore d\'accento dell\'app torna alla sua tavolozza di prima: i colori più luminosi valgono solo per i turni di cucina.'
+    'Turni di cucina: colori più chiari (il testo sopra diventa scuro per leggersi bene).'
   ]
 };
 
@@ -10528,7 +10538,7 @@ function profileAvatarChar(){
 // Sfondo dell'immagine profilo: il tuo colore del turno di cucina.
 function profileAvatarColor(){
   const u = getCurrentUser();
-  return (u && state.userColors[u]) || '#ff3b1d';
+  return (u && state.userColors[u]) || '#ff7a66';
 }
 function refreshProfileLink(){
   const el = document.getElementById('settings-profile-text');
