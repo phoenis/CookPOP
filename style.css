@@ -1494,3 +1494,10 @@ body{ overflow-x:clip; }
 .shop-assignee-btn.assignee-mara{ color:color-mix(in srgb, var(--user-color-mara) 60%, #000); }
 .shop-assignee-btn.assignee-ste{ color:color-mix(in srgb, var(--user-color-ste) 60%, #000); }
 .settings-avatar{ color:#2a1d1a; }
+/* Modalità cucina: passare da una ricetta all'altra */
+.cook-switch{ display:flex; gap:var(--space-xsmall); overflow-x:auto; padding:var(--space-xsmall) var(--space-medium); scrollbar-width:none; background:var(--surface); }
+.cook-switch::-webkit-scrollbar{ display:none; }
+.cook-switch-chip{ flex:none; display:inline-flex; align-items:center; gap:var(--space-xsmall); max-width:60%; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); border-radius:var(--radius-pill); padding:var(--space-xsmall) var(--space-small); font-family:var(--font-family); font-size:var(--text-small); cursor:pointer; }
+.cook-switch-chip.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.cook-switch-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:var(--weight-medium); }
+.cook-switch-step{ flex:none; font-size:var(--text-xsmall); opacity:0.7; }
