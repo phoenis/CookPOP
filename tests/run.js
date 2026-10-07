@@ -1950,6 +1950,22 @@ test('catalogo: nove dolci dal ricettario, con ingredienti, procedimento e repar
   eq(r, { ok: true, pastiera: true, reparti: ['dolci', 'dolci', 'dolci', 'dolci', 'dolci'], anice: 'bibite', grano: 'conserve' });
 });
 
+test('regole di generazione: porzioni di partenza configurabili, salvate e usate alla generazione', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.weekPortionsBase = 2; state.tab = 'menu'; state.genSettingsOpen = 'plain'; render();
+    const out = { start: document.querySelector('.filters-modal .qty-num').textContent };
+    document.querySelector('[data-gen-portions-inc]').click(); document.querySelector('[data-gen-portions-inc]').click();
+    out.after = state.weekPortionsBase;
+    out.payload = buildPersonalPayload().weekPortionsBase;
+    state.genSettingsOpen = null; state.extraWeeks = []; generateWeek(1);
+    out.cena = state.dayPortions['1_3_cena']; out.apripista = state.dayPortions['1_6_cena']; out.pranzo = state.dayPortions['1_5_pranzo'];
+    state.weekPortionsBase = 2;
+    return out;
+  });
+  eq(r, { start: '2', after: 4, payload: 4, cena: 4, apripista: 5, pranzo: 4 });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
