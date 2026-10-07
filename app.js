@@ -221,6 +221,8 @@ const LUOGO_ICON = {
   giardino:'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.42 39.86a12 12 0 0 0-11.28-11.28c-39.6-2.33-74.59 2.34-104 13.87C84 53.48 62.31 70.58 49.39 91.9c-17.62 29.11-17.66 64.45-.45 98.19l-17.43 17.43a12 12 0 0 0 17 17l17.43-17.43c16.74 8.54 33.88 12.85 50.45 12.85a91.3 91.3 0 0 0 47.74-13.3c21.32-12.92 38.42-34.62 49.45-62.75c11.5-29.43 16.17-64.43 13.84-104.03m-75.76 146.22C131.57 198.25 108 199.17 83.94 189l84.54-84.54a12 12 0 1 0-17-17L67 172.06c-10.14-24-9.22-47.63 3-67.72c20.91-34.53 70.54-53.72 134-52.25c1.38 63.44-17.81 113.08-52.34 133.99"></path></svg>' 
 };
 const DEPT_RULES = [
+  // Dolci tradizionali (Zeppole, Pastiera, Struffoli...): aromi, vanillina, bicarbonato, creme e amarene stanno con i dolci.
+  ['aroma di','dolci'], ['vanillina','dolci'], ['bicarbonato','dolci'], ['crema pasticcera','dolci'], ['amarene','dolci'], ['grano cotto','conserve'], ['anice','bibite'],
   // Prodotti per la casa (vista Casa in Dispensa): prima di tutto il resto,
   // perché nomi come "Sale per lavastoviglie" o "Aceto per pulizie"
   // conterrebbero parole chiave alimentari.
@@ -4114,11 +4116,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-09',
+  version: '2026-12-10',
   title: 'Novità',
   items: [
-    'Backup in una pagina a parte, dalle Impostazioni.',
-    'Nei tre puntini del Menù c\'è "Rigenera menu": rigenera tutte le settimane attive (i pasti bloccati e quelli già passati restano), con "Annulla". "Rigenera la settimana" non serve più: c\'è già per ogni settimana vicino al titolo.'
+    'Nove nuove ricette di dolci dal ricettario: Zeppole di San Giuseppe (fritte e al forno), Tronchetto, Struffoli, Pastiera, Pasta frolla, Nodini di carnevale, Migliaccio e Crema al limone. Le porzioni sono stimate: correggile da "Modifica ricetta" se serve.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo

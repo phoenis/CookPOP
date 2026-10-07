@@ -1937,6 +1937,19 @@ test('backup in pagina dedicata e "Rigenera menu" rigenera tutte le settimane at
   eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['🔄 Rigenera menu'], regen: true, toast: true });
 });
 
+test('catalogo: nove dolci dal ricettario, con ingredienti, procedimento e reparti giusti', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const nomi = ['Zeppole di San Giuseppe (fritte)', 'Zeppole di San Giuseppe', 'Tronchetto', 'Struffoli', 'Pastiera', 'Pasta frolla', 'Nodini di carnevale', 'Migliaccio', 'Crema al limone'];
+    return {
+      ok: nomi.every(n => { const m = getRecipeMeta(n), d = getRecipeDetails(n); return m && m.tipologia === 'dolce' && d && d.link === 'ricettario' && d.procedimento.length >= 2 && getIngredientsFor(n).length >= 4; }),
+      pastiera: getIngredientsFor('Pastiera').map(i => i.ingrediente).includes('Grano cotto'),
+      reparti: ['Vanillina', 'Aroma di limone', "Aroma di fiori d'arancio", 'Bicarbonato', 'Crema pasticcera'].map(classifyDept),
+      anice: classifyDept('Anice'), grano: classifyDept('Grano cotto')
+    };
+  });
+  eq(r, { ok: true, pastiera: true, reparti: ['dolci', 'dolci', 'dolci', 'dolci', 'dolci'], anice: 'bibite', grano: 'conserve' });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
