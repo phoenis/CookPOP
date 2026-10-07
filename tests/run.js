@@ -1906,6 +1906,37 @@ test('impostazioni: uscendo da una pagina si torna all\'elenco, e chiuse le Impo
   eq(r, { during: true, pageAbove: true, backToList: true, restoredTab: true });
 });
 
+test('backup in pagina dedicata e "Rigenera menu" rigenera tutte le settimane attive', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'spesa'; render();
+    document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
+    const out = { noInline: !document.querySelector('#settings-backdrop #backup-download') };
+    try{ localStorage.removeItem(LAST_AUTO_BACKUP_KEY); localStorage.removeItem(AUTO_BACKUP_OFF_KEY); }catch(e){}
+    await maybeAutoBackup();
+    document.querySelector('[data-settings-go="backup"]').click();
+    await new Promise(r => setTimeout(r, 300));
+    out.page = !!document.querySelector('[data-page="backup"] #backup-download') && !!document.querySelector('[data-page="backup"] #backup-restore-input') && document.getElementById('settings-backdrop').classList.contains('open');
+    out.list = document.querySelectorAll('[data-page="backup"] [data-auto-backup-restore]').length >= 1;
+    const tg = document.getElementById('auto-backup-toggle'); tg.checked = false; tg.dispatchEvent(new Event('change', { bubbles: true }));
+    out.off = !autoBackupEnabled();
+    tg.checked = true; tg.dispatchEvent(new Event('change', { bubbles: true }));
+    out.on = autoBackupEnabled();
+    document.querySelector('[data-close-backup]').click();
+    out.closed = !state.backupOpen && document.getElementById('settings-backdrop').classList.contains('open');
+    document.getElementById('settings-close').click();
+    // Rigenera menu: week 0 + una extra
+    state.extraWeeks = []; generateWeek(0); generateWeek(1);
+    const b0 = state.weekBaseline, b1 = state.extraWeeks[0].baseline;
+    out.menuItems = TAB_MENU_ITEMS.menu.map(i => i.label);
+    TAB_MENU_ITEMS.menu[0].action();
+    out.regen = state.weekBaseline !== b0 && state.extraWeeks[0].baseline !== b1;
+    out.toast = /2 settimane/.test((document.querySelector('.undo-toast') || {}).textContent || '');
+    return out;
+  });
+  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['🔄 Rigenera menu'], regen: true, toast: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
