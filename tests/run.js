@@ -2123,6 +2123,21 @@ test('profilo: emoji come immagine, sfondo col colore del turno di cucina', asyn
   eq(r, { initial: 'M', emoji: '🍝', stored: '🍝', bg: 'rgb(46,125,107)', big: '🍝', back: 'M', cleared: true });
 });
 
+test('freezer: "Base congelabile" unita a "Si può congelare" (catalogo e ricette tue)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    out.order = FREEZER_ORDER.slice();
+    out.catalogBase = allRecipeMetas().filter(x => x.freezerNew === 'base').length;
+    state.customRecipes['Mia base'] = { nome: 'Mia base', freezerNew: 'base' };
+    state.recipeEdits['Carbonara'] = { freezerNew: 'base' };
+    state.freezerMerge1 = false;
+    MIGRATIONS.find(m => m.flag === 'freezerMerge1').run();
+    out.custom = state.customRecipes['Mia base'].freezerNew; out.edit = state.recipeEdits['Carbonara'].freezerNew;
+    return out;
+  });
+  eq(r, { order: ['congelabile', 'meal-prep'], catalogBase: 0, custom: 'congelabile', edit: 'congelabile' });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
