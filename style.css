@@ -1397,3 +1397,4 @@
 .auto-backup-list .settings-field-label{ margin-bottom:0.25rem; }
 
 .settings-backdrop{ z-index:185; }
+.settings-card .settings-search{ background:var(--bg); border-color:var(--ink-light); }
