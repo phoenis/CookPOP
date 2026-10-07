@@ -4111,10 +4111,12 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-05',
+  version: '2026-12-06',
   title: 'Novità',
   items: [
-    'Il bottone "Cucina" è più in alto, uguale nella ricetta del Menù e in quella del Ricettario.'
+    'Impostazioni riordinate: Io, Aspetto, Il mio menù, Ingredienti e Dispensa (ingredienti, gruppi, categorie, ordine corsie), Carte fedeltà, Backup, App. In alto c\'è una ricerca.',
+    'Backup automatico: una volta al mese l\'app salva da sola una copia su questo telefono (le ultime 3), da ripristinare da Impostazioni. Si può spegnere.',
+    'I tre puntini sono più leggeri: Dispensa (Inventario veloce), Ricette (Importa), Menù (Rigenera la settimana). Il resto è in Impostazioni.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -9725,12 +9727,10 @@ function goToTab(delta){
 // testa, indipendentemente dalla tab.
 const TAB_MENU_ITEMS = {
   dispensa: [
-    { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } },
-    { label: '🗂️ Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
-    { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
+    { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } }
   ],
-  spesa: [
-    { label: '↕️ Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
+  menu: [
+    { label: '🔄 Rigenera la settimana', action: ()=>{ state.genSettingsOpen = 0; } }
   ],
   prep: [
     { label: '📥 Importa da un reel o da un testo', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } }
@@ -9784,7 +9784,7 @@ const TAB_MENU_ITEMS = {
     const extraHtml = currentExtraItems.length
       ? `<div class="topbar-menu-sep"></div>` + currentExtraItems.map((it,idx)=>`<button type="button" class="topbar-menu-item" data-topbar-menu-action="${idx}">${it.label}</button>`).join('')
       : '';
-    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>⚙️ Impostazioni${backupOverdue() ? '<span class="menu-badge">backup</span>' : ''}</button>${extraHtml}`;
+    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>⚙️ Impostazioni</button>${extraHtml}`;
   };
   const openTopbarMenu = ()=>{
     renderTopbarMenuContent();
@@ -11132,18 +11132,92 @@ function backupOverdue(){
   const d = daysUntilDate(last);
   return d === null || -d > BACKUP_REMIND_DAYS;
 }
+const LAST_AUTO_BACKUP_KEY = 'cookpop-last-auto-backup';
+const AUTO_BACKUP_OFF_KEY = 'cookpop-auto-backup-off';
+const AUTO_BACKUP_EVERY_DAYS = 30;
+const AUTO_BACKUP_KEEP = 3;
+function autoBackupEnabled(){
+  try{ return localStorage.getItem(AUTO_BACKUP_OFF_KEY) !== '1'; }catch(e){ return true; }
+}
+function lastAutoBackupDate(){
+  try{ return localStorage.getItem(LAST_AUTO_BACKUP_KEY) || null; }catch(e){ return null; }
+}
+function backupDateLabel(iso){
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('it-IT', { day:'numeric', month:'long', year:'numeric' });
+}
 function backupStatusHtml(){
-  const last = lastBackupDate();
-  if(!last) return '<span class="backup-status is-due">Da questo telefono non hai ancora scaricato un backup.</span>';
-  const [y, m, d] = last.split('-').map(Number);
-  const label = new Date(y, m - 1, d).toLocaleDateString('it-IT', { day:'numeric', month:'long' });
-  return backupOverdue()
-    ? `<span class="backup-status is-due">Ultimo backup il ${label}: è passato più di un mese, scaricane uno nuovo.</span>`
-    : `<span class="backup-status">Ultimo backup il ${label}.</span>`;
+  const dates = [lastBackupDate(), lastAutoBackupDate()].filter(Boolean).sort();
+  const last = dates[dates.length - 1];
+  if(!last) return '<span class="backup-status">Ancora nessun backup su questo telefono.</span>';
+  return `<span class="backup-status">Ultimo backup il ${backupDateLabel(last)}.</span>`;
+}
+// Copie automatiche: una al mese, nel database del browser di questo telefono
+// (IndexedDB), le ultime AUTO_BACKUP_KEEP. Servono per tornare indietro dopo un
+// errore; per averne una fuori dal telefono c'è "Scarica backup".
+function autoBackupDb(){
+  return new Promise((resolve, reject)=>{
+    if(!window.indexedDB) return reject(new Error('no-idb'));
+    const req = indexedDB.open('cookpop-backups', 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore('snaps', { keyPath:'id' }); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function autoBackupList(){
+  try{
+    const db = await autoBackupDb();
+    return await new Promise((resolve, reject)=>{
+      const req = db.transaction('snaps').objectStore('snaps').getAll();
+      req.onsuccess = ()=> resolve((req.result || []).sort((x, y) => y.id.localeCompare(x.id)));
+      req.onerror = ()=> reject(req.error);
+    });
+  }catch(e){ return []; }
+}
+async function autoBackupSave(snap){
+  const db = await autoBackupDb();
+  await new Promise((resolve, reject)=>{
+    const tx = db.transaction('snaps', 'readwrite');
+    tx.objectStore('snaps').put(snap);
+    tx.oncomplete = resolve; tx.onerror = ()=> reject(tx.error);
+  });
+  const all = await autoBackupList();
+  if(all.length > AUTO_BACKUP_KEEP){
+    const tx = db.transaction('snaps', 'readwrite');
+    all.slice(AUTO_BACKUP_KEEP).forEach(s => tx.objectStore('snaps').delete(s.id));
+  }
+}
+async function maybeAutoBackup(){
+  if(!autoBackupEnabled()) return false;
+  // Solo a dati caricati: altrimenti si salverebbe una copia vuota.
+  if(window.cookpopSync && !personalSynced) return false;
+  const last = lastAutoBackupDate();
+  if(last){
+    const d = daysUntilDate(last);
+    if(d !== null && -d < AUTO_BACKUP_EVERY_DAYS) return false;
+  }
+  try{
+    const today = isoLocalDate(new Date());
+    await autoBackupSave({ id: today, data: buildBackup() });
+    try{ localStorage.setItem(LAST_AUTO_BACKUP_KEY, today); }catch(e){}
+    refreshBackupStatus();
+    return true;
+  }catch(e){ return false; }
+}
+async function refreshAutoBackupList(){
+  const el = document.getElementById('auto-backup-list');
+  if(!el) return;
+  const all = await autoBackupList();
+  el.innerHTML = all.length
+    ? `<div class="settings-field-label">Copie automatiche su questo telefono</div>` + all.map(s => `<div class="auto-backup-row"><span>${escapeHtml(backupDateLabel(s.id))}</span><button type="button" class="btn is-chip" data-auto-backup-restore="${escapeAttr(s.id)}">Ripristina</button></div>`).join('')
+    : '';
 }
 function refreshBackupStatus(){
   const el = document.getElementById('backup-status');
   if(el) el.innerHTML = backupStatusHtml();
+  const tg = document.getElementById('auto-backup-toggle');
+  if(tg) tg.checked = autoBackupEnabled();
+  refreshAutoBackupList();
 }
 function downloadBackup(){
   try{ localStorage.setItem(LAST_BACKUP_KEY, isoLocalDate(new Date())); }catch(e){}
@@ -11183,6 +11257,54 @@ function restoreBackup(data, confirmFn){
     const err = restoreBackup(data);
     if(err) window.alert(err);
     else closeSettingsBackdrop();
+  });
+})();
+
+(function(){
+  const tg = document.getElementById('auto-backup-toggle');
+  if(tg) tg.addEventListener('change', ()=>{
+    try{ if(tg.checked) localStorage.removeItem(AUTO_BACKUP_OFF_KEY); else localStorage.setItem(AUTO_BACKUP_OFF_KEY, '1'); }catch(e){}
+    if(tg.checked) maybeAutoBackup();
+  });
+  const list = document.getElementById('auto-backup-list');
+  if(list) list.addEventListener('click', async e=>{
+    const b = e.target.closest('[data-auto-backup-restore]');
+    if(!b) return;
+    const snap = (await autoBackupList()).find(s => s.id === b.dataset.autoBackupRestore);
+    if(!snap) return;
+    const err = restoreBackup(snap.data);
+    if(err) window.alert(err); else closeSettingsBackdrop();
+  });
+  // Copia del mese: poco dopo l'avvio (a dati caricati) e quando si torna all'app.
+  setTimeout(maybeAutoBackup, 10000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setTimeout(maybeAutoBackup, 3000); });
+})();
+
+// Impostazioni: voci che aprono le pagine di gestione, e ricerca.
+document.addEventListener('click', e=>{
+  const go = e.target.closest('[data-settings-go]');
+  if(!go) return;
+  const what = go.dataset.settingsGo;
+  closeSettingsBackdrop();
+  if(what === 'gen'){ state.tab = 'menu'; state.genSettingsOpen = 'plain'; }
+  else if(what === 'ingredients'){ state.tab = 'dispensa'; state.ingredientManagerOpen = true; }
+  else if(what === 'groups'){ state.tab = 'dispensa'; state.pantryGroupsModalOpen = true; }
+  else if(what === 'depts'){ state.tab = 'dispensa'; state.deptsModalOpen = true; }
+  else if(what === 'aisles'){ state.aisleOrderOpen = true; }
+  render();
+});
+(function(){
+  const input = document.getElementById('settings-search');
+  if(!input) return;
+  input.addEventListener('input', ()=>{
+    const q = ingMatchKey(input.value);
+    document.querySelectorAll('#settings-backdrop .settings-section').forEach(sec=>{
+      const title = ingMatchKey((sec.querySelector('.settings-section-title') || {}).textContent);
+      const links = [...sec.querySelectorAll('.settings-link')];
+      const secHit = !q || ingMatchKey(sec.textContent).includes(q);
+      links.forEach(l => { l.hidden = !!q && !title.includes(q) && !ingMatchKey(l.textContent).includes(q); });
+      sec.hidden = !secHit || (links.length > 0 && links.every(l => l.hidden));
+    });
   });
 })();
 

@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=117">
+<link rel="stylesheet" href="style.css?v=118">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -81,8 +81,9 @@
       <h2 class="settings-title">Impostazioni</h2>
     </header>
     <div class="settings-body">
+      <div class="settings-search-wrap"><input class="input-search settings-search" type="search" id="settings-search" placeholder="Cerca nelle impostazioni…" autocomplete="off" aria-label="Cerca nelle impostazioni"></div>
       <section class="settings-section" id="profile-section">
-        <h3 class="settings-section-title">Profilo</h3>
+        <h3 class="settings-section-title">Io</h3>
         <div class="settings-card" id="profile-panel"></div>
       </section>
       <section class="settings-section">
@@ -104,20 +105,37 @@
         <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
       </section>
       <section class="settings-section">
+        <h3 class="settings-section-title">Il mio menù</h3>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="gen"><span class="settings-link-text">🍽️ Regole di generazione<small>Tempi, proteine, avanzi, solo con quello che hai</small></span></button>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Ingredienti e Dispensa</h3>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="ingredients"><span class="settings-link-text">🗂️ Gestisci ingredienti<small>Nomi, sinonimi, unione dei doppioni</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="groups"><span class="settings-link-text">🧺 Gruppi<small>Ingredienti equivalenti, come pasta corta</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="depts"><span class="settings-link-text">🏷️ Gestisci categorie<small>Reparti di Spesa e Dispensa</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="aisles"><span class="settings-link-text">↕️ Ordine corsie<small>L'ordine dei reparti nella lista della spesa</small></span></button>
+        </div>
+      </section>
+      <section class="settings-section">
         <h3 class="settings-section-title">Carte fedeltà</h3>
-        <div class="settings-card">
-          <p class="settings-card-text">Le tessere dei negozi, da mostrare in cassa col codice a barre (da Spesa → 💳 Carte).</p>
-          <button class="btn is-outline is-block" type="button" data-cards-manage>💳 Le tue carte</button>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-cards-manage><span class="settings-link-text">💳 Le tue carte<small>Le tessere dei negozi, da mostrare in cassa</small></span></button>
         </div>
       </section>
       <section class="settings-section">
         <h3 class="settings-section-title">Backup dei dati</h3>
         <div class="settings-card">
-          <p class="settings-card-text">Salva sul telefono una copia di Dispensa, menù, spesa e ricette, da ripristinare se qualcosa va storto. Le foto dei piatti non sono incluse.</p>
+          <p class="settings-card-text">Una copia di Dispensa, menù, spesa e ricette, da ripristinare se qualcosa va storto. Le foto dei piatti non sono incluse.</p>
           <p class="settings-card-text" id="backup-status"></p>
+          <label class="settings-toggle"><input type="checkbox" id="auto-backup-toggle"><span>Backup automatico ogni mese</span></label>
+          <p class="settings-note" id="auto-backup-note">Ogni mese l'app salva da sola una copia su questo telefono (tiene le ultime 3). Per averne una anche fuori dal telefono, scarica il file.</p>
+          <div id="auto-backup-list" class="auto-backup-list"></div>
           <div class="backup-row">
             <button class="btn is-outline" id="backup-download" type="button">⬇ Scarica backup</button>
-            <label class="btn is-outline backup-restore-label">⬆ Ripristina<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
+            <label class="btn is-outline backup-restore-label">⬆ Ripristina da file<input type="file" id="backup-restore-input" accept="application/json,.json" hidden></label>
           </div>
         </div>
       </section>
@@ -140,6 +158,6 @@
 });
 </script>
 <script src="catalog.js?v=9"></script>
-<script src="app.js?v=176"></script>
+<script src="app.js?v=177"></script>
 </body>
 </html>
