@@ -1395,3 +1395,5 @@
 .auto-backup-list{ display:flex; flex-direction:column; }
 .auto-backup-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); padding:0.375rem 0; border-top:1px solid var(--line); font-size:var(--text-small); }
 .auto-backup-list .settings-field-label{ margin-bottom:0.25rem; }
+
+.settings-backdrop{ z-index:185; }

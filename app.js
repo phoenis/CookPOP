@@ -1618,6 +1618,7 @@ const state = {
   prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
+  settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
@@ -4112,10 +4113,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-07',
+  version: '2026-12-08',
   title: 'Novità',
   items: [
-    'Impostazioni: tema e colore d\'accento sono in una pagina a parte ("Tema e colori"), così in Impostazioni resta solo l\'elenco.'
+    'Uscendo da una pagina delle Impostazioni (Tema e colori, Ingredienti, Gruppi, Categorie, Ordine corsie, Regole, Carte) si torna all\'elenco delle Impostazioni, non a un\'altra pagina dell\'app.',
+    'Il colore dei tuoi turni di cucina è ora in "Tema e colori". In Impostazioni non ci sono più "Io" e il prossimo turno.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -4305,6 +4307,9 @@ function isSettingsBackdropOpen(){
 function closeSettingsBackdrop(){
   const el = document.getElementById('settings-backdrop');
   if(el) el.classList.remove('open');
+  // Le voci di Impostazioni che aprono pagine di Dispensa/Menù cambiano la
+  // scheda sotto: chiuse le Impostazioni si torna a quella di prima.
+  if(state.settingsReturnTab){ state.tab = state.settingsReturnTab; state.settingsReturnTab = null; }
 }
 function isTopbarMenuOpen(){
   const el = document.getElementById('topbar-menu-backdrop');
@@ -5483,23 +5488,6 @@ function isCloseTap(e, el){
 // Pannello profilo nel foglio Impostazioni: nome, prossimo turno di cucina,
 // colore identità. Ricostruito ogni volta che il foglio si apre e a ogni
 // cambio colore (vedi wiring in fondo al file), non fa parte del render() principale.
-function renderProfilePanel(){
-  const user = getCurrentUser();
-  if(!user) return '';
-  const next = nextCookDayFor(user);
-  const nextLine = next
-    ? `Prossimo turno: <b>${escapeHtml(next.giorno)} ${escapeHtml(next.dateLabel)} · ${escapeHtml(MEAL_LABEL[next.meal])}</b>${next.name ? ' — '+escapeHtml(next.name) : ''}`
-    : 'Nessun turno di cucina in programma.';
-  const swatches = USER_COLOR_PRESETS.map(c=>`<button type="button" class="color-swatch${state.userColors[user]===c?' active':''}" style="background:${c}" data-user-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
-  return `
-    <div class="profile-panel">
-      <div class="profile-name">${escapeHtml(COOK_LABEL[user])}</div>
-      <p class="profile-next-cook">${nextLine}</p>
-      <div class="settings-field-label">Il tuo colore nei turni di cucina</div>
-      <div class="color-swatch-row">${swatches}</div>
-    </div>`;
-}
-
 // Etichetta leggibile invece dell'ingranaggio: "regole: circa 30 min",
 // stesso trigger di sempre (apre genSettingsModal) ma si legge da sola
 // invece di essere un'icona senza testo.
@@ -9743,7 +9731,6 @@ const TAB_MENU_ITEMS = {
   const topbarMenu = document.getElementById('topbar-menu');
   const settingsBackdrop = document.getElementById('settings-backdrop');
   const settingsClose = document.getElementById('settings-close');
-  const profilePanel = document.getElementById('profile-panel');
   const themeRow = document.getElementById('theme-toggle-row');
   const accentRow = document.getElementById('accent-swatch-row');
   if(!topbarMenuBtn || !settingsBackdrop) return;
@@ -9760,11 +9747,6 @@ const TAB_MENU_ITEMS = {
     accentRow.innerHTML = USER_COLOR_PRESETS.map(c=>`<button type="button" class="color-swatch${active===c?' active':''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
   };
   const open = ()=>{
-    if(profilePanel){
-      profilePanel.innerHTML = renderProfilePanel();
-      const section = document.getElementById('profile-section');
-      if(section) section.hidden = !profilePanel.innerHTML;
-    }
     refreshThemeRow();
     refreshAccentRow();
     refreshBackupStatus();
@@ -9772,7 +9754,7 @@ const TAB_MENU_ITEMS = {
     settingsBackdrop.scrollTop = 0;
     reconcileModalHistory();
   };
-  const close = ()=>{ settingsBackdrop.classList.remove('open'); reconcileModalHistory(); };
+  const close = ()=>{ const back = state.settingsReturnTab; closeSettingsBackdrop(); reconcileModalHistory(); if(back) render(); };
   if(settingsClose) settingsClose.addEventListener('click', close);
 
   // Menu "tre puntini" della topbar: Impostazioni + le voci di TAB_MENU_ITEMS
@@ -9809,18 +9791,6 @@ const TAB_MENU_ITEMS = {
       if(e.target.closest('[data-stop-close]')) return;
       closeTopbarMenu();
       reconcileModalHistory();
-    });
-  }
-  if(profilePanel){
-    profilePanel.addEventListener('click', e=>{
-      const swatch = e.target.closest('[data-user-color]');
-      if(!swatch) return;
-      const user = getCurrentUser();
-      if(!user) return;
-      state.userColors[user] = swatch.dataset.userColor;
-      applyUserColors();
-      persist();
-      profilePanel.innerHTML = renderProfilePanel();
     });
   }
   if(themeRow){
@@ -10381,6 +10351,15 @@ function renderAppearancePage(){
   const theme = currentTheme();
   const accent = localStorage.getItem(ACCENT_KEY) || USER_COLOR_PRESETS[0];
   const themes = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']];
+  const user = getCurrentUser();
+  const turni = user ? `
+      <section class="settings-section">
+        <h3 class="settings-section-title">Il tuo colore nei turni di cucina</h3>
+        <div class="settings-card">
+          <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${state.userColors[user] === c ? ' active' : ''}" style="background:${c}" data-user-color="${c}" aria-label="Scegli questo colore"></button>`).join('')}</div>
+        </div>
+        <p class="settings-note">È il colore con cui compari nel Menù quando tocca a te cucinare, per tutti.</p>
+      </section>` : '';
   const body = `
       <section class="settings-section">
         <h3 class="settings-section-title">Tema</h3>
@@ -10394,7 +10373,7 @@ function renderAppearancePage(){
           <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${accent === c ? ' active' : ''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('')}</div>
         </div>
         <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
-      </section>`;
+      </section>${turni}`;
   return managePageHtml({ key: 'appearance', title: 'Tema e colori', closeAttr: 'data-close-appearance', body });
 }
 document.addEventListener('click', e=>{
@@ -10407,7 +10386,14 @@ document.addEventListener('click', e=>{
   const th = t.closest('[data-theme-choice]');
   if(th){ applyTheme(th.dataset.themeChoice); render(); return; }
   const ac = t.closest('[data-accent-color]');
-  if(ac){ applyAccent(ac.dataset.accentColor); render(); }
+  if(ac){ applyAccent(ac.dataset.accentColor); render(); return; }
+  const uc = t.closest('[data-user-color]');
+  if(uc){
+    const user = getCurrentUser();
+    if(!user) return;
+    state.userColors[user] = uc.dataset.userColor;
+    applyUserColors(); persist(); render();
+  }
 });
 function renderAislesPage(){
   if(!state.aisleOrderOpen) return '';
@@ -11053,7 +11039,7 @@ document.addEventListener('click', e=>{
   const open = t.closest('[data-open-cards]');
   if(open){ state.cardsOpen = 'list'; render(); return; }
   const manage = t.closest('[data-cards-manage]');
-  if(manage){ closeSettingsBackdrop(); state.cardsOpen = 'list'; state.cardsListUnder = false; render(); return; }
+  if(manage){ state.cardsOpen = 'list'; state.cardsListUnder = false; render(); return; }
   const view = t.closest('[data-card-view]');
   if(view){ state.cardViewId = view.dataset.cardView; render(); return; }
   const color = t.closest('[data-card-color]');
@@ -11320,13 +11306,15 @@ document.addEventListener('click', e=>{
   const go = e.target.closest('[data-settings-go]');
   if(!go) return;
   const what = go.dataset.settingsGo;
-  closeSettingsBackdrop();
-  if(what === 'gen'){ state.tab = 'menu'; state.genSettingsOpen = 'plain'; }
-  else if(what === 'ingredients'){ state.tab = 'dispensa'; state.ingredientManagerOpen = true; }
-  else if(what === 'groups'){ state.tab = 'dispensa'; state.pantryGroupsModalOpen = true; }
-  else if(what === 'depts'){ state.tab = 'dispensa'; state.deptsModalOpen = true; }
-  else if(what === 'aisles'){ state.aisleOrderOpen = true; }
-  else if(what === 'appearance'){ state.appearanceOpen = true; }
+  // Le Impostazioni restano aperte sotto: chiusa la pagina si torna all'elenco.
+  const tabFor = { gen:'menu', ingredients:'dispensa', groups:'dispensa', depts:'dispensa' }[what];
+  if(tabFor && state.tab !== tabFor){ if(!state.settingsReturnTab) state.settingsReturnTab = state.tab; state.tab = tabFor; }
+  if(what === 'gen') state.genSettingsOpen = 'plain';
+  else if(what === 'ingredients') state.ingredientManagerOpen = true;
+  else if(what === 'groups') state.pantryGroupsModalOpen = true;
+  else if(what === 'depts') state.deptsModalOpen = true;
+  else if(what === 'aisles') state.aisleOrderOpen = true;
+  else if(what === 'appearance') state.appearanceOpen = true;
   render();
 });
 (function(){
