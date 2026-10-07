@@ -4195,11 +4195,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-15',
+  version: '2026-12-16',
   title: 'Novità',
   items: [
-    'Modifica ricetta: ora puoi cambiare il nome della ricetta. Si aggiorna ovunque (pasti, album, foto).',
-    'Pasta e zucca, Pasta e patate e Pasta e lenticchie: restano solo quelle del ricettario, senza "(ricettario)" nel nome.'
+    'Album: tolto il + in basso a destra, si crea dal riquadro "Nuovo album" in alto.'
   ]
 };
 
@@ -6767,7 +6766,6 @@ function renderPrep(){
     ${recipeDetailScreen}
     ${prepSwitch}
     <div class="buttons-fixed">
-      <button class="btn is-fixed" type="button" data-cookbook-new aria-label="Nuovo album"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>`;
   }
 
