@@ -1373,3 +1373,7 @@
 .dish-acc-body .note-box, .dish-acc-body .steps-list{ margin-top:var(--space-medium); }
 .dish-acc-body{ row-gap:0; }
 .dish-acc-body > .freezer-info, .dish-acc-body > .soak-note, .dish-acc-body > .recipe-photo{ margin-bottom:var(--space-small); }
+
+/* "Cucina": al centro in basso, con margine dai bordi, uguale nel pasto e nel Ricettario */
+.cook-fab{ left:50%; right:auto; transform:translateX(-50%); bottom:calc(1.5rem + env(safe-area-inset-bottom)); max-width:calc(100vw - 2 * var(--space-medium)); white-space:nowrap; }
+.has-cook-fab{ padding-bottom:7rem; }

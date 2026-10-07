@@ -1794,6 +1794,19 @@ test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, t
   eq(r.rec.btnTop >= 16 && r.rec.btnToPersone >= 16, true);
 });
 
+test('cucina: il bottone è al centro in basso, uguale nel pasto e nel Ricettario', async ({ page }) => {
+  const open = (setup) => page.evaluate(setup);
+  const pos = () => page.evaluate(() => { const b = document.querySelector('.cook-fab').getBoundingClientRect(); const w = document.documentElement.clientWidth;
+    return { centered: Math.abs((b.left + b.right) / 2 - w / 2) < 1, gap: Math.round(window.innerHeight - b.bottom) >= 20 }; });
+  await open(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.extraWeeks = []; generateWeek(1); writeMealDishes(1, 1, 'cena', 'Amatriciana', []); state.tab = 'menu'; state.expandedDay = '1_1_cena'; render(); });
+  await page.waitForTimeout(400);
+  const meal = await pos();
+  await open(() => { state.expandedDay = null; state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = 'Amatriciana'; render(); });
+  await page.waitForTimeout(400);
+  eq({ meal, rec: await pos() }, { meal: { centered: true, gap: true }, rec: { centered: true, gap: true } });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
