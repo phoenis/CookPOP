@@ -4231,11 +4231,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-29',
+  version: '2026-12-30',
   title: 'Novità',
   items: [
-    'Profilo: puoi scegliere un\'emoji come immagine; lo sfondo è il tuo colore dei turni di cucina.',
-    'Impostazioni: le righe di divisione separano gli argomenti (non le voci simili) e i contenuti sono allineati al margine della pagina.'
+    'Impostazioni: titolo e descrizione più vicini, titolo meno in grassetto, via le freccette.',
+    'Menu ⋯: la voce Impostazioni è l\'ultima, senza linea di divisione, e le voci hanno più aria.'
   ]
 };
 
@@ -9866,9 +9866,9 @@ const TAB_MENU_ITEMS = {
   const renderTopbarMenuContent = ()=>{
     currentExtraItems = TAB_MENU_ITEMS[state.tab] || [];
     const extraHtml = currentExtraItems.length
-      ? `<div class="topbar-menu-sep"></div>` + currentExtraItems.map((it,idx)=>`<button type="button" class="topbar-menu-item" data-topbar-menu-action="${idx}">${it.label}</button>`).join('')
+      ? currentExtraItems.map((it,idx)=>`<button type="button" class="topbar-menu-item" data-topbar-menu-action="${idx}">${it.label}</button>`).join('')
       : '';
-    if(topbarMenu) topbarMenu.innerHTML = `<button type="button" class="topbar-menu-item" data-topbar-menu-settings>${uiIcon('gear')} Impostazioni</button>${extraHtml}`;
+    if(topbarMenu) topbarMenu.innerHTML = `${extraHtml}<button type="button" class="topbar-menu-item" data-topbar-menu-settings>${uiIcon('gear')} Impostazioni</button>`;
   };
   const openTopbarMenu = ()=>{
     renderTopbarMenuContent();

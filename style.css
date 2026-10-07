@@ -1457,3 +1457,9 @@ body{ overflow-x:clip; }
 .emoji-opt{ aspect-ratio:1; border:1px solid var(--line); border-radius:var(--form-border-radius); background:var(--surface); font-size:1.25rem; line-height:1; cursor:pointer; color:var(--ink); font-family:var(--font-family); }
 .emoji-opt.active{ border-color:var(--gold); background:rgba(var(--gold-rgb),0.12); }
 #profile-emoji-custom{ box-sizing:border-box; width:100%; border:1px solid var(--line); border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-body); color:var(--ink); background:var(--surface); padding:0 var(--space-small); min-height:2.75rem; }
+/* Impostazioni: titolo e descrizione vicini, titolo meno bold, niente freccia; menu ⋯ con più aria */
+#settings-backdrop .settings-link::after{ display:none; }
+#settings-backdrop .settings-link{ font-weight:500; }
+#settings-backdrop .settings-link-text{ gap:0; font-weight:500; }
+#settings-backdrop .settings-link-text small{ line-height:1.25; }
+.topbar-menu-item{ padding:var(--space-small) var(--space-small); line-height:1.5; }
