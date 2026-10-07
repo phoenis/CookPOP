@@ -594,6 +594,46 @@ function mancantiButtonHtml(mancanti){
 // Avanti (anche scorrendo col dito). Lo schermo resta acceso finché è aperta.
 // Bottone "Cucina" flottante e fisso, qualunque tab (Ingredienti/Passaggi) sia
 // aperta: solo se la ricetta ha un procedimento.
+// Ricette da cucinare insieme: i piatti dello stesso pasto che hanno un
+// procedimento, ognuno con la sua scala di porzioni. Si passa dall'una
+// all'altra restando al passo a cui si è arrivati in ciascuna.
+function cookSessionFor(name, ratio, mk){
+  const list = [{ name, step: 0, ratio: ratio || 1 }];
+  if(!mk) return list;
+  const { weekIdx, i, meal } = parseMealKey(mk);
+  const dishes = mealDishes(weekIdx, i, meal);
+  const baseOf = n => { const dt = getRecipeDetails(n); return dt ? parsePortionsBase(dt.porzioni) : null; };
+  const principale = effectiveMeal(weekIdx, i, meal).principale;
+  const basePortions = (principale && baseOf(principale)) || dishes.map(x => baseOf(x.name)).find(Boolean) || null;
+  const current = basePortions ? (state.dayPortions[mk] || basePortions) : null;
+  dishes.forEach(d=>{
+    if(d.name === name) return;
+    const det = getRecipeDetails(d.name);
+    if(!det || !det.procedimento || !det.procedimento.length) return;
+    const b = baseOf(d.name);
+    list.push({ name: d.name, step: 0, ratio: (b && current) ? current / b : 1 });
+  });
+  return list;
+}
+function cookSwitchTo(name){
+  const cm = state.cookMode; if(!cm || cm.name === name) return;
+  const cur = state.cookSession.find(x => x.name === cm.name);
+  if(cur) cur.step = cm.step || 0;
+  const target = state.cookSession.find(x => x.name === name);
+  if(!target) return;
+  state.cookMode = { name: target.name, step: target.step || 0, ratio: target.ratio || 1, mk: cm.mk };
+  render();
+}
+function cookSwitcherHtml(cm){
+  const list = state.cookSession;
+  if(!list || list.length < 2) return '';
+  const total = n => ((getRecipeDetails(n) || {}).procedimento || []).length;
+  return `<div class="cook-switch" role="tablist" aria-label="Ricette in cucina">${list.map(x=>{
+    const active = x.name === cm.name;
+    const step = active ? (cm.step || 0) : (x.step || 0);
+    return `<button type="button" class="cook-switch-chip${active ? ' active' : ''}" role="tab" aria-selected="${active}" data-cook-switch="${escapeAttr(x.name)}"><span class="cook-switch-name">${escapeHtml(x.name)}</span><span class="cook-switch-step">${step + 1}/${total(x.name)}</span></button>`;
+  }).join('')}</div>`;
+}
 function cookFabHtml(name, ratio, mk){
   const det = getRecipeDetails(name);
   if(!det || !det.procedimento || !det.procedimento.length) return '';
@@ -749,6 +789,7 @@ function renderCookModePage(){
       <button type="button" class="cook-end" data-close-cook>Termina</button>
       <h2 class="cook-title">${escapeHtml(cm.name)}</h2>
     </header>
+    ${cookSwitcherHtml(cm)}
     ${timerUi.bar}
     <div class="cook-bar" role="progressbar" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${step + 1}"><span style="width:${Math.round((step + 1) / total * 100)}%"></span></div>
     <div class="cook-body" data-cook-swipe>
@@ -1745,7 +1786,8 @@ const state = {
   prepSuggOpen: {}, // ephemeral: settimana -> suggerimenti di prep aperti
   dishPicker: null, // ephemeral: {key: mealKey, replace: nome del piatto da cambiare o null, tipo, search} per "+ piatto"/"Cambia" del singolo piatto
   cookTimer: null, // ephemeral: { end (ms), total (s), label } timer del passo in modalità cucina
-  cookMode: null, // ephemeral: { name, step } modalità cucina (un passo per schermata)
+  cookMode: null, // ephemeral: { name, step, ratio, mk } modalità cucina (un passo per schermata)
+  cookSession: [], // ephemeral: le ricette che si cucinano insieme (stesso pasto) con il passo a cui sono: { name, step, ratio }
   recipePortions: {}, // ephemeral: ricetta -> persone scelte nel dettaglio del Ricettario
   recipeMenuOpen: false, // ephemeral: menù ⋯ del dettaglio ricetta
   dishPane: {}, // ephemeral: "mealKey|piatto" (o "r|ricetta") -> 'ing' | 'steps', tab dentro il piatto
@@ -4261,10 +4303,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-10',
+  version: '2027-01-11',
   title: 'Novità',
   items: [
-    'Turni di cucina: colori più chiari (il testo sopra diventa scuro per leggersi bene).'
+    'Modalità cucina: se il pasto ha più piatti con il procedimento (es. primo e contorno) puoi passare da una ricetta all\'altra in alto, restando al passo a cui eri in ciascuna.'
   ]
 };
 
@@ -8801,11 +8843,14 @@ function attachHandlers(){
     el.addEventListener('click', ()=>{ state.mealDetailMenuOpen = false; render(); });
   });
   document.querySelectorAll('[data-cook-start]').forEach(el=>{
-    el.addEventListener('click', ()=>{ state.cookMode = { name: el.dataset.cookStart, step: 0, ratio: parseFloat(el.dataset.cookRatio) || 1, mk: el.dataset.cookMeal || '' }; render(); });
+    el.addEventListener('click', ()=>{ const mk = el.dataset.cookMeal || ''; const ratio = parseFloat(el.dataset.cookRatio) || 1; state.cookSession = cookSessionFor(el.dataset.cookStart, ratio, mk); state.cookMode = { name: el.dataset.cookStart, step: 0, ratio, mk }; render(); });
   });
   // "Fatto" all'ultimo passo: chiude la modalità cucina e, se la ricetta è un
   // pasto del Menù non ancora segnato, apre "Ricetta fatta!" per chiedere
   // quali ingredienti sono finiti.
+  document.querySelectorAll('[data-cook-switch]').forEach(el=>{
+    el.addEventListener('click', ()=> cookSwitchTo(el.dataset.cookSwitch));
+  });
   document.querySelectorAll('[data-cook-finish]').forEach(el=>{
     el.addEventListener('click', ()=>{
       const mk = state.cookMode && state.cookMode.mk;

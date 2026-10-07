@@ -2148,6 +2148,35 @@ test('colori: l\'accento ha la sua tavolozza, diversa da quella dei turni di cuc
   eq(r, { acc: ['#e03c1e', '#87282b', '#c9702e', '#b08d2b', '#5a7517', '#2e7d6b', '#546e7a', '#7a5a8a'], same: true, differs: true, def: '#e03c1e' });
 });
 
+test('modalità cucina: si passa da una ricetta all\'altra restando al passo a cui si è arrivati', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    isMealPast = () => false; generateWeek(0);
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    ['Prova uno', 'Prova due'].forEach((n, k) => {
+      state.customRecipes[n] = { nome: n, tipologia: k ? 'contorno' : 'primo' };
+      state.recipeEdits[n] = { ingredienti: [{ ingrediente: 'Pasta lunga', qta: '100 g' }], procedimento: ['A ' + n, 'B ' + n, 'C ' + n] };
+    });
+    const mk = '0_' + WEEK_DISPLAY_ORDER[WEEK_DISPLAY_ORDER.length - 1] + '_cena';
+    const { weekIdx, i, meal } = parseMealKey(mk);
+    writeMealDishes(weekIdx, i, meal, 'Prova uno', ['Prova due']);
+    state.cookSession = cookSessionFor('Prova uno', 1, mk);
+    state.cookMode = { name: 'Prova uno', step: 0, ratio: 1, mk };
+    render();
+    const out = { chips: [...document.querySelectorAll('[data-cook-switch]')].map(b => b.dataset.cookSwitch) };
+    document.querySelector('[data-cook-next]').click();
+    out.step1 = state.cookMode.step;
+    document.querySelector('[data-cook-switch="Prova due"]').click();
+    out.second = [state.cookMode.name, state.cookMode.step];
+    document.querySelector('[data-cook-next]').click(); document.querySelector('[data-cook-next]').click();
+    document.querySelector('[data-cook-switch="Prova uno"]').click();
+    out.back = [state.cookMode.name, state.cookMode.step, document.querySelector('.cook-step-text').textContent];
+    document.querySelector('[data-cook-switch="Prova due"]').click();
+    out.second2 = [state.cookMode.name, state.cookMode.step];
+    return out;
+  });
+  eq(r, { chips: ['Prova uno', 'Prova due'], step1: 1, second: ['Prova due', 0], back: ['Prova uno', 1, 'B Prova uno'], second2: ['Prova due', 2] });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
