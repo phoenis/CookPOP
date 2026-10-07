@@ -4111,10 +4111,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-04',
+  version: '2026-12-05',
   title: 'Novità',
   items: [
-    'Il bottone "Cucina" sta al centro in basso, con un po\' di margine dai bordi, uguale nella ricetta del Menù e in quella del Ricettario.'
+    'Il bottone "Cucina" è più in alto, uguale nella ricetta del Menù e in quella del Ricettario.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo

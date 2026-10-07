@@ -1797,7 +1797,7 @@ test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, t
 test('cucina: il bottone è al centro in basso, uguale nel pasto e nel Ricettario', async ({ page }) => {
   const open = (setup) => page.evaluate(setup);
   const pos = () => page.evaluate(() => { const b = document.querySelector('.cook-fab').getBoundingClientRect(); const w = document.documentElement.clientWidth;
-    return { centered: Math.abs((b.left + b.right) / 2 - w / 2) < 1, gap: Math.round(window.innerHeight - b.bottom) >= 20 }; });
+    return { centered: Math.abs((b.left + b.right) / 2 - w / 2) < 1, gap: Math.round(window.innerHeight - b.bottom) >= 40 }; });
   await open(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.extraWeeks = []; generateWeek(1); writeMealDishes(1, 1, 'cena', 'Amatriciana', []); state.tab = 'menu'; state.expandedDay = '1_1_cena'; render(); });
   await page.waitForTimeout(400);
