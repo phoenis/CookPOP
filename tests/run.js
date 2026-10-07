@@ -1821,7 +1821,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
     s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true }));
     // voci
     document.querySelector('[data-settings-go="aisles"]').click();
-    out.aisles = state.aisleOrderOpen === true && !document.getElementById('settings-backdrop').classList.contains('open');
+    out.aisles = state.aisleOrderOpen === true && document.getElementById('settings-backdrop').classList.contains('open');
     state.aisleOrderOpen = false; render();
     document.getElementById('topbar-menu-btn').click();
     document.querySelector('[data-topbar-menu-settings]').click();
@@ -1842,7 +1842,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
     try{ localStorage.removeItem(AUTO_BACKUP_OFF_KEY); }catch(e){}
     return out;
   });
-  eq(r.titles, ['Io', 'Aspetto', 'Il mio menù', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
+  eq(r.titles, ['Aspetto', 'Il mio menù', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
   eq(r.visible, ['Ingredienti e Dispensa']);
   eq(r.visibleLinks, ['aisles']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
@@ -1857,7 +1857,7 @@ test('impostazioni: "Tema e colori" è una pagina a parte e cambia tema e colore
     document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
     const out = { noInline: !document.querySelector('#settings-backdrop .theme-toggle-row') };
     document.querySelector('[data-settings-go="appearance"]').click();
-    out.page = !!document.querySelector('[data-page="appearance"]') && !document.getElementById('settings-backdrop').classList.contains('open');
+    out.page = !!document.querySelector('[data-page="appearance"]') && document.getElementById('settings-backdrop').classList.contains('open');
     document.querySelector('[data-theme-choice="dark"]').click();
     out.dark = document.documentElement.dataset.theme === 'dark' && !!document.querySelector('[data-theme-choice="dark"].active');
     const sw = [...document.querySelectorAll('[data-accent-color]')][1]; sw.click();
@@ -1869,6 +1869,41 @@ test('impostazioni: "Tema e colori" è una pagina a parte e cambia tema e colore
     return out;
   });
   eq(r, { noInline: true, page: true, dark: true, accent: true, closed: true });
+});
+
+test('tema e colori: il colore dei turni di cucina è lì, e Impostazioni non ha più "Io" né il prossimo turno', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const user = getCurrentUser() || Object.keys(COOK_LABEL)[0];
+    window.getCurrentUser = () => user;
+    state.appearanceOpen = true; render();
+    const out = { swatches: document.querySelectorAll('[data-page="appearance"] [data-user-color]').length === USER_COLOR_PRESETS.length, noProfile: !document.getElementById('profile-panel') && !/Prossimo turno/.test(document.getElementById('settings-backdrop').textContent) };
+    const c = USER_COLOR_PRESETS[2];
+    document.querySelector(`[data-user-color="${c}"]`).click();
+    out.saved = state.userColors[user] === c && !!document.querySelector(`[data-user-color="${c}"].active`);
+    return out;
+  });
+  eq(r, { swatches: true, noProfile: true, saved: true });
+});
+
+test('impostazioni: uscendo da una pagina si torna all\'elenco, e chiuse le Impostazioni si ritorna alla scheda di prima', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'spesa'; render();
+    const bd = () => document.getElementById('settings-backdrop');
+    document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
+    const out = {};
+    document.querySelector('[data-settings-go="ingredients"]').click();
+    out.during = state.tab === 'dispensa' && !!document.querySelector('[data-page="ingredients"], .sheet-page') && bd().classList.contains('open');
+    const z = el => parseInt(getComputedStyle(el).zIndex, 10);
+    out.pageAbove = z(document.querySelector('.sheet-page')) > z(bd());
+    document.querySelector('.sheet-page [data-close-ingredient-manager], .sheet-page .settings-back').click();
+    out.backToList = !state.ingredientManagerOpen && bd().classList.contains('open');
+    document.getElementById('settings-close').click();
+    out.restoredTab = state.tab === 'spesa' && !bd().classList.contains('open');
+    return out;
+  });
+  eq(r, { during: true, pageAbove: true, backToList: true, restoredTab: true });
 });
 
 (async () => {
