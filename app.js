@@ -1671,6 +1671,7 @@ const state = {
   // base, chiave "i_meal" (es. "5_cena", "5_pranzo" — così ven/sab/dom
   // possono avere un tetto diverso tra pranzo e cena dello stesso giorno).
   weekTempoBase: 'normale',
+  weekPortionsBase: 2, // porzioni di partenza di ogni pasto generato (Regole di generazione); le cene da cui avanza il pranzo dopo partono con una in più
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
   userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
@@ -2680,6 +2681,7 @@ function buildPersonalPayload(){
     dayPortions: state.dayPortions,
     mealLocked: state.mealLocked,
     weekTempoBase: state.weekTempoBase,
+    weekPortionsBase: state.weekPortionsBase,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
     notifDismissed: state.notifDismissed,
@@ -3892,6 +3894,11 @@ function isMealPast(weekIdx, i, meal){
   const pos = WEEK_DISPLAY_ORDER.indexOf(i);
   return pos < todayPos || (pos === todayPos && meal === 'pranzo' && isTodayLunchPast());
 }
+// Porzioni di partenza dei pasti (Regole di generazione), da 1 a 12.
+function defaultPortions(){
+  const n = parseInt(state.weekPortionsBase, 10);
+  return n >= 1 && n <= 12 ? n : 2;
+}
 function generateWeek(weekIdx){
   // Settimana extra nuova (non ancora esistente): qualunque stato rimasto con
   // il suo numero (blocchi, avanzi, porzioni... di una settimana eliminata in
@@ -3955,8 +3962,9 @@ function generateWeek(weekIdx){
   // 6,0,1,2 — quelle da cui Lun-Gio pranzo prende l'avanzo), che partono a 3
   // per coprire anche il pranzo del giorno dopo.
   for(let i = 0; i < 7; i++){
-    state.dayPortions[`${weekIdx}_${i}_cena`] = [6,0,1,2].includes(i) ? 3 : 2;
-    if(i === 4 || i === 5 || i === 6) state.dayPortions[`${weekIdx}_${i}_pranzo`] = 2;
+    const basePor = defaultPortions();
+    state.dayPortions[`${weekIdx}_${i}_cena`] = [6,0,1,2].includes(i) ? basePor + 1 : basePor;
+    if(i === 4 || i === 5 || i === 6) state.dayPortions[`${weekIdx}_${i}_pranzo`] = basePor;
   }
   // Ripristino i pasti bloccati: stessa ricetta/contorni di prima nella
   // baseline appena generata, ed eventuale link avanzo preservato al posto
@@ -4116,10 +4124,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-10',
+  version: '2026-12-11',
   title: 'Novità',
   items: [
-    'Nove nuove ricette di dolci dal ricettario: Zeppole di San Giuseppe (fritte e al forno), Tronchetto, Struffoli, Pastiera, Pasta frolla, Nodini di carnevale, Migliaccio e Crema al limone. Le porzioni sono stimate: correggile da "Modifica ricetta" se serve.'
+    'Regole di generazione: puoi scegliere le porzioni di partenza dei pasti (da 1 a 12). Valgono dalla prossima generazione; le cene da cui avanza il pranzo dopo partono con una in più.'
   ]
 };
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
@@ -5296,7 +5304,7 @@ function canPrepAhead(name){
 }
 function mealPortions(mk, principale){
   const det = principale ? getRecipeDetails(principale) : null;
-  return state.dayPortions[mk] || (det && parsePortionsBase(det.porzioni)) || 2;
+  return state.dayPortions[mk] || (det && parsePortionsBase(det.porzioni)) || defaultPortions();
 }
 // Porzioni di una ricetta nel freezer (voce di Dispensa segnata frozenMeal).
 function freezerPortionsOf(name){
@@ -5890,6 +5898,11 @@ function renderMenu(){
             <div class="tempo-base-list">
               ${TEMPO_ORDER.map(t=>`<button type="button" class="tempo-base-row${state.weekTempoBase===t?' active':''}" data-set-tempo-base="${t}"><span>${escapeHtml(TEMPO_LABEL[t])}</span>${state.weekTempoBase===t?'<span class="tempo-base-check">✓</span>':''}</button>`).join('')}
             </div>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Porzioni di partenza</div>
+            <div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="qty-num">${defaultPortions()}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></span><span>${defaultPortions() === 1 ? 'persona' : 'persone'}</span></div>
+            <p class="section-sub" style="margin:0;">Valgono dalla prossima generazione. Le cene da cui avanza il pranzo del giorno dopo partono con una porzione in più.</p>
           </div>
           ${genSettingsTargetWeek !== null ? `<div class="filter-group">
             <div class="filter-group-label">Ingredienti</div>
@@ -8240,6 +8253,13 @@ function attachHandlers(){
   document.querySelectorAll('[data-dismiss-eaten-reminder]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       state.mealsDoneReminderDismissed[e.currentTarget.dataset.dismissEatenReminder] = true;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-portions-dec], [data-gen-portions-inc]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const d = btn.hasAttribute('data-gen-portions-inc') ? 1 : -1;
+      state.weekPortionsBase = Math.min(12, Math.max(1, defaultPortions() + d));
       persist(); render();
     });
   });
