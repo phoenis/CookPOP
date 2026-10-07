@@ -1984,6 +1984,8 @@ const COOK_LABEL = { mara:'Mara', ste:'Ste' };
 // col testo chiaro sopra (--bg) del cook-pill.
 const USER_COLOR_PRESETS = ['#ff3b1d','#ff2d6f','#ff8a00','#ffb800','#2fd24f','#00c2a8','#2d8cff','#a75cff'];
 const USER_COLOR_PRESETS_OLD = ['#e03c1e','#87282b','#c9702e','#b08d2b','#5a7517','#2e7d6b','#546e7a','#7a5a8a'];
+// Colore d'accento dell'app: tavolozza a sé (non cambia con quella dei turni di cucina).
+const ACCENT_PRESETS = USER_COLOR_PRESETS_OLD;
 function applyUserColors(){
   document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#ff3b1d');
   document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#ff2d6f');
@@ -2032,6 +2034,16 @@ function applyAccent(hex){
   root.setProperty('--gold-dark', darkenHex(hex, 0.18));
   root.setProperty('--gold-rgb', hexToRgbTriplet(hex).join(','));
 }
+
+// Se per un attimo l'accento è stato scelto dalla tavolozza nuova dei turni di
+// cucina, torna al colore corrispondente della sua tavolozza.
+(function(){
+  try{
+    const a = localStorage.getItem(ACCENT_KEY);
+    const i = a ? USER_COLOR_PRESETS.indexOf(a) : -1;
+    if(i >= 0 && !ACCENT_PRESETS.includes(a)) applyAccent(ACCENT_PRESETS[i]);
+  }catch(e){}
+})();
 
 // Migrazioni una tantum dello stato personale, in ordine di arrivo: ognuna
 // gira una sola volta per spazio (il suo flag in state, salvato su Firebase
@@ -4239,10 +4251,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-08',
+  version: '2027-01-09',
   title: 'Novità',
   items: [
-    'Turni di cucina: colori più saturi e luminosi (quelli già scelti passano al nuovo colore corrispondente).'
+    'Il colore d\'accento dell\'app torna alla sua tavolozza di prima: i colori più luminosi valgono solo per i turni di cucina.'
   ]
 };
 
@@ -9854,8 +9866,8 @@ const TAB_MENU_ITEMS = {
   };
   const refreshAccentRow = ()=>{
     if(!accentRow) return;
-    const active = localStorage.getItem(ACCENT_KEY) || USER_COLOR_PRESETS[0];
-    accentRow.innerHTML = USER_COLOR_PRESETS.map(c=>`<button type="button" class="color-swatch${active===c?' active':''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
+    const active = localStorage.getItem(ACCENT_KEY) || ACCENT_PRESETS[0];
+    accentRow.innerHTML = ACCENT_PRESETS.map(c=>`<button type="button" class="color-swatch${active===c?' active':''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('');
   };
   const open = ()=>{
     refreshThemeRow();
@@ -10607,7 +10619,7 @@ document.addEventListener('change', async e=>{
 function renderAppearancePage(){
   if(!state.appearanceOpen) return '';
   const theme = currentTheme();
-  const accent = localStorage.getItem(ACCENT_KEY) || USER_COLOR_PRESETS[0];
+  const accent = localStorage.getItem(ACCENT_KEY) || ACCENT_PRESETS[0];
   const themes = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']];
   const user = getCurrentUser();
   const turni = user ? `
@@ -10628,7 +10640,7 @@ function renderAppearancePage(){
       <section class="settings-section">
         <h3 class="settings-section-title">Colore d'accento</h3>
         <div class="settings-card">
-          <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${accent === c ? ' active' : ''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('')}</div>
+          <div class="color-swatch-row">${ACCENT_PRESETS.map(c => `<button type="button" class="color-swatch${accent === c ? ' active' : ''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('')}</div>
         </div>
         <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
       </section>${turni}`;

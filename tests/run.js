@@ -2139,6 +2139,15 @@ test('freezer: "Base congelabile" unita a "Si può congelare" (catalogo e ricett
   eq(r, { order: ['congelabile', 'meal-prep'], catalogBase: 0, custom: 'congelabile', edit: 'congelabile' });
 });
 
+test('colori: l\'accento ha la sua tavolozza, diversa da quella dei turni di cucina', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.appearanceOpen = true; render();
+    const acc = [...document.querySelectorAll('[data-accent-color]')].map(b => b.dataset.accentColor);
+    return { acc, same: acc.join() === ACCENT_PRESETS.join(), differs: ACCENT_PRESETS.join() !== USER_COLOR_PRESETS.join(), def: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() };
+  });
+  eq(r, { acc: ['#e03c1e', '#87282b', '#c9702e', '#b08d2b', '#5a7517', '#2e7d6b', '#546e7a', '#7a5a8a'], same: true, differs: true, def: '#e03c1e' });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
