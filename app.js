@@ -1732,6 +1732,7 @@ const state = {
   weekPortionsBase: 2, // porzioni di partenza di ogni pasto generato (Regole di generazione); le cene da cui avanza il pranzo dopo partono con una in più
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
+  userEmojis: {}, // emoji del profilo scelta da ciascun utente (vuota = iniziale del nome)
   userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "tocca a te cucinare" già chiuso per quel pasto
   mealsDoneReminderDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel pasto (senza segnarlo mangiato)
@@ -1997,6 +1998,7 @@ const USER_COLOR_PRESETS = ['#e03c1e','#87282b','#c9702e','#b08d2b','#5a7517','#
 function applyUserColors(){
   document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#e03c1e');
   document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#87282b');
+  if(typeof refreshProfileLink === 'function') refreshProfileLink();
 }
 
 // Tema e colore d'accento: preferenze di QUESTO dispositivo (localStorage,
@@ -2602,7 +2604,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors','prepDay','dishPlan','freezerDishes'];
+const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -2759,6 +2761,7 @@ function buildPersonalPayload(){
     weekPortionsBase: state.weekPortionsBase,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
+    userEmojis: state.userEmojis,
     notifDismissed: state.notifDismissed,
     mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
     pantryConfirmedShop: state.pantryConfirmedShop,
@@ -4228,11 +4231,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-28',
+  version: '2026-12-29',
   title: 'Novità',
   items: [
-    'Impostazioni in stile WhatsApp: in alto il tuo profilo con l\'iniziale, poi un elenco semplice di voci con icona, titolo e descrizione.',
-    'Profilo: il campo del nome ha lo stesso stile degli altri campi.'
+    'Profilo: puoi scegliere un\'emoji come immagine; lo sfondo è il tuo colore dei turni di cucina.',
+    'Impostazioni: le righe di divisione separano gli argomenti (non le voci simili) e i contenuti sono allineati al margine della pagina.'
   ]
 };
 
@@ -10494,17 +10497,42 @@ function profileDisplayName(){
   const u = getCurrentUser();
   return u ? u.charAt(0).toUpperCase() + u.slice(1) : '';
 }
+const PROFILE_EMOJIS = ['👩','👨','🧑','👧','👦','👵','👴','👩‍🍳','👨‍🍳','🧑‍🍳','🍕','🍝','🥗','🍋','🍓','🥑','🌶️','🍅','🧁','🍪','🦊','🐱','🐶','🐼','🦄','🌻','⭐','❤️'];
+function profileAvatarChar(){
+  const u = getCurrentUser();
+  const e = u && state.userEmojis ? state.userEmojis[u] : '';
+  return e || (profileDisplayName() || '?').trim().charAt(0).toUpperCase();
+}
+// Sfondo dell'immagine profilo: il tuo colore del turno di cucina.
+function profileAvatarColor(){
+  const u = getCurrentUser();
+  return (u && state.userColors[u]) || '#e03c1e';
+}
 function refreshProfileLink(){
   const el = document.getElementById('settings-profile-text');
   if(!el) return;
   const name = profileDisplayName();
   el.innerHTML = `${escapeHtml(name || 'Il tuo profilo')}<small>${escapeHtml(loggedInEmail || 'Nome, email, esci')}</small>`;
   const av = document.getElementById('settings-avatar');
-  if(av) av.textContent = (name || '?').trim().charAt(0).toUpperCase();
+  if(av){ av.textContent = profileAvatarChar(); av.style.background = profileAvatarColor(); }
 }
 function renderProfilePage(){
   if(!state.profileOpen) return '';
+  const user = getCurrentUser();
+  const cur = user ? (state.userEmojis[user] || '') : '';
   const body = `
+      <div class="profile-hero"><span class="settings-avatar is-big" style="background:${profileAvatarColor()}">${escapeHtml(profileAvatarChar())}</span></div>
+      ${user ? `<section class="settings-section">
+        <h3 class="settings-section-title">Immagine</h3>
+        <div class="settings-card">
+          <div class="emoji-grid">
+            <button type="button" class="emoji-opt${cur ? '' : ' active'}" data-profile-emoji="" aria-label="Usa l'iniziale">Aa</button>
+            ${PROFILE_EMOJIS.map(e => `<button type="button" class="emoji-opt${cur === e ? ' active' : ''}" data-profile-emoji="${e}">${e}</button>`).join('')}
+          </div>
+          <input type="text" id="profile-emoji-custom" placeholder="Oppure scrivi un'emoji" autocomplete="off" aria-label="Emoji personalizzata">
+          <p class="settings-note">Lo sfondo è il tuo colore dei turni di cucina (si cambia in Tema e colori).</p>
+        </div>
+      </section>` : ''}
       <section class="settings-section">
         <h3 class="settings-section-title">Il tuo nome</h3>
         <div class="settings-card">
@@ -10534,6 +10562,23 @@ document.addEventListener('click', e=>{
   if(e.target.closest('[data-logout]') && window.cookpopAuth){
     state.profileOpen = false; closeSettingsBackdrop(); window.cookpopAuth.signOut();
   }
+});
+function setProfileEmoji(value){
+  const u = getCurrentUser();
+  if(!u) return;
+  if(value) state.userEmojis[u] = value; else delete state.userEmojis[u];
+  persist(); refreshProfileLink(); render();
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-profile-emoji]');
+  if(b) setProfileEmoji(b.dataset.profileEmoji);
+});
+document.addEventListener('change', e=>{
+  if(e.target.id !== 'profile-emoji-custom') return;
+  const v = e.target.value.trim();
+  if(!v) return;
+  const first = (window.Intl && Intl.Segmenter) ? [...new Intl.Segmenter('it', { granularity: 'grapheme' }).segment(v)][0].segment : Array.from(v)[0];
+  setProfileEmoji(first);
 });
 document.addEventListener('change', async e=>{
   if(e.target.id !== 'profile-name') return;
