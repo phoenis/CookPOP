@@ -1842,7 +1842,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
     try{ localStorage.removeItem(AUTO_BACKUP_OFF_KEY); }catch(e){}
     return out;
   });
-  eq(r.titles, ['Aspetto', 'Il mio menù', 'Ricette', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
+  eq(r.titles, ['Profilo', 'Aspetto', 'Il mio menù', 'Ricette', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
   eq(r.visible, ['Ingredienti e Dispensa']);
   eq(r.visibleLinks, ['aisles']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
@@ -2088,6 +2088,30 @@ test('migrazione: le paste del ricettario prendono il nome semplice, via i resti
     return out;
   });
   eq(r, { zuccaVisibile: true, vecchiaEditPersa: true, editSpostata: true, album: 'Pasta e lenticchie|Pasta e zucca', flag: true });
+});
+
+test('impostazioni: Profilo con nome, email ed Esci', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    loggedInEmail = 'mara@esempio.it'; loggedInName = '';
+    let saved = null, loggedOut = false;
+    window.cookpopAuth = { updateName: async n => { saved = n; }, signOut: () => { loggedOut = true; } };
+    refreshProfileLink();
+    out.linkSub = document.querySelector('#settings-profile-text small').textContent;
+    out.linkName = document.querySelector('#settings-profile-text').firstChild.textContent;
+    document.querySelector('[data-settings-go="profile"]').click();
+    out.page = state.profileOpen === true && !!document.querySelector('.sheet-page [id="profile-name"]');
+    out.email = document.getElementById('profile-email').textContent;
+    out.defaultName = document.getElementById('profile-name').value;
+    const inp = document.getElementById('profile-name');
+    inp.value = 'Mara C.'; inp.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 50));
+    out.saved = saved; out.linkAfter = document.querySelector('#settings-profile-text').firstChild.textContent;
+    document.querySelector('[data-logout]').click();
+    out.loggedOut = loggedOut;
+    return out;
+  });
+  eq(r, { linkSub: 'mara@esempio.it', linkName: 'Mara', page: true, email: 'mara@esempio.it', defaultName: 'Mara', saved: 'Mara C.', linkAfter: 'Mara C.', loggedOut: true });
 });
 
 (async () => {

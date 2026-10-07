@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=130">
+<link rel="stylesheet" href="style.css?v=131">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -83,6 +83,12 @@
     <div class="settings-body">
       <div class="settings-search-wrap"><input class="input-search settings-search" type="search" id="settings-search" placeholder="Cerca nelle impostazioni…" autocomplete="off" aria-label="Cerca nelle impostazioni"></div>
       <section class="settings-section">
+        <h3 class="settings-section-title">Profilo</h3>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="profile"><span class="settings-link-ico" data-ico="user"></span><span class="settings-link-text" id="settings-profile-text">Il tuo profilo<small>Nome, email, esci</small></span></button>
+        </div>
+      </section>
+      <section class="settings-section">
         <h3 class="settings-section-title">Aspetto</h3>
         <div class="settings-card is-links">
           <button type="button" class="settings-link" data-settings-go="appearance"><span class="settings-link-ico" data-ico="palette"></span><span class="settings-link-text">Tema e colori<small>Chiaro o scuro, colore d'accento</small></span></button>
@@ -127,7 +133,6 @@
         <div class="settings-card">
           <p class="settings-card-text">Se qualcosa non si vede come dovrebbe, scarica l'ultima versione.</p>
           <button class="btn is-outline is-block" id="refresh-btn" type="button"><span class="ui-ico-wrap" data-ico="refresh"></span> Aggiorna app</button>
-          <button class="btn is-outline is-block settings-item-danger" id="logout-btn" type="button" style="display:none;"><span class="ui-ico-wrap" data-ico="power"></span> Esci</button>
         </div>
       </section>
       <p class="settings-credit">AGGIORNATO A MANO, CUCINATO CON CURA</p>
@@ -141,6 +146,6 @@
 });
 </script>
 <script src="catalog.js?v=13"></script>
-<script src="app.js?v=197"></script>
+<script src="app.js?v=198"></script>
 </body>
 </html>
