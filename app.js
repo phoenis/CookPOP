@@ -222,6 +222,7 @@ const LUOGO_ICON = {
 };
 const DEPT_RULES = [
   // Dolci tradizionali (Zeppole, Pastiera, Struffoli...): aromi, vanillina, bicarbonato, creme e amarene stanno con i dolci.
+  ['pastina','pasta'], ['scarola','verdura'], ['grasso a scelta','salumi'],
   ['aroma di','dolci'], ['vanillina','dolci'], ['bicarbonato','dolci'], ['crema pasticcera','dolci'], ['amarene','dolci'], ['grano cotto','conserve'], ['anice','bibite'],
   // Prodotti per la casa (vista Casa in Dispensa): prima di tutto il resto,
   // perché nomi come "Sale per lavastoviglie" o "Aceto per pulizie"
@@ -4125,13 +4126,13 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-13',
+  version: '2026-12-14',
   title: 'Novità',
   items: [
-    'Otto nuove ricette dal ricettario: Buccette, Zuppa di pesce, Polpo, Polpo al pomodoro, Insalata di polpo, Polpette al sugo con uvetta e pinoli, Sugo per polpette e Pizza con la scarola. Le porzioni sono stimate e dove il ricettario non dà le quantità c\'è "q.b.".',
-    'I tre puntini di ogni scheda hanno di nuovo le voci di quella scheda, anche se restano in Impostazioni: Ricette (Aggiungi e Importa ricetta), Dispensa (Inventario, ingredienti, gruppi, categorie), Spesa (Ordine corsie), Menù (Rigenera menu, Regole di generazione).'
+    'Dieci nuove ricette dal ricettario: Casatiello, Impasto pizza, Pasta e zucca, Pasta e lenticchie, Pasta e patate, Stracciatella, Pastella per frittelle, Migliaccio rustico, Gnocchi alla farina e Besciamella. Le porzioni sono stimate e dove il ricettario non dà le quantità c\'è "q.b.".'
   ]
 };
+
 
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
 // stesso spazio: prima, se la chiudeva uno, non compariva più all'altro).
