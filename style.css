@@ -37,7 +37,7 @@
     --text-medium:1.125rem;
     --text-large:1.3rem;
 
-    --user-color-mara:#e03c1e; --user-color-ste:#87282b; /* default = --gold/--tomato, sovrascritti inline per-utente da applyUserColors() */
+    --user-color-mara:#ff3b1d; --user-color-ste:#ff2d6f; /* default = --gold/--tomato, sovrascritti inline per-utente da applyUserColors() */
 
     --luogo-dispensa: #eeb844;
     --luogo-ripostiglio: #df7150;

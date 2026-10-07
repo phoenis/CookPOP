@@ -1635,6 +1635,7 @@ const state = {
   baseDeptMigrated1: false,
   ricettarioDupes1: false,
   freezerMerge1: false,
+  userColorsBright1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -1720,7 +1721,7 @@ const state = {
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
   userEmojis: {}, // emoji del profilo scelta da ciascun utente (vuota = iniziale del nome)
-  userColors: { mara:'#e03c1e', ste:'#87282b' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
+  userColors: { mara:'#ff3b1d', ste:'#ff2d6f' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "tocca a te cucinare" già chiuso per quel pasto
   mealsDoneReminderDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel pasto (senza segnarlo mangiato)
   genSettingsOpen: null, // null = chiuso; 'plain' = solo impostazioni (da "Aggiungi settimana"); un numero = impostazioni + genera/rigenera per quella settimana (dal titolo settimana)
@@ -1981,10 +1982,11 @@ const COOK_LABEL = { mara:'Mara', ste:'Ste' };
 // Tavolozza di colori preimpostati tra cui scegliere il proprio "colore identità"
 // (profilo in Impostazioni): solo toni abbastanza scuri/saturi da restare leggibili
 // col testo chiaro sopra (--bg) del cook-pill.
-const USER_COLOR_PRESETS = ['#e03c1e','#87282b','#c9702e','#b08d2b','#5a7517','#2e7d6b','#546e7a','#7a5a8a'];
+const USER_COLOR_PRESETS = ['#ff3b1d','#ff2d6f','#ff8a00','#ffb800','#2fd24f','#00c2a8','#2d8cff','#a75cff'];
+const USER_COLOR_PRESETS_OLD = ['#e03c1e','#87282b','#c9702e','#b08d2b','#5a7517','#2e7d6b','#546e7a','#7a5a8a'];
 function applyUserColors(){
-  document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#e03c1e');
-  document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#87282b');
+  document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#ff3b1d');
+  document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#ff2d6f');
   if(typeof refreshProfileLink === 'function') refreshProfileLink();
 }
 
@@ -2206,6 +2208,14 @@ const MIGRATIONS = [
   // 22. Una tantum: "Base congelabile" e "Si può congelare" diventano una sola
   // voce ("Si può congelare"): le ricette tue con 'base' passano a 'congelabile'
   // (il catalogo è già aggiornato in catalog.js).
+  // 23. Una tantum: colori dei turni di cucina più saturi e luminosi; quelli
+  // già scelti passano al corrispondente della nuova tavolozza.
+  { flag: 'userColorsBright1', run(){
+    Object.keys(state.userColors || {}).forEach(u=>{
+      const i = USER_COLOR_PRESETS_OLD.indexOf(state.userColors[u]);
+      if(i >= 0) state.userColors[u] = USER_COLOR_PRESETS[i];
+    });
+  } },
   { flag: 'freezerMerge1', run(){
     Object.values(state.recipeEdits || {}).forEach(e=>{ if(e && e.freezerNew === 'base') e.freezerNew = 'congelabile'; });
     Object.values(state.customRecipes || {}).forEach(r=>{ if(r && r.freezerNew === 'base') r.freezerNew = 'congelabile'; });
@@ -4229,10 +4239,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-07',
+  version: '2027-01-08',
   title: 'Novità',
   items: [
-    'Ricette: "Base congelabile" e "Si può congelare" sono diventate una sola voce, "Si può congelare".'
+    'Turni di cucina: colori più saturi e luminosi (quelli già scelti passano al nuovo colore corrispondente).'
   ]
 };
 
@@ -10506,7 +10516,7 @@ function profileAvatarChar(){
 // Sfondo dell'immagine profilo: il tuo colore del turno di cucina.
 function profileAvatarColor(){
   const u = getCurrentUser();
-  return (u && state.userColors[u]) || '#e03c1e';
+  return (u && state.userColors[u]) || '#ff3b1d';
 }
 function refreshProfileLink(){
   const el = document.getElementById('settings-profile-text');
