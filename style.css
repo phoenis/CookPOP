@@ -1477,3 +1477,8 @@ body{ overflow-x:clip; }
 /* Bottone Cucina: stessa posizione, un po' più in basso, da Menù e da Ricette */
 .cook-fab{ bottom:calc(1.75rem + env(safe-area-inset-bottom)); }
 .has-cook-fab{ padding-bottom:7rem; }
+/* Passaggi con testo grande come gli ingredienti; "Per X persone" in una pillola grigia a destra, come il tempo */
+.detail-section .steps-list{ font-size:var(--text-body); padding-left:1.25rem; }
+.detail-section .steps-list li{ margin-bottom:var(--space-small); line-height:1.5; }
+.detail-section > .persone-row{ display:flex; width:fit-content; margin:var(--space-xsmall) 0 var(--space-xsmall) auto; padding:var(--space-xxsmall) var(--space-small); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-xsmall); font-weight:var(--weight-medium); color:var(--ink); gap:var(--space-xsmall); }
+.detail-section > .persone-row .qty-btn{ width:1.25rem; height:1.25rem; }

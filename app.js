@@ -626,8 +626,7 @@ function cookStepIngredients(name, stepText, ratio){
 // --- Timer in modalità cucina --------------------------------------------
 // Durata scritta nel passo ("10 minuti", "mezz'ora", "1 ora e mezza"): se c'è,
 // il passo mostra "Avvia timer" (suona e vibra qui nell'app, finché resta
-// aperta) e, su Android, "Nell'orologio" (timer vero del telefono, suona anche
-// a schermo bloccato). Con un intervallo ("20-25 minuti") vale il minimo.
+// aperta). Con un intervallo ("20-25 minuti") vale il minimo.
 function stepDurationSecs(text){
   const t = String(text || '').toLowerCase();
   const num = s => parseFloat(String(s).replace(',', '.'));
@@ -720,40 +719,12 @@ document.addEventListener('click', e=>{
   }
   if(e.target.closest('[data-cook-timer-cancel]')){ state.cookTimer = null; render(); return; }
   if(e.target.closest('[data-timer-stop]')){ timerStopRinging(); return; }
-  const phone = e.target.closest('[data-cook-timer-phone]');
-  if(phone){
-    const secs = parseInt(phone.dataset.cookTimerPhone, 10) || 0;
-    if(!secs) return;
-    timerPrimeAudio();
-    const msg = encodeURIComponent((state.cookMode && state.cookMode.name) || 'CookPOP');
-    const url = `intent:#Intent;action=android.intent.action.SET_TIMER;i.android.intent.extra.alarm.LENGTH=${secs};S.android.intent.extra.alarm.MESSAGE=${msg};B.android.intent.extra.alarm.SKIP_UI=true;end`;
-    // Se l'Orologio si apre, la pagina passa in secondo piano: niente da fare.
-    // Se dopo un attimo siamo ancora qui, il telefono non l'ha aperto: parte
-    // il timer dell'app, così il tempo non va perso.
-    let left = false;
-    const onLeave = ()=>{ left = true; };
-    document.addEventListener('visibilitychange', onLeave, { once: true });
-    window.addEventListener('pagehide', onLeave, { once: true });
-    window.addEventListener('blur', onLeave, { once: true });
-    const a = document.createElement('a');
-    a.href = url; a.style.display = 'none';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>{
-      document.removeEventListener('visibilitychange', onLeave);
-      window.removeEventListener('pagehide', onLeave);
-      window.removeEventListener('blur', onLeave);
-      if(left || document.hidden || state.cookTimer) return;
-      state.cookTimer = { end: Date.now() + secs * 1000, total: secs, label: formatTimerLabel(secs), note: 'Orologio non aperto: timer nell\'app' };
-      render();
-    }, 1500);
-  }
 });
 function cookTimerHtml(stepText){
   const secs = stepDurationSecs(stepText);
   const running = state.cookTimer;
-  const isAndroid = /android/i.test(navigator.userAgent || '');
   const bar = running ? `<div class="cook-timer-bar"><span aria-hidden="true">⏱</span><b id="cook-timer-time">${formatTimerClock(Math.ceil((running.end - Date.now()) / 1000))}</b><span class="cook-timer-label">${escapeHtml(running.note || ('Timer ' + running.label))}</span><button type="button" class="cook-timer-cancel" data-cook-timer-cancel>Annulla</button></div>` : '';
-  const btns = secs ? `<div class="cook-timer-row"><button type="button" class="cook-timer-btn" data-cook-timer-start="${secs}">⏱ Avvia timer ${formatTimerLabel(secs)}</button>${isAndroid ? `<button type="button" class="cook-timer-btn is-ghost" data-cook-timer-phone="${secs}">Nell'orologio</button>` : ''}</div>` : '';
+  const btns = secs ? `<div class="cook-timer-row"><button type="button" class="cook-timer-btn" data-cook-timer-start="${secs}">⏱ Avvia timer ${formatTimerLabel(secs)}</button></div>` : '';
   return { bar, btns };
 }
 function renderCookModePage(){
@@ -834,7 +805,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
       ${gradTagHtml(name)}
     </div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
   const stepsHtml = det && det.procedimento && det.procedimento.length
-    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+    ? `<div class="detail-section"><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
     : '';
   const noteExtra = det ? [
       det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
@@ -4246,11 +4217,12 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-03',
+  version: '2027-01-04',
   title: 'Novità',
   items: [
-    'Ricetta aperta dal Menù: margini bilanciati come nelle Ricette (una card sporgeva e allargava la pagina).',
-    'Bottone Cucina: stessa posizione da Menù e da Ricette, un po\' più in basso.'
+    'Cucina: tolto "Nell\'orologio" dal timer (resta il timer dell\'app).',
+    'Passaggi: tolto il titolo "Procedimento" e testo grande come negli ingredienti.',
+    'Ingredienti: "Per X persone" in una pillola grigia a destra, come il tempo.'
   ]
 };
 
@@ -6616,7 +6588,7 @@ function renderRecipeDetailScreen(name){
   const recPane = state.dishPane['r|' + name] || 'ing';
   const ingHtml = renderIngredientsSection(ing, rRatio, { noButton: true, titleHtml: personeRowHtml(nPers, '', name) }, nPers);
   const stepsHtml = det && det.procedimento && det.procedimento.length
-    ? `<div class="detail-section"><div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
+    ? `<div class="detail-section"><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
     : '';
   const noteExtra = det ? [
       det.porzioni ? `<b>Porzioni:</b> ${escapeHtml(det.porzioni)}` : '',
