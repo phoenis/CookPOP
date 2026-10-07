@@ -4222,11 +4222,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-23',
+  version: '2026-12-24',
   title: 'Novità',
   items: [
-    'Icone dei luoghi più piccole.',
-    'Swipe col cestino in Spesa e Dispensa: box rosso con bordi arrotondati e icona più piccola, uguale in entrambe.'
+    'Swipe col cestino come Gmail: il box rosso parte stretto e si allarga seguendo il dito, con bordi arrotondati (Spesa, Dispensa e Menù).',
+    'Menù: nello swipe si sposta tutta la card, senza tagliare il contenuto.'
   ]
 };
 
@@ -8145,7 +8145,8 @@ function attachHandlers(){
     let longPressed = false;
     let startX = 0, startY = 0;
     let swiping = false; // una volta capito che è uno swipe verso destra (non tap né pressione lunga)
-    function setTx(px){ block.style.transform = px ? `translateX(${px}px)` : ''; }
+    const trashEl = wrap && wrap.querySelector('.meal-block-trash');
+    function setTx(px){ block.style.transform = px ? `translateX(${px}px)` : ''; if(trashEl) trashEl.style.width = px ? `${px}px` : ''; }
     // Se questa card era rimasta "rivelata" da prima del render, resta aperta.
     if(wrap && revealedMealKey === blockMk) setTx(TRASH_REVEAL);
     block.addEventListener('pointerdown', e=>{
@@ -9939,7 +9940,8 @@ function attachSwipeToDelete(wrap, onDelete){
   const id = wrap.dataset.swipeId;
   if(!content) return;
   let tracking = false, swiping = false, justSwiped = false, startX = 0, startY = 0;
-  const setTx = px=>{ content.style.transform = px ? `translateX(${px}px)` : ''; };
+  const trashEl = wrap.querySelector('.swipe-trash');
+  const setTx = px=>{ content.style.transform = px ? `translateX(${px}px)` : ''; if(trashEl) trashEl.style.width = px ? `${px}px` : ''; };
   if(revealedSwipeId === id) setTx(SWIPE_REVEAL);
   const doDelete = ()=>{ revealedSwipeId = null; onDelete(); };
   wrap.querySelector('.swipe-trash').addEventListener('click', doDelete);
