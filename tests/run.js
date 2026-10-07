@@ -2024,6 +2024,19 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
   eq(r, { dispensa: ['Inventario veloce', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Regole di generazione'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true });
 });
 
+test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const nomi = ['Casatiello', 'Impasto pizza', 'Pasta e zucca (ricettario)', 'Stracciatella', 'Pastella per frittelle', 'Migliaccio rustico', 'Pasta e lenticchie (ricettario)', 'Pasta e patate (ricettario)', 'Gnocchi alla farina', 'Besciamella'];
+    return {
+      ok: nomi.every(n => { const m = getRecipeMeta(n), d = getRecipeDetails(n); return m && d && d.link === 'ricettario' && d.procedimento.length >= 1 && getIngredientsFor(n).length >= 3; }),
+      basi: ['Impasto pizza', 'Pastella per frittelle', 'Besciamella'].map(n => getRecipeMeta(n).tipologia),
+      originali: ['Pasta e zucca', 'Pasta e patate', 'Pasta e lenticchie'].every(n => !!getRecipeMeta(n)),
+      reparti: ['Pastina', 'Scarola', 'Grasso a scelta (meglio con la cotica)'].map(classifyDept)
+    };
+  });
+  eq(r, { ok: true, basi: ['antipasto', 'antipasto', 'antipasto'], originali: true, reparti: ['pasta', 'verdura', 'salumi'] });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
