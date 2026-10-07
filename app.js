@@ -4125,12 +4125,14 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-12',
+  version: '2026-12-13',
   title: 'Novità',
   items: [
-    'In Impostazioni c\'è la sezione "Ricette": "Aggiungi ricetta" (ora è una pagina, non più una finestra) e "Importa ricetta". Il + rosso e la voce nei tre puntini di Ricette non ci sono più.'
+    'Otto nuove ricette dal ricettario: Buccette, Zuppa di pesce, Polpo, Polpo al pomodoro, Insalata di polpo, Polpette al sugo con uvetta e pinoli, Sugo per polpette e Pizza con la scarola. Le porzioni sono stimate e dove il ricettario non dà le quantità c\'è "q.b.".',
+    'I tre puntini di ogni scheda hanno di nuovo le voci di quella scheda, anche se restano in Impostazioni: Ricette (Aggiungi e Importa ricetta), Dispensa (Inventario, ingredienti, gruppi, categorie), Spesa (Ordine corsie), Menù (Rigenera menu, Regole di generazione).'
   ]
 };
+
 // Chi l'ha già vista si ricorda per persona (Mara e Ste condividono lo
 // stesso spazio: prima, se la chiudeva uno, non compariva più all'altro).
 function whatsNewViewerKey(){
@@ -9695,14 +9697,26 @@ function regenerateAllWeeks(){
   });
 }
 const TAB_MENU_ITEMS = {
+  // Scorciatoie alle stesse voci che stanno anche in Impostazioni.
   dispensa: [
-    { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } }
+    { label: '📝 Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } },
+    { label: '🗂️ Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
+    { label: '🧺 Gruppi', action: ()=>{ state.pantryGroupsModalOpen = true; } },
+    { label: '🏷️ Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
+  ],
+  spesa: [
+    { label: '↕️ Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
   ],
   menu: [
-    { label: '🔄 Rigenera menu', action: ()=>{ regenerateAllWeeks(); } }
+    { label: '🔄 Rigenera menu', action: ()=>{ regenerateAllWeeks(); } },
+    { label: '🍽️ Regole di generazione', action: ()=>{ state.genSettingsOpen = 'plain'; } }
   ],
-  prep: []
+  prep: [
+    { label: '➕ Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); } },
+    { label: '📥 Importa ricetta', action: ()=>{ state.recipeImport = { name: '', link: '', text: '' }; } }
+  ]
 };
+
 
 (function(){
   const topbarMenuBtn = document.getElementById('topbar-menu-btn');
