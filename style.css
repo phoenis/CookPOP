@@ -1472,3 +1472,8 @@ body{ overflow-x:clip; }
 .grad-pop-opt.active{ background:rgba(var(--gold-rgb),0.12); font-weight:var(--weight-bold); }
 .recipe-photo-drop{ display:flex; align-items:center; justify-content:center; box-sizing:border-box; min-height:5rem; margin-bottom:var(--space-small); border:2px dashed var(--line); border-radius:var(--radius-modal); color:var(--ink-light); font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-medium); cursor:pointer; text-align:center; }
 .settings-title{ line-height:1.2; }
+/* La card del giorno aperta (dietro la pagina di dettaglio) non deve sporgere dallo schermo: allargava la pagina di 8px e la sbilanciava */
+.day-card.open, .recipe-list .day-card.open{ margin-left:0; margin-right:0; }
+/* Bottone Cucina: stessa posizione, un po' più in basso, da Menù e da Ricette */
+.cook-fab{ bottom:calc(1.75rem + env(safe-area-inset-bottom)); }
+.has-cook-fab{ padding-bottom:7rem; }
