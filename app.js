@@ -4228,10 +4228,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2026-12-27',
+  version: '2026-12-28',
   title: 'Novità',
   items: [
-    'Impostazioni: nuova voce Profilo con il tuo nome (lo scegli tu), l\'email dell\'account e il pulsante Esci.'
+    'Impostazioni in stile WhatsApp: in alto il tuo profilo con l\'iniziale, poi un elenco semplice di voci con icona, titolo e descrizione.',
+    'Profilo: il campo del nome ha lo stesso stile degli altri campi.'
   ]
 };
 
@@ -10498,6 +10499,8 @@ function refreshProfileLink(){
   if(!el) return;
   const name = profileDisplayName();
   el.innerHTML = `${escapeHtml(name || 'Il tuo profilo')}<small>${escapeHtml(loggedInEmail || 'Nome, email, esci')}</small>`;
+  const av = document.getElementById('settings-avatar');
+  if(av) av.textContent = (name || '?').trim().charAt(0).toUpperCase();
 }
 function renderProfilePage(){
   if(!state.profileOpen) return '';
