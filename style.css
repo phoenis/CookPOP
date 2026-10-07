@@ -1438,3 +1438,12 @@ body{ overflow-x:clip; }
 /* Niente barra di scorrimento che toglie larghezza alle pagine a schermo intero: ricetta dal Menù e dal Ricettario hanno gli stessi margini */
 .sheet-page, .meal-detail-body{ scrollbar-width:none; }
 .sheet-page::-webkit-scrollbar, .meal-detail-body::-webkit-scrollbar{ display:none; }
+/* Impostazioni in stile WhatsApp: profilo in alto con iniziale, poi elenco piatto di voci (icona, titolo, descrizione) senza titoli di sezione */
+#settings-backdrop .settings-section-title{ display:none; }
+#settings-backdrop .settings-section{ margin-bottom:var(--space-xsmall); }
+.settings-link-ico{ width:2rem; justify-content:center; }
+.settings-profile{ padding-top:var(--space-medium); padding-bottom:var(--space-medium); }
+.settings-avatar{ flex:none; width:3.5rem; height:3.5rem; border-radius:50%; background:var(--gold); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:var(--weight-bold); }
+.settings-profile .settings-link-text{ font-size:var(--text-medium); }
+.settings-profile .settings-link-text small{ font-size:var(--text-small); }
+#profile-name{ box-sizing:border-box; width:100%; border:1px solid var(--line); border-radius:var(--form-border-radius); font-family:var(--font-family); font-size:var(--text-body); font-weight:var(--weight-normal); color:var(--ink); background:var(--surface); padding:0 var(--space-small); min-height:2.75rem; }
