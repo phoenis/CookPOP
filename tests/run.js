@@ -2177,6 +2177,28 @@ test('modalità cucina: si passa da una ricetta all\'altra restando al passo a c
   eq(r, { chips: ['Prova uno', 'Prova due'], step1: 1, second: ['Prova due', 0], back: ['Prova uno', 1, 'B Prova uno'], second2: ['Prova due', 2] });
 });
 
+test('Ricetta fatta!: la spunta "finito" manda l\'ingrediente tra i Finiti della Spesa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1);
+    upsertPantryItem('Pane', 'dispensa', 6);
+    writeMealPrincipale(weekOverridesRef(1), 1, 'cena', 'Carbonara');
+    mealCookIngredients('1_1_cena', effectiveMeal(1, 1, 'cena')).forEach(i => upsertPantryItem(i.ingrediente, 'dispensa', 5));
+    state.tab = 'menu'; render();
+    document.querySelector('[data-toggle-done="1_1_cena"]').click();
+    const out = { split: !!document.querySelector('.done-finished-section') };
+    const cb = document.querySelector('[data-done-finished-toggle]');
+    out.hasCheck = !!cb;
+    const name = cb.getAttribute('data-done-finished-toggle');
+    cb.click();
+    document.querySelector('[data-confirm-done="1_1_cena"]').click();
+    const it = resolvePantryItem(name);
+    out.qty = it && it.qty;
+    out.inShop = buildShopFlat().some(x => x.context === 'Finiti in Dispensa' && String(x.name || x.ingrediente || '').toLowerCase() === name.toLowerCase());
+    return out;
+  });
+  eq([r.split, r.hasCheck, r.qty, r.inShop], [false, true, 0, true], JSON.stringify(r));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
