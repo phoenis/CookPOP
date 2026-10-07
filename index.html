@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=118">
+<link rel="stylesheet" href="style.css?v=119">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -88,21 +88,9 @@
       </section>
       <section class="settings-section">
         <h3 class="settings-section-title">Aspetto</h3>
-        <div class="settings-card">
-          <div class="settings-field">
-            <div class="settings-field-label">Tema</div>
-            <div class="theme-toggle-row" id="theme-toggle-row">
-              <button type="button" class="btn is-outline theme-btn" data-theme-choice="system">Sistema</button>
-              <button type="button" class="btn is-outline theme-btn" data-theme-choice="light">Chiaro</button>
-              <button type="button" class="btn is-outline theme-btn" data-theme-choice="dark">Scuro</button>
-            </div>
-          </div>
-          <div class="settings-field">
-            <div class="settings-field-label">Colore d'accento</div>
-            <div class="color-swatch-row" id="accent-swatch-row"></div>
-          </div>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="appearance"><span class="settings-link-text">🎨 Tema e colori<small>Chiaro o scuro, colore d'accento</small></span></button>
         </div>
-        <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
       </section>
       <section class="settings-section">
         <h3 class="settings-section-title">Il mio menù</h3>
@@ -158,6 +146,6 @@
 });
 </script>
 <script src="catalog.js?v=9"></script>
-<script src="app.js?v=177"></script>
+<script src="app.js?v=178"></script>
 </body>
 </html>

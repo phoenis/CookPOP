@@ -1850,6 +1850,27 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
+test('impostazioni: "Tema e colori" è una pagina a parte e cambia tema e colore', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'spesa'; render();
+    document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
+    const out = { noInline: !document.querySelector('#settings-backdrop .theme-toggle-row') };
+    document.querySelector('[data-settings-go="appearance"]').click();
+    out.page = !!document.querySelector('[data-page="appearance"]') && !document.getElementById('settings-backdrop').classList.contains('open');
+    document.querySelector('[data-theme-choice="dark"]').click();
+    out.dark = document.documentElement.dataset.theme === 'dark' && !!document.querySelector('[data-theme-choice="dark"].active');
+    const sw = [...document.querySelectorAll('[data-accent-color]')][1]; sw.click();
+    out.accent = localStorage.getItem(ACCENT_KEY) === sw.dataset.accentColor;
+    document.querySelector('[data-theme-choice="system"]').click();
+    applyAccent(null);
+    document.querySelector('[data-close-appearance]').click();
+    out.closed = !state.appearanceOpen;
+    return out;
+  });
+  eq(r, { noInline: true, page: true, dark: true, accent: true, closed: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
