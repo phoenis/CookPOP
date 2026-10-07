@@ -56,8 +56,8 @@ const STAGIONE_ORDER = ['primavera','estate','autunno','inverno','tutto'];
 const AVANZI_LABEL = { 'ottima':'Ottima per il pranzo dopo', 'buona':'Buona il giorno dopo', 'meglio-fatta':'Meglio appena fatta' };
 const AVANZI_ORDER = ['ottima','buona','meglio-fatta'];
 
-const FREEZER_LABEL = { 'non-adatta':'❄️ Non adatta', 'congelabile':'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.65 149.14a12 12 0 0 1-8.79 14.51l-20.67 5.08l5.4 20.16a12 12 0 0 1-23.18 6.22l-7.29-27.2L140 148.78V187l20.48 20.48a12 12 0 0 1-17 17L128 209l-15.51 15.52a12 12 0 0 1-17-17L116 187v-38.22l-33.12 19.13l-7.29 27.2a12 12 0 0 1-23.18-6.22l5.4-20.16l-20.67-5.08a12 12 0 1 1 5.72-23.3l27.89 6.85L104 128l-33.25-19.2l-27.89 6.85A11.8 11.8 0 0 1 40 116a12 12 0 0 1-2.85-23.65l20.67-5.08l-5.4-20.16a12 12 0 0 1 23.18-6.22l7.29 27.2L116 107.21V69L95.52 48.48a12 12 0 0 1 17-17L128 47l15.51-15.52a12 12 0 1 1 17 17L140 69v38.24l33.12-19.12l7.29-27.2a12 12 0 0 1 23.18 6.22l-5.4 20.16l20.67 5.08A12 12 0 0 1 216 116a11.8 11.8 0 0 1-2.87-.35l-27.89-6.85L152 128l33.25 19.2l27.89-6.85a12 12 0 0 1 14.51 8.79"></path></svg> Si può congelare', 'meal-prep':'🍱 Meal prep', 'base':'🧱 Base congelabile' };
-const FREEZER_ORDER = ['congelabile','meal-prep','base'];
+const FREEZER_LABEL = { 'non-adatta':'❄️ Non adatta', 'congelabile':'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.65 149.14a12 12 0 0 1-8.79 14.51l-20.67 5.08l5.4 20.16a12 12 0 0 1-23.18 6.22l-7.29-27.2L140 148.78V187l20.48 20.48a12 12 0 0 1-17 17L128 209l-15.51 15.52a12 12 0 0 1-17-17L116 187v-38.22l-33.12 19.13l-7.29 27.2a12 12 0 0 1-23.18-6.22l5.4-20.16l-20.67-5.08a12 12 0 1 1 5.72-23.3l27.89 6.85L104 128l-33.25-19.2l-27.89 6.85A11.8 11.8 0 0 1 40 116a12 12 0 0 1-2.85-23.65l20.67-5.08l-5.4-20.16a12 12 0 0 1 23.18-6.22l7.29 27.2L116 107.21V69L95.52 48.48a12 12 0 0 1 17-17L128 47l15.51-15.52a12 12 0 1 1 17 17L140 69v38.24l33.12-19.12l7.29-27.2a12 12 0 0 1 23.18 6.22l-5.4 20.16l20.67 5.08A12 12 0 0 1 216 116a11.8 11.8 0 0 1-2.87-.35l-27.89-6.85L152 128l33.25 19.2l27.89-6.85a12 12 0 0 1 14.51 8.79"></path></svg> Si può congelare', 'meal-prep':'🍱 Meal prep' };
+const FREEZER_ORDER = ['congelabile','meal-prep'];
 
 const GRAD_LABEL = { 'preferita':'❤️ Preferita', 'ci-piace':'🙂 Ci piace', 'ogni-tanto':'😐 Ogni tanto', 'da-provare':'🧪 Da provare' };
 const GRAD_ORDER = ['preferita','ci-piace','ogni-tanto','da-provare'];
@@ -1634,6 +1634,7 @@ const state = {
   shopKeysByName1: false,
   baseDeptMigrated1: false,
   ricettarioDupes1: false,
+  freezerMerge1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -2202,6 +2203,13 @@ const MIGRATIONS = [
   // il posto delle versioni del catalogo con lo stesso nome: via le modifiche e gli
   // "eliminata" rimasti alle vecchie, e quelle col "(ricettario)" nel nome passano
   // al nome semplice (pasti, album, modifiche comprese).
+  // 22. Una tantum: "Base congelabile" e "Si può congelare" diventano una sola
+  // voce ("Si può congelare"): le ricette tue con 'base' passano a 'congelabile'
+  // (il catalogo è già aggiornato in catalog.js).
+  { flag: 'freezerMerge1', run(){
+    Object.values(state.recipeEdits || {}).forEach(e=>{ if(e && e.freezerNew === 'base') e.freezerNew = 'congelabile'; });
+    Object.values(state.customRecipes || {}).forEach(r=>{ if(r && r.freezerNew === 'base') r.freezerNew = 'congelabile'; });
+  } },
   { flag: 'ricettarioDupes1', run(){
     [['Pasta e zucca', 'Pasta e zucca (ricettario)'], ['Pasta e patate', 'Pasta e patate (ricettario)'], ['Pasta e lenticchie', 'Pasta e lenticchie (ricettario)']].forEach(([plain, tagged])=>{
       delete state.recipeEdits[plain]; delete state.recipeIngredients[plain]; delete state.hiddenRecipes[plain];
@@ -3194,7 +3202,7 @@ function suggestSwaps(weekIdx, i, exclude){
   const WEEKDAY_TEMPO = ['express','veloce','normale'];
   const scored = allRecipeMetas().filter(r => isMainDish(r) && !inPlan.has(r.nome) && !(exclude && exclude.has(r.nome))).map(r=>{
     const isLong = r.tempoBucket === 'progetto' || r.tempoBucket === 'lunga';
-    const isFreezable = r.freezerNew === 'congelabile' || r.freezerNew === 'base';
+    const isFreezable = r.freezerNew === 'congelabile';
     let motivo;
     if(isWeekend && isLong) motivo = 'Progetto da weekend';
     else if(WEEKDAY_TEMPO.includes(r.tempoBucket)) motivo = 'Sotto i 30–45 minuti';
@@ -4221,11 +4229,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-06',
+  version: '2027-01-07',
   title: 'Novità',
   items: [
-    'Modalità cucina: "Avanti" per il passaggio successivo, "Fatto" all\'ultimo. Con "Fatto" il pasto si segna come cucinato e l\'app chiede quali ingredienti sono finiti.',
-    'Modifica ricetta: ingredienti e passaggi come gli altri campi, etichette con icone SVG.'
+    'Ricette: "Base congelabile" e "Si può congelare" sono diventate una sola voce, "Si può congelare".'
   ]
 };
 
