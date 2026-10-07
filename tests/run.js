@@ -1694,7 +1694,7 @@ test('app: Carte nella barra in alto (solo Spesa), titolo Menù, ricerca alta ug
     out.hSpesa = Math.round(document.querySelector('.list-search').getBoundingClientRect().height);
     at('prep'); out.hPrep = Math.round(document.querySelector('.list-search').getBoundingClientRect().height);
     out.check = !!document.querySelector('.shop-head .pantry-check[data-toggle-pantry-mode]');
-    out.menuExtras = ['dispensa', 'prep'].map(t => TAB_MENU_ITEMS[t].some(i => /Aggiungi/.test(i.label)));
+    out.menuExtras = ['dispensa', 'prep'].map(t => TAB_MENU_ITEMS[t].some(i => /\+ Aggiungi/.test(i.label)));
     return out;
   });
   eq(r, { title: 'Menù', cardsMenu: true, cardsSpesa: false, noOldBtn: true, hSpesa: 44, hPrep: 44, check: true, menuExtras: [false, false] });
@@ -1846,7 +1846,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq(r.visible, ['Ingredienti e Dispensa']);
   eq(r.visibleLinks, ['aisles']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 1, spesa: 0, menu: 1, prep: 0 });
+  eq(r.menus, { dispensa: 4, spesa: 1, menu: 2, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -1934,7 +1934,7 @@ test('backup in pagina dedicata e "Rigenera menu" rigenera tutte le settimane at
     out.toast = /2 settimane/.test((document.querySelector('.undo-toast') || {}).textContent || '');
     return out;
   });
-  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['🔄 Rigenera menu'], regen: true, toast: true });
+  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['🔄 Rigenera menu', '🍽️ Regole di generazione'], regen: true, toast: true });
 });
 
 test('catalogo: nove dolci dal ricettario, con ingredienti, procedimento e reparti giusti', async ({ page }) => {
@@ -1970,7 +1970,7 @@ test('ricette: "Aggiungi ricetta" è una pagina dalle Impostazioni, "Importa ric
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.tab = 'prep'; state.prepView = 'ricette'; render();
-    const out = { noFab: !document.getElementById('prep-fab'), noMenu: TAB_MENU_ITEMS.prep.length === 0 };
+    const out = { noFab: !document.getElementById('prep-fab'), noMenu: TAB_MENU_ITEMS.prep.map(i => i.label).join('|') === '➕ Aggiungi ricetta|📥 Importa ricetta' };
     state.tab = 'spesa'; render();
     document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
     out.links = [...document.querySelectorAll('#settings-backdrop [data-settings-go="newrecipe"], #settings-backdrop [data-settings-go="import"]')].length;
@@ -1993,6 +1993,35 @@ test('ricette: "Aggiungi ricetta" è una pagina dalle Impostazioni, "Importa ric
     return out;
   });
   eq(r, { noFab: true, noMenu: true, links: 2, page: true, empty: true, created: true, backInSettings: true, import: true, tabBack: true });
+});
+
+test('catalogo: otto ricette dal ricettario (pesce, polpo, polpette, buccette, pizza con la scarola)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const nomi = ['Buccette', 'Zuppa di pesce', 'Insalata di polpo', 'Polpo al pomodoro', 'Polpo', 'Polpette al sugo con uvetta e pinoli', 'Sugo per polpette', 'Pizza con la scarola'];
+    return {
+      ok: nomi.every(n => { const m = getRecipeMeta(n), d = getRecipeDetails(n); return m && d && d.link === 'ricettario' && d.procedimento.length >= 2 && getIngredientsFor(n).length >= 2; }),
+      sugoNonInMenu: getRecipeMeta('Sugo per polpette').tipologia === 'antipasto',
+      zuppa: getIngredientsFor('Zuppa di pesce').length >= 12,
+      originale: !!getRecipeMeta('Polpette al sugo')
+    };
+  });
+  eq(r, { ok: true, sugoNonInMenu: true, zuppa: true, originale: true });
+});
+
+test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardano', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const labels = k => TAB_MENU_ITEMS[k].map(i => i.label.replace(/^\S+\s/, ''));
+    const out = { dispensa: labels('dispensa'), spesa: labels('spesa'), menu: labels('menu'), prep: labels('prep') };
+    TAB_MENU_ITEMS.prep[0].action(); out.newPage = state.newRecipeModalOpen === true; state.newRecipeModalOpen = false;
+    TAB_MENU_ITEMS.prep[1].action(); out.imp = !!state.recipeImport; state.recipeImport = null;
+    TAB_MENU_ITEMS.dispensa[1].action(); out.ing = state.ingredientManagerOpen === true; state.ingredientManagerOpen = false;
+    TAB_MENU_ITEMS.dispensa[2].action(); out.grp = state.pantryGroupsModalOpen === true; state.pantryGroupsModalOpen = false;
+    TAB_MENU_ITEMS.dispensa[3].action(); out.dept = state.deptsModalOpen === true; state.deptsModalOpen = false;
+    TAB_MENU_ITEMS.spesa[0].action(); out.aisle = state.aisleOrderOpen === true; state.aisleOrderOpen = false;
+    TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genSettingsOpen === 'plain'; state.genSettingsOpen = null;
+    return out;
+  });
+  eq(r, { dispensa: ['Inventario veloce', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Regole di generazione'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true });
 });
 
 (async () => {
