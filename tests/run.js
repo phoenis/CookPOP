@@ -2220,6 +2220,28 @@ test('blocco per piatto: lucchetto solo sul piatto bloccato, la rigenerazione lo
   });
   eq([r.before, r.lockedP, r.lockedC, r.locks >= 1, r.keptP, r.stillLocked, r.cleared], [0, true, false, true, 'Carbonara', true, true], JSON.stringify(r));
 });
+test('blocco piatto: tocco sull\'icona blocca/sblocca, anche su un avanzo; badge avanzo senza giorno', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.extraWeeks = []; generateWeek(1);
+    state.tab = 'menu'; state.expandedDay = null; render();
+    const out = {};
+    const mk = '1_1_pranzo'; // avanzo della cena del giorno prima
+    out.isLeftover = !!state.dayLinks[mk];
+    const sel = '[data-toggle-dish-lock="' + mk + '"]';
+    const btn = document.querySelector(sel);
+    out.hasBtn = !!btn;
+    btn.click();
+    out.locked = !!state.mealLocked[mk];
+    out.iconLocked = !!document.querySelector(sel + '.is-locked');
+    document.querySelector(sel).click();
+    out.unlocked = !state.mealLocked[mk];
+    const badge = document.querySelector('[data-unlink-day="' + mk + '"]');
+    out.badge = badge ? badge.textContent.replace('✕', '').trim() : null;
+    return out;
+  });
+  eq([r.isLeftover, r.hasBtn, r.locked, r.iconLocked, r.unlocked, r.badge], [true, true, true, true, true, 'Avanzo'], JSON.stringify(r));
+});
 
 (async () => {
   const filter = process.argv[2] || '';
