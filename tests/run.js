@@ -907,8 +907,8 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
   eq(d.paneActive, 'Ingredienti', 'parte da Ingredienti');
   assert(/^Per.*\d+.*person[ae]$/.test(d.persone) && d.stepperInRow && d.noTitleInIng && d.portionsUp, `porzioni nella tab: ${d.persone}`);
   assert(d.fab && d.stepsShown && d.fabInSteps, 'Cucina fisso in entrambe le tab');
-  eq(d.menu.length, 3, 'menù ⋯: cambia, modifica, togli');
-  assert(/Cambia piatto/.test(d.menu[0]) && /Modifica ricetta/.test(d.menu[1]) && /Togli/.test(d.menu[2]), `voci: ${d.menu.join(' | ')}`);
+  eq(d.menu.length, 4, 'menù ⋯: cambia, blocca, modifica, togli');
+  assert(/Cambia piatto/.test(d.menu[0]) && /Blocca il piatto/.test(d.menu[1]) && /Modifica ricetta/.test(d.menu[2]) && /Togli/.test(d.menu[3]), `voci: ${d.menu.join(' | ')}`);
   assert(d.addInRow, '+ piatto a destra delle tab');
   assert(d.buttons <= 1, 'un solo "Aggiungi ingredienti" per tutto il pasto');
   eq(page.errors, [], 'errori JS');
@@ -2199,6 +2199,26 @@ test('Ricetta fatta!: quantità usate come il pane, c\'è/non c\'è in fondo col
     return out;
   });
   eq([r.lastIsCart, r.noSwipe, r.qty, r.inShop], [true, true, 0, true], JSON.stringify(r));
+});
+test('blocco per piatto: lucchetto solo sul piatto bloccato, la rigenerazione lo tiene, gli altri cambiano', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.extraWeeks = []; generateWeek(1);
+    writeMealDishes(1, 2, 'cena', 'Carbonara', ['Insalata mista']);
+    const mk = '1_2_cena';
+    const out = { before: document.querySelectorAll('.dish-ic.is-locked').length };
+    toggleDishLock(mk, 'Carbonara');
+    out.lockedP = dishLockedHas(mk, 'Carbonara'); out.lockedC = dishLockedHas(mk, 'Insalata mista');
+    state.tab = 'menu'; state.expandedDay = null; render();
+    out.locks = document.querySelectorAll('.dish-ic.is-locked').length;
+    generateWeek(1);
+    out.keptP = effectiveMeal(1, 2, 'cena').principale;
+    out.stillLocked = dishLockedHas(mk, 'Carbonara');
+    toggleDishLock(mk, 'Carbonara');
+    out.cleared = !state.mealLocked[mk];
+    return out;
+  });
+  eq([r.before, r.lockedP, r.lockedC, r.locks >= 1, r.keptP, r.stillLocked, r.cleared], [0, true, false, true, 'Carbonara', true, true], JSON.stringify(r));
 });
 
 (async () => {

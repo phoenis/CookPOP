@@ -3701,6 +3701,21 @@ function dishCourse(name){
 }
 function courseLabel(tipo){ return tipo === 'unico' ? 'Piatto unico' : (TIPO_LABEL[tipo] || 'Piatto'); }
 // role come in dayIngKey/buildShopFlat: 'p' il principale, 'c0'/'c1'... gli altri.
+// Blocco per piatto: state.mealLocked[mk] è un elenco di nomi di piatti
+// (principale/contorni) che la rigenerazione non tocca. `true` è il vecchio
+// blocco dell'intero pasto: vale per tutti i piatti.
+function dishLockedHas(mk, name){
+  const v = state.mealLocked[mk];
+  return v === true || (Array.isArray(v) && v.includes(name));
+}
+function toggleDishLock(mk, name){
+  const { weekIdx, i, meal } = parseMealKey(mk);
+  const names = mealDishes(weekIdx, i, meal).map(d => d.name);
+  const v = state.mealLocked[mk];
+  let cur = v === true ? names.slice() : (Array.isArray(v) ? v.filter(n => names.includes(n)) : []);
+  cur = cur.includes(name) ? cur.filter(n => n !== name) : cur.concat(name);
+  if(cur.length) state.mealLocked[mk] = cur; else delete state.mealLocked[mk];
+}
 function mealDishes(weekIdx, i, meal){
   const m = effectiveMeal(weekIdx, i, meal);
   if(!m.principale) return [];
@@ -4076,16 +4091,21 @@ function generateWeek(weekIdx){
     ['pranzo','cena'].forEach(lm=>{
       const lkey = `${weekIdx}_${li}_${lm}`;
       const past = isMealPast(weekIdx, li, lm);
-      if(state.mealLocked[lkey] || past){
-        lockedMeals.push({ i: li, meal: lm, past, data: effectiveMeal(weekIdx, li, lm), link: linkedSourceMealKey(weekIdx, li, lm),
+      const lv = state.mealLocked[lkey];
+      const curData = effectiveMeal(weekIdx, li, lm);
+      const curNames = [curData.principale].concat(curData.contorni || []).filter(Boolean);
+      const lockedNames = lv === true ? curNames : (Array.isArray(lv) ? lv.filter(n => curNames.includes(n)) : []);
+      if(lv && !lockedNames.length && !past) delete state.mealLocked[lkey]; // blocco su piatti spariti
+      if(lockedNames.length || past){
+        lockedMeals.push({ i: li, meal: lm, past, lockedNames, whole: lv === true, data: curData, link: linkedSourceMealKey(weekIdx, li, lm),
           portions: state.dayPortions[lkey], done: !!(state.mealsDone[li] && state.mealsDone[li][lm]) && weekIdx === 0 });
       }
     });
   }
   // I pasti bloccati restano com'erano, ma pesano sull'equilibrio della settimana.
   const fixed = {};
-  lockedMeals.forEach(({i, meal, data, link})=>{
-    const meta = !link && data.principale ? getRecipeMeta(data.principale) : null;
+  lockedMeals.forEach(({i, meal, data, link, past, lockedNames})=>{
+    const meta = !link && data.principale && (past || lockedNames.includes(data.principale)) ? getRecipeMeta(data.principale) : null;
     if(meta && (meal === 'cena' || i >= 4)) fixed[`${i}_${meal}`] = meta;
   });
   const days = pickWeekRecipes(fixed, weekIdx);
@@ -4139,7 +4159,7 @@ function generateWeek(weekIdx){
   // rigenerazione. Stesso controllo sui contorni, uno per uno.
   if(lockedMeals.length){
     const targetBaseline = weekIdx === 0 ? state.weekBaseline : state.extraWeeks[weekIdx-1].baseline;
-    lockedMeals.forEach(({i, meal, past, data, link, portions, done})=>{
+    lockedMeals.forEach(({i, meal, past, data, link, portions, done, lockedNames, whole})=>{
       const lkey = `${weekIdx}_${i}_${meal}`;
       // Pasto passato: resta tale e quale, anche vuoto, con porzioni,
       // avanzo e "cucinato".
@@ -4156,9 +4176,14 @@ function generateWeek(weekIdx){
         delete state.mealLocked[lkey];
         return;
       }
-      const validContorni = (data.contorni || []).filter(c => getRecipeMeta(c));
-      targetBaseline[i][meal] = { principale: data.principale, contorni: validContorni };
-      if(link) state.dayLinks[lkey] = link; else delete state.dayLinks[lkey];
+      const gen = targetBaseline[i][meal] || { principale: '', contorni: [] };
+      const lockP = lockedNames.includes(data.principale);
+      const lockedC = (data.contorni || []).filter(c => lockedNames.includes(c) && getRecipeMeta(c));
+      let validContorni;
+      if(whole) validContorni = (data.contorni || []).filter(c => getRecipeMeta(c));
+      else validContorni = lockedC.concat((gen.contorni || []).filter(c => !lockedC.includes(c) && c !== (lockP ? data.principale : gen.principale))).slice(0, Math.max((gen.contorni || []).length, lockedC.length));
+      targetBaseline[i][meal] = { principale: lockP ? data.principale : gen.principale, contorni: validContorni };
+      if(lockP){ if(link) state.dayLinks[lkey] = link; else delete state.dayLinks[lkey]; }
     });
   }
   state.expandedDay = null;
@@ -4280,6 +4305,7 @@ const CLEAR_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" heig
 const UI_ICONS = {
   'palette': '<path d="M12 21a9 9 0 0 1 0-18c4.97 0 9 3.582 9 8c0 1.06-.474 2.078-1.318 2.828c-.844.75-1.989 1.172-3.182 1.172h-2.5a2 2 0 0 0-1 3.75a1.3 1.3 0 0 1-1 2.25"/><path d="M8.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3-3a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3 3a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/>',
   'plus': '<path d="M12 5v14M5 12h14"/>',
+  'lock': '<path d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 1 0-2 0m-3-5V7a4 4 0 1 1 8 0v4"/>',
   'download': '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="m7 11l5 5l5-5M12 4v12"/>',
   'upload': '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="m7 9l5-5l5 5M12 4v12"/>',
   'database': '<path d="M4 6a8 3 0 1 0 16 0a8 3 0 1 0-16 0"/><path d="M4 6v6a8 3 0 0 0 16 0V6"/><path d="M4 12v6a8 3 0 0 0 16 0v-6"/>',
@@ -4318,10 +4344,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-15',
+  version: '2027-01-16',
   title: 'Novità',
   items: [
-    'Tolta l\'etichetta "Cucinata" accanto a "Bloccata": lo stato si vede e si cambia già nel bottone in basso a destra.'
+    'Si blocca il singolo piatto, non più tutto il pasto: dal ⋯ del piatto, "Blocca il piatto". Quando è bloccato, al posto dell\'icona del piatto c\'è un lucchetto. La rigenerazione non lo cambia.'
   ]
 };
 
@@ -4949,7 +4975,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         const fixed = !!linkSource && dsh.role === 'p';
         return `
       <div class="dish-item">
-        <span class="dish-ic" aria-hidden="true">${tipoIcon(dsh.tipo)}</span>
+        <span class="dish-ic${dishLockedHas(mk, dsh.name) ? ' is-locked' : ''}" aria-hidden="true">${dishLockedHas(mk, dsh.name) ? uiIcon('lock') : tipoIcon(dsh.tipo)}</span>
         <div class="dish-text">
           <div class="dish-course">${escapeHtml(courseLabel(dsh.tipo))}<span class="dish-tag">${escapeHtml(dishTag(dsh.name))}</span></div>
           <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>
@@ -5021,7 +5047,6 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         { label:'È avanzo di…', note:'Collega questo pasto a una cena passata: gli ingredienti non tornano in spesa.', attr:`data-open-avanzodi-picker="${mk}"` },
         hasOverride ? { label: originalName ? `Torna a «${originalName}»` : 'Torna alla ricetta originale', note:'Rimette la proposta di partenza del generatore.', attr:`data-reset-swap="${mk}"` } : null,
         { label:'Segna come avanzata', note:'Scegli quale pasto futuro mangerà quello che resta.', attr:`data-open-link-picker="${mk}"` },
-        { label: isLocked ? 'Sblocca il pasto' : 'Blocca il pasto', note: isLocked ? 'Torna a essere toccato dalla rigenerazione della settimana.' : 'La rigenerazione della settimana non lo tocca più.', attr:`data-toggle-lock="${mk}"` },
         { label:'Svuota il pasto', note:'Torna "nessuna ricetta scelta". Toglie gli ingredienti dalla lista della spesa.', attr:`data-clear-meal="${mk}"`, danger: true }
       ].filter(Boolean);
       overflowModalHtml = `
@@ -5076,7 +5101,6 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   const doneTag = ''; // lo stato "Cucinata" si legge e si cambia già nel bottone in basso a destra
   const statusBadges = `
     ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>${!state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : ''}` : ''}
-    ${isLocked ? `<span class="status-badge status-locked">Bloccat${meal==='cena'?'a':'o'}</span>` : ''}
   `;
 
   const isOpen = state.expandedDay === mk;
@@ -5178,7 +5202,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
         const label = courseLabel(dsh.tipo);
         seenCourse[label] = (seenCourse[label] || 0) + 1;
         const text = seenCourse[label] > 1 ? `${label} ${seenCourse[label]}` : label;
-        return `<button type="button" class="dish-tab${idx === activeIdx ? ' active' : ''}" role="tab" aria-selected="${idx === activeIdx}" data-dish-tab="${mk}" data-dish-tab-name="${escapeAttr(dsh.name)}"><span class="dish-ic" aria-hidden="true">${tipoIcon(dsh.tipo)}</span><span class="dish-tab-label">${escapeHtml(text)}</span></button>`;
+        return `<button type="button" class="dish-tab${idx === activeIdx ? ' active' : ''}" role="tab" aria-selected="${idx === activeIdx}" data-dish-tab="${mk}" data-dish-tab-name="${escapeAttr(dsh.name)}"><span class="dish-ic${dishLockedHas(mk, dsh.name) ? ' is-locked' : ''}" aria-hidden="true">${dishLockedHas(mk, dsh.name) ? uiIcon('lock') : tipoIcon(dsh.tipo)}</span><span class="dish-tab-label">${escapeHtml(text)}</span></button>`;
       }).join('')}
     </div>
     ${addDishBtn}
@@ -5194,6 +5218,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
   const actName = act ? act.dsh.name : '';
   const menuItems = !act ? [] : [
     fixedDish ? null : { label: `${ICON_SWAP} Cambia piatto`, attrs: `data-open-dish-picker="${mk}" data-dish-replace="${escapeAttr(actName)}"` },
+    !fixedDish ? { label: dishLockedHas(mk, actName) ? `${uiIcon('lock')} Sblocca il piatto` : `${uiIcon('lock')} Blocca il piatto`, attrs: `data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(actName)}"` } : null,
     getRecipeMeta(actName) ? { label: `✏️ Modifica ricetta`, attrs: `data-open-recipe-edit="${escapeAttr(actName)}"` } : null,
     fixedDish ? null : { label: `✕ Togli dal pasto`, attrs: `data-dish-remove="${mk}" data-dish-name="${escapeAttr(actName)}"`, danger: true }
   ].filter(Boolean);
@@ -8603,12 +8628,10 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-done]').forEach(btn=>{
     btn.addEventListener('click', e=>toggleMealDoneFn(e.currentTarget.dataset.toggleDone));
   });
-  document.querySelectorAll('[data-toggle-lock]').forEach(btn=>{
+  document.querySelectorAll('[data-toggle-dish-lock]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const key = e.currentTarget.dataset.toggleLock;
-      if(state.mealLocked[key]) delete state.mealLocked[key];
-      else state.mealLocked[key] = true;
-      state.mealOverflowOpen = null;
+      toggleDishLock(e.currentTarget.dataset.toggleDishLock, e.currentTarget.dataset.dishName);
+      state.mealDetailMenuOpen = false;
       persist(); render();
     });
   });
