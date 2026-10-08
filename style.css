@@ -1518,3 +1518,6 @@ body{ overflow-x:clip; }
 .done-cart-btn{ color:var(--ink-light); }
 .done-cart-btn.active{ background:var(--tomato); color:#fff; }
 .done-ing-list .swipe-wrap{ border-bottom:none; }
+
+.dish-ic.is-locked{ color:var(--delete); }
+.dish-ic .ui-ico{ width:1em; height:1em; }
