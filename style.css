@@ -1521,3 +1521,7 @@ body{ overflow-x:clip; }
 
 .dish-ic.is-locked{ color:var(--delete); }
 .dish-ic .ui-ico{ width:1em; height:1em; }
+
+button.dish-ic{ border:0; padding:0; font:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
+.dish-tab .dish-ic{ cursor:pointer; }
