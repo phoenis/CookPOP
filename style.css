@@ -1511,3 +1511,10 @@ body{ overflow-x:clip; }
 .done-ing-list .swipe-wrap{ border-bottom:1px solid var(--line); }
 .done-ing-list .swipe-wrap:last-child{ border-bottom:none; }
 .done-ing-list .swipe-content{ background:var(--surface); border-radius:0; border-bottom:none; }
+
+.cook-fab-bar{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(1.75rem + env(safe-area-inset-bottom)); z-index:60; display:flex; gap:var(--space-small); max-width:calc(100vw - 2 * var(--space-medium)); }
+.cook-fab-bar .cook-fab{ position:static; left:auto; right:auto; bottom:auto; transform:none; }
+.cook-fab-bar .cook-fab-done{ background:var(--surface); color:var(--ink); border:1px solid var(--line-strong); }
+.done-cart-btn{ color:var(--ink-light); }
+.done-cart-btn.active{ background:var(--tomato); color:#fff; }
+.done-ing-list .swipe-wrap{ border-bottom:none; }

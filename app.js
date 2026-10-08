@@ -644,7 +644,15 @@ function cookSwitcherHtml(cm){
 function cookFabHtml(name, ratio, mk){
   const det = getRecipeDetails(name);
   if(!det || !det.procedimento || !det.procedimento.length) return '';
-  return `<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}"${mk ? ` data-cook-meal="${escapeAttr(mk)}"` : ''}>Cucina</button>`;
+  // Dal pasto, se non è ancora fatto, "Fatto" a sinistra di "Cucina": apre
+  // "Ricetta fatta!" senza passare dalla modalità cucina.
+  let doneBtn = '';
+  if(mk){
+    const { weekIdx, i, meal } = parseMealKey(mk);
+    const md = weekMealsDoneRef(weekIdx);
+    if(!(md[i] && md[i][meal])) doneBtn = `<button type="button" class="cook-fab cook-fab-done" data-cook-done-meal="${escapeAttr(mk)}">Fatto</button>`;
+  }
+  return `<div class="cook-fab-bar">${doneBtn}<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}"${mk ? ` data-cook-meal="${escapeAttr(mk)}"` : ''}>Cucina</button></div>`;
 }
 // Tab Ingredienti | Passaggi dentro il piatto (stato in state.dishPane).
 function paneTabsHtml(paneKey, pane){
@@ -4310,10 +4318,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-13',
+  version: '2027-01-14',
   title: 'Novità',
   items: [
-    'Ricetta fatta!: gli ingredienti sono come in Dispensa. Quanto ne resta (− / +) o la spunta, e scorri per segnarli finiti: vanno tra i Finiti della Spesa.'
+    'Ricetta fatta!: come per il pane, ogni ingrediente mostra quanto ne è servito (dalla ricetta) con − / +. In fondo quelli senza quantità, con il carrello per metterli in lista spesa.',
+    'Nel pasto c\'è il bottone "Fatto" a sinistra di "Cucina".'
   ]
 };
 
@@ -5917,40 +5926,42 @@ function renderMenu(){
     // Una riga sola per ingrediente, come in Dispensa: nome, quantità usata
     // (se si conta) e la spunta "finito" per tutti quelli che hai in Dispensa.
     // Spuntato = scorta a 0, quindi finisce tra i Finiti della Spesa.
-    const normalRowsHtml = uniqueIng.map(it=>{
+    // Come il pane: per ogni ingrediente con quantità, quanto ne è servito
+    // (in teoria, dalla ricetta) con − / +. In fondo gli ingredienti senza
+    // quantità (c'è / non c'è): un carrello per metterli in lista spesa.
+    const CART_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M17 17H6V3H4"/><path d="m6 5l14 1l-1 7H6"/></g></svg>';
+    const qtyRows = [], restRows = [];
+    uniqueIng.forEach(it=>{
       const name = it.ingrediente;
       const pantryIt = resolvePantryItem(name);
       if(!pantryIt){
-        return `<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`;
+        restRows.push(`<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`);
+        return;
       }
-      // Come in Dispensa: con unità di misura il contatore di quanto ne resta
-      // (−/+ o tocco sul numero), senza unità la spunta "c'è". Swipe = finito.
-      // Internamente resta "quanto ne hai usato" (doneModalQty): qui si mostra
-      // e si modifica la scorta che rimane dopo il pasto.
-      const hasQty = Object.prototype.hasOwnProperty.call(qtyMap, name) && pantryIt.unit !== 'none';
-      let controlHtml;
-      if(hasQty){
+      if(Object.prototype.hasOwnProperty.call(qtyMap, name) && pantryIt.unit !== 'none'){
         const unit = pantryIt.unit || '';
         const step = qtyStepFor(unit);
-        const left = Math.max(0, Math.round(((pantryIt.qty || 0) - qtyMap[name]) * 100) / 100);
+        const used = qtyMap[name];
+        const have = pantryIt.qty || 0;
+        const left = Math.max(0, Math.round((have - used) * 100) / 100);
         const editingThis = state.doneQtyEditingKey === name;
-        controlHtml = `
-        <span class="qty-stepper">
-          <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
-          ${editingThis
-            ? `<input type="number" min="0" step="${step}" class="qty-input" value="${left}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
-            : `<span class="qty-num${left <= 0 ? ' low' : ''}" data-done-qty-show="${escapeAttr(name)}">${left}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
-          <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
-        </span>`;
-      } else {
-        const present = (typeof pantryIt.qty !== 'number' || pantryIt.qty > 0) && !finishedMap[name];
-        controlHtml = `<label class="presence-toggle"><input type="checkbox" ${present ? 'checked' : ''} data-done-finished-toggle="${escapeAttr(name)}" aria-label="${escapeAttr(name)}: c'è ancora"></label>`;
+        qtyRows.push(`
+        <div class="done-ing-row">
+          <span>${escapeHtml(name)}<span class="done-bread-left">${have > 0 ? `In Dispensa: ${have}${unit ? ' ' + escapeHtml(unit) : ''}, ne restano ${left}${unit ? ' ' + escapeHtml(unit) : ''}` : 'Finito in Dispensa'}</span></span>
+          <span class="qty-stepper">
+            <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
+            ${editingThis
+              ? `<input type="number" min="0" step="${step}" class="qty-input" value="${used}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
+              : `<span class="qty-num" data-done-qty-show="${escapeAttr(name)}">${used}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
+            <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
+          </span>
+        </div>`);
+        return;
       }
-      return `<div class="swipe-wrap" data-swipe-id="done:${escapeAttr(name)}" data-swipe-done="${escapeAttr(name)}">
-        <button type="button" class="swipe-trash" tabindex="-1" aria-label="${escapeAttr(name)}: finito">${TRASH_ICON_SVG}</button>
-        <div class="done-ing-row swipe-content"><span>${escapeHtml(name)}</span>${controlHtml}</div>
-      </div>`;
-    }).join('');
+      const inCart = !!finishedMap[name];
+      restRows.push(`<div class="done-ing-row"><span>${escapeHtml(name)}</span><button type="button" class="btn is-icon done-cart-btn${inCart ? ' active' : ''}" data-done-cart-toggle="${escapeAttr(name)}" aria-pressed="${inCart}" title="${inCart ? 'In lista spesa' : 'Aggiungi alla lista spesa'}" aria-label="${escapeAttr(name)}: aggiungi alla lista spesa">${CART_SVG}</button></div>`);
+    });
+    const normalRowsHtml = qtyRows.concat(restRows).join('');
     const finishedSectionHtml = '';
     const breadIt = breadPantryItem();
     const showBread = mealHasBread(di, doneMeal) && !recipeListsBread(uniqueIng);
@@ -5973,7 +5984,7 @@ function renderMenu(){
           <h3>Ricetta fatta! 🎉</h3>
           <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
         </div>
-        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Come in Dispensa: cambia quanto ne resta, togli la spunta o scorri per segnarlo finito: va tra i Finiti della Spesa.</p>
+        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Quanto ne è servito per questo pasto (dalla ricetta): alla conferma lo tolgo dalla Dispensa. Col carrello metti in lista spesa quelli che non hai più.</p>
         ${doneName && getRecipeMeta(doneName) ? `<div class="done-grad">${gradimentoPickerHtml(doneName)}</div>` : ''}
         ${breadRowHtml}
         ${uniqueIng.length ? `
@@ -8650,23 +8661,19 @@ function attachHandlers(){
       render();
     });
   });
-  document.querySelectorAll('[data-done-finished-toggle]').forEach(cb=>{
-    cb.addEventListener('change', e=>{
-      const name = e.currentTarget.dataset.doneFinishedToggle;
-      state.doneModalFinished[name] = !e.currentTarget.checked;
+  document.querySelectorAll('[data-done-cart-toggle]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const name = e.currentTarget.dataset.doneCartToggle;
+      state.doneModalFinished[name] = !state.doneModalFinished[name];
       render();
     });
   });
-  const doneUsedSet = (name, used)=>{
-    const pantryIt = resolvePantryItem(name);
-    const max = (pantryIt && pantryIt.qty) || 0;
-    state.doneModalQty[name] = Math.min(max, Math.max(0, Math.round(used * 100) / 100));
-  };
   document.querySelectorAll('[data-done-qty-dec]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.doneQtyDec;
       const pantryIt = resolvePantryItem(name);
-      doneUsedSet(name, (state.doneModalQty[name]||0) + qtyStepFor(pantryIt && pantryIt.unit));
+      const step = qtyStepFor(pantryIt && pantryIt.unit);
+      state.doneModalQty[name] = Math.max(0, Math.round(((state.doneModalQty[name]||0) - step) * 100) / 100);
       render();
     });
   });
@@ -8674,16 +8681,8 @@ function attachHandlers(){
     btn.addEventListener('click', e=>{
       const name = e.currentTarget.dataset.doneQtyInc;
       const pantryIt = resolvePantryItem(name);
-      doneUsedSet(name, (state.doneModalQty[name]||0) - qtyStepFor(pantryIt && pantryIt.unit));
-      render();
-    });
-  });
-  document.querySelectorAll('.swipe-wrap[data-swipe-done]').forEach(wrap=>{
-    attachSwipeToDelete(wrap, ()=>{
-      const name = wrap.dataset.swipeDone;
-      const pantryIt = resolvePantryItem(name);
-      if(Object.prototype.hasOwnProperty.call(state.doneModalQty, name) && pantryIt && pantryIt.unit !== 'none') doneUsedSet(name, pantryIt.qty || 0);
-      else state.doneModalFinished[name] = true;
+      const step = qtyStepFor(pantryIt && pantryIt.unit);
+      state.doneModalQty[name] = Math.round(((state.doneModalQty[name]||0) + step) * 100) / 100;
       render();
     });
   });
@@ -8700,8 +8699,7 @@ function attachHandlers(){
     const commitDoneQtyEdit = ()=>{
       const name = doneQtyEditInput.dataset.doneQtyEdit;
       const n = parseFloat(doneQtyEditInput.value);
-      const pIt = resolvePantryItem(name);
-      doneUsedSet(name, Number.isNaN(n) ? 0 : ((pIt && pIt.qty) || 0) - n);
+      state.doneModalQty[name] = Number.isNaN(n) ? 0 : Math.max(0, n);
       state.doneQtyEditingKey = null;
       render();
     };
@@ -8766,12 +8764,14 @@ function attachHandlers(){
         const pantryIt = resolvePantryItem(ingrediente);
         if(pantryIt) pantryIt.qty = Math.max(0, Math.round(((pantryIt.qty||0) - qtyMap[ingrediente]) * 100) / 100);
       });
-      // Ingredienti spuntati "finito" (con o senza quantità): scorta a 0, così
-      // la Spesa li mostra tra i Finiti in Dispensa, pronti da rimettere in lista.
+      // Ingredienti col carrello: scorta a 0 e subito in lista spesa.
       Object.entries(state.doneModalFinished || {}).forEach(([ingrediente, checked])=>{
         if(!checked) return;
         const pantryIt = resolvePantryItem(ingrediente);
-        if(pantryIt) pantryIt.qty = 0;
+        if(!pantryIt) return;
+        pantryIt.qty = 0;
+        const pKey = Object.keys(state.pantryItems).find(k => state.pantryItems[k] === pantryIt);
+        if(pKey) state.pantryConfirmedShop[pKey] = true;
       });
       // Avanzo fisico segnalato dall'utente: voce a sé in Dispensa, come
       // presenza/assenza (nessuna quantità da tracciare) nel luogo scelto —
@@ -8865,6 +8865,9 @@ function attachHandlers(){
   // quali ingredienti sono finiti.
   document.querySelectorAll('[data-cook-switch]').forEach(el=>{
     el.addEventListener('click', ()=> cookSwitchTo(el.dataset.cookSwitch));
+  });
+  document.querySelectorAll('[data-cook-done-meal]').forEach(el=>{
+    el.addEventListener('click', ()=>{ if(toggleMealDoneFn) toggleMealDoneFn(el.dataset.cookDoneMeal); });
   });
   document.querySelectorAll('[data-cook-finish]').forEach(el=>{
     el.addEventListener('click', ()=>{
