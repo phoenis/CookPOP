@@ -4318,11 +4318,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-14',
+  version: '2027-01-15',
   title: 'Novità',
   items: [
-    'Ricetta fatta!: come per il pane, ogni ingrediente mostra quanto ne è servito (dalla ricetta) con − / +. In fondo quelli senza quantità, con il carrello per metterli in lista spesa.',
-    'Nel pasto c\'è il bottone "Fatto" a sinistra di "Cucina".'
+    'Tolta l\'etichetta "Cucinata" accanto a "Bloccata": lo stato si vede e si cambia già nel bottone in basso a destra.'
   ]
 };
 
@@ -5074,7 +5073,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // vale per "Cambiato": l'annullo ("Torna alla ricetta originale") si è
   // spostato nel foglio "⋯". "Avanzo di GG" resta badge-con-✕ (scollega),
   // e "Bloccato" è sola lettura (l'annullo sta nel lucchetto/nel foglio "⋯").
-  const doneTag = isDone ? `<span class="done-tag">✓ Cucinat${meal==='cena'?'a':'o'}</span>` : '';
+  const doneTag = ''; // lo stato "Cucinata" si legge e si cambia già nel bottone in basso a destra
   const statusBadges = `
     ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo di ${escapeHtml(sourceGiorno)} <span class="status-badge-reset">✕</span></button>${!state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : ''}` : ''}
     ${isLocked ? `<span class="status-badge status-locked">Bloccat${meal==='cena'?'a':'o'}</span>` : ''}
