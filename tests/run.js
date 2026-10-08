@@ -1786,7 +1786,7 @@ test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, t
 
 test('cucina: il bottone è al centro in basso, uguale nel pasto e nel Ricettario', async ({ page }) => {
   const open = (setup) => page.evaluate(setup);
-  const pos = () => page.evaluate(() => { const b = document.querySelector('.cook-fab').getBoundingClientRect(); const w = document.documentElement.clientWidth;
+  const pos = () => page.evaluate(() => { const b = document.querySelector('.cook-fab-bar').getBoundingClientRect(); const w = document.documentElement.clientWidth;
     return { centered: Math.abs((b.left + b.right) / 2 - w / 2) < 1, gap: Math.round(window.innerHeight - b.bottom) >= 24 && Math.round(window.innerHeight - b.bottom) <= 32 }; });
   await open(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.extraWeeks = []; generateWeek(1); writeMealDishes(1, 1, 'cena', 'Amatriciana', []); state.tab = 'menu'; state.expandedDay = '1_1_cena'; render(); });
@@ -2177,32 +2177,28 @@ test('modalità cucina: si passa da una ricetta all\'altra restando al passo a c
   eq(r, { chips: ['Prova uno', 'Prova due'], step1: 1, second: ['Prova due', 0], back: ['Prova uno', 1, 'B Prova uno'], second2: ['Prova due', 2] });
 });
 
-test('Ricetta fatta!: righe come in Dispensa, swipe/zero = finito e va tra i Finiti della Spesa', async ({ page }) => {
+test('Ricetta fatta!: quantità usate come il pane, c\'è/non c\'è in fondo col carrello, Fatto nel dettaglio', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.extraWeeks = []; generateWeek(1);
     writeMealPrincipale(weekOverridesRef(1), 1, 'cena', 'Carbonara');
-    mealCookIngredients('1_1_cena', effectiveMeal(1, 1, 'cena')).forEach(i => upsertPantryItem(i.ingrediente, 'dispensa', 5, 'g'));
+    const ing = mealCookIngredients('1_1_cena', effectiveMeal(1, 1, 'cena'));
+    ing.forEach((i, k) => upsertPantryItem(i.ingrediente, 'dispensa', k === 0 ? 1 : 500, k === 0 ? 'none' : 'g'));
+    const noneName = ing[0].ingrediente;
     state.tab = 'menu'; render();
+    const out = { fatto: false };
+    state.mealDetail = null;
     document.querySelector('[data-toggle-done="1_1_cena"]').click();
-    const out = { rows: document.querySelectorAll('.done-ing-list .swipe-wrap[data-swipe-done]').length > 0, split: !!document.querySelector('.done-finished-section') };
-    const row = document.querySelector('.swipe-wrap[data-swipe-done]');
-    const name = row.dataset.swipeDone;
-    const before = document.querySelector('[data-done-qty-show="' + CSS.escape(name) + '"]').textContent;
-    document.querySelector('[data-done-qty-inc="' + CSS.escape(name) + '"]').click();
-    out.incNoExceed = state.doneModalQty[name] >= 0;
-    // "−" sul rimanente = usato di più
-    const used0 = state.doneModalQty[name];
-    document.querySelector('[data-done-qty-dec="' + CSS.escape(name) + '"]').click();
-    out.dec = state.doneModalQty[name] > used0 || state.doneModalQty[name] === 5;
-    // azzera il rimanente
-    state.doneModalQty[name] = 5; render();
+    const rows = [...document.querySelectorAll('.done-ing-list:not(.done-bread) .done-ing-row')];
+    out.lastIsCart = !!rows[rows.length - 1].querySelector('[data-done-cart-toggle]');
+    out.noSwipe = document.querySelectorAll('[data-swipe-done]').length === 0;
+    document.querySelector('[data-done-cart-toggle="' + CSS.escape(noneName) + '"]').click();
     document.querySelector('[data-confirm-done="1_1_cena"]').click();
-    const it = resolvePantryItem(name);
+    const it = resolvePantryItem(noneName);
     out.qty = it && it.qty;
-    out.inShop = buildShopFlat().some(x => x.context === 'Finiti in Dispensa' && String(x.name || x.ingrediente || '').toLowerCase() === name.toLowerCase());
+    out.inShop = buildShopFlat().some(x => String(x.name || x.ingrediente || '').toLowerCase() === noneName.toLowerCase());
     return out;
   });
-  eq([r.rows, r.split, r.dec, r.qty, r.inShop], [true, false, true, 0, true], JSON.stringify(r));
+  eq([r.lastIsCart, r.noSwipe, r.qty, r.inShop], [true, true, 0, true], JSON.stringify(r));
 });
 
 (async () => {
