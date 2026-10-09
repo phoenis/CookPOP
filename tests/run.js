@@ -2362,8 +2362,8 @@ test('scadenze stimate: pagina in Impostazioni, giorni per reparto, eccezioni pe
     state.expiryEstOpen = true; render();
     out.page = !!document.querySelector('[data-page="expiry-est"]');
     // reparto: + giorni
-    const dep = document.querySelector('[data-expiry-dept="latticini"][data-delta="1"]');
-    dep.click();
+    const dep = document.querySelector('[data-expiry-days="dept:latticini"]');
+    dep.value = '6'; dep.dispatchEvent(new Event('change', { bubbles: true }));
     out.latt = [expiryDaysForDept('latticini'), state.expiryEstimates.latticini];
     // regola per nome nuova e modificata
     document.querySelector('[data-expiry-rule-add]').click();
