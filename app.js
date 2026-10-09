@@ -1676,7 +1676,8 @@ function canonicalIngredientName(name){
   const hit = allKnownIngredientNamesWithGroups().find(n => ingMatchKey(n) === k);
   return hit || name;
 }
-function attachIngredientCombobox(input){
+function attachIngredientCombobox(input, opts){
+  opts = opts || {};
   if(!input || input.dataset.comboAttached) return;
   input.dataset.comboAttached = '1';
   input.setAttribute('autocomplete', 'off');
@@ -1692,14 +1693,14 @@ function attachIngredientCombobox(input){
     const raw = input.value.trim();
     const q = ingMatchKey(raw);
     if(!q){ list.innerHTML = ''; return; }
-    const pool = allKnownIngredientNamesWithGroups();
+    const pool = opts.pool ? opts.pool() : allKnownIngredientNamesWithGroups();
     const stem = ingMatchStem(q);
     const matches = pool.filter(n => { const k = ingMatchKey(n); return k.includes(q) || (stem.length >= 3 && k.includes(stem)); })
       .sort((x, y) => (ingMatchKey(y).startsWith(q) ? 1 : 0) - (ingMatchKey(x).startsWith(q) ? 1 : 0))
       .slice(0, 8);
     const exact = pool.some(n => ingMatchKey(n) === q);
     let html = matches.map(n=>`<button type="button" class="add-ing-suggestion" data-combo-pick>${escapeHtml(n)}</button>`).join('');
-    if(!exact) html += `<button type="button" class="add-ing-suggestion add-ing-suggestion-new" data-combo-create>+ Crea "${escapeHtml(raw)}" come nuovo ingrediente</button>`;
+    if(!exact && !opts.noCreate) html += `<button type="button" class="add-ing-suggestion add-ing-suggestion-new" data-combo-create>+ Crea "${escapeHtml(raw)}" come nuovo ingrediente</button>`;
     list.innerHTML = html;
   }
   input.addEventListener('input', renderSuggestions);
@@ -4456,10 +4457,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-31',
+  version: '2027-02-01',
   title: 'Novità',
   items: [
-    'Scadenze stimate: le eccezioni sono per ingrediente preciso (lo scegli dall\'elenco), non più per parole del nome: corrispondenza certa. Le uova restano a 21 giorni.'
+    'Scadenze stimate → Nuova eccezione: mentre scrivi compare l\'elenco degli ingredienti da cui scegliere (prima non usciva).'
   ]
 };
 
@@ -8240,7 +8241,9 @@ function attachHandlers(){
   // righe aggiunte dopo, con la modale già aperta, si agganciano da sole nel
   // loro punto di inserimento — vedi #edit-add-ing-row — perché quella parte
   // non passa da un render() completo).
-  document.querySelectorAll('.edit-ing-name, [data-ning], [data-rning]').forEach(attachIngredientCombobox);
+  document.querySelectorAll('.edit-ing-name, [data-ning], [data-rning]').forEach(el => attachIngredientCombobox(el));
+  // Eccezioni delle scadenze stimate: solo ingredienti che esistono già.
+  document.querySelectorAll('.expiry-rule-match').forEach(el => attachIngredientCombobox(el, { noCreate: true, pool: allKnownIngredientNames }));
 
   document.querySelectorAll('[data-shop-group]').forEach(sel=>{
     sel.addEventListener('change', ()=>{ state.shopView = sel.value; render(); });
@@ -11341,7 +11344,7 @@ function renderExpiryEstimatesPage(){
   const rules = Object.entries(state.expiryRules || {});
   const ruleRows = rules.map(([id, r]) => `
       <div class="manage-row expiry-row expiry-rule">
-        <input type="text" class="expiry-rule-match" data-expiry-rule-name="${escapeAttr(id)}" list="expiry-ingredients" value="${escapeAttr(r.nome || '')}" placeholder="Scegli un ingrediente" aria-label="Ingrediente" autocomplete="off">
+        <input type="text" class="expiry-rule-match" data-expiry-rule-name="${escapeAttr(id)}" value="${escapeAttr(r.nome || '')}" placeholder="Scegli un ingrediente" aria-label="Ingrediente" autocomplete="off">
         ${expiryStepperHtml(`data-expiry-rule="${escapeAttr(id)}"`, Number(r.days) || 0)}
         <button type="button" class="btn is-icon" data-expiry-rule-del="${escapeAttr(id)}" aria-label="Togli la regola">✕</button>
       </div>`).join('');
@@ -11354,7 +11357,6 @@ function renderExpiryEstimatesPage(){
       <section class="settings-section">
         <h3 class="settings-section-title">Eccezioni per ingrediente</h3>
         <p class="settings-note">Valgono più del reparto: per quell'ingrediente preciso si usano i giorni indicati. Scrivi il nome e scegli dall'elenco.</p>
-        <datalist id="expiry-ingredients">${expiryIngredientNames().map(n => `<option value="${escapeAttr(n)}"></option>`).join('')}</datalist>
         ${ruleRows ? `<div class="settings-card manage-list">${ruleRows}</div>` : ''}
         <button type="button" class="btn is-outline is-block" data-expiry-rule-add>+ Nuova eccezione</button>
       </section>
