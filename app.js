@@ -1748,6 +1748,7 @@ const state = {
   userColorsLight1: false,
   breadRecurring1: false,
   expiryRules1: false,
+  expiryRules2: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -2352,6 +2353,20 @@ const MIGRATIONS = [
     // Le uova stanno in Latticini (5 giorni) ma durano molto di più: regola per nome.
     if(!state.expiryRules) state.expiryRules = {};
     if(!Object.keys(state.expiryRules).length) state.expiryRules = defaultExpiryRules();
+  } },
+  { flag: 'expiryRules2', run(){
+    // Le eccezioni passano da parole del nome a ingrediente preciso: ogni parola
+    // che coincide con un ingrediente noto diventa una regola su quel nome.
+    const rules = state.expiryRules || {};
+    const known = new Map(allKnownIngredientNames().concat(Object.values(state.pantryItems || {}).map(it => it.nome)).map(n => [String(n).trim().toLowerCase(), n]));
+    const next = {};
+    Object.entries(rules).forEach(([id, r])=>{
+      if(r.nome){ next[id] = r; return; }
+      String(r.match || '').split(/[,;]/).map(w => w.trim().toLowerCase()).filter(Boolean).forEach(w=>{
+        if(known.has(w)) next[w.replace(/\W+/g, '-')] = { nome: known.get(w), days: Number(r.days) || 0 };
+      });
+    });
+    state.expiryRules = next;
   } },
   { flag: 'breadRecurring1', run(){
     // Il pane a pasto (cena + weekend a pranzo) era un conteggio a parte: ora è
@@ -4441,10 +4456,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-30',
+  version: '2027-01-31',
   title: 'Novità',
   items: [
-    'Impostazioni → Scadenze stimate: scegli tu quanti giorni dura un fresco per reparto (verdura, carne, pesce, latticini…) e aggiungi eccezioni per nome (le uova sono già a 21 giorni). Si salvano come le altre tue impostazioni.'
+    'Scadenze stimate: le eccezioni sono per ingrediente preciso (lo scegli dall\'elenco), non più per parole del nome: corrispondenza certa. Le uova restano a 21 giorni.'
   ]
 };
 
@@ -7273,17 +7288,18 @@ function expiryBannerDismissedToday(){
   try{ return localStorage.getItem(EXPIRY_BANNER_KEY) === isoLocalDate(new Date()); }catch(e){ return false; }
 }
 const EXPIRY_ESTIMATE_DAYS = { verdura:5, carne:2, pesce:2, latticini:5 };
-function defaultExpiryRules(){ return { uova: { match: 'uova, uovo', days: 21 } }; }
+function defaultExpiryRules(){ return { uova: { nome: 'Uova', days: 21 } }; }
 function expiryDaysForDept(d){
   const o = (state.expiryEstimates || {})[d];
   return o !== undefined ? o : (EXPIRY_ESTIMATE_DAYS[d] || 0);
 }
-// Eccezioni per nome (state.expiryRules): vincono sul reparto.
+// Eccezioni per ingrediente (state.expiryRules): corrispondenza esatta sul nome
+// (maiuscole a parte), valgono più del reparto.
 function expiryRuleDays(nome){
-  const n = (nome || '').toLowerCase();
+  const n = (nome || '').trim().toLowerCase();
+  if(!n) return undefined;
   for(const rule of Object.values(state.expiryRules || {})){
-    const words = String(rule.match || '').split(/[,;]/).map(w => w.trim().toLowerCase()).filter(Boolean);
-    if(words.some(w => new RegExp('(^|[^a-zàèéìòù])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-zàèéìòù]|$)').test(n))) return Number(rule.days) || 0;
+    if(rule.nome && String(rule.nome).trim().toLowerCase() === n) return Number(rule.days) || 0;
   }
   return undefined;
 }
@@ -11304,6 +11320,14 @@ function expiryStepperHtml(attrs, days){
     <button class="qty-btn" type="button" ${attrs} data-delta="1" aria-label="Più">+</button>
   </span>`;
 }
+function expiryIngredientNames(){
+  const seen = new Map();
+  allKnownIngredientNames().concat(Object.values(state.pantryItems || {}).map(it => it.nome)).forEach(n=>{
+    const k = String(n || '').trim().toLowerCase();
+    if(k && !seen.has(k)) seen.set(k, String(n).trim());
+  });
+  return [...seen.values()].sort((a, b) => IT_COLLATOR.compare(a, b));
+}
 function renderExpiryEstimatesPage(){
   if(!state.expiryEstOpen) return '';
   const depts = DEPT_ORDER.filter(d => d !== 'finiti' && d !== 'avanzi' && !isNonFoodDept(d))
@@ -11317,7 +11341,7 @@ function renderExpiryEstimatesPage(){
   const rules = Object.entries(state.expiryRules || {});
   const ruleRows = rules.map(([id, r]) => `
       <div class="manage-row expiry-row expiry-rule">
-        <input type="text" class="expiry-rule-match" data-expiry-rule-match="${escapeAttr(id)}" value="${escapeAttr(r.match || '')}" placeholder="Es. uova, uovo" aria-label="Parole del nome" autocomplete="off">
+        <input type="text" class="expiry-rule-match" data-expiry-rule-name="${escapeAttr(id)}" list="expiry-ingredients" value="${escapeAttr(r.nome || '')}" placeholder="Scegli un ingrediente" aria-label="Ingrediente" autocomplete="off">
         ${expiryStepperHtml(`data-expiry-rule="${escapeAttr(id)}"`, Number(r.days) || 0)}
         <button type="button" class="btn is-icon" data-expiry-rule-del="${escapeAttr(id)}" aria-label="Togli la regola">✕</button>
       </div>`).join('');
@@ -11328,8 +11352,9 @@ function renderExpiryEstimatesPage(){
         <div class="settings-card manage-list">${deptRows}</div>
       </section>
       <section class="settings-section">
-        <h3 class="settings-section-title">Eccezioni per nome</h3>
-        <p class="settings-note">Valgono più del reparto: se il nome contiene una di queste parole (separate da virgola), si usano i giorni indicati.</p>
+        <h3 class="settings-section-title">Eccezioni per ingrediente</h3>
+        <p class="settings-note">Valgono più del reparto: per quell'ingrediente preciso si usano i giorni indicati. Scrivi il nome e scegli dall'elenco.</p>
+        <datalist id="expiry-ingredients">${expiryIngredientNames().map(n => `<option value="${escapeAttr(n)}"></option>`).join('')}</datalist>
         ${ruleRows ? `<div class="settings-card manage-list">${ruleRows}</div>` : ''}
         <button type="button" class="btn is-outline is-block" data-expiry-rule-add>+ Nuova eccezione</button>
       </section>
@@ -11361,7 +11386,7 @@ document.addEventListener('click', e=>{
   if(del){ delete state.expiryRules[del.dataset.expiryRuleDel]; persist(); render(); return; }
   if(t.closest('[data-expiry-rule-add]')){
     if(!state.expiryRules) state.expiryRules = {};
-    state.expiryRules['r' + Date.now().toString(36)] = { match: '', days: 7 };
+    state.expiryRules['r' + Date.now().toString(36)] = { nome: '', days: 7 };
     persist(); render();
     const inputs = document.querySelectorAll('.expiry-rule-match'); const last = inputs[inputs.length - 1]; if(last) last.focus();
     return;
@@ -11372,10 +11397,13 @@ document.addEventListener('click', e=>{
   }
 });
 document.addEventListener('change', e=>{
-  const inp = e.target.closest && e.target.closest('[data-expiry-rule-match]');
+  const inp = e.target.closest && e.target.closest('[data-expiry-rule-name]');
   if(!inp) return;
-  const r = (state.expiryRules || {})[inp.dataset.expiryRuleMatch]; if(!r) return;
-  r.match = inp.value;
+  const r = (state.expiryRules || {})[inp.dataset.expiryRuleName]; if(!r) return;
+  const typed = inp.value.trim();
+  // Nome esatto dell'ingrediente (come scritto nell'elenco), se c'è.
+  const exact = expiryIngredientNames().find(n => n.toLowerCase() === typed.toLowerCase());
+  r.nome = exact || typed;
   persist(); render();
 });
 function renderAislesPage(){

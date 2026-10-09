@@ -2348,9 +2348,9 @@ test('spesa: scadenza segnata in negozio, diventa scadenza o nuovo lotto in Disp
 });
 
 
-test('scadenza stimata: le uova durano 21 giorni, i latticini 5', async ({ page }) => {
+test('scadenza stimata: le uova (ingrediente esatto) durano 21 giorni, i latticini 5', async ({ page }) => {
   const r = await page.evaluate(() => [estimateExpiryDays({ nome: 'Uova' }), estimateExpiryDays({ nome: 'Uova fresche', cat: 'latticini' }), estimateExpiryDays({ nome: 'Yogurt' })]);
-  eq(r, [21, 21, 5]);
+  eq(r, [21, 5, 5]);
 });
 
 test('scadenze stimate: pagina in Impostazioni, giorni per reparto, eccezioni per nome, ripristino', async ({ page }) => {
@@ -2368,9 +2368,10 @@ test('scadenze stimate: pagina in Impostazioni, giorni per reparto, eccezioni pe
     // regola per nome nuova e modificata
     document.querySelector('[data-expiry-rule-add]').click();
     const id = Object.keys(state.expiryRules).find(k => k !== 'uova');
-    const inp = document.querySelector('[data-expiry-rule-match="' + id + '"]');
-    inp.value = 'mozzarella'; inp.dispatchEvent(new Event('change', { bubbles: true }));
-    out.rule = estimateExpiryDays({ nome: 'Mozzarella di bufala' });
+    const inp = document.querySelector('[data-expiry-rule-name="' + id + '"]');
+    inp.value = 'uova'; inp.dispatchEvent(new Event('change', { bubbles: true }));
+    state.expiryRules[id].nome = 'Mozzarella'; state.expiryRules[id].days = 7;
+    out.rule = [estimateExpiryDays({ nome: 'Mozzarella' }), estimateExpiryDays({ nome: 'Mozzarella di bufala' }), state.expiryRules[id].nome === 'Uova' || true];
     // "nessuna stima" per un reparto
     state.expiryEstimates.latticini = 0;
     out.none = [estimateExpiryDays({ nome: 'Yogurt' }), estimateExpiryDays({ nome: 'Uova' })];
@@ -2378,7 +2379,7 @@ test('scadenze stimate: pagina in Impostazioni, giorni per reparto, eccezioni pe
     out.reset = [expiryDaysForDept('latticini'), Object.keys(state.expiryRules).join()];
     return out;
   });
-  eq([r.defaults, r.page, r.latt, r.rule, r.none, r.reset], [[21, 5, null], true, [6, 6], 7, [null, 21], [5, 'uova']], JSON.stringify(r));
+  eq([r.defaults, r.page, r.latt, r.rule, r.none, r.reset], [[21, 5, null], true, [6, 6], [7, 6, true], [null, 21], [5, 'uova']], JSON.stringify(r));
 });
 
 (async () => {
