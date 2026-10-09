@@ -4457,10 +4457,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-02-06',
+  version: '2027-02-07',
   title: 'Novità',
   items: [
-    'Consumi ricorrenti: l\'ingrediente si sceglie dall\'elenco che compare mentre scrivi (e va scelto da lì), così il nome corrisponde sempre.'
+    'Impostazioni: ora c\'è anche "Consumi ricorrenti" (oltre che nel ⋯ della Dispensa).'
   ]
 };
 
@@ -12348,7 +12348,7 @@ document.addEventListener('click', e=>{
   if(!go) return;
   const what = go.dataset.settingsGo;
   // Le Impostazioni restano aperte sotto: chiusa la pagina si torna all'elenco.
-  const tabFor = { gen:'menu', ingredients:'dispensa', groups:'dispensa', depts:'dispensa' }[what];
+  const tabFor = { gen:'menu', ingredients:'dispensa', groups:'dispensa', depts:'dispensa', recurring:'dispensa' }[what];
   if(tabFor && state.tab !== tabFor){ if(!state.settingsReturnTab) state.settingsReturnTab = state.tab; state.tab = tabFor; }
   if(what === 'gen') state.genSettingsOpen = 'plain';
   else if(what === 'ingredients') state.ingredientManagerOpen = true;
@@ -12356,6 +12356,7 @@ document.addEventListener('click', e=>{
   else if(what === 'depts') state.deptsModalOpen = true;
   else if(what === 'aisles') state.aisleOrderOpen = true;
   else if(what === 'expiry') state.expiryEstOpen = true;
+  else if(what === 'recurring'){ state.recurringOpen = true; state.recurringEditId = null; state.recurringDraft = null; }
   else if(what === 'appearance') state.appearanceOpen = true;
   else if(what === 'profile') state.profileOpen = true;
   else if(what === 'newrecipe'){ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); }
