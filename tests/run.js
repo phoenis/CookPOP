@@ -2276,6 +2276,37 @@ test('lotti: più scadenze per lo stesso ingrediente, conta la più vicina, si c
   eq([r.split, r.nearest, r.consumed], [true, true, true], JSON.stringify(r));
 });
 
+test('codice a barre: lettura quantità confezione, ricerca su Open Food Facts, ricordo del prodotto', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    out.packs = [parsePackQuantity('500 g'), parsePackQuantity('1,5 l'), parsePackQuantity('6 x 125 g'), parsePackQuantity('33 cl'), parsePackQuantity('qualche')];
+    let calls = 0;
+    window.fetch = async url => { calls++; return { ok: true, json: async () => ({ status: 1, product: { product_name_it: 'panna da cucina', quantity: '200 ml' } }) }; };
+    state.tab = 'dispensa'; state.pantryAddModalOpen = true; state.pantryDraft = newPantryDraft(false); render();
+    document.querySelector('[data-scan-barcode]').click();
+    out.overlay = !!document.getElementById('scan-overlay') && state.scannerOpen === true;
+    document.getElementById('scan-code').value = '8001234567890';
+    document.getElementById('scan-go').click();
+    await new Promise(res => setTimeout(res, 300));
+    out.closed = !document.getElementById('scan-overlay') && state.scannerOpen === false;
+    const d = state.pantryDraft;
+    out.draft = [d.nome, d.unit, d.qty, d.barcode];
+    document.getElementById('pantry-add-btn').click();
+    out.remembered = JSON.stringify(state.barcodes['8001234567890']);
+    // seconda volta: dal ricordo, senza rete
+    window.fetch = async () => { throw new Error('offline'); };
+    const again = await lookupBarcode('8001234567890');
+    out.again = [again && again.nome, again && again.remembered];
+    out.unknown = await lookupBarcode('1111111111111');
+    out.calls = calls;
+    return out;
+  });
+  eq(r.packs, [{ qty: 500, unit: 'g' }, { qty: 1.5, unit: 'l' }, { qty: 750, unit: 'g' }, { qty: 330, unit: 'ml' }, null]);
+  eq([r.overlay, r.closed, r.draft, r.again, r.unknown, r.calls], [true, true, ['Panna da cucina', 'ml', 200, '8001234567890'], ['Panna da cucina', true], null, 1], JSON.stringify(r));
+  assert(/"nome":"Panna da cucina"/.test(r.remembered), 'prodotto ricordato');
+});
+
 
 (async () => {
   const filter = process.argv[2] || '';
