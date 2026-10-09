@@ -4376,10 +4376,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-23',
+  version: '2027-01-24',
   title: 'Novità',
   items: [
-    'Scheda Aggiungi ingrediente: "Scansiona il codice a barre". La fotocamera legge il codice, il nome si cerca su Open Food Facts e compila la scheda (anche la quantità della confezione, se la trova). I prodotti scansionati si ricordano col nome che scegli.'
+    'Scansione codice a barre più chiara: quando legge il codice la camera si ferma, il riquadro diventa verde e il telefono vibra; poi la scheda mostra un riquadro "Trovato: nome · quantità" e il nome si illumina. Se il prodotto non si riconosce, lo dice ("Prodotto non riconosciuto") e in scheda resta l\'avviso per scrivere il nome.'
   ]
 };
 
@@ -7367,7 +7367,7 @@ async function lookupBarcode(code){
   const timer = ctl ? setTimeout(() => ctl.abort(), 8000) : null;
   try{
     const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_it,generic_name_it,quantity`, ctl ? { signal: ctl.signal } : undefined);
-    if(!res.ok) return null;
+    if(!res.ok) return res.status === 404 ? null : { failed: true };
     const data = await res.json();
     const p = data && data.status === 1 && data.product;
     if(!p) return null;
@@ -7376,14 +7376,18 @@ async function lookupBarcode(code){
     nome = nome.charAt(0).toUpperCase() + nome.slice(1);
     const pack = parsePackQuantity(p.quantity);
     return { nome, cat: '', unit: pack ? pack.unit : '', qty: pack ? pack.qty : 0, remembered: false };
-  }catch(e){ return null; }
+  }catch(e){ return { failed: true }; }
   finally{ if(timer) clearTimeout(timer); }
 }
 function applyScannedProduct(code, product){
   const d = state.pantryDraft; if(!d) return;
   d.barcode = code;
-  if(!product){
-    d.scanMsg = 'Prodotto non trovato: scrivi il nome, lo ricorderò per la prossima volta.';
+  if(!product || product.failed){
+    d.scanOk = false;
+    d.scanMsg = product && product.failed
+      ? 'Codice letto, ma non riesco a cercare il prodotto (internet?): scrivi il nome, lo ricorderò per la prossima volta.'
+      : 'Prodotto non riconosciuto: scrivi il nome, lo ricorderò per la prossima volta.';
+    d.scanFlash = false;
     return;
   }
   fillDraftFromPantry(d, product.nome);
@@ -7393,17 +7397,10 @@ function applyScannedProduct(code, product){
     if(product.qty > 0) d.qty = product.qty;
   }
   d.packQty = product.qty || 0;
-  d.scanMsg = product.remembered ? 'Riconosciuto: controlla e aggiungi.' : 'Trovato: controlla nome e quantità, poi aggiungi.';
-}
-async function handleScannedCode(code){
-  code = String(code || '').replace(/\D/g, '');
-  if(!code || !state.pantryDraft) return;
-  state.pantryDraft.scanMsg = 'Cerco il prodotto…';
-  render();
-  const product = await lookupBarcode(code);
-  if(!state.pantryDraft) return; // scheda chiusa nel frattempo
-  applyScannedProduct(code, product);
-  render();
+  d.scanOk = true;
+  d.scanFlash = true;
+  const pack = product.qty > 0 && product.unit ? ` · ${product.qty} ${UNIT_SHORT[product.unit] || product.unit}` : '';
+  d.scanMsg = `${product.remembered ? 'Riconosciuto' : 'Trovato'}: ${product.nome}${pack}. Controlla e aggiungi.`;
 }
 function closeBarcodeScanner(){
   clearInterval(scannerTimer); scannerTimer = null;
@@ -7423,7 +7420,33 @@ function openBarcodeScanner(){
     <div class="scan-manual"><input type="text" inputmode="numeric" id="scan-code" placeholder="Oppure scrivi il numero" autocomplete="off"><button type="button" class="btn is-solid" id="scan-go">Cerca</button></div>`;
   document.body.appendChild(ov);
   const msg = t => { const el = document.getElementById('scan-msg'); if(el) el.textContent = t; };
-  const finish = code => { closeBarcodeScanner(); render(); handleScannedCode(code); };
+  let found = false;
+  const finish = async code => {
+    code = String(code || '').replace(/\D/g, '');
+    if(found || !code) return;
+    found = true;
+    // Feedback subito: si ferma l'immagine, il riquadro diventa verde e il
+    // telefono vibra; la finestra resta aperta finché non ho il prodotto.
+    clearInterval(scannerTimer); scannerTimer = null;
+    const v = document.getElementById('scan-video'); if(v) v.pause();
+    ov.classList.add('is-found');
+    msg(`✓ Codice letto: ${code}`);
+    try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
+    await new Promise(res => setTimeout(res, 500));
+    msg('Cerco il prodotto…');
+    const product = await lookupBarcode(code);
+    if(!product || product.failed){
+      // Niente da compilare: lo si dice qui, in rosso, prima di chiudere.
+      ov.classList.remove('is-found'); ov.classList.add('is-miss');
+      msg(product && product.failed ? 'Non riesco a cercare il prodotto: controlla internet' : 'Prodotto non riconosciuto');
+      await new Promise(res => setTimeout(res, 1600));
+    }
+    closeBarcodeScanner();
+    if(state.pantryDraft) applyScannedProduct(code, product);
+    render();
+    if(state.pantryDraft && !state.pantryDraft.scanOk){ const nm = document.getElementById('pantry-add-name'); if(nm) nm.focus(); }
+    if(state.pantryDraft) setTimeout(()=>{ state.pantryDraft && (state.pantryDraft.scanFlash = false); }, 1600);
+  };
   document.getElementById('scan-close').addEventListener('click', ()=>{ closeBarcodeScanner(); render(); });
   const go = ()=>{ const v = (document.getElementById('scan-code').value || '').replace(/\D/g, ''); if(v.length >= 6) finish(v); else msg('Scrivi tutte le cifre del codice.'); };
   document.getElementById('scan-go').addEventListener('click', go);
@@ -7539,8 +7562,8 @@ function renderIngredientSheet(it, isNew){
     <div class="settings-body sheet-body">
       <section class="settings-section">
         <div class="settings-card">
-          ${isNew ? '<div class="add-ing-combo">' : ''}<input type="text" class="sheet-name" id="${isNew ? 'pantry-add-name' : 'pantry-edit-name'}" value="${escapeAttr(it.nome)}" placeholder="${home ? 'Es. Detersivo piatti' : 'Es. Zucchine'}" aria-label="Nome" autocomplete="off">${isNew ? '<div class="add-ing-suggestions" id="pantry-add-suggest"></div></div>' : ''}
-          ${isNew ? `<button type="button" class="btn is-outline is-block scan-open-btn" data-scan-barcode>${uiIcon('barcode')} Scansiona il codice a barre</button>${it.scanMsg ? `<p class="settings-note scan-note">${escapeHtml(it.scanMsg)}</p>` : ''}` : ''}
+          ${isNew ? '<div class="add-ing-combo">' : ''}<input type="text" class="sheet-name${it.scanFlash ? ' scan-flash' : ''}" id="${isNew ? 'pantry-add-name' : 'pantry-edit-name'}" value="${escapeAttr(it.nome)}" placeholder="${home ? 'Es. Detersivo piatti' : 'Es. Zucchine'}" aria-label="Nome" autocomplete="off">${isNew ? '<div class="add-ing-suggestions" id="pantry-add-suggest"></div></div>' : ''}
+          ${isNew ? `${it.scanMsg ? `<div class="scan-result ${it.scanOk ? 'is-ok' : 'is-miss'}" role="status"><span class="scan-result-ic" aria-hidden="true">${it.scanOk ? '✓' : '!'}</span><span>${escapeHtml(it.scanMsg)}</span></div>` : ''}<button type="button" class="btn is-outline is-block scan-open-btn" data-scan-barcode>${uiIcon('barcode')} ${it.barcode ? 'Scansiona un altro codice' : 'Scansiona il codice a barre'}</button>` : ''}
           <div class="settings-field sheet-qty-row">
             <div class="settings-field-label">${unit === 'none' ? 'Ce l\'hai?' : (isNew && existingPantryFor(it.nome) ? 'Quanto ne aggiungi' : 'Quantità')}${isNew ? pantryHaveHintHtml(it.nome) : ''}</div>
             ${qtyHtml}

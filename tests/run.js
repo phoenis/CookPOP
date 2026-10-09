@@ -2288,21 +2288,27 @@ test('codice a barre: lettura quantità confezione, ricerca su Open Food Facts, 
     out.overlay = !!document.getElementById('scan-overlay') && state.scannerOpen === true;
     document.getElementById('scan-code').value = '8001234567890';
     document.getElementById('scan-go').click();
-    await new Promise(res => setTimeout(res, 300));
+    await new Promise(res => setTimeout(res, 1300));
     out.closed = !document.getElementById('scan-overlay') && state.scannerOpen === false;
     const d = state.pantryDraft;
     out.draft = [d.nome, d.unit, d.qty, d.barcode];
+    out.banner = !!document.querySelector('.scan-result.is-ok') && /Scansiona un altro/.test(document.querySelector('.scan-open-btn').textContent);
     document.getElementById('pantry-add-btn').click();
     out.remembered = JSON.stringify(state.barcodes['8001234567890']);
     // seconda volta: dal ricordo, senza rete
     window.fetch = async () => { throw new Error('offline'); };
     const again = await lookupBarcode('8001234567890');
     out.again = [again && again.nome, again && again.remembered];
+    window.fetch = async () => ({ ok: true, json: async () => ({ status: 0 }) });
     out.unknown = await lookupBarcode('1111111111111');
+    window.fetch = async () => { throw new Error('offline'); };
+    out.offline = await lookupBarcode('2222222222222');
     out.calls = calls;
     return out;
   });
   eq(r.packs, [{ qty: 500, unit: 'g' }, { qty: 1.5, unit: 'l' }, { qty: 750, unit: 'g' }, { qty: 330, unit: 'ml' }, null]);
+  assert(r.offline && r.offline.failed, 'senza rete si distingue da non trovato');
+  assert(r.banner, 'riquadro Trovato e bottone Scansiona un altro codice');
   eq([r.overlay, r.closed, r.draft, r.again, r.unknown, r.calls], [true, true, ['Panna da cucina', 'ml', 200, '8001234567890'], ['Panna da cucina', true], null, 1], JSON.stringify(r));
   assert(/"nome":"Panna da cucina"/.test(r.remembered), 'prodotto ricordato');
 });
