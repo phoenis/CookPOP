@@ -4376,10 +4376,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-24',
+  version: '2027-01-25',
   title: 'Novità',
   items: [
-    'Scansione codice a barre più chiara: quando legge il codice la camera si ferma, il riquadro diventa verde e il telefono vibra; poi la scheda mostra un riquadro "Trovato: nome · quantità" e il nome si illumina. Se il prodotto non si riconosce, lo dice ("Prodotto non riconosciuto") e in scheda resta l\'avviso per scrivere il nome.'
+    'Scheda ingrediente: l\'unità di misura si cambia accanto alla quantità, con un piccolo elenco a comparsa.'
   ]
 };
 
@@ -7493,13 +7493,25 @@ function renderIngredientSheet(it, isNew){
   const unit = it.unit || '';
   const picker = state.pantrySheetPicker;
   const closeAttr = isNew ? 'data-close-pantry-add-modal' : 'data-close-pantry-edit';
+  // Unità accanto alla quantità: un tocco apre un piccolo elenco (come il luogo
+  // nelle righe di Dispensa) per cambiarla senza uscire dalla scheda.
+  const unitChoices = home ? HOME_UNITS.concat(unit && !HOME_UNITS.includes(unit) ? [unit] : []) : UNIT_ORDER;
+  const unitPickerHtml = `
+      <span class="unit-anchor">
+        <button type="button" class="sheet-unit-btn" data-sheet-picker="unit" aria-haspopup="listbox" aria-expanded="${picker === 'unit'}" aria-label="Unità di misura: ${escapeAttr(UNIT_SHORT[unit] || unit)}">${escapeHtml(unit === 'none' ? 'solo c\'è' : (UNIT_SHORT[unit] || unit))} <span aria-hidden="true">▾</span></button>
+        ${picker === 'unit' ? `
+        <div class="luogo-picker-backdrop" data-sheet-picker-close></div>
+        <div class="unit-picker" role="listbox" aria-label="Unità di misura">
+          ${unitChoices.map(u => `<button type="button" class="unit-picker-opt${unit === u ? ' active' : ''}" role="option" aria-selected="${unit === u}" data-sheet-unit="${u}">${escapeHtml(UNIT_SHORT[u] || u)}</button>`).join('')}
+        </div>` : ''}
+      </span>`;
   const qtyHtml = unit === 'none'
-    ? `<label class="sheet-presence"><input type="checkbox" data-sheet-presence ${it.qty > 0 ? 'checked' : ''}> In casa</label>`
+    ? `<label class="sheet-presence"><input type="checkbox" data-sheet-presence ${it.qty > 0 ? 'checked' : ''}> In casa</label>${unitPickerHtml}`
     : `<span class="qty-stepper sheet-stepper">
         <button class="qty-btn" type="button" data-sheet-qty="-1" aria-label="Diminuisci">−</button>
         <input type="number" inputmode="decimal" min="0" step="${qtyStepFor(unit)}" class="qty-input" id="pantry-edit-qty" value="${it.qty}" aria-label="Quantità">
         <button class="qty-btn" type="button" data-sheet-qty="1" aria-label="Aumenta">+</button>
-        <span class="sheet-unit">${escapeHtml(UNIT_SHORT[unit] || unit)}</span>
+        ${unitPickerHtml}
       </span>`;
   const luoghi = LUOGO_ORDER.map(l=>`<button type="button" class="sheet-luogo${(it.luogo||'dispensa')===l?' active':''}" data-sheet-luogo="${l}" aria-pressed="${(it.luogo||'dispensa')===l}"><span class="sheet-luogo-icon">${LUOGO_ICON[l]}</span><span>${escapeHtml(LUOGO_LABEL[l])}</span></button>`).join('');
   const days = it.scadenza ? daysUntilDate(it.scadenza) : null;
@@ -7557,7 +7569,6 @@ function renderIngredientSheet(it, isNew){
           ${groups.map(([id, g]) => `<button type="button" class="sheet-option${it.group === id ? ' active' : ''}" data-sheet-group="${escapeAttr(id)}">${escapeHtml(g.label)}</button>`).join('')}
           <button type="button" class="sheet-option is-link" data-open-pantry-groups>${uiIcon('category')} Gestisci gruppi…</button>
         </div>`;
-  const units = home ? HOME_UNITS.concat(unit && !HOME_UNITS.includes(unit) ? [unit] : []) : UNIT_ORDER;
   const more = !!state.pantrySheetMore;
   return `
   <div class="sheet-page${entering ? ' is-entering' : ''}" data-sheet-page>
@@ -7590,22 +7601,16 @@ function renderIngredientSheet(it, isNew){
         </div>
         ${home ? '' : '<p class="settings-note">Il gruppo unisce più formati (es. Fusilli e Penne in "Pasta corta"): una ricetta che chiede pasta corta li trova tutti.</p>'}
       </section>
-      <section class="settings-section">
+      ${isNew ? '' : `<section class="settings-section">
         <button type="button" class="sheet-more-toggle" data-sheet-more aria-expanded="${more}">Altro ${more ? '▴' : '▾'}</button>
         ${more ? `
         <div class="settings-card">
           <div class="settings-field">
-            <div class="settings-field-label">Unità</div>
-            <div class="chip-row">${units.map(u => `<button type="button" class="btn is-chip${unit === u ? ' active' : ''}" data-sheet-unit="${u}">${escapeHtml(UNIT_SHORT[u] || u)}</button>`).join('')}</div>
-            <p class="settings-card-text">${home ? 'Pezzi per contarli, oppure solo se ce l\'hai o no.' : 'Serve a capire se ne hai abbastanza per una ricetta (es. 500 g di pasta).'}</p>
-          </div>
-          ${isNew ? '' : `
-          <div class="settings-field">
             <button type="button" class="btn is-outline is-block" data-open-merge="${escapeAttr(it.nome)}">${uiIcon('link')} Unisci con un doppione…</button>
             <button type="button" class="btn is-outline is-block color-delete" id="pantry-edit-delete">Elimina dalla Dispensa</button>
-          </div>`}
+          </div>
         </div>` : ''}
-      </section>
+      </section>`}
     </div>
     <div class="sheet-footer">
       ${isNew
@@ -10238,8 +10243,10 @@ function attachHandlers(){
     const it = sheetTarget(); if(!it) return;
     const v = btn.dataset.sheetUnit;
     if(v) it.unit = v; else delete it.unit;
+    state.pantrySheetPicker = null;
     sheetChanged();
   }));
+  document.querySelectorAll('[data-sheet-picker-close]').forEach(el=> el.addEventListener('click', ()=>{ state.pantrySheetPicker = null; render(); }));
   document.querySelectorAll('[data-sheet-more]').forEach(btn=> btn.addEventListener('click', ()=>{
     state.pantrySheetMore = !state.pantrySheetMore;
     render();

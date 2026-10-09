@@ -701,7 +701,7 @@ test('scheda ingrediente: modifica (quantità, luogo, categoria, gruppo, unità)
   await page.click('[data-sheet-luogo="freezer"]');
   await page.click('[data-sheet-picker="cat"]');
   await page.click('[data-sheet-cat="surgelati"]');
-  await page.click('[data-sheet-more]');
+  await page.click('[data-sheet-picker="unit"]');
   await page.click('[data-sheet-unit="g"]');
   const it = await page.evaluate(() => state.pantryItems['carciofi']);
   eq({ qty: it.qty, luogo: it.luogo, cat: it.cat, unit: it.unit }, { qty: 4, luogo: 'freezer', cat: 'surgelati', unit: 'g' }, 'modifiche salvate subito');
@@ -733,7 +733,7 @@ test('scheda ingrediente: aprire un elenco o "Altro" non la riporta in cima né 
   const before = await page.evaluate(() => document.querySelector('.sheet-page').scrollTop);
   assert(before > 100, `la scheda scorre (${before})`);
   await page.click('[data-sheet-more]');
-  const r = await page.evaluate(() => ({ top: document.querySelector('.sheet-page').scrollTop, entering: document.querySelector('.sheet-page').classList.contains('is-entering'), more: !!document.querySelector('[data-sheet-unit]') }));
+  const r = await page.evaluate(() => ({ top: document.querySelector('.sheet-page').scrollTop, entering: document.querySelector('.sheet-page').classList.contains('is-entering'), more: !!document.querySelector('[data-open-merge]') }));
   eq(r, { top: before, entering: false, more: true });
   eq(page.errors, [], 'errori JS');
 });
