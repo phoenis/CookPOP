@@ -1836,7 +1836,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq(r.visible, ['Ingredienti e Dispensa']);
   eq(r.visibleLinks, ['aisles']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 4, spesa: 1, menu: 2, prep: 2 });
+  eq(r.menus, { dispensa: 5, spesa: 1, menu: 2, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -2004,14 +2004,14 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     const out = { dispensa: labels('dispensa'), spesa: labels('spesa'), menu: labels('menu'), prep: labels('prep') };
     TAB_MENU_ITEMS.prep[0].action(); out.newPage = state.newRecipeModalOpen === true; state.newRecipeModalOpen = false;
     TAB_MENU_ITEMS.prep[1].action(); out.imp = !!state.recipeImport; state.recipeImport = null;
-    TAB_MENU_ITEMS.dispensa[1].action(); out.ing = state.ingredientManagerOpen === true; state.ingredientManagerOpen = false;
-    TAB_MENU_ITEMS.dispensa[2].action(); out.grp = state.pantryGroupsModalOpen === true; state.pantryGroupsModalOpen = false;
-    TAB_MENU_ITEMS.dispensa[3].action(); out.dept = state.deptsModalOpen === true; state.deptsModalOpen = false;
+    TAB_MENU_ITEMS.dispensa[2].action(); out.ing = state.ingredientManagerOpen === true; state.ingredientManagerOpen = false;
+    TAB_MENU_ITEMS.dispensa[3].action(); out.grp = state.pantryGroupsModalOpen === true; state.pantryGroupsModalOpen = false;
+    TAB_MENU_ITEMS.dispensa[4].action(); out.dept = state.deptsModalOpen === true; state.deptsModalOpen = false;
     TAB_MENU_ITEMS.spesa[0].action(); out.aisle = state.aisleOrderOpen === true; state.aisleOrderOpen = false;
     TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genSettingsOpen === 'plain'; state.genSettingsOpen = null;
     return out;
   });
-  eq(r, { dispensa: ['Inventario veloce', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Regole di generazione'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true });
+  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Regole di generazione'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true });
 });
 
 test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
@@ -2241,6 +2241,42 @@ test('blocco piatto: tocco sull\'icona blocca/sblocca, anche su un avanzo; badge
     return out;
   });
   eq([r.isLeftover, r.hasBtn, r.locked, r.iconLocked, r.unlocked, r.badge], [true, true, true, true, true, 'Avanzo'], JSON.stringify(r));
+});
+test('consumi ricorrenti: scalano dalla Dispensa ogni N giorni, pagina dal menù Dispensa, il pane ricorrente ferma il conto a pasto', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    upsertPantryItem('Latte', 'frigo', 6, ''); resolvePantryItem('Latte').qty = 6;
+    const ago = n => { const d = new Date(); d.setDate(d.getDate() - n); return isoLocalDate(d); };
+    state.recurringItems = { a: { nome: 'Latte', qty: 1, every: 3, last: ago(7) } };
+    recurringRanOn = '';
+    applyRecurringConsumption();
+    out.qty = resolvePantryItem('Latte').qty;
+    out.last = state.recurringItems.a.last === ago(1);
+    recurringRanOn = '';
+    applyRecurringConsumption();
+    out.again = resolvePantryItem('Latte').qty;
+    out.breadBefore = mealHasBread(1, 'cena');
+    state.recurringItems.b = { nome: 'Pane', qty: 1, every: 1, last: ago(0) };
+    out.breadAfter = mealHasBread(1, 'cena');
+    delete state.recurringItems.b;
+    // pagina
+    state.tab = 'dispensa'; render();
+    const item = TAB_MENU_ITEMS.dispensa.find(x => /Consumi ricorrenti/.test(x.label));
+    out.menu = !!item;
+    item.action(); render();
+    out.page = !!document.querySelector('[data-page="recurring"]');
+    document.querySelector('[data-recurring-edit="new"]').click();
+    document.getElementById('recurring-name').value = 'Yogurt';
+    document.getElementById('recurring-name').dispatchEvent(new Event('input'));
+    document.getElementById('recurring-every').value = '2';
+    document.getElementById('recurring-every').dispatchEvent(new Event('input'));
+    document.getElementById('recurring-save').click();
+    const saved = Object.values(state.recurringItems).find(x => x.nome === 'Yogurt');
+    out.saved = !!saved && saved.every === 2 && saved.qty === 1;
+    return out;
+  });
+  eq([r.qty, r.last, r.again, r.breadBefore, r.breadAfter, r.menu, r.page, r.saved], [4, true, 4, true, false, true, true, true], JSON.stringify(r));
 });
 
 (async () => {

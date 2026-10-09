@@ -1729,6 +1729,10 @@ const state = {
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
+  recurringItems: {}, // id -> { nome, qty, every, last }: ingredienti che si consumano a ritmo fisso (qty ogni `every` giorni); `last` = ultimo giorno già scalato dalla Dispensa
+  recurringOpen: false, // non persistito: pagina "Consumi ricorrenti" aperta
+  recurringEditId: null, // non persistito: 'new' o id in modifica
+  recurringDraft: null, // non persistito: { nome, qty, every }
   inventoryOpen: false, // non persistito: pagina "Inventario veloce" aperta
   inventoryFilter: 'todo', inventorySearch: '', inventoryKeep: {}, // non persistiti: filtro/ricerca, e righe col Sì ancora aperte (in attesa di OK)
   inventoryAnswered: null, // risposte dell'inventario (in localStorage, vedi inventoryAnswers)
@@ -2687,7 +2691,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','userColors','prepDay','dishPlan','freezerDishes'];
+const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -2854,6 +2858,7 @@ function buildPersonalPayload(){
     mealsDone: state.mealsDone,
     ingredientNotes: state.ingredientNotes,
     pantryItems: state.pantryItems,
+    recurringItems: state.recurringItems,
     week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy,
@@ -4357,10 +4362,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-17',
+  version: '2027-01-18',
   title: 'Novità',
   items: [
-    'Tocca l\'icona del piatto (o il lucchetto) per bloccarlo e sbloccarlo, anche se è un avanzo. Il badge dell\'avanzo non riporta più il giorno.'
+    'Dispensa ⋯ → Consumi ricorrenti: aggiungi gli ingredienti che finiscono a ritmo fisso (pane 1 al giorno, latte 1 ogni 3 giorni). La Dispensa li scala da sola e, quando finiscono, vanno in Spesa tra i Finiti. Se aggiungi il pane, smette il conto a pasto.'
   ]
 };
 
@@ -4452,6 +4457,7 @@ function restoreRecipeEditForm(snap){
 function render(){
   applyCustomDepts();
   if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
+  if(personalSynced || !window.cookpopSync) applyRecurringConsumption();
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
@@ -4597,6 +4603,8 @@ const MODAL_CHECKS = [
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
+  [()=> !!state.recurringOpen && !!state.recurringEditId, ()=>{ state.recurringEditId = null; state.recurringDraft = null; }],
+  [()=> !!state.recurringOpen, ()=>{ state.recurringOpen = false; }],
   [()=> !!state.inventoryOpen, ()=>{ state.inventoryOpen = false; }],
   [()=> !!state.ingredientManagerOpen, ()=>{ state.ingredientManagerOpen = false; }],
   [()=> !!state.addIngModalOpen, ()=>{ state.addIngModalOpen = false; state.addIngDraft = null; }],
@@ -6971,9 +6979,100 @@ function pantryExpiryDays(it){
 // si segna come mangiato, così la voce "Pane" dice quando sta finendo (a 0
 // finisce in Spesa tra i Finiti, come il resto). Conta solo una voce a pezzi:
 // in grammi o "solo presenza" non si saprebbe quanto togliere.
+// Consumi ricorrenti (Dispensa ⋯): ingredienti che finiscono a ritmo fisso,
+// es. pane 1 al giorno, latte 1 ogni 3 giorni. Ogni `every` giorni si scala
+// `qty` dalla scorta in Dispensa (a 0 finisce in Spesa tra i Finiti, come il
+// resto). `last` è l'ultimo giorno già scalato: aprire l'app dopo qualche
+// giorno recupera i cicli passati. Solo voci con unità (non "solo presenza").
+let recurringRanOn = '';
+function recurringList(){
+  return Object.entries(state.recurringItems || {}).map(([id, r]) => Object.assign({ id }, r));
+}
+function recurringSummary(r, unit){
+  const u = unit && unit !== 'none' ? ' ' + (UNIT_SHORT[unit] || unit) : '';
+  return `${r.qty}${u} ${r.every === 1 ? 'al giorno' : `ogni ${r.every} giorni`}`;
+}
+function applyRecurringConsumption(){
+  const list = recurringList();
+  if(!list.length) return;
+  const today = isoLocalDate(new Date());
+  if(recurringRanOn === today) return;
+  recurringRanOn = today;
+  let changed = false;
+  list.forEach(r=>{
+    const every = Math.max(1, parseInt(r.every, 10) || 1);
+    const since = r.last ? -daysUntilDate(r.last) : 0;
+    const cycles = Math.floor(since / every);
+    if(!(cycles > 0)) return;
+    const it = resolvePantryItem(r.nome);
+    if(it && typeof it.qty === 'number' && it.unit !== 'none') it.qty = Math.max(0, Math.round((it.qty - cycles * r.qty) * 100) / 100);
+    const d = new Date(); d.setDate(d.getDate() - (since - cycles * every));
+    state.recurringItems[r.id].last = isoLocalDate(d);
+    changed = true;
+  });
+  if(changed) persist();
+}
+function recurringCoversBread(){
+  const bread = breadPantryItem();
+  return recurringList().some(r => (bread && resolvePantryItem(r.nome) === bread) || BREAD_NAMES.some(n => n.toLowerCase() === (r.nome || '').trim().toLowerCase()));
+}
+function recurringEditCardHtml(id){
+  const d = state.recurringDraft || { nome: '', qty: 1, every: 1 };
+  const isNew = id === 'new';
+  const names = Object.values(state.pantryItems).map(it => it.nome).sort((a, b) => IT_COLLATOR.compare(a, b));
+  return `
+      <div class="manage-edit" data-recurring-edit-card="${escapeAttr(id)}">
+        <label class="manage-field"><span>Ingrediente</span>
+          <input type="text" id="recurring-name" list="recurring-names" value="${escapeAttr(d.nome || '')}" placeholder="Es. Pane" autocomplete="off"></label>
+        <datalist id="recurring-names">${names.map(n => `<option value="${escapeAttr(n)}"></option>`).join('')}</datalist>
+        <label class="manage-field"><span>Quanto ne consumo</span>
+          <input type="number" inputmode="decimal" min="0" step="0.5" id="recurring-qty" value="${escapeAttr(d.qty)}"></label>
+        <label class="manage-field"><span>Ogni quanti giorni</span>
+          <input type="number" inputmode="numeric" min="1" step="1" id="recurring-every" value="${escapeAttr(d.every)}"></label>
+        ${d.error ? '<p class="settings-note color-delete">Scrivi ingrediente, quantità e ogni quanti giorni.</p>' : ''}
+        <div class="manage-edit-actions">
+          ${isNew ? '<span></span>' : `<button type="button" class="btn is-text color-delete" data-recurring-delete="${escapeAttr(id)}">Elimina</button>`}
+          <span class="manage-edit-buttons">
+            <button type="button" class="btn is-outline" data-recurring-cancel>${isNew ? 'Annulla' : 'Chiudi'}</button>
+            <button type="button" class="btn is-solid" id="recurring-save">${isNew ? 'Aggiungi' : 'Salva'}</button>
+          </span>
+        </div>
+      </div>`;
+}
+function renderRecurringPage(){
+  const editing = state.recurringEditId;
+  const rows = recurringList().sort((a, b) => IT_COLLATOR.compare(a.nome, b.nome)).map(r=>{
+    if(editing === r.id) return recurringEditCardHtml(r.id);
+    const it = resolvePantryItem(r.nome);
+    const unit = it ? it.unit : '';
+    let sub = recurringSummary(r, unit);
+    if(!it) sub += ' · non in Dispensa';
+    else if(typeof it.qty === 'number' && it.unit !== 'none'){
+      const left = r.qty > 0 ? Math.floor(it.qty / r.qty) * r.every : 0;
+      sub += it.qty > 0 ? ` · ne hai ${it.qty}${unit ? ' ' + (UNIT_SHORT[unit] || unit) : ''}, bastano ~${left} ${left === 1 ? 'giorno' : 'giorni'}` : ' · finito';
+    }
+    return `
+      <button type="button" class="manage-row" data-recurring-edit="${escapeAttr(r.id)}">
+        <span class="manage-row-icon">${uiIcon('refresh')}</span>
+        <span class="manage-row-main">${escapeHtml(r.nome.charAt(0).toUpperCase() + r.nome.slice(1))}
+          <span class="manage-row-sub">${escapeHtml(sub)}</span></span>
+        <span class="manage-row-chevron" aria-hidden="true">›</span>
+      </button>`;
+  }).join('');
+  const body = `
+      <p class="settings-note manage-intro">Ingredienti che finiscono a ritmo fisso, come il pane o il latte. Dici quanto ne consumi e ogni quanti giorni: la Dispensa li scala da sola, e quando finiscono vanno in Spesa tra i Finiti.</p>
+      <section class="settings-section">
+        ${editing === 'new' ? `<div class="settings-card">${recurringEditCardHtml('new')}</div>` : `<button type="button" class="btn is-outline is-block" data-recurring-edit="new">+ Nuovo consumo</button>`}
+      </section>
+      <section class="settings-section">
+        <div class="settings-card manage-list">${rows || '<p class="settings-card-text">Nessun consumo ricorrente.</p>'}</div>
+      </section>`;
+  return managePageHtml({ key: 'recurring', title: 'Consumi ricorrenti', closeAttr: 'data-close-recurring', body });
+}
 const BREAD_NAMES = ['Pane', 'Panini', 'Panino'];
 const BREAD_PER_MEAL = 1;
 function mealHasBread(i, meal){
+  if(recurringCoversBread()) return false; // il pane è un consumo ricorrente: niente conto a pasto
   return meal === 'cena' || (meal === 'pranzo' && (Number(i) === 5 || Number(i) === 6));
 }
 function breadPantryItem(){
@@ -7740,6 +7839,7 @@ function renderDispensa(){
   const deptsModal = state.deptsModalOpen ? renderDeptsPage() : '';
   const ingredientManagerModal = state.ingredientManagerOpen ? renderIngredientManagerPage() : '';
   const inventoryPage = state.inventoryOpen ? renderInventoryPage() : '';
+  const recurringPage = state.recurringOpen ? renderRecurringPage() : '';
 
   // Ingredienti a scorta 0: mai cancellati (vedi Spesa/"Finiti in Dispensa"),
   // in Dispensa non compaiono proprio — niente sezione "Finiti" a parte (tolta
@@ -7782,6 +7882,7 @@ function renderDispensa(){
     <div class="save-hint"></div>
     ${ingredientManagerModal}
     ${inventoryPage}
+    ${recurringPage}
     ${editModal}
     ${addModal}
     ${groupsModal}
@@ -9444,6 +9545,45 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-close-recurring]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(!isCloseTap(e, el)) return;
+      state.recurringOpen = false; state.recurringEditId = null; state.recurringDraft = null;
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-recurring-edit]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const id = btn.dataset.recurringEdit;
+    const r = state.recurringItems[id];
+    state.recurringEditId = id;
+    state.recurringDraft = r ? { nome: r.nome, qty: r.qty, every: r.every } : { nome: '', qty: 1, every: 1 };
+    render();
+    const inp = document.getElementById('recurring-name');
+    if(inp && id === 'new') inp.focus();
+  }));
+  document.querySelectorAll('[data-recurring-cancel]').forEach(btn=> btn.addEventListener('click', ()=>{ state.recurringEditId = null; state.recurringDraft = null; render(); }));
+  [['recurring-name', 'nome'], ['recurring-qty', 'qty'], ['recurring-every', 'every']].forEach(([elId, field])=>{
+    const inp = document.getElementById(elId);
+    if(inp && state.recurringDraft) inp.addEventListener('input', e=>{ state.recurringDraft[field] = e.target.value; });
+  });
+  const recurringSave = document.getElementById('recurring-save');
+  if(recurringSave) recurringSave.addEventListener('click', ()=>{
+    const d = state.recurringDraft; if(!d) return;
+    const nome = String(d.nome || '').trim();
+    const qty = parseFloat(String(d.qty).replace(',', '.'));
+    const every = parseInt(d.every, 10);
+    if(!nome || !(qty > 0) || !(every >= 1)){ d.error = true; render(); return; }
+    const id = state.recurringEditId === 'new' ? 'r' + Date.now().toString(36) : state.recurringEditId;
+    const prev = state.recurringItems[id];
+    state.recurringItems[id] = { nome, qty, every, last: prev ? prev.last : isoLocalDate(new Date()) };
+    state.recurringEditId = null; state.recurringDraft = null;
+    persist(); render();
+  });
+  document.querySelectorAll('[data-recurring-delete]').forEach(btn=> btn.addEventListener('click', ()=>{
+    delete state.recurringItems[btn.dataset.recurringDelete];
+    state.recurringEditId = null; state.recurringDraft = null;
+    persist(); render();
+  }));
   document.querySelectorAll('[data-close-inventory]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
@@ -9939,6 +10079,7 @@ const TAB_MENU_ITEMS = {
   // Scorciatoie alle stesse voci che stanno anche in Impostazioni.
   dispensa: [
     { label: uiIcon('clipboard-list') + ' Inventario veloce', action: ()=>{ state.inventoryOpen = true; state.inventoryKeep = {}; } },
+    { label: uiIcon('refresh') + ' Consumi ricorrenti', action: ()=>{ state.recurringOpen = true; state.recurringEditId = null; state.recurringDraft = null; } },
     { label: uiIcon('list-details') + ' Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
     { label: uiIcon('category') + ' Gruppi', action: ()=>{ state.pantryGroupsModalOpen = true; } },
     { label: uiIcon('tag') + ' Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
