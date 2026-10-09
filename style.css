@@ -1602,3 +1602,7 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .expiry-row{ gap:var(--space-xsmall); }
 .expiry-stepper .qty-num{ min-width:6rem; text-align:center; }
 .expiry-rule-match{ flex:1; min-width:0; font-family:var(--font-family); font-size:var(--text-small); padding:var(--space-xsmall); border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); }
+
+.expiry-rule .add-ing-combo{ flex:1; min-width:0; }
+.expiry-rule .add-ing-suggestions{ min-width:12rem; }
+.settings-card.manage-list:has(.expiry-rule){ overflow:visible; }
