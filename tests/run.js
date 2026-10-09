@@ -1583,9 +1583,9 @@ test('Ricettario: dettaglio ricetta come pagina (tab, persone, Aggiungi in alto,
 
 test('menù: card dei pasti senza bordo e con ombra leggera; le card vuote senza bordo né ombra', async ({ page }) => {
   const r = await page.evaluate(() => {
-    isMealPast = () => false; generateWeek(0);
+    isMealPast = () => false; findTodayPos = () => 0; generateWeek(0); // "oggi" fisso: il test non dipende dal giorno in cui gira
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
-    const di = WEEK_DISPLAY_ORDER[Math.min(findTodayPos() + 1, WEEK_DISPLAY_ORDER.length - 1)];
+    const di = WEEK_DISPLAY_ORDER[1];
     clearMealToEmpty(0, di, 'cena'); state.tab = 'menu'; render();
     const cs = el => getComputedStyle(el);
     const full = document.querySelector('.meal-block-swipe-wrap .meal-block:not(.is-empty)');
@@ -2399,6 +2399,23 @@ test('scadenze stimate: i giorni si scrivono (anche un anno) per reparto e per e
     return out;
   });
   eq([r.pasta, r.uova, r.carne], [[365, 365], 40, null], JSON.stringify(r));
+});
+
+test('impostazioni: voce Consumi ricorrenti apre la pagina in Dispensa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'menu'; render();
+    document.querySelector('[data-topbar-menu-settings]') || document.getElementById('topbar-menu-btn').click();
+    document.querySelector('[data-topbar-menu-settings]').click();
+    const link = document.querySelector('#settings-backdrop [data-settings-go="recurring"]');
+    const out = { link: !!link };
+    link.click();
+    out.open = state.recurringOpen === true;
+    out.tab = state.tab;
+    out.page = !!document.querySelector('[data-page="recurring"]');
+    return out;
+  });
+  eq(r, { link: true, open: true, tab: 'dispensa', page: true });
 });
 
 (async () => {
