@@ -1731,6 +1731,8 @@ const state = {
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
+  barcodes: {}, // codice a barre -> { nome, cat, unit, qty }: prodotti già scansionati, col nome scelto da te
+  scannerOpen: false, // non persistito: lettore di codici a barre aperto
   recurringItems: {}, // id -> { nome, qty, every, last }: ingredienti che si consumano a ritmo fisso (qty ogni `every` giorni); `last` = ultimo giorno già scalato dalla Dispensa
   doneModalMeal: {}, // ephemeral: id consumo ricorrente "a pasto" -> quanto togliere dalla Dispensa alla conferma di "Ricetta fatta!"
   recurringOpen: false, // non persistito: pagina "Consumi ricorrenti" aperta
@@ -2701,7 +2703,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','userColors','prepDay','dishPlan','freezerDishes'];
+const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -2869,6 +2871,7 @@ function buildPersonalPayload(){
     ingredientNotes: state.ingredientNotes,
     pantryItems: state.pantryItems,
     recurringItems: state.recurringItems,
+    barcodes: state.barcodes,
     week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy,
@@ -4333,6 +4336,7 @@ const CLEAR_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" heig
 const UI_ICONS = {
   'palette': '<path d="M12 21a9 9 0 0 1 0-18c4.97 0 9 3.582 9 8c0 1.06-.474 2.078-1.318 2.828c-.844.75-1.989 1.172-3.182 1.172h-2.5a2 2 0 0 0-1 3.75a1.3 1.3 0 0 1-1 2.25"/><path d="M8.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3-3a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3 3a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/>',
   'plus': '<path d="M12 5v14M5 12h14"/>',
+  'barcode': '<path d="M4 7V6a2 2 0 0 1 2-2h2M4 17v1a2 2 0 0 0 2 2h2m8-16h2a2 2 0 0 1 2 2v1m-4 13h2a2 2 0 0 0 2-2v-1M8 8v8m3-8v8m3-8v8m3-8v8"/>',
   'lock': '<path d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 1 0-2 0m-3-5V7a4 4 0 1 1 8 0v4"/>',
   'download': '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="m7 11l5 5l5-5M12 4v12"/>',
   'upload': '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="m7 9l5-5l5 5M12 4v12"/>',
@@ -4372,10 +4376,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-22',
+  version: '2027-01-23',
   title: 'Novità',
   items: [
-    'Più scadenze per lo stesso ingrediente (es. due panne): aggiungendone una nuova con un\'altra data diventa un\'altra confezione. Nella scheda dell\'ingrediente vedi le scadenze e puoi cambiarle o aggiungerne con "+ Altra scadenza". Conta la più vicina, e quando ne consumi scende prima quella.'
+    'Scheda Aggiungi ingrediente: "Scansiona il codice a barre". La fotocamera legge il codice, il nome si cerca su Open Food Facts e compila la scheda (anche la quantità della confezione, se la trova). I prodotti scansionati si ricordano col nome che scegli.'
   ]
 };
 
@@ -4614,6 +4618,7 @@ const MODAL_CHECKS = [
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
+  [()=> !!state.scannerOpen, ()=>{ closeBarcodeScanner(); }],
   [()=> !!state.recurringOpen && !!state.recurringEditId, ()=>{ state.recurringEditId = null; state.recurringDraft = null; }],
   [()=> !!state.recurringOpen, ()=>{ state.recurringOpen = false; }],
   [()=> !!state.inventoryOpen, ()=>{ state.inventoryOpen = false; }],
@@ -7337,6 +7342,110 @@ function fillDraftFromPantry(d, nome){
   if(d.unit === 'none') d.qty = 1;
   d.home = isNonFoodDept(knownDept(d.cat) || classifyDept(d.nome));
 }
+// --- Codice a barre ---------------------------------------------------------
+// "Scansiona il codice a barre" nella scheda Aggiungi: la fotocamera legge
+// l'EAN (BarcodeDetector, Chrome su Android), il nome si cerca su Open Food
+// Facts (gratuito, senza registrazione) e compila la scheda. I prodotti già
+// scansionati si ricordano col nome scelto da te (state.barcodes), anche
+// senza rete. Dove la fotocamera o il lettore non ci sono, si scrive il numero.
+const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+let scannerStream = null, scannerTimer = null;
+// "500 g", "1,5 l", "6 x 125 g", "33 cl" -> { qty, unit } nelle unità dell'app.
+function parsePackQuantity(text){
+  const m = /^\s*(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i.exec(text || '');
+  if(!m) return null;
+  let qty = parseFloat(m[2].replace(',', '.')) * (m[1] ? parseInt(m[1], 10) : 1);
+  let unit = m[3].toLowerCase();
+  if(unit === 'cl'){ qty *= 10; unit = 'ml'; }
+  if(!(qty > 0)) return null;
+  return { qty: Math.round(qty * 100) / 100, unit };
+}
+async function lookupBarcode(code){
+  const known = (state.barcodes || {})[code];
+  if(known) return { nome: known.nome, cat: known.cat || '', unit: known.unit || '', qty: known.qty || 0, remembered: true };
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), 8000) : null;
+  try{
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_it,generic_name_it,quantity`, ctl ? { signal: ctl.signal } : undefined);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const p = data && data.status === 1 && data.product;
+    if(!p) return null;
+    let nome = (p.product_name_it || p.product_name || p.generic_name_it || '').trim();
+    if(!nome) return null;
+    nome = nome.charAt(0).toUpperCase() + nome.slice(1);
+    const pack = parsePackQuantity(p.quantity);
+    return { nome, cat: '', unit: pack ? pack.unit : '', qty: pack ? pack.qty : 0, remembered: false };
+  }catch(e){ return null; }
+  finally{ if(timer) clearTimeout(timer); }
+}
+function applyScannedProduct(code, product){
+  const d = state.pantryDraft; if(!d) return;
+  d.barcode = code;
+  if(!product){
+    d.scanMsg = 'Prodotto non trovato: scrivi il nome, lo ricorderò per la prossima volta.';
+    return;
+  }
+  fillDraftFromPantry(d, product.nome);
+  if(product.cat) d.cat = product.cat;
+  if(!existingPantryFor(product.nome) && product.unit && UNIT_ORDER.includes(product.unit)){
+    d.unit = product.unit;
+    if(product.qty > 0) d.qty = product.qty;
+  }
+  d.packQty = product.qty || 0;
+  d.scanMsg = product.remembered ? 'Riconosciuto: controlla e aggiungi.' : 'Trovato: controlla nome e quantità, poi aggiungi.';
+}
+async function handleScannedCode(code){
+  code = String(code || '').replace(/\D/g, '');
+  if(!code || !state.pantryDraft) return;
+  state.pantryDraft.scanMsg = 'Cerco il prodotto…';
+  render();
+  const product = await lookupBarcode(code);
+  if(!state.pantryDraft) return; // scheda chiusa nel frattempo
+  applyScannedProduct(code, product);
+  render();
+}
+function closeBarcodeScanner(){
+  clearInterval(scannerTimer); scannerTimer = null;
+  if(scannerStream){ scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  const ov = document.getElementById('scan-overlay'); if(ov) ov.remove();
+  state.scannerOpen = false;
+}
+function openBarcodeScanner(){
+  closeBarcodeScanner();
+  state.scannerOpen = true;
+  const ov = document.createElement('div');
+  ov.className = 'scan-overlay'; ov.id = 'scan-overlay';
+  ov.innerHTML = `
+    <div class="scan-head"><button type="button" class="btn is-icon" id="scan-close" aria-label="Chiudi">✕</button><span>Inquadra il codice a barre</span></div>
+    <div class="scan-view"><video id="scan-video" playsinline muted></video><div class="scan-frame"></div></div>
+    <p class="scan-msg" id="scan-msg"></p>
+    <div class="scan-manual"><input type="text" inputmode="numeric" id="scan-code" placeholder="Oppure scrivi il numero" autocomplete="off"><button type="button" class="btn is-solid" id="scan-go">Cerca</button></div>`;
+  document.body.appendChild(ov);
+  const msg = t => { const el = document.getElementById('scan-msg'); if(el) el.textContent = t; };
+  const finish = code => { closeBarcodeScanner(); render(); handleScannedCode(code); };
+  document.getElementById('scan-close').addEventListener('click', ()=>{ closeBarcodeScanner(); render(); });
+  const go = ()=>{ const v = (document.getElementById('scan-code').value || '').replace(/\D/g, ''); if(v.length >= 6) finish(v); else msg('Scrivi tutte le cifre del codice.'); };
+  document.getElementById('scan-go').addEventListener('click', go);
+  document.getElementById('scan-code').addEventListener('keydown', e=>{ if(e.key === 'Enter') go(); });
+  render(); // registra la finestra per il tasto Indietro del telefono
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ msg('La fotocamera non è disponibile: scrivi il numero.'); return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }).then(stream=>{
+    if(!state.scannerOpen){ stream.getTracks().forEach(t => t.stop()); return; }
+    scannerStream = stream;
+    const video = document.getElementById('scan-video');
+    video.srcObject = stream; video.play().catch(()=>{});
+    if(!('BarcodeDetector' in window)){ msg('Questo browser non legge i codici: scrivi il numero.'); return; }
+    const detector = new BarcodeDetector({ formats: BARCODE_FORMATS });
+    let busy = false;
+    scannerTimer = setInterval(async ()=>{
+      if(busy || !video.videoWidth) return;
+      busy = true;
+      try{ const found = await detector.detect(video); if(found.length) finish(found[0].rawValue); }catch(e){}
+      busy = false;
+    }, 250);
+  }).catch(()=> msg('Non riesco ad aprire la fotocamera: scrivi il numero.'));
+}
 function pantryAddSuggestions(q){
   q = (q || '').trim().toLowerCase();
   if(!q) return [];
@@ -7431,6 +7540,7 @@ function renderIngredientSheet(it, isNew){
       <section class="settings-section">
         <div class="settings-card">
           ${isNew ? '<div class="add-ing-combo">' : ''}<input type="text" class="sheet-name" id="${isNew ? 'pantry-add-name' : 'pantry-edit-name'}" value="${escapeAttr(it.nome)}" placeholder="${home ? 'Es. Detersivo piatti' : 'Es. Zucchine'}" aria-label="Nome" autocomplete="off">${isNew ? '<div class="add-ing-suggestions" id="pantry-add-suggest"></div></div>' : ''}
+          ${isNew ? `<button type="button" class="btn is-outline is-block scan-open-btn" data-scan-barcode>${uiIcon('barcode')} Scansiona il codice a barre</button>${it.scanMsg ? `<p class="settings-note scan-note">${escapeHtml(it.scanMsg)}</p>` : ''}` : ''}
           <div class="settings-field sheet-qty-row">
             <div class="settings-field-label">${unit === 'none' ? 'Ce l\'hai?' : (isNew && existingPantryFor(it.nome) ? 'Quanto ne aggiungi' : 'Quantità')}${isNew ? pantryHaveHintHtml(it.nome) : ''}</div>
             ${qtyHtml}
@@ -10105,6 +10215,7 @@ function attachHandlers(){
     state.pantrySheetMore = !state.pantrySheetMore;
     render();
   }));
+  document.querySelectorAll('[data-scan-barcode]').forEach(btn=> btn.addEventListener('click', ()=> openBarcodeScanner()));
   const pantryAddBtn = document.getElementById('pantry-add-btn');
   if(pantryAddBtn) pantryAddBtn.addEventListener('click', ()=>{
     const d = state.pantryDraft; if(!d) return;
@@ -10117,6 +10228,10 @@ function attachHandlers(){
     const key = nome.toLowerCase();
     const prevItem = state.pantryItems[key] ? Object.assign({}, state.pantryItems[key]) : null;
     upsertPantryItem(nome, d.luogo, d.unit === 'none' ? (d.qty > 0 ? 1 : 0) : d.qty, d.unit || '', cat, d.group || '');
+    if(d.barcode){
+      if(!state.barcodes) state.barcodes = {};
+      state.barcodes[d.barcode] = { nome, cat: d.cat || '', unit: d.unit || '', qty: d.packQty || 0 };
+    }
     const added = state.pantryItems[key];
     if(added){
       // Voce che c'era già: vale quello scelto nella scheda (es. il luogo).
