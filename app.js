@@ -4457,10 +4457,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-02-02',
+  version: '2027-02-03',
   title: 'Novità',
   items: [
-    'Scadenze stimate: i giorni si possono scrivere (tocca il numero), fino a 10 anni, oltre a − e +. Utile per pasta e conserve.'
+    'Scadenze stimate: campo dei giorni più stretto, con "gg" al posto di "giorni".'
   ]
 };
 
@@ -11320,7 +11320,7 @@ function expiryStepperHtml(attrs, days, field){
   return `<span class="qty-stepper expiry-stepper">
     <button class="qty-btn" type="button" ${attrs} data-delta="-1" aria-label="Meno">−</button>
     <input type="number" inputmode="numeric" min="0" max="3650" step="1" class="qty-input expiry-days-input" data-expiry-days="${escapeAttr(field)}" value="${days}" aria-label="Giorni">
-    <span class="expiry-days-unit">${days > 0 ? (days === 1 ? 'giorno' : 'giorni') : 'nessuna stima'}</span>
+    <span class="expiry-days-unit">${days > 0 ? 'gg' : 'nessuna stima'}</span>
     <button class="qty-btn" type="button" ${attrs} data-delta="1" aria-label="Più">+</button>
   </span>`;
 }

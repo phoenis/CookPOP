@@ -1609,3 +1609,6 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 
 .expiry-stepper .expiry-days-input{ width:4.25rem; height:2rem; text-align:center; }
 .expiry-days-unit{ min-width:4.5rem; font-size:var(--text-small); color:var(--ink-light); }
+
+.expiry-stepper .expiry-days-input{ width:3.25rem; }
+.expiry-days-unit{ min-width:1.5rem; }
