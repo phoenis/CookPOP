@@ -2382,6 +2382,25 @@ test('scadenze stimate: pagina in Impostazioni, giorni per reparto, eccezioni pe
   eq([r.defaults, r.page, r.latt, r.rule, r.none, r.reset], [[21, 5, null], true, [6, 6], [7, 6, true], [null, 21], [5, 'uova']], JSON.stringify(r));
 });
 
+test('scadenze stimate: i giorni si scrivono (anche un anno) per reparto e per eccezione', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.expiryEstimates = {}; state.expiryRules = defaultExpiryRules();
+    state.expiryEstOpen = true; render();
+    const dep = document.querySelector('[data-expiry-days="dept:pasta"]');
+    dep.value = '365'; dep.dispatchEvent(new Event('change', { bubbles: true }));
+    const out = { pasta: [expiryDaysForDept('pasta'), estimateExpiryDays({ nome: 'Spaghetti', cat: 'pasta' })] };
+    const rule = document.querySelector('[data-expiry-days="rule:uova"]');
+    rule.value = '40'; rule.dispatchEvent(new Event('change', { bubbles: true }));
+    out.uova = estimateExpiryDays({ nome: 'Uova' });
+    const z = document.querySelector('[data-expiry-days="dept:carne"]');
+    z.value = '0'; z.dispatchEvent(new Event('change', { bubbles: true }));
+    out.carne = estimateExpiryDays({ nome: 'Pollo', cat: 'carne' });
+    return out;
+  });
+  eq([r.pasta, r.uova, r.carne], [[365, 365], 40, null], JSON.stringify(r));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

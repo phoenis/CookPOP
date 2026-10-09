@@ -4457,10 +4457,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-02-01',
+  version: '2027-02-02',
   title: 'Novità',
   items: [
-    'Scadenze stimate → Nuova eccezione: mentre scrivi compare l\'elenco degli ingredienti da cui scegliere (prima non usciva).'
+    'Scadenze stimate: i giorni si possono scrivere (tocca il numero), fino a 10 anni, oltre a − e +. Utile per pasta e conserve.'
   ]
 };
 
@@ -11316,10 +11316,11 @@ document.addEventListener('click', e=>{
 // Quanti giorni dura un fresco appena comprato, per reparto, più eccezioni per
 // nome (es. le uova). Le stime partono già compilate in Spesa e Dispensa.
 function expiryDaysLabel(n){ return n > 0 ? `${n} ${n === 1 ? 'giorno' : 'giorni'}` : 'nessuna stima'; }
-function expiryStepperHtml(attrs, days){
+function expiryStepperHtml(attrs, days, field){
   return `<span class="qty-stepper expiry-stepper">
     <button class="qty-btn" type="button" ${attrs} data-delta="-1" aria-label="Meno">−</button>
-    <span class="qty-num">${escapeHtml(expiryDaysLabel(days))}</span>
+    <input type="number" inputmode="numeric" min="0" max="3650" step="1" class="qty-input expiry-days-input" data-expiry-days="${escapeAttr(field)}" value="${days}" aria-label="Giorni">
+    <span class="expiry-days-unit">${days > 0 ? (days === 1 ? 'giorno' : 'giorni') : 'nessuna stima'}</span>
     <button class="qty-btn" type="button" ${attrs} data-delta="1" aria-label="Più">+</button>
   </span>`;
 }
@@ -11339,17 +11340,17 @@ function renderExpiryEstimatesPage(){
       <div class="manage-row expiry-row">
         <span class="manage-row-icon">${DEPT_ICON[d] || ''}</span>
         <span class="manage-row-main">${escapeHtml(DEPT_LABEL[d])}</span>
-        ${expiryStepperHtml(`data-expiry-dept="${escapeAttr(d)}"`, expiryDaysForDept(d))}
+        ${expiryStepperHtml(`data-expiry-dept="${escapeAttr(d)}"`, expiryDaysForDept(d), 'dept:' + d)}
       </div>`).join('');
   const rules = Object.entries(state.expiryRules || {});
   const ruleRows = rules.map(([id, r]) => `
       <div class="manage-row expiry-row expiry-rule">
         <input type="text" class="expiry-rule-match" data-expiry-rule-name="${escapeAttr(id)}" value="${escapeAttr(r.nome || '')}" placeholder="Scegli un ingrediente" aria-label="Ingrediente" autocomplete="off">
-        ${expiryStepperHtml(`data-expiry-rule="${escapeAttr(id)}"`, Number(r.days) || 0)}
+        ${expiryStepperHtml(`data-expiry-rule="${escapeAttr(id)}"`, Number(r.days) || 0, 'rule:' + id)}
         <button type="button" class="btn is-icon" data-expiry-rule-del="${escapeAttr(id)}" aria-label="Togli la regola">✕</button>
       </div>`).join('');
   const body = `
-      <p class="settings-note manage-intro">Per i freschi l'app propone una scadenza dalla data di acquisto: qui scegli quanti giorni. Il numero è sempre una stima, la data vera la cambi tu quando spunti in Spesa o nella scheda dell'ingrediente. A "nessuna stima" non propone niente.</p>
+      <p class="settings-note manage-intro">Per i freschi l'app propone una scadenza dalla data di acquisto: qui scegli quanti giorni. Il numero è sempre una stima, la data vera la cambi tu quando spunti in Spesa o nella scheda dell'ingrediente. Scrivi il numero o usa − e +: a 0 ("nessuna stima") non propone niente.</p>
       <section class="settings-section">
         <h3 class="settings-section-title">Per reparto</h3>
         <div class="settings-card manage-list">${deptRows}</div>
@@ -11373,7 +11374,7 @@ document.addEventListener('click', e=>{
   const dep = t.closest('[data-expiry-dept]');
   if(dep){
     const d = dep.dataset.expiryDept;
-    const next = Math.max(0, Math.min(365, expiryDaysForDept(d) + Number(dep.dataset.delta)));
+    const next = Math.max(0, Math.min(3650, expiryDaysForDept(d) + Number(dep.dataset.delta)));
     if(!state.expiryEstimates) state.expiryEstimates = {};
     if(next === (EXPIRY_ESTIMATE_DAYS[d] || 0)) delete state.expiryEstimates[d]; else state.expiryEstimates[d] = next;
     persist(); render(); return;
@@ -11381,7 +11382,7 @@ document.addEventListener('click', e=>{
   const rule = t.closest('[data-expiry-rule]');
   if(rule){
     const r = (state.expiryRules || {})[rule.dataset.expiryRule]; if(!r) return;
-    r.days = Math.max(0, Math.min(365, (Number(r.days) || 0) + Number(rule.dataset.delta)));
+    r.days = Math.max(0, Math.min(3650, (Number(r.days) || 0) + Number(rule.dataset.delta)));
     persist(); render(); return;
   }
   const del = t.closest('[data-expiry-rule-del]');
@@ -11399,6 +11400,17 @@ document.addEventListener('click', e=>{
   }
 });
 document.addEventListener('change', e=>{
+  const dayInp = e.target.closest && e.target.closest('[data-expiry-days]');
+  if(dayInp){
+    const [kind, id] = [dayInp.dataset.expiryDays.split(':')[0], dayInp.dataset.expiryDays.slice(dayInp.dataset.expiryDays.indexOf(':') + 1)];
+    const n = Math.max(0, Math.min(3650, parseInt(dayInp.value, 10) || 0));
+    if(kind === 'dept'){
+      if(!state.expiryEstimates) state.expiryEstimates = {};
+      if(n === (EXPIRY_ESTIMATE_DAYS[id] || 0)) delete state.expiryEstimates[id]; else state.expiryEstimates[id] = n;
+    } else if(state.expiryRules && state.expiryRules[id]) state.expiryRules[id].days = n;
+    persist(); render();
+    return;
+  }
   const inp = e.target.closest && e.target.closest('[data-expiry-rule-name]');
   if(!inp) return;
   const r = (state.expiryRules || {})[inp.dataset.expiryRuleName]; if(!r) return;

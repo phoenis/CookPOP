@@ -1606,3 +1606,6 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .expiry-rule .add-ing-combo{ flex:1; min-width:0; }
 .expiry-rule .add-ing-suggestions{ min-width:12rem; }
 .settings-card.manage-list:has(.expiry-rule){ overflow:visible; }
+
+.expiry-stepper .expiry-days-input{ width:4.25rem; height:2rem; text-align:center; }
+.expiry-days-unit{ min-width:4.5rem; font-size:var(--text-small); color:var(--ink-light); }
