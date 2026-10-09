@@ -1835,7 +1835,6 @@ const state = {
   doneModalLeftover: '', // ephemeral: testo libero "cosa è avanzato" nella modale "Ricetta fatta!", precompilato col nome della ricetta
   doneModalLeftoverLuogo: 'frigo', // ephemeral: luogo scelto per l'avanzo (icona con luogo-picker, come in Dispensa)
   doneModalLeftoverCat: 'avanzi', // ephemeral: reparto scelto per l'avanzo; di default "Avanzi", ma modificabile (es. un sugo che ricongeli va in "Legumi e conserve")
-  doneModalBread: 0, // ephemeral: panini da togliere dalla Dispensa alla conferma di "Ricetta fatta!" (vedi mealHasBread)
   doneModalLeftoverChecked: false, // ephemeral: se spuntato, l'avanzo va in Dispensa alla conferma; sempre deselezionato al caricamento
   doneModalLeftoverPickerOpen: false, // ephemeral: luogo-picker dell'avanzo aperto/chiuso
   doneModalLeftoverCatPickerOpen: false, // ephemeral: cat-picker (reparto) dell'avanzo aperto/chiuso
@@ -4362,10 +4361,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-18',
+  version: '2027-01-19',
   title: 'Novità',
   items: [
-    'Dispensa ⋯ → Consumi ricorrenti: aggiungi gli ingredienti che finiscono a ritmo fisso (pane 1 al giorno, latte 1 ogni 3 giorni). La Dispensa li scala da sola e, quando finiscono, vanno in Spesa tra i Finiti. Se aggiungi il pane, smette il conto a pasto.'
+    'Il pane si gestisce solo da Dispensa ⋯ → Consumi ricorrenti: tolto il conteggio a pasto (riga "Pane" in Ricetta fatta! e "Pane per i pasti" in Spesa).'
   ]
 };
 
@@ -6008,20 +6007,6 @@ function renderMenu(){
     });
     const normalRowsHtml = qtyRows.concat(restRows).join('');
     const finishedSectionHtml = '';
-    const breadIt = breadPantryItem();
-    const showBread = mealHasBread(di, doneMeal) && !recipeListsBread(uniqueIng);
-    const breadRowHtml = !showBread ? '' : (breadCountable(breadIt) ? `
-      <div class="done-ing-list done-bread">
-        <div class="done-ing-row">
-          <span>🍞 ${escapeHtml(breadIt.nome)}<span class="done-bread-left">${breadIt.qty > 0 ? `In Dispensa: ${breadIt.qty}, ne restano ${Math.max(0, breadIt.qty - state.doneModalBread)}` : 'Finito in Dispensa'}</span></span>
-          <span class="qty-stepper">
-            <button class="qty-btn" type="button" data-done-bread="-1" aria-label="Un panino in meno">−</button>
-            <span class="qty-num">${state.doneModalBread}</span>
-            <button class="qty-btn" type="button" data-done-bread="1" aria-label="Un panino in più">+</button>
-          </span>
-        </div>
-      </div>` : `
-      <div class="done-ing-list done-bread"><div class="done-ing-row untracked"><span>🍞 Pane</span><span class="done-ing-hint">${breadIt ? 'in Dispensa non è a pezzi' : 'non in dispensa'}</span></div></div>`);
     doneModal = `
     <div class="filters-modal-backdrop" data-close-done-modal>
       <div class="filters-modal" data-stop-close>
@@ -6031,7 +6016,6 @@ function renderMenu(){
         </div>
         <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Quanto ne è servito per questo pasto (dalla ricetta): alla conferma lo tolgo dalla Dispensa. Col carrello metti in lista spesa quelli che non hai più.</p>
         ${doneName && getRecipeMeta(doneName) ? `<div class="done-grad">${gradimentoPickerHtml(doneName)}</div>` : ''}
-        ${breadRowHtml}
         ${uniqueIng.length ? `
         ${normalRowsHtml ? `<div class="done-ing-list">${normalRowsHtml}</div>` : ''}
         ${finishedSectionHtml}
@@ -6257,8 +6241,6 @@ function buildShopFlat(){
       });
     });
   });
-  const bread = breadShopNeed();
-  if(bread && !state.shopDismissed[bread.key]) flat.push({ key: bread.key, ingrediente: bread.nome, qta: String(bread.need), dove:'', note:'', context:'Pane per i pasti', contextShort:`Pane per ${bread.meals} pasti` });
   DATA.generalShopping.forEach((it,idx)=>{
     const key = `gen_${idx}`;
     if(state.shopDismissed[key]) return;
@@ -6973,12 +6955,6 @@ function pantryExpiryDays(it){
 // giorni da oggi, per reparto: una stima prudente per la confezione tipica,
 // da confermare o correggere subito (vedi renderExpiryConfirmModal). Niente
 // stima per il resto (pasta, conserve, surgelati...) né per ciò che sta in freezer.
-// Pane: a cena ogni giorno e anche a pranzo sabato e domenica si mangia
-// pane (BREAD_PER_MEAL panini, nella finestra si cambia con + e −);
-// un pasto non impostato non conta. Si toglie dalla Dispensa quando il pasto
-// si segna come mangiato, così la voce "Pane" dice quando sta finendo (a 0
-// finisce in Spesa tra i Finiti, come il resto). Conta solo una voce a pezzi:
-// in grammi o "solo presenza" non si saprebbe quanto togliere.
 // Consumi ricorrenti (Dispensa ⋯): ingredienti che finiscono a ritmo fisso,
 // es. pane 1 al giorno, latte 1 ogni 3 giorni. Ogni `every` giorni si scala
 // `qty` dalla scorta in Dispensa (a 0 finisce in Spesa tra i Finiti, come il
@@ -7011,10 +6987,6 @@ function applyRecurringConsumption(){
     changed = true;
   });
   if(changed) persist();
-}
-function recurringCoversBread(){
-  const bread = breadPantryItem();
-  return recurringList().some(r => (bread && resolvePantryItem(r.nome) === bread) || BREAD_NAMES.some(n => n.toLowerCase() === (r.nome || '').trim().toLowerCase()));
 }
 function recurringEditCardHtml(id){
   const d = state.recurringDraft || { nome: '', qty: 1, every: 1 };
@@ -7069,71 +7041,9 @@ function renderRecurringPage(){
       </section>`;
   return managePageHtml({ key: 'recurring', title: 'Consumi ricorrenti', closeAttr: 'data-close-recurring', body });
 }
-const BREAD_NAMES = ['Pane', 'Panini', 'Panino'];
-const BREAD_PER_MEAL = 1;
-function mealHasBread(i, meal){
-  if(recurringCoversBread()) return false; // il pane è un consumo ricorrente: niente conto a pasto
-  return meal === 'cena' || (meal === 'pranzo' && (Number(i) === 5 || Number(i) === 6));
-}
-function breadPantryItem(){
-  let fallback = null;
-  for(const n of BREAD_NAMES){
-    const it = resolvePantryItem(n);
-    if(!it) continue;
-    if(typeof it.qty === 'number' && it.qty > 0) return it;
-    if(!fallback) fallback = it;
-  }
-  return fallback;
-}
-function breadCountable(it){ return !!(it && (it.unit || '') === '' ); }
-// Il pane è già tra gli ingredienti della ricetta (es. "uovo/pane"): lo conta la ricetta.
-function recipeListsBread(ingredients){
-  const bread = breadPantryItem();
-  // Anche "Pane casereccio", "Panini al latte"... (non pangrattato né pan di Spagna).
-  return ingredients.some(it => (bread && resolvePantryItem(it.ingrediente) === bread) || /^(pane|panini|panino)\b/i.test((it.ingrediente || '').trim()));
-}
-// Pane da comprare: 1 panino per ogni pasto col pane ancora da mangiare (da
-// oggi in poi, settimane in più comprese; solo pasti impostati e non ancora
-// segnati), meno quelli già in Dispensa. Una riga sola in Spesa: la chiave
-// cambia col numero, così dopo aver comprato meno del necessario (o se il menù
-// cambia) la riga torna per il resto, anche se quella di prima era spuntata.
-function breadMealsAhead(){
-  let count = 0;
-  const startPos = findTodayPos() ?? 0;
-  const weeks = [0, ...state.extraWeeks.map((_,n)=>n+1)];
-  weeks.forEach(weekIdx=>{
-    const done = weekMealsDoneRef(weekIdx);
-    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{
-      if(weekIdx === 0 && pos < startPos) return;
-      ['pranzo','cena'].forEach(meal=>{
-        if(!mealHasBread(i, meal)) return;
-        if(weekIdx === 0 && pos === startPos && meal === 'pranzo' && isTodayLunchPast()) return;
-        if(done[i] && done[i][meal]) return;
-        if(effectiveMeal(weekIdx, i, meal).principale) count++;
-      });
-    });
-  });
-  return count;
-}
-function breadShopNeed(){
-  const it = breadPantryItem();
-  if(it && !breadCountable(it)) return null;
-  const meals = breadMealsAhead();
-  const have = it && typeof it.qty === 'number' ? Math.max(0, it.qty) : 0;
-  const need = meals * BREAD_PER_MEAL - have;
-  if(need <= 0) return null;
-  return { key: `bread_${need}`, nome: it ? it.nome : 'Pane', need, meals };
-}
 const EXPIRY_BANNER_KEY = 'cookpop-expiry-banner-closed';
 function expiryBannerDismissedToday(){
   try{ return localStorage.getItem(EXPIRY_BANNER_KEY) === isoLocalDate(new Date()); }catch(e){ return false; }
-}
-function takeBread(n){
-  const it = breadPantryItem();
-  if(!n || !breadCountable(it) || !(it.qty > 0)) return null;
-  const prev = it.qty;
-  it.qty = Math.max(0, prev - n);
-  return { it, prev };
 }
 const EXPIRY_ESTIMATE_DAYS = { verdura:5, carne:2, pesce:2, latticini:5, uova:21 };
 function estimateExpiryDays(it){
@@ -8693,17 +8603,10 @@ function attachHandlers(){
       } else if(linkedSourceMealKey(weekIdx, i, meal)){
         // pasto "avanzo": nessun nuovo ingrediente consumato (già scalato sul
         // pasto sorgente), quindi si segna direttamente senza passare dalla
-        // modale di aggiornamento Dispensa. Il pane invece si mangia anche con
-        // l'avanzo: si toglie qui, con Annulla.
+        // modale di aggiornamento Dispensa.
         if(!mealsDone[i]) mealsDone[i] = {};
         mealsDone[i][meal] = true;
-        const took = mealHasBread(i, meal) ? takeBread(BREAD_PER_MEAL) : null;
         persist(); render();
-        if(took) showUndoToast(`Tolto il pane: ${took.it.qty ? `ne restano ${took.it.qty}` : 'è finito'}`, ()=>{
-          took.it.qty = took.prev;
-          clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
-          persist(); render();
-        });
       } else {
         const mealData = effectiveMeal(weekIdx, i, meal);
         // Stessa scala porzioni usata ovunque (Spesa, dettaglio ricetta): la
@@ -8726,7 +8629,6 @@ function attachHandlers(){
           }
         });
         state.doneModalDay = key;
-        state.doneModalBread = mealHasBread(i, meal) ? BREAD_PER_MEAL : 0;
         state.doneModalQty = qtyMap;
         state.doneQtyEditingKey = null;
         state.doneModalFinished = {};
@@ -8789,12 +8691,6 @@ function attachHandlers(){
       state.doneModalLeftoverChecked = false;
       state.doneModalLeftoverPickerOpen = false;
       state.doneModalLeftoverCatPickerOpen = false;
-      render();
-    });
-  });
-  document.querySelectorAll('[data-done-bread]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.doneModalBread = Math.max(0, state.doneModalBread + parseInt(btn.dataset.doneBread, 10));
       render();
     });
   });
@@ -8927,9 +8823,6 @@ function attachHandlers(){
         if(!existing || existing.leftover) state.pantryItems[leftoverKey].leftover = true;
       }
       const doneMealData = effectiveMeal(weekIdx, i, meal);
-      const doneIngAll = (doneMealData.principale ? getIngredientsFor(doneMealData.principale) : []).concat(doneMealData.contorni.reduce((acc,c)=>acc.concat(getIngredientsFor(c)), []));
-      if(mealHasBread(i, meal) && !recipeListsBread(doneIngAll)) takeBread(state.doneModalBread);
-      state.doneModalBread = 0;
       // Freezer: le porzioni prese per questo pasto scendono; la metà in più
       // di una doppia dose (se non già messa via dal prep) ci va adesso.
       const doneMk = mealKey(weekIdx, i, meal);
