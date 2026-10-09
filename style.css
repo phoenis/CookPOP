@@ -1568,3 +1568,13 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 
 .scan-overlay.is-miss .scan-frame{ border-color:#ff5a4d; box-shadow:0 0 0 3px #ff5a4d; }
 .scan-overlay.is-miss .scan-msg{ color:#ff8a80; font-weight:var(--weight-bold); }
+
+.unit-anchor{ position:relative; display:inline-flex; margin-left:0.25rem; }
+.sheet-unit-btn{ display:inline-flex; align-items:center; gap:0.25rem; height:2.25rem; padding:0 var(--space-small); border:1px solid var(--line); border-radius:var(--radius-pill); background:var(--surface-2); color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); cursor:pointer; }
+.unit-picker{ position:absolute; top:100%; right:0; margin-top:var(--space-xxsmall); z-index:151; display:flex; flex-direction:column; min-width:9rem; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-modal); padding:var(--space-xxsmall); box-shadow:var(--shadow-dropdown); }
+.unit-picker-opt{ text-align:left; padding:var(--space-xsmall) var(--space-small); border:0; border-radius:var(--radius-modal); background:none; color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); cursor:pointer; white-space:nowrap; }
+.unit-picker-opt.active{ background:var(--surface-2); font-weight:var(--weight-bold); }
+
+/* Input della quantità (Dispensa, finestre): come nella scheda ingrediente, bordo sottile arrotondato e, al focus, un solo bordo. */
+.qty-input{ border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); }
+.qty-input:focus, .qty-input:focus-visible{ outline:none; border-color:var(--gold); }
