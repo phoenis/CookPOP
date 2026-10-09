@@ -4430,10 +4430,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-28',
+  version: '2027-01-29',
   title: 'Novità',
   items: [
-    'Spesa: sulle righe spuntate c\'è direttamente la data di scadenza (la stima parte già compilata, con "~"). La tocchi per cambiarla dal calendario, con la ✕ la togli. O data o niente: tolti +3 giorni, +1 settimana, +1 mese.'
+    'Scadenza stimata delle uova: 21 giorni (prima valevano 5, come i latticini).'
   ]
 };
 
@@ -7263,6 +7263,8 @@ function expiryBannerDismissedToday(){
 const EXPIRY_ESTIMATE_DAYS = { verdura:5, carne:2, pesce:2, latticini:5, uova:21 };
 function estimateExpiryDays(it){
   if(!it || it.luogo === 'freezer') return null;
+  // Le uova stanno nel reparto Latticini (5 giorni), ma durano molto di più.
+  if(/\buov(a|o)\b/i.test(it.nome || '')) return EXPIRY_ESTIMATE_DAYS.uova;
   const dept = knownDept(it.cat) || classifyDept(it.nome);
   return EXPIRY_ESTIMATE_DAYS[dept] ?? null;
 }

@@ -2348,6 +2348,11 @@ test('spesa: scadenza segnata in negozio, diventa scadenza o nuovo lotto in Disp
 });
 
 
+test('scadenza stimata: le uova durano 21 giorni, i latticini 5', async ({ page }) => {
+  const r = await page.evaluate(() => [estimateExpiryDays({ nome: 'Uova' }), estimateExpiryDays({ nome: 'Uova fresche', cat: 'latticini' }), estimateExpiryDays({ nome: 'Yogurt' })]);
+  eq(r, [21, 21, 5]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
