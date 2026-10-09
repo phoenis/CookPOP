@@ -2341,7 +2341,7 @@ test('spesa: scadenza segnata in negozio, diventa scadenza o nuovo lotto in Disp
     out.noneNoLot = !state.pantryItems['lattuga'].lots;
     out.estShown = /~/.test(shopExpiryHtml('rowE', 'Spinaci'));
     // interfaccia: tasto calendario sulle righe spuntate
-    out.btnFn = typeof shopExpiryHtml === 'function' && /data-shop-exp="r1"/.test(shopExpiryHtml('r1'));
+    out.btnFn = typeof shopExpiryHtml === 'function' && /data-shop-exp-date="r1"/.test(shopExpiryHtml('r1', 'Spinaci'));
     return out;
   });
   eq([r.first, r.second, r.btnFn, r.estLot, r.noneNoLot, r.estShown], [[2, true, true], [3, true, 2, true], true, [2, 2], true, true], JSON.stringify(r));

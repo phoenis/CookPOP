@@ -957,28 +957,22 @@ function shopExpiryEstimate(name){
   const est = estimateExpiryDays(pantry || { nome: name });
   return est === null || est === undefined ? '' : addDaysIso(est);
 }
-// state.shopExpiry[riga]: data scelta, 'none' = scelto "Nessuna", assente = stima.
+// state.shopExpiry[riga]: data scelta, 'none' = tolta, assente = stima. Sulla
+// riga c'è direttamente la data (la stima parte già compilata, con "~"): un
+// tocco apre il selettore data del telefono, la ✕ la toglie. O data o niente.
 function shopExpiryHtml(rowKey, name){
   const choice = (state.shopExpiry || {})[rowKey];
   const estIso = shopExpiryEstimate(name);
   const iso = choice === 'none' ? '' : (choice || estIso);
   const isEst = !choice && !!estIso;
-  const open = state.shopExpiryPicker === rowKey;
-  const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-  const label = iso ? (isEst ? '~' : '') + fmt(iso) : '';
+  const label = iso ? (isEst ? '~' : '') + new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) : 'Scadenza';
   return `
-      <span class="unit-anchor shop-exp-anchor">
-        <button type="button" class="btn is-icon shop-exp-btn${iso ? ' has-date' : ''}${isEst ? ' is-estimate' : ''}" data-shop-exp="${escapeAttr(rowKey)}" aria-haspopup="listbox" aria-expanded="${open}" aria-label="${iso ? (isEst ? 'Scadenza stimata ' : 'Scadenza ') + escapeAttr(label) : 'Segna la scadenza'}">${uiIcon('calendar')}${label ? `<span class="shop-exp-label">${escapeHtml(label)}</span>` : ''}</button>
-        ${open ? `
-        <div class="luogo-picker-backdrop" data-shop-exp-close></div>
-        <div class="unit-picker" role="listbox" aria-label="Scadenza">
-          ${estIso ? `<button type="button" class="unit-picker-opt${choice ? '' : ' active'}" role="option" data-shop-exp-set="est" data-shop-exp-row="${escapeAttr(rowKey)}">Stimata · ${escapeHtml(fmt(estIso))}</button>` : ''}
-          <button type="button" class="unit-picker-opt${choice === 'none' || (!choice && !estIso) ? ' active' : ''}" role="option" data-shop-exp-set="none" data-shop-exp-row="${escapeAttr(rowKey)}">Nessuna</button>
-          <button type="button" class="unit-picker-opt" role="option" data-shop-exp-set="+3" data-shop-exp-row="${escapeAttr(rowKey)}">+3 giorni</button>
-          <button type="button" class="unit-picker-opt" role="option" data-shop-exp-set="+7" data-shop-exp-row="${escapeAttr(rowKey)}">+1 settimana</button>
-          <button type="button" class="unit-picker-opt" role="option" data-shop-exp-set="+30" data-shop-exp-row="${escapeAttr(rowKey)}">+1 mese</button>
-          <label class="unit-picker-opt shop-exp-date">${uiIcon('calendar')} Data… <input type="date" data-shop-exp-date="${escapeAttr(rowKey)}" value="${escapeAttr(choice && choice !== 'none' ? choice : '')}" aria-label="Scegli la data di scadenza"></label>
-        </div>` : ''}
+      <span class="shop-exp-wrap">
+        <label class="shop-exp-chip${iso ? ' has-date' : ''}${isEst ? ' is-estimate' : ''}" aria-label="${iso ? 'Scadenza ' + escapeAttr(label) : 'Segna la scadenza'}">
+          ${uiIcon('calendar')}<span class="shop-exp-label">${escapeHtml(label)}</span>
+          <input type="date" data-shop-exp-date="${escapeAttr(rowKey)}" value="${escapeAttr(iso)}" aria-label="Scadenza">
+        </label>
+        ${iso ? `<button type="button" class="btn is-icon shop-exp-clear" data-shop-exp-clear="${escapeAttr(rowKey)}" aria-label="Togli la scadenza">✕</button>` : ''}
       </span>`;
 }
 // La scadenza segnata in negozio entra in Dispensa: sulla voce se non ne avevi,
@@ -1790,7 +1784,6 @@ const state = {
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
   shopExpiry: {}, // rowKey di Spesa -> scadenza (YYYY-MM-DD) segnata in negozio; passa in Dispensa quando sposti la riga
-  shopExpiryPicker: null, // non persistito: riga di Spesa con l'elenco scadenza aperto
   barcodes: {}, // codice a barre -> { nome, cat, unit, qty }: prodotti già scansionati, col nome scelto da te
   scannerOpen: false, // non persistito: lettore di codici a barre aperto
   recurringItems: {}, // id -> { nome, qty, every, last }: ingredienti che si consumano a ritmo fisso (qty ogni `every` giorni); `last` = ultimo giorno già scalato dalla Dispensa
@@ -4437,10 +4430,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-27',
+  version: '2027-01-28',
   title: 'Novità',
   items: [
-    'Spesa: sulle righe spuntate la scadenza è già quella stimata dal reparto (con "~"), così la vedi subito; la cambi dal calendario (+3 giorni, +1 settimana, +1 mese, data o Nessuna). Per i freschi che hai già in casa, la stima diventa un nuovo lotto.'
+    'Spesa: sulle righe spuntate c\'è direttamente la data di scadenza (la stima parte già compilata, con "~"). La tocchi per cambiarla dal calendario, con la ✕ la togli. O data o niente: tolti +3 giorni, +1 settimana, +1 mese.'
   ]
 };
 
@@ -4679,7 +4672,6 @@ const MODAL_CHECKS = [
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
-  [()=> !!state.shopExpiryPicker, ()=>{ state.shopExpiryPicker = null; }],
   [()=> !!state.scannerOpen, ()=>{ closeBarcodeScanner(); }],
   [()=> !!state.recurringOpen && !!state.recurringEditId, ()=>{ state.recurringEditId = null; state.recurringDraft = null; }],
   [()=> !!state.recurringOpen, ()=>{ state.recurringOpen = false; }],
@@ -10314,24 +10306,13 @@ function attachHandlers(){
     state.pantrySheetMore = !state.pantrySheetMore;
     render();
   }));
-  document.querySelectorAll('[data-shop-exp]').forEach(btn=> btn.addEventListener('click', e=>{
-    e.preventDefault(); e.stopPropagation();
-    const k = btn.dataset.shopExp;
-    state.shopExpiryPicker = state.shopExpiryPicker === k ? null : k;
-    render();
-  }));
-  document.querySelectorAll('[data-shop-exp-close]').forEach(el=> el.addEventListener('click', ()=>{ state.shopExpiryPicker = null; render(); }));
-  const setShopExpiry = (k, iso)=>{
+  const setShopExpiry = (k, v)=>{
     if(!state.shopExpiry) state.shopExpiry = {};
-    if(iso) state.shopExpiry[k] = iso; else delete state.shopExpiry[k]; // vuoto = torna alla stima
-    state.shopExpiryPicker = null;
+    state.shopExpiry[k] = v;
     persist(); render();
   };
-  document.querySelectorAll('[data-shop-exp-set]').forEach(btn=> btn.addEventListener('click', ()=>{
-    const v = btn.dataset.shopExpSet;
-    setShopExpiry(btn.dataset.shopExpRow, v === 'est' ? '' : v === 'none' ? 'none' : addDaysIso(parseInt(v, 10)));
-  }));
-  document.querySelectorAll('[data-shop-exp-date]').forEach(inp=> inp.addEventListener('change', e=> setShopExpiry(inp.dataset.shopExpDate, e.target.value || '')));
+  document.querySelectorAll('[data-shop-exp-date]').forEach(inp=> inp.addEventListener('change', e=> setShopExpiry(inp.dataset.shopExpDate, e.target.value || 'none')));
+  document.querySelectorAll('[data-shop-exp-clear]').forEach(btn=> btn.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); setShopExpiry(btn.dataset.shopExpClear, 'none'); }));
   document.querySelectorAll('[data-scan-barcode]').forEach(btn=> btn.addEventListener('click', ()=> openBarcodeScanner()));
   const pantryAddBtn = document.getElementById('pantry-add-btn');
   if(pantryAddBtn) pantryAddBtn.addEventListener('click', ()=>{
