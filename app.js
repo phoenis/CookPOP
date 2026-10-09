@@ -4457,10 +4457,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-02-03',
+  version: '2027-02-04',
   title: 'Novità',
   items: [
-    'Scadenze stimate: campo dei giorni più stretto, con "gg" al posto di "giorni".'
+    'Scadenze stimate: se non c\'è una stima il campo mostra "—" (con "gg" accanto) al posto di 0 e di "nessuna stima".'
   ]
 };
 
@@ -11319,8 +11319,8 @@ function expiryDaysLabel(n){ return n > 0 ? `${n} ${n === 1 ? 'giorno' : 'giorni
 function expiryStepperHtml(attrs, days, field){
   return `<span class="qty-stepper expiry-stepper">
     <button class="qty-btn" type="button" ${attrs} data-delta="-1" aria-label="Meno">−</button>
-    <input type="number" inputmode="numeric" min="0" max="3650" step="1" class="qty-input expiry-days-input" data-expiry-days="${escapeAttr(field)}" value="${days}" aria-label="Giorni">
-    <span class="expiry-days-unit">${days > 0 ? 'gg' : 'nessuna stima'}</span>
+    <input type="text" inputmode="numeric" maxlength="4" class="qty-input expiry-days-input" data-expiry-days="${escapeAttr(field)}" value="${days > 0 ? days : '—'}" aria-label="Giorni (— = nessuna stima)" onfocus="this.select()">
+    <span class="expiry-days-unit">gg</span>
     <button class="qty-btn" type="button" ${attrs} data-delta="1" aria-label="Più">+</button>
   </span>`;
 }
@@ -11350,7 +11350,7 @@ function renderExpiryEstimatesPage(){
         <button type="button" class="btn is-icon" data-expiry-rule-del="${escapeAttr(id)}" aria-label="Togli la regola">✕</button>
       </div>`).join('');
   const body = `
-      <p class="settings-note manage-intro">Per i freschi l'app propone una scadenza dalla data di acquisto: qui scegli quanti giorni. Il numero è sempre una stima, la data vera la cambi tu quando spunti in Spesa o nella scheda dell'ingrediente. Scrivi il numero o usa − e +: a 0 ("nessuna stima") non propone niente.</p>
+      <p class="settings-note manage-intro">Per i freschi l'app propone una scadenza dalla data di acquisto: qui scegli quanti giorni. Il numero è sempre una stima, la data vera la cambi tu quando spunti in Spesa o nella scheda dell'ingrediente. Scrivi il numero o usa − e +: con il trattino (—) non propone niente.</p>
       <section class="settings-section">
         <h3 class="settings-section-title">Per reparto</h3>
         <div class="settings-card manage-list">${deptRows}</div>
