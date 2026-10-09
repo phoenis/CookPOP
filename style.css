@@ -1588,3 +1588,5 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .shop-exp-date input{ width:100%; min-width:0; font-family:var(--font-family); font-size:var(--text-small); border:1px solid var(--line); border-radius:var(--radius-modal); padding:var(--space-xxsmall) var(--space-xsmall); background:var(--bg); color:var(--ink); }
 .shop-exp-anchor .unit-picker{ top:auto; bottom:100%; margin-top:0; margin-bottom:var(--space-xxsmall); z-index:260; }
 .swipe-wrap:has(.unit-picker){ overflow:visible; }
+
+.shop-exp-btn.is-estimate{ color:var(--ink-light); font-style:italic; }

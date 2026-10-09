@@ -2329,11 +2329,22 @@ test('spesa: scadenza segnata in negozio, diventa scadenza o nuovo lotto in Disp
     moveShopRowToPantry(fakeCb('rowB', 'Crema di latte'));
     const b = state.pantryItems['crema di latte'];
     out.second = [b.qty, b.scadenza === addDaysIso(6), (b.lots || []).length, !state.shopExpiry.rowB];
+    // senza scelta: stima del reparto (fresco già in casa -> nuovo lotto); "nessuna" la salta
+    state.pantryItems['spinaci freschi'] = { nome: 'Spinaci freschi', qty: 1, luogo: 'frigo', unit: '', cat: 'verdura', scadenza: addDaysIso(2) };
+    state.shopQty['rowC'] = 1; state.shopExpiry = {};
+    moveShopRowToPantry(fakeCb('rowC', 'Spinaci freschi'));
+    const c = state.pantryItems['spinaci freschi'];
+    out.estLot = [c.qty, (c.lots || []).length];
+    state.pantryItems['lattuga'] = { nome: 'Lattuga', qty: 1, luogo: 'frigo', unit: '', cat: 'verdura', scadenza: addDaysIso(2) };
+    state.shopQty['rowD'] = 1; state.shopExpiry = { rowD: 'none' };
+    moveShopRowToPantry(fakeCb('rowD', 'Lattuga'));
+    out.noneNoLot = !state.pantryItems['lattuga'].lots;
+    out.estShown = /~/.test(shopExpiryHtml('rowE', 'Spinaci'));
     // interfaccia: tasto calendario sulle righe spuntate
     out.btnFn = typeof shopExpiryHtml === 'function' && /data-shop-exp="r1"/.test(shopExpiryHtml('r1'));
     return out;
   });
-  eq([r.first, r.second, r.btnFn], [[2, true, true], [3, true, 2, true], true], JSON.stringify(r));
+  eq([r.first, r.second, r.btnFn, r.estLot, r.noneNoLot, r.estShown], [[2, true, true], [3, true, 2, true], true, [2, 2], true, true], JSON.stringify(r));
 });
 
 
