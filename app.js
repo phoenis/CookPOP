@@ -936,7 +936,8 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
     ...(finalGroup ? { group: finalGroup } : {}),
     // La scadenza resta finché c'è ancora scorta (vale quella della confezione
     // già in casa, la più vicina); se era finita, quella nuova non si conosce.
-    ...(currentQty > 0 && existing && existing.scadenza ? { scadenza: existing.scadenza } : {})
+    ...(currentQty > 0 && existing && existing.scadenza ? { scadenza: existing.scadenza } : {}),
+    ...(newQty > 0 && existing && existing.lots ? { lots: existing.lots } : {})
   };
   // Torna in scorta: una volta rifinito serve una nuova conferma esplicita da Spesa.
   if(newQty > 0) delete state.pantryConfirmedShop[key];
@@ -4371,11 +4372,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-21',
+  version: '2027-01-22',
   title: 'Novità',
   items: [
-    'Gestisci ingredienti: c\'è "+ Nuovo ingrediente" in alto, come in Gruppi, Categorie e Consumi ricorrenti.',
-    'Nelle liste che si aprono sul posto (Gruppi, Categorie, Consumi) la freccia è in giù e la voce aperta è un riquadro con titolo e freccia in su per richiuderla.'
+    'Più scadenze per lo stesso ingrediente (es. due panne): aggiungendone una nuova con un\'altra data diventa un\'altra confezione. Nella scheda dell\'ingrediente vedi le scadenze e puoi cambiarle o aggiungerne con "+ Altra scadenza". Conta la più vicina, e quando ne consumi scende prima quella.'
   ]
 };
 
@@ -4468,6 +4468,7 @@ function render(){
   applyCustomDepts();
   if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
   if(personalSynced || !window.cookpopSync) applyRecurringConsumption();
+  if(personalSynced || !window.cookpopSync) reconcileAllLots();
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
@@ -6981,6 +6982,54 @@ function addDaysIso(days){
   d.setDate(d.getDate() + days);
   return isoLocalDate(d);
 }
+// Lotti: lo stesso ingrediente con più scadenze (due panne). it.lots =
+// [{ qty, scadenza }] ordinati per data; it.qty resta il totale e it.scadenza
+// la più vicina, così tutto il resto (banner, "In scadenza", Menù) funziona
+// com'era. Chi toglie scorta (−, Ricetta fatta!, consumi) tocca solo it.qty:
+// normalizeLots toglie dal lotto che scade prima, o aggiunge un lotto senza
+// data se la scorta è salita. Un solo lotto resta una voce semplice.
+const LOT_NO_DATE = '9999-99-99';
+function normalizeLots(it){
+  if(!it || !Array.isArray(it.lots)) return false;
+  const r2 = n => Math.round(n * 100) / 100;
+  const sig = () => JSON.stringify([it.lots || null, it.qty, it.scadenza || '']);
+  const before = sig();
+  const key = l => l.scadenza || LOT_NO_DATE;
+  const sortLots = a => a.sort((x, y) => key(x) < key(y) ? -1 : key(x) > key(y) ? 1 : 0);
+  let lots = it.lots.map(l => ({ qty: r2(Number(l.qty) || 0), scadenza: l.scadenza || '' })).filter(l => l.qty > 0);
+  sortLots(lots);
+  const target = typeof it.qty === 'number' ? it.qty : 0;
+  const total = r2(lots.reduce((n, l) => n + l.qty, 0));
+  if(total > target){
+    let extra = r2(total - target);
+    lots.forEach(l => { if(extra <= 0) return; const cut = Math.min(l.qty, extra); l.qty = r2(l.qty - cut); extra = r2(extra - cut); });
+    lots = lots.filter(l => l.qty > 0);
+  } else if(total < target){
+    const blank = lots.find(l => !l.scadenza);
+    if(blank) blank.qty = r2(blank.qty + target - total); else lots.push({ qty: r2(target - total), scadenza: '' });
+  }
+  const merged = [];
+  lots.forEach(l => {
+    const m = l.scadenza && merged.find(x => x.scadenza === l.scadenza);
+    if(m) m.qty = r2(m.qty + l.qty); else merged.push(l);
+  });
+  sortLots(merged);
+  if(merged.length <= 1 || it.unit === 'none' || target <= 0){
+    delete it.lots;
+    if(merged[0] && merged[0].scadenza) it.scadenza = merged[0].scadenza;
+    else if(merged.length) delete it.scadenza;
+  } else {
+    it.lots = merged;
+    const first = merged.find(l => l.scadenza);
+    if(first) it.scadenza = first.scadenza; else delete it.scadenza;
+  }
+  return sig() !== before;
+}
+function reconcileAllLots(){
+  let changed = false;
+  Object.values(state.pantryItems || {}).forEach(it => { if(it.lots && normalizeLots(it)) changed = true; });
+  if(changed) persist();
+}
 function pantryExpiryDays(it){
   return it && typeof it.qty === 'number' && it.qty > 0 ? daysUntilDate(it.scadenza) : null;
 }
@@ -7284,7 +7333,7 @@ function fillDraftFromPantry(d, nome){
   d.unit = ex.unit || '';
   d.cat = ex.cat || '';
   d.group = ex.group || '';
-  d.scadenza = (typeof ex.qty === 'number' && ex.qty > 0 && ex.scadenza) || '';
+  d.scadenza = ''; // la data della nuova confezione: quella già in casa resta (vedi lotti)
   if(d.unit === 'none') d.qty = 1;
   d.home = isNonFoodDept(knownDept(d.cat) || classifyDept(d.nome));
 }
@@ -7316,9 +7365,27 @@ function renderIngredientSheet(it, isNew){
       </span>`;
   const luoghi = LUOGO_ORDER.map(l=>`<button type="button" class="sheet-luogo${(it.luogo||'dispensa')===l?' active':''}" data-sheet-luogo="${l}" aria-pressed="${(it.luogo||'dispensa')===l}"><span class="sheet-luogo-icon">${LUOGO_ICON[l]}</span><span>${escapeHtml(LUOGO_LABEL[l])}</span></button>`).join('');
   const days = it.scadenza ? daysUntilDate(it.scadenza) : null;
-  const scadenzaHtml = home ? '' : `
+  const existingForNew = isNew ? existingPantryFor(it.nome) : null;
+  const addsLot = !!(existingForNew && typeof existingForNew.qty === 'number' && existingForNew.qty > 0 && unit !== 'none');
+  const canLots = !isNew && !home && unit !== 'none' && typeof it.qty === 'number' && it.qty > 0;
+  const lotsHtml = (canLots && Array.isArray(it.lots)) ? `
         <div class="settings-field">
-          <div class="settings-field-label">Scadenza ${it.scadenza ? expiryBadgeHtml(days, it.scadenza) : '<span class="sheet-hint-inline">nessuna</span>'}</div>
+          <div class="settings-field-label">Scadenze <span class="sheet-hint-inline">una per confezione</span></div>
+          <div class="lots-list">
+            ${it.lots.map((l, i) => `
+            <div class="lot-row">
+              <input type="number" inputmode="decimal" min="0" step="${qtyStepFor(unit)}" class="lot-qty" data-lot-qty="${i}" value="${l.qty}" aria-label="Quantità della confezione ${i + 1}">
+              <span class="lot-unit">${escapeHtml(UNIT_SHORT[unit] || unit)}</span>
+              <input type="date" class="lot-date" data-lot-date="${i}" value="${escapeAttr(l.scadenza || '')}" aria-label="Scadenza della confezione ${i + 1}">
+              <button type="button" class="btn is-icon lot-remove" data-lot-remove="${i}" aria-label="Togli questa confezione">✕</button>
+              <span class="lot-badge">${l.scadenza ? expiryBadgeHtml(daysUntilDate(l.scadenza), l.scadenza) : '<span class="sheet-hint-inline">nessuna scadenza</span>'}</span>
+            </div>`).join('')}
+          </div>
+          <button type="button" class="btn is-outline is-block" data-lot-add>+ Altra scadenza</button>
+        </div>` : '';
+  const scadenzaHtml = home ? '' : lotsHtml || `
+        <div class="settings-field">
+          <div class="settings-field-label">${addsLot ? 'Scadenza della nuova confezione' : 'Scadenza'} ${it.scadenza ? expiryBadgeHtml(days, it.scadenza) : '<span class="sheet-hint-inline">nessuna</span>'}</div>
           <div class="chip-row scadenza-quick">
             <button type="button" class="btn is-chip${it.scadenza ? '' : ' active'}" data-scadenza-clear>Nessuna</button>
             <button type="button" class="btn is-chip" data-scadenza-quick="3">+3 giorni</button>
@@ -7326,6 +7393,7 @@ function renderIngredientSheet(it, isNew){
             <button type="button" class="btn is-chip" data-scadenza-quick="30">+1 mese</button>
             <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} Data…<input type="date" id="pantry-edit-scadenza" value="${escapeAttr(it.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
           </div>
+          ${canLots ? '<button type="button" class="btn is-text lot-add-link" data-lot-add>+ Altra scadenza (un\'altra confezione)</button>' : ''}
         </div>`;
   // Righe che si aprono in un elenco (categoria, gruppo), una alla volta.
   const pickRow = (key, label, valueHtml) => `
@@ -9964,6 +10032,39 @@ function attachHandlers(){
     if(iso) it.scadenza = iso; else delete it.scadenza;
     sheetChanged();
   };
+  const lotsOf = it => Array.isArray(it.lots) ? it.lots.map(l => ({ qty: l.qty, scadenza: l.scadenza || '' })) : [{ qty: it.qty, scadenza: it.scadenza || '' }];
+  const setLots = (it, lots)=>{
+    it.lots = lots;
+    it.qty = Math.round(lots.reduce((n, l) => n + (Number(l.qty) || 0), 0) * 100) / 100;
+    normalizeLots(it);
+    sheetChanged();
+  };
+  document.querySelectorAll('[data-lot-add]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it || state.pantryAddModalOpen) return;
+    const lots = lotsOf(it);
+    const total = lots.reduce((n, l) => n + (Number(l.qty) || 0), 0);
+    if(!Array.isArray(it.lots) && total > 1) lots[0].qty = Math.round((lots[0].qty - 1) * 100) / 100; // già più pezzi: ne stacco uno
+    lots.push({ qty: 1, scadenza: '' });
+    setLots(it, lots);
+  }));
+  document.querySelectorAll('[data-lot-qty]').forEach(inp=> inp.addEventListener('change', e=>{
+    const it = sheetTarget(); if(!it) return;
+    const lots = lotsOf(it); const l = lots[parseInt(e.target.dataset.lotQty, 10)]; if(!l) return;
+    const n = parseFloat(String(e.target.value).replace(',', '.'));
+    l.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+    setLots(it, lots);
+  }));
+  document.querySelectorAll('[data-lot-date]').forEach(inp=> inp.addEventListener('change', e=>{
+    const it = sheetTarget(); if(!it) return;
+    const lots = lotsOf(it); const l = lots[parseInt(e.target.dataset.lotDate, 10)]; if(!l) return;
+    l.scadenza = e.target.value || '';
+    setLots(it, lots);
+  }));
+  document.querySelectorAll('[data-lot-remove]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    const lots = lotsOf(it); lots.splice(parseInt(btn.dataset.lotRemove, 10), 1);
+    setLots(it, lots);
+  }));
   const editScadenzaInput = document.getElementById('pantry-edit-scadenza');
   if(editScadenzaInput) editScadenzaInput.addEventListener('change', e=> setEditScadenza(e.target.value));
   document.querySelectorAll('[data-scadenza-quick]').forEach(btn=>{
@@ -10021,7 +10122,15 @@ function attachHandlers(){
       // Voce che c'era già: vale quello scelto nella scheda (es. il luogo).
       added.luogo = d.luogo || added.luogo;
       if(d.unit === 'none') added.qty = d.qty > 0 ? 1 : 0;
-      if(d.scadenza) added.scadenza = d.scadenza;
+      if(d.scadenza){
+        // Voce già in casa con un'altra scadenza: la nuova confezione è un lotto.
+        if(prevItem && typeof prevItem.qty === 'number' && prevItem.qty > 0 && d.unit !== 'none'){
+          const lots = (Array.isArray(prevItem.lots) ? prevItem.lots : [{ qty: prevItem.qty, scadenza: prevItem.scadenza || '' }]).map(l => ({ qty: l.qty, scadenza: l.scadenza || '' }));
+          lots.push({ qty: d.qty, scadenza: d.scadenza });
+          added.lots = lots;
+          normalizeLots(added);
+        } else added.scadenza = d.scadenza;
+      }
     }
     // Se è finito nell'altra vista (es. "Detersivo" aggiunto da Cibo), ci
     // si sposta lì: altrimenti sembrerebbe non essere stato aggiunto.

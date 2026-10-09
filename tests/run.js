@@ -2250,6 +2250,32 @@ test('consumi "con i pasti": il pane si conta in Ricetta fatta! e in Spesa, e si
   eq([r.dinner, r.lunchMon, r.lunchSat, r.row, r.qty, r.shop], [true, false, true, true, 4, true], JSON.stringify(r));
 });
 
+test('lotti: più scadenze per lo stesso ingrediente, conta la più vicina, si consuma dalla più vicina', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    state.pantryItems['panna fresca'] = { nome: 'Panna fresca', qty: 2, luogo: 'frigo', unit: '', cat: 'latticini', scadenza: addDaysIso(10) };
+    state.tab = 'dispensa'; state.pantryEditKey = 'panna fresca'; render();
+    document.querySelector('[data-lot-add]').click();
+    const it = state.pantryItems['panna fresca'];
+    out.split = Array.isArray(it.lots) && it.lots.length === 2 && it.qty === 2;
+    // data più vicina sul secondo lotto (quello senza data)
+    const idx = it.lots.findIndex(l => !l.scadenza);
+    const dateInput = document.querySelector('[data-lot-date="' + idx + '"]');
+    dateInput.value = addDaysIso(3); dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+    const it2 = state.pantryItems['panna fresca'];
+    out.nearest = it2.scadenza === addDaysIso(3) && it2.lots[0].scadenza === addDaysIso(3);
+    // consumo: −1 totale toglie dal lotto più vicino, resta la scadenza lontana
+    it2.qty = 1; render();
+    const it3 = state.pantryItems['panna fresca'];
+    out.consumed = !it3.lots && it3.qty === 1 && it3.scadenza === addDaysIso(10);
+    // altra confezione in aggiunta, via scheda "Aggiungi"
+    state.pantryEditKey = null; closeIngredientSheet && closeIngredientSheet();
+    return out;
+  });
+  eq([r.split, r.nearest, r.consumed], [true, true, true], JSON.stringify(r));
+});
+
 
 (async () => {
   const filter = process.argv[2] || '';

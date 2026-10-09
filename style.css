@@ -1532,3 +1532,15 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .manage-edit-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); width:100%; padding:var(--space-small) 0; border:0; border-bottom:1px solid var(--line); background:none; color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-bold); text-align:left; cursor:pointer; }
 .manage-edit-head .manage-chev{ color:var(--ink-light); }
 .manage-list .manage-edit input[type=text], .manage-list .manage-edit input[type=number], .manage-list .manage-edit select{ background:var(--surface); }
+
+.lots-list{ display:flex; flex-direction:column; gap:var(--space-xsmall); margin-bottom:var(--space-small); }
+.lot-row{ display:flex; align-items:center; gap:var(--space-xsmall); flex-wrap:wrap; }
+.lot-qty{ width:4.25rem; min-width:0; font-family:var(--font-family); font-size:var(--text-body, 1rem); padding:var(--space-xsmall); border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); text-align:center; }
+.lot-unit{ font-size:var(--text-small); color:var(--ink-light); }
+.lot-date{ flex:1 1 7.5rem; min-width:0; font-family:var(--font-family); font-size:var(--text-small); padding:var(--space-xsmall); border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); }
+.lot-remove{ margin-left:auto; }
+.lot-add-link{ margin-top:var(--space-xsmall); padding-left:0; }
+
+.lot-row{ display:grid; grid-template-columns:4.25rem auto 1fr auto; align-items:center; column-gap:var(--space-xsmall); row-gap:2px; }
+.lot-badge{ grid-column:3 / -1; }
+.lot-remove{ margin-left:0; }
