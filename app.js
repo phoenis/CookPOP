@@ -7352,13 +7352,19 @@ const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
 let scannerStream = null, scannerTimer = null;
 // "500 g", "1,5 l", "6 x 125 g", "33 cl" -> { qty, unit } nelle unità dell'app.
 function parsePackQuantity(text){
-  const m = /^\s*(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i.exec(text || '');
-  if(!m) return null;
-  let qty = parseFloat(m[2].replace(',', '.')) * (m[1] ? parseInt(m[1], 10) : 1);
-  let unit = m[3].toLowerCase();
-  if(unit === 'cl'){ qty *= 10; unit = 'ml'; }
-  if(!(qty > 0)) return null;
-  return { qty: Math.round(qty * 100) / 100, unit };
+  const t = String(text || '');
+  // Peso o volume, anche dentro altre parole ("Peso netto 500 g", "4 x 125 g (500 g)").
+  const m = /(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i.exec(t);
+  if(m){
+    let qty = parseFloat(m[2].replace(',', '.')) * (m[1] ? parseInt(m[1], 10) : 1);
+    let unit = m[3].toLowerCase();
+    if(unit === 'cl'){ qty *= 10; unit = 'ml'; }
+    if(qty > 0) return { qty: Math.round(qty * 100) / 100, unit };
+  }
+  // A pezzi ("6 uova", "10 bustine").
+  const p = /(\d+)\s*(?:pz|pezzi|uova|bustine|capsule|fette|bastoncini|biscotti|panini|filtri|rotoli)\b/i.exec(t);
+  if(p && parseInt(p[1], 10) > 0) return { qty: parseInt(p[1], 10), unit: '' };
+  return null;
 }
 async function lookupBarcode(code){
   const known = (state.barcodes || {})[code];
@@ -7375,7 +7381,7 @@ async function lookupBarcode(code){
     if(!nome) return null;
     nome = nome.charAt(0).toUpperCase() + nome.slice(1);
     const pack = parsePackQuantity(p.quantity);
-    return { nome, cat: '', unit: pack ? pack.unit : '', qty: pack ? pack.qty : 0, remembered: false };
+    return { nome, cat: '', unit: pack ? pack.unit : '', qty: pack ? pack.qty : 0, remembered: false, noPack: !pack };
   }catch(e){ return { failed: true }; }
   finally{ if(timer) clearTimeout(timer); }
 }
@@ -7392,15 +7398,15 @@ function applyScannedProduct(code, product){
   }
   fillDraftFromPantry(d, product.nome);
   if(product.cat) d.cat = product.cat;
-  if(!existingPantryFor(product.nome) && product.unit && UNIT_ORDER.includes(product.unit)){
-    d.unit = product.unit;
-    if(product.qty > 0) d.qty = product.qty;
+  if(!existingPantryFor(product.nome) && product.qty > 0 && UNIT_ORDER.includes(product.unit || '')){
+    d.unit = product.unit || '';
+    d.qty = product.qty;
   }
   d.packQty = product.qty || 0;
   d.scanOk = true;
   d.scanFlash = true;
-  const pack = product.qty > 0 && product.unit ? ` · ${product.qty} ${UNIT_SHORT[product.unit] || product.unit}` : '';
-  d.scanMsg = `${product.remembered ? 'Riconosciuto' : 'Trovato'}: ${product.nome}${pack}. Controlla e aggiungi.`;
+  const pack = product.qty > 0 ? ` · ${product.qty} ${UNIT_SHORT[product.unit || ''] || product.unit}` : '';
+  d.scanMsg = `${product.remembered ? 'Riconosciuto' : 'Trovato'}: ${product.nome}${pack}.${product.noPack ? ' Quantità non indicata sul prodotto: scrivila tu.' : ' Controlla e aggiungi.'}`;
 }
 function closeBarcodeScanner(){
   clearInterval(scannerTimer); scannerTimer = null;
