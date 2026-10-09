@@ -1747,6 +1747,7 @@ const state = {
   userColorsBright1: false,
   userColorsLight1: false,
   breadRecurring1: false,
+  expiryRules1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -1783,6 +1784,9 @@ const state = {
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
+  expiryEstimates: {}, // reparto -> giorni di scadenza stimata scelti da te (0 = nessuna stima); assente = valore di partenza
+  expiryRules: {}, // id -> { match: 'parole, separate, da virgola', days }: eccezioni per nome (es. uova 21 giorni), vincono sul reparto
+  expiryEstOpen: false, // non persistito: pagina "Scadenze stimate"
   shopExpiry: {}, // rowKey di Spesa -> scadenza (YYYY-MM-DD) segnata in negozio; passa in Dispensa quando sposti la riga
   barcodes: {}, // codice a barre -> { nome, cat, unit, qty }: prodotti già scansionati, col nome scelto da te
   scannerOpen: false, // non persistito: lettore di codici a barre aperto
@@ -2344,6 +2348,11 @@ const MIGRATIONS = [
   // già scelti passano al corrispondente della nuova tavolozza.
   // 24. Una tantum: colori dei turni più chiari; chi aveva la versione "luminosa"
   // di poco fa passa a quella chiara corrispondente.
+  { flag: 'expiryRules1', run(){
+    // Le uova stanno in Latticini (5 giorni) ma durano molto di più: regola per nome.
+    if(!state.expiryRules) state.expiryRules = {};
+    if(!Object.keys(state.expiryRules).length) state.expiryRules = defaultExpiryRules();
+  } },
   { flag: 'breadRecurring1', run(){
     // Il pane a pasto (cena + weekend a pranzo) era un conteggio a parte: ora è
     // un consumo ricorrente "con i pasti", gestito da Dispensa ⋯.
@@ -2756,7 +2765,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','shopExpiry','userColors','prepDay','dishPlan','freezerDishes'];
+const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','shopExpiry','expiryEstimates','expiryRules','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -2926,6 +2935,8 @@ function buildPersonalPayload(){
     recurringItems: state.recurringItems,
     barcodes: state.barcodes,
     shopExpiry: state.shopExpiry,
+    expiryEstimates: state.expiryEstimates,
+    expiryRules: state.expiryRules,
     week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy,
@@ -4430,10 +4441,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-29',
+  version: '2027-01-30',
   title: 'Novità',
   items: [
-    'Scadenza stimata delle uova: 21 giorni (prima valevano 5, come i latticini).'
+    'Impostazioni → Scadenze stimate: scegli tu quanti giorni dura un fresco per reparto (verdura, carne, pesce, latticini…) e aggiungi eccezioni per nome (le uova sono già a 21 giorni). Si salvano come le altre tue impostazioni.'
   ]
 };
 
@@ -4544,7 +4555,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderProfilePage() + renderAislesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -4672,6 +4683,7 @@ const MODAL_CHECKS = [
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
+  [()=> !!state.expiryEstOpen, ()=>{ state.expiryEstOpen = false; }],
   [()=> !!state.scannerOpen, ()=>{ closeBarcodeScanner(); }],
   [()=> !!state.recurringOpen && !!state.recurringEditId, ()=>{ state.recurringEditId = null; state.recurringDraft = null; }],
   [()=> !!state.recurringOpen, ()=>{ state.recurringOpen = false; }],
@@ -7260,13 +7272,27 @@ const EXPIRY_BANNER_KEY = 'cookpop-expiry-banner-closed';
 function expiryBannerDismissedToday(){
   try{ return localStorage.getItem(EXPIRY_BANNER_KEY) === isoLocalDate(new Date()); }catch(e){ return false; }
 }
-const EXPIRY_ESTIMATE_DAYS = { verdura:5, carne:2, pesce:2, latticini:5, uova:21 };
+const EXPIRY_ESTIMATE_DAYS = { verdura:5, carne:2, pesce:2, latticini:5 };
+function defaultExpiryRules(){ return { uova: { match: 'uova, uovo', days: 21 } }; }
+function expiryDaysForDept(d){
+  const o = (state.expiryEstimates || {})[d];
+  return o !== undefined ? o : (EXPIRY_ESTIMATE_DAYS[d] || 0);
+}
+// Eccezioni per nome (state.expiryRules): vincono sul reparto.
+function expiryRuleDays(nome){
+  const n = (nome || '').toLowerCase();
+  for(const rule of Object.values(state.expiryRules || {})){
+    const words = String(rule.match || '').split(/[,;]/).map(w => w.trim().toLowerCase()).filter(Boolean);
+    if(words.some(w => new RegExp('(^|[^a-zàèéìòù])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-zàèéìòù]|$)').test(n))) return Number(rule.days) || 0;
+  }
+  return undefined;
+}
 function estimateExpiryDays(it){
   if(!it || it.luogo === 'freezer') return null;
-  // Le uova stanno nel reparto Latticini (5 giorni), ma durano molto di più.
-  if(/\buov(a|o)\b/i.test(it.nome || '')) return EXPIRY_ESTIMATE_DAYS.uova;
-  const dept = knownDept(it.cat) || classifyDept(it.nome);
-  return EXPIRY_ESTIMATE_DAYS[dept] ?? null;
+  const r = expiryRuleDays(it.nome);
+  if(r !== undefined) return r > 0 ? r : null;
+  const d = expiryDaysForDept(knownDept(it.cat) || classifyDept(it.nome));
+  return d > 0 ? d : null;
 }
 // Finestra "Scadenze stimate": una riga per fresco appena spostato in
 // Dispensa, con la data stimata già salvata. − e + la spostano di un giorno,
@@ -11267,6 +11293,91 @@ document.addEventListener('click', e=>{
     applyUserColors(); persist(); render();
   }
 });
+// --- Scadenze stimate (Impostazioni) ----------------------------------------
+// Quanti giorni dura un fresco appena comprato, per reparto, più eccezioni per
+// nome (es. le uova). Le stime partono già compilate in Spesa e Dispensa.
+function expiryDaysLabel(n){ return n > 0 ? `${n} ${n === 1 ? 'giorno' : 'giorni'}` : 'nessuna stima'; }
+function expiryStepperHtml(attrs, days){
+  return `<span class="qty-stepper expiry-stepper">
+    <button class="qty-btn" type="button" ${attrs} data-delta="-1" aria-label="Meno">−</button>
+    <span class="qty-num">${escapeHtml(expiryDaysLabel(days))}</span>
+    <button class="qty-btn" type="button" ${attrs} data-delta="1" aria-label="Più">+</button>
+  </span>`;
+}
+function renderExpiryEstimatesPage(){
+  if(!state.expiryEstOpen) return '';
+  const depts = DEPT_ORDER.filter(d => d !== 'finiti' && d !== 'avanzi' && !isNonFoodDept(d))
+    .sort((a, b) => IT_COLLATOR.compare(DEPT_LABEL[a], DEPT_LABEL[b]));
+  const deptRows = depts.map(d => `
+      <div class="manage-row expiry-row">
+        <span class="manage-row-icon">${DEPT_ICON[d] || ''}</span>
+        <span class="manage-row-main">${escapeHtml(DEPT_LABEL[d])}</span>
+        ${expiryStepperHtml(`data-expiry-dept="${escapeAttr(d)}"`, expiryDaysForDept(d))}
+      </div>`).join('');
+  const rules = Object.entries(state.expiryRules || {});
+  const ruleRows = rules.map(([id, r]) => `
+      <div class="manage-row expiry-row expiry-rule">
+        <input type="text" class="expiry-rule-match" data-expiry-rule-match="${escapeAttr(id)}" value="${escapeAttr(r.match || '')}" placeholder="Es. uova, uovo" aria-label="Parole del nome" autocomplete="off">
+        ${expiryStepperHtml(`data-expiry-rule="${escapeAttr(id)}"`, Number(r.days) || 0)}
+        <button type="button" class="btn is-icon" data-expiry-rule-del="${escapeAttr(id)}" aria-label="Togli la regola">✕</button>
+      </div>`).join('');
+  const body = `
+      <p class="settings-note manage-intro">Per i freschi l'app propone una scadenza dalla data di acquisto: qui scegli quanti giorni. Il numero è sempre una stima, la data vera la cambi tu quando spunti in Spesa o nella scheda dell'ingrediente. A "nessuna stima" non propone niente.</p>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Per reparto</h3>
+        <div class="settings-card manage-list">${deptRows}</div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Eccezioni per nome</h3>
+        <p class="settings-note">Valgono più del reparto: se il nome contiene una di queste parole (separate da virgola), si usano i giorni indicati.</p>
+        ${ruleRows ? `<div class="settings-card manage-list">${ruleRows}</div>` : ''}
+        <button type="button" class="btn is-outline is-block" data-expiry-rule-add>+ Nuova eccezione</button>
+      </section>
+      <button type="button" class="btn is-outline is-block" data-expiry-reset>Ripristina i valori di partenza</button>`;
+  return managePageHtml({ key: 'expiry-est', title: 'Scadenze stimate', closeAttr: 'data-close-expiry-est', body });
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  const closeEl = t.closest('[data-close-expiry-est]');
+  if(closeEl){
+    if(!isCloseTap(e, closeEl)) return;
+    state.expiryEstOpen = false; render(); return;
+  }
+  const dep = t.closest('[data-expiry-dept]');
+  if(dep){
+    const d = dep.dataset.expiryDept;
+    const next = Math.max(0, Math.min(365, expiryDaysForDept(d) + Number(dep.dataset.delta)));
+    if(!state.expiryEstimates) state.expiryEstimates = {};
+    if(next === (EXPIRY_ESTIMATE_DAYS[d] || 0)) delete state.expiryEstimates[d]; else state.expiryEstimates[d] = next;
+    persist(); render(); return;
+  }
+  const rule = t.closest('[data-expiry-rule]');
+  if(rule){
+    const r = (state.expiryRules || {})[rule.dataset.expiryRule]; if(!r) return;
+    r.days = Math.max(0, Math.min(365, (Number(r.days) || 0) + Number(rule.dataset.delta)));
+    persist(); render(); return;
+  }
+  const del = t.closest('[data-expiry-rule-del]');
+  if(del){ delete state.expiryRules[del.dataset.expiryRuleDel]; persist(); render(); return; }
+  if(t.closest('[data-expiry-rule-add]')){
+    if(!state.expiryRules) state.expiryRules = {};
+    state.expiryRules['r' + Date.now().toString(36)] = { match: '', days: 7 };
+    persist(); render();
+    const inputs = document.querySelectorAll('.expiry-rule-match'); const last = inputs[inputs.length - 1]; if(last) last.focus();
+    return;
+  }
+  if(t.closest('[data-expiry-reset]')){
+    state.expiryEstimates = {}; state.expiryRules = defaultExpiryRules();
+    persist(); render(); return;
+  }
+});
+document.addEventListener('change', e=>{
+  const inp = e.target.closest && e.target.closest('[data-expiry-rule-match]');
+  if(!inp) return;
+  const r = (state.expiryRules || {})[inp.dataset.expiryRuleMatch]; if(!r) return;
+  r.match = inp.value;
+  persist(); render();
+});
 function renderAislesPage(){
   if(!state.aisleOrderOpen) return '';
   const list = shopAisles();
@@ -12211,6 +12322,7 @@ document.addEventListener('click', e=>{
   else if(what === 'groups') state.pantryGroupsModalOpen = true;
   else if(what === 'depts') state.deptsModalOpen = true;
   else if(what === 'aisles') state.aisleOrderOpen = true;
+  else if(what === 'expiry') state.expiryEstOpen = true;
   else if(what === 'appearance') state.appearanceOpen = true;
   else if(what === 'profile') state.profileOpen = true;
   else if(what === 'newrecipe'){ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); }
