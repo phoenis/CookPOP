@@ -4457,10 +4457,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-02-05',
+  version: '2027-02-06',
   title: 'Novità',
   items: [
-    'Scadenze stimate: tolti − e +, i giorni si scrivono direttamente.'
+    'Consumi ricorrenti: l\'ingrediente si sceglie dall\'elenco che compare mentre scrivi (e va scelto da lì), così il nome corrisponde sempre.'
   ]
 };
 
@@ -7227,13 +7227,11 @@ function applyRecurringConsumption(){
 function recurringEditCardHtml(id){
   const d = state.recurringDraft || { nome: '', qty: 1, every: 1, mode: 'time' };
   const isNew = id === 'new';
-  const names = Object.values(state.pantryItems).map(it => it.nome).sort((a, b) => IT_COLLATOR.compare(a, b));
   return `
       <div class="manage-edit" data-recurring-edit-card="${escapeAttr(id)}">
         ${isNew ? '' : `<button type="button" class="manage-edit-head" data-recurring-cancel aria-expanded="true"><span>${escapeHtml((d.nome || '').charAt(0).toUpperCase() + (d.nome || '').slice(1))}</span>${CHEV_UP_SVG}</button>`}
         <label class="manage-field"><span>Ingrediente</span>
-          <input type="text" id="recurring-name" list="recurring-names" value="${escapeAttr(d.nome || '')}" placeholder="Es. Pane" autocomplete="off"></label>
-        <datalist id="recurring-names">${names.map(n => `<option value="${escapeAttr(n)}"></option>`).join('')}</datalist>
+          <input type="text" id="recurring-name" value="${escapeAttr(d.nome || '')}" placeholder="Scegli un ingrediente" autocomplete="off"></label>
         <div class="manage-field"><span>Come si consuma</span>
           <div class="chip-row">
             <button type="button" class="btn is-chip${d.mode === 'meal' ? '' : ' active'}" data-recurring-mode="time">A tempo</button>
@@ -7243,7 +7241,7 @@ function recurringEditCardHtml(id){
           <input type="number" inputmode="decimal" min="0" step="0.5" id="recurring-qty" value="${escapeAttr(d.qty)}"></label>
         ${d.mode === 'meal' ? '<p class="settings-note">Si conta insieme alla ricetta: lo trovi in "Ricetta fatta!" (a cena e sabato e domenica a pranzo) e in Spesa quanto ne serve per i pasti in menù.</p>' : `<label class="manage-field"><span>Ogni quanti giorni</span>
           <input type="number" inputmode="numeric" min="1" step="1" id="recurring-every" value="${escapeAttr(d.every)}"></label>`}
-        ${d.error ? '<p class="settings-note color-delete">Scrivi ingrediente, quantità e ogni quanti giorni.</p>' : ''}
+        ${d.error ? `<p class="settings-note color-delete">${d.error === 'name' ? 'Scegli l\'ingrediente dall\'elenco che compare mentre scrivi.' : 'Scrivi ingrediente, quantità e ogni quanti giorni.'}</p>` : ''}
         <div class="manage-edit-actions">
           ${isNew ? '<span></span>' : `<button type="button" class="btn is-text color-delete" data-recurring-delete="${escapeAttr(id)}">Elimina</button>`}
           <span class="manage-edit-buttons">
@@ -9902,15 +9900,24 @@ function attachHandlers(){
   document.querySelectorAll('[data-recurring-cancel]').forEach(btn=> btn.addEventListener('click', ()=>{ state.recurringEditId = null; state.recurringDraft = null; render(); }));
   [['recurring-name', 'nome'], ['recurring-qty', 'qty'], ['recurring-every', 'every']].forEach(([elId, field])=>{
     const inp = document.getElementById(elId);
-    if(inp && state.recurringDraft) inp.addEventListener('input', e=>{ state.recurringDraft[field] = e.target.value; });
+    if(inp && state.recurringDraft){
+      inp.addEventListener('input', e=>{ state.recurringDraft[field] = e.target.value; });
+      if(field === 'nome') inp.addEventListener('change', e=>{ state.recurringDraft.nome = e.target.value; });
+    }
   });
+  // Consumo ricorrente: l'ingrediente si sceglie dall'elenco, per non sbagliare il nome.
+  const recName = document.getElementById('recurring-name');
+  if(recName) attachIngredientCombobox(recName, { noCreate: true, pool: allKnownIngredientNames });
   document.querySelectorAll('[data-recurring-mode]').forEach(btn=> btn.addEventListener('click', ()=>{
     if(state.recurringDraft){ state.recurringDraft.mode = btn.dataset.recurringMode; render(); }
   }));
   const recurringSave = document.getElementById('recurring-save');
   if(recurringSave) recurringSave.addEventListener('click', ()=>{
     const d = state.recurringDraft; if(!d) return;
-    const nome = String(d.nome || '').trim();
+    let nome = String(d.nome || '').trim();
+    const known = nome && allKnownIngredientNames().find(n => n.trim().toLowerCase() === nome.toLowerCase());
+    if(nome && !known){ d.error = 'name'; render(); return; }
+    if(known) nome = known.trim();
     const qty = parseFloat(String(d.qty).replace(',', '.'));
     const isMeal = d.mode === 'meal';
     const every = isMeal ? 1 : parseInt(d.every, 10);

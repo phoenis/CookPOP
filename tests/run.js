@@ -2218,12 +2218,12 @@ test('consumi ricorrenti: scalano dalla Dispensa ogni N giorni, pagina dal menù
     item.action(); render();
     out.page = !!document.querySelector('[data-page="recurring"]');
     document.querySelector('[data-recurring-edit="new"]').click();
-    document.getElementById('recurring-name').value = 'Yogurt';
+    document.getElementById('recurring-name').value = 'uova';
     document.getElementById('recurring-name').dispatchEvent(new Event('input'));
     document.getElementById('recurring-every').value = '2';
     document.getElementById('recurring-every').dispatchEvent(new Event('input'));
     document.getElementById('recurring-save').click();
-    const saved = Object.values(state.recurringItems).find(x => x.nome === 'Yogurt');
+    const saved = Object.values(state.recurringItems).find(x => x.nome === 'Uova');
     out.saved = !!saved && saved.every === 2 && saved.qty === 1;
     return out;
   });
