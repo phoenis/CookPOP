@@ -576,34 +576,6 @@ test('spesa: i freschi spostati in Dispensa hanno la scadenza stimata, da confer
   eq(page.errors, [], 'errori JS');
 });
 
-test('pane: segnando il pasto come mangiato si tolgono i panini (cena sempre, pranzo solo nel weekend)', async ({ page }) => {
-  const r = await page.evaluate(() => {
-    state.extraWeeks = []; generateWeek(1);
-    Object.keys(state.pantryItems).filter(k => ['pane','panini','panino'].includes(k)).forEach(k => delete state.pantryItems[k]);
-    upsertPantryItem('Pane', 'dispensa', 6);
-    writeMealPrincipale(weekOverridesRef(1), 1, 'cena', 'Carbonara'); // ricetta nota, senza pane tra gli ingredienti
-    state.tab = 'menu'; render();
-    const click = sel => document.querySelector(sel).click();
-    const out = { lunchMon: mealHasBread(0, 'pranzo'), lunchSat: mealHasBread(5, 'pranzo'), dinnerTue: mealHasBread(1, 'cena') };
-    // cena di martedì: modale con 1 panino, + ne fa 2
-    click('[data-toggle-done="1_1_cena"]');
-    out.modalBread = state.doneModalBread;
-    click('[data-done-bread="1"]');
-    click('[data-confirm-done="1_1_cena"]');
-    out.afterDinner = state.pantryItems['pane'].qty;
-    // pranzo di sabato come avanzo della cena di venerdì: si toglie subito, con Annulla
-    state.dayLinks['1_5_pranzo'] = '1_4_cena'; render();
-    click('[data-toggle-done="1_5_pranzo"]');
-    out.afterLeftover = state.pantryItems['pane'].qty;
-    out.toast = state.undoToast && state.undoToast.message;
-    return out;
-  });
-  eq(r, { lunchMon: false, lunchSat: true, dinnerTue: true, modalBread: 1, afterDinner: 4, afterLeftover: 3, toast: 'Tolto il pane: ne restano 3' });
-  await page.click('.undo-toast button');
-  eq(await page.evaluate(() => ({ qty: state.pantryItems['pane'].qty, done: !!(weekMealsDoneRef(1)[5] && weekMealsDoneRef(1)[5].pranzo) })), { qty: 4, done: false }, 'annulla');
-  eq(page.errors, [], 'errori JS');
-});
-
 test('gradimento: nessuno di partenza, la migrazione toglie quelli salvati, e si vota da "Ricetta fatta!"', async ({ page }) => {
   const r = await page.evaluate(() => {
     const noneInCatalog = DATA.recipes.every(x => !x.gradimento);
@@ -619,23 +591,6 @@ test('gradimento: nessuno di partenza, la migrazione toglie quelli salvati, e si
   });
   eq(r, { noneInCatalog: true, migrated: { grad: '', nota: 'nota' }, voted: 'ci-piace', modalOpen: true });
   eq(page.errors, [], 'errori JS');
-});
-
-test('spesa: il pane per i pasti in menù meno quello in Dispensa; si aggiorna se ne compri meno', async ({ page }) => {
-  const r = await page.evaluate(() => {
-    state.extraWeeks = []; generateWeek(1);
-    Object.keys(state.pantryItems).filter(k => ['pane','panini','panino'].includes(k)).forEach(k => delete state.pantryItems[k]);
-    const meals = breadMealsAhead();
-    upsertPantryItem('Pane', 'dispensa', 3);
-    const row = buildShopFlat().find(it => it.key.startsWith('bread_'));
-    state.shopDismissed[row.key] = true; // comprato/tolto
-    upsertPantryItem('Pane', 'dispensa', 2);
-    const row2 = buildShopFlat().find(it => it.key.startsWith('bread_'));
-    state.pantryItems['pane'].qty = 100;
-    const none = buildShopFlat().some(it => it.key.startsWith('bread_'));
-    return { atLeastWeek: meals >= 9, qta: row.qta === String(meals - 3), dept: classifyDept(row.ingrediente), again: !!row2 && row2.qta === String(meals - 5), none };
-  });
-  eq(r, { atLeastWeek: true, qta: true, dept: 'pane', again: true, none: false });
 });
 
 test('menù: avviso di ciò che scade presto, "Cosa cucino" apre Con quello che ho, ✕ lo chiude fino a domani', async ({ page }) => {
@@ -2242,7 +2197,7 @@ test('blocco piatto: tocco sull\'icona blocca/sblocca, anche su un avanzo; badge
   });
   eq([r.isLeftover, r.hasBtn, r.locked, r.iconLocked, r.unlocked, r.badge], [true, true, true, true, true, 'Avanzo'], JSON.stringify(r));
 });
-test('consumi ricorrenti: scalano dalla Dispensa ogni N giorni, pagina dal menù Dispensa, il pane ricorrente ferma il conto a pasto', async ({ page }) => {
+test('consumi ricorrenti: scalano dalla Dispensa ogni N giorni, pagina dal menù Dispensa, niente più conto del pane a pasto', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     const out = {};
@@ -2256,10 +2211,6 @@ test('consumi ricorrenti: scalano dalla Dispensa ogni N giorni, pagina dal menù
     recurringRanOn = '';
     applyRecurringConsumption();
     out.again = resolvePantryItem('Latte').qty;
-    out.breadBefore = mealHasBread(1, 'cena');
-    state.recurringItems.b = { nome: 'Pane', qty: 1, every: 1, last: ago(0) };
-    out.breadAfter = mealHasBread(1, 'cena');
-    delete state.recurringItems.b;
     // pagina
     state.tab = 'dispensa'; render();
     const item = TAB_MENU_ITEMS.dispensa.find(x => /Consumi ricorrenti/.test(x.label));
@@ -2276,7 +2227,7 @@ test('consumi ricorrenti: scalano dalla Dispensa ogni N giorni, pagina dal menù
     out.saved = !!saved && saved.every === 2 && saved.qty === 1;
     return out;
   });
-  eq([r.qty, r.last, r.again, r.breadBefore, r.breadAfter, r.menu, r.page, r.saved], [4, true, 4, true, false, true, true, true], JSON.stringify(r));
+  eq([r.qty, r.last, r.again, r.menu, r.page, r.saved], [4, true, 4, true, true, true], JSON.stringify(r));
 });
 
 (async () => {
