@@ -1613,3 +1613,5 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .expiry-days-unit{ min-width:1.5rem; }
 
 .expiry-days{ display:inline-flex; align-items:center; gap:0.25rem; }
+
+.manage-edit .manage-field .add-ing-combo{ width:100%; }
