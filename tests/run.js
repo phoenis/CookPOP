@@ -2353,6 +2353,34 @@ test('scadenza stimata: le uova durano 21 giorni, i latticini 5', async ({ page 
   eq(r, [21, 21, 5]);
 });
 
+test('scadenze stimate: pagina in Impostazioni, giorni per reparto, eccezioni per nome, ripristino', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    state.expiryEstimates = {}; state.expiryRules = defaultExpiryRules();
+    out.defaults = [estimateExpiryDays({ nome: 'Uova' }), estimateExpiryDays({ nome: 'Yogurt' }), estimateExpiryDays({ nome: 'Pasta' })];
+    state.expiryEstOpen = true; render();
+    out.page = !!document.querySelector('[data-page="expiry-est"]');
+    // reparto: + giorni
+    const dep = document.querySelector('[data-expiry-dept="latticini"][data-delta="1"]');
+    dep.click();
+    out.latt = [expiryDaysForDept('latticini'), state.expiryEstimates.latticini];
+    // regola per nome nuova e modificata
+    document.querySelector('[data-expiry-rule-add]').click();
+    const id = Object.keys(state.expiryRules).find(k => k !== 'uova');
+    const inp = document.querySelector('[data-expiry-rule-match="' + id + '"]');
+    inp.value = 'mozzarella'; inp.dispatchEvent(new Event('change', { bubbles: true }));
+    out.rule = estimateExpiryDays({ nome: 'Mozzarella di bufala' });
+    // "nessuna stima" per un reparto
+    state.expiryEstimates.latticini = 0;
+    out.none = [estimateExpiryDays({ nome: 'Yogurt' }), estimateExpiryDays({ nome: 'Uova' })];
+    document.querySelector('[data-expiry-reset]').click();
+    out.reset = [expiryDaysForDept('latticini'), Object.keys(state.expiryRules).join()];
+    return out;
+  });
+  eq([r.defaults, r.page, r.latt, r.rule, r.none, r.reset], [[21, 5, null], true, [6, 6], 7, [null, 21], [5, 'uova']], JSON.stringify(r));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
