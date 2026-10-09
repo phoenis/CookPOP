@@ -1578,3 +1578,13 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 /* Input della quantità (Dispensa, finestre): come nella scheda ingrediente, bordo sottile arrotondato e, al focus, un solo bordo. */
 .qty-input{ border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--bg); color:var(--ink); }
 .qty-input:focus, .qty-input:focus-visible{ outline:none; border-color:var(--gold); }
+
+.shop-exp-anchor{ margin-left:auto; margin-right:var(--space-xsmall); flex:none; }
+.shop-exp-btn{ display:inline-flex; align-items:center; gap:0.25rem; color:var(--ink-light); }
+.shop-exp-btn .ui-ico{ width:1.125rem; height:1.125rem; }
+.shop-exp-btn.has-date{ color:var(--ink); }
+.shop-exp-label{ font-size:var(--text-xsmall); font-weight:var(--weight-bold); }
+.shop-exp-date{ display:flex; align-items:center; gap:var(--space-xsmall); cursor:pointer; }
+.shop-exp-date input{ width:100%; min-width:0; font-family:var(--font-family); font-size:var(--text-small); border:1px solid var(--line); border-radius:var(--radius-modal); padding:var(--space-xxsmall) var(--space-xsmall); background:var(--bg); color:var(--ink); }
+.shop-exp-anchor .unit-picker{ top:auto; bottom:100%; margin-top:0; margin-bottom:var(--space-xxsmall); z-index:260; }
+.swipe-wrap:has(.unit-picker){ overflow:visible; }

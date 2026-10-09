@@ -2313,6 +2313,29 @@ test('codice a barre: lettura quantità confezione, ricerca su Open Food Facts, 
   assert(/"nome":"Panna da cucina"/.test(r.remembered), 'prodotto ricordato');
 });
 
+test('spesa: scadenza segnata in negozio, diventa scadenza o nuovo lotto in Dispensa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    const fakeCb = (keys, name) => ({ dataset: { shopKeys: keys, shopName: name, shopUnit: '' }, closest: () => null });
+    // senza scorta: la data diventa la scadenza
+    delete state.pantryItems['crema di latte'];
+    state.shopQty['rowA'] = 2; state.shopExpiry = { rowA: addDaysIso(6) };
+    moveShopRowToPantry(fakeCb('rowA', 'Crema di latte'));
+    const a = state.pantryItems['crema di latte'];
+    out.first = [a.qty, a.scadenza === addDaysIso(6), !a.lots];
+    // con scorta e un'altra data: lotto
+    state.shopQty['rowB'] = 1; state.shopExpiry = { rowB: addDaysIso(20) };
+    moveShopRowToPantry(fakeCb('rowB', 'Crema di latte'));
+    const b = state.pantryItems['crema di latte'];
+    out.second = [b.qty, b.scadenza === addDaysIso(6), (b.lots || []).length, !state.shopExpiry.rowB];
+    // interfaccia: tasto calendario sulle righe spuntate
+    out.btnFn = typeof shopExpiryHtml === 'function' && /data-shop-exp="r1"/.test(shopExpiryHtml('r1'));
+    return out;
+  });
+  eq([r.first, r.second, r.btnFn], [[2, true, true], [3, true, 2, true], true], JSON.stringify(r));
+});
+
 
 (async () => {
   const filter = process.argv[2] || '';

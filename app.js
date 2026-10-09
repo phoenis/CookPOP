@@ -946,6 +946,41 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
 // Sposta in Dispensa la riga di Spesa di una checkbox (upsert + dismiss):
 // stessa logica di "Sposta in dispensa" per la spunta multipla, riusata
 // anche dalla spunta singola quando "Modalità spesa" è attiva.
+// Scadenza segnata in negozio: sulle righe spuntate un tasto calendario apre
+// un piccolo elenco (+3 giorni, +1 settimana, +1 mese, data, nessuna). La data
+// resta legata alla riga e, a "Sposta in Dispensa", diventa la scadenza della
+// voce, o di un nuovo lotto se ne hai già in casa (vedi lotti).
+function shopExpiryHtml(rowKey){
+  const iso = (state.shopExpiry || {})[rowKey] || '';
+  const open = state.shopExpiryPicker === rowKey;
+  const label = iso ? new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) : '';
+  return `
+      <span class="unit-anchor shop-exp-anchor">
+        <button type="button" class="btn is-icon shop-exp-btn${iso ? ' has-date' : ''}" data-shop-exp="${escapeAttr(rowKey)}" aria-haspopup="listbox" aria-expanded="${open}" aria-label="${iso ? 'Scadenza ' + escapeAttr(label) : 'Segna la scadenza'}">${uiIcon('calendar')}${label ? `<span class="shop-exp-label">${escapeHtml(label)}</span>` : ''}</button>
+        ${open ? `
+        <div class="luogo-picker-backdrop" data-shop-exp-close></div>
+        <div class="unit-picker" role="listbox" aria-label="Scadenza">
+          <button type="button" class="unit-picker-opt${iso ? '' : ' active'}" role="option" data-shop-exp-set="" data-shop-exp-row="${escapeAttr(rowKey)}">Nessuna</button>
+          <button type="button" class="unit-picker-opt" role="option" data-shop-exp-set="+3" data-shop-exp-row="${escapeAttr(rowKey)}">+3 giorni</button>
+          <button type="button" class="unit-picker-opt" role="option" data-shop-exp-set="+7" data-shop-exp-row="${escapeAttr(rowKey)}">+1 settimana</button>
+          <button type="button" class="unit-picker-opt" role="option" data-shop-exp-set="+30" data-shop-exp-row="${escapeAttr(rowKey)}">+1 mese</button>
+          <label class="unit-picker-opt shop-exp-date">${uiIcon('calendar')} Data… <input type="date" data-shop-exp-date="${escapeAttr(rowKey)}" value="${escapeAttr(iso)}" aria-label="Scegli la data di scadenza"></label>
+        </div>` : ''}
+      </span>`;
+}
+// La scadenza segnata in negozio entra in Dispensa: sulla voce se non ne avevi,
+// altrimenti come nuovo lotto accanto a quello che c'era (before = voce prima
+// dell'aggiunta).
+function applyShopExpiry(pantryKey, added, iso, before){
+  const it = state.pantryItems[pantryKey];
+  if(!it || !iso) return;
+  const hadStock = !!(before && typeof before.qty === 'number' && before.qty > 0);
+  if(!hadStock || it.unit === 'none'){ it.scadenza = iso; return; }
+  const lots = (Array.isArray(before.lots) ? before.lots : [{ qty: before.qty, scadenza: before.scadenza || '' }]).map(l => ({ qty: l.qty, scadenza: l.scadenza || '' }));
+  lots.push({ qty: added, scadenza: iso });
+  it.lots = lots;
+  normalizeLots(it);
+}
 function moveShopRowToPantry(cb){
   const rowKey = cb.dataset.shopKeys;
   const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
@@ -963,6 +998,8 @@ function moveShopRowToPantry(cb){
   const hadStock = !!(before && typeof before.qty === 'number' && before.qty > 0);
   upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
   rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+  const shopIso = (state.shopExpiry || {})[rowKey];
+  if(shopIso){ applyShopExpiry(pantryKey, qty, shopIso, before); delete state.shopExpiry[rowKey]; }
   // Fresco appena comprato (senza scorta prima): scadenza stimata dal reparto,
   // da confermare o sistemare subito (renderExpiryConfirmModal).
   const it = state.pantryItems[pantryKey];
@@ -986,6 +1023,8 @@ function snapshotShopRowForUndo(cb){
     hadConfirmedShop: Object.prototype.hasOwnProperty.call(state.pantryConfirmedShop, pantryKey),
     prevConfirmedShop: state.pantryConfirmedShop[pantryKey],
     rowKeys,
+    rowKey: cb.dataset.shopKeys,
+    prevExpiry: (state.shopExpiry || {})[cb.dataset.shopKeys],
     prevDismissed: rowKeys.map(k=>state.shopDismissed[k])
   };
 }
@@ -994,6 +1033,7 @@ function restoreShopRowSnapshot(snap){
   else delete state.pantryItems[snap.pantryKey];
   if(snap.hadConfirmedShop) state.pantryConfirmedShop[snap.pantryKey] = snap.prevConfirmedShop;
   else delete state.pantryConfirmedShop[snap.pantryKey];
+  if(snap.prevExpiry){ if(!state.shopExpiry) state.shopExpiry = {}; state.shopExpiry[snap.rowKey] = snap.prevExpiry; }
   snap.rowKeys.forEach((k,idx)=>{
     const prev = snap.prevDismissed[idx];
     if(prev !== undefined) state.shopDismissed[k] = prev; else delete state.shopDismissed[k];
@@ -1731,6 +1771,8 @@ const state = {
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
+  shopExpiry: {}, // rowKey di Spesa -> scadenza (YYYY-MM-DD) segnata in negozio; passa in Dispensa quando sposti la riga
+  shopExpiryPicker: null, // non persistito: riga di Spesa con l'elenco scadenza aperto
   barcodes: {}, // codice a barre -> { nome, cat, unit, qty }: prodotti già scansionati, col nome scelto da te
   scannerOpen: false, // non persistito: lettore di codici a barre aperto
   recurringItems: {}, // id -> { nome, qty, every, last }: ingredienti che si consumano a ritmo fisso (qty ogni `every` giorni); `last` = ultimo giorno già scalato dalla Dispensa
@@ -2703,7 +2745,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','userColors','prepDay','dishPlan','freezerDishes'];
+const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','shopExpiry','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -2872,6 +2914,7 @@ function buildPersonalPayload(){
     pantryItems: state.pantryItems,
     recurringItems: state.recurringItems,
     barcodes: state.barcodes,
+    shopExpiry: state.shopExpiry,
     week0Start: state.week0Start,
     whatsNewSeen: state.whatsNewSeen,
     whatsNewSeenBy: state.whatsNewSeenBy,
@@ -4376,10 +4419,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-25',
+  version: '2027-01-26',
   title: 'Novità',
   items: [
-    'Scheda ingrediente: l\'unità di misura si cambia accanto alla quantità, con un piccolo elenco a comparsa.'
+    'Spesa: sulle righe spuntate c\'è un tasto calendario per segnare la scadenza mentre sei in negozio (+3 giorni, +1 settimana, +1 mese o una data). Quando sposti in Dispensa diventa la scadenza della voce, o di un nuovo lotto se ne hai già in casa.'
   ]
 };
 
@@ -4618,6 +4661,7 @@ const MODAL_CHECKS = [
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
+  [()=> !!state.shopExpiryPicker, ()=>{ state.shopExpiryPicker = null; }],
   [()=> !!state.scannerOpen, ()=>{ closeBarcodeScanner(); }],
   [()=> !!state.recurringOpen && !!state.recurringEditId, ()=>{ state.recurringEditId = null; state.recurringDraft = null; }],
   [()=> !!state.recurringOpen, ()=>{ state.recurringOpen = false; }],
@@ -6398,6 +6442,7 @@ function renderSpesa(){
           ${ingNoteHtml}
         </span>
       </label>
+      ${checked ? shopExpiryHtml(rowKey) : ''}
       <span class="qty-stepper" title="Quantità da prendere">
         <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Diminuisci quantità">−</button>
         ${editingQty
@@ -10251,6 +10296,24 @@ function attachHandlers(){
     state.pantrySheetMore = !state.pantrySheetMore;
     render();
   }));
+  document.querySelectorAll('[data-shop-exp]').forEach(btn=> btn.addEventListener('click', e=>{
+    e.preventDefault(); e.stopPropagation();
+    const k = btn.dataset.shopExp;
+    state.shopExpiryPicker = state.shopExpiryPicker === k ? null : k;
+    render();
+  }));
+  document.querySelectorAll('[data-shop-exp-close]').forEach(el=> el.addEventListener('click', ()=>{ state.shopExpiryPicker = null; render(); }));
+  const setShopExpiry = (k, iso)=>{
+    if(!state.shopExpiry) state.shopExpiry = {};
+    if(iso) state.shopExpiry[k] = iso; else delete state.shopExpiry[k];
+    state.shopExpiryPicker = null;
+    persist(); render();
+  };
+  document.querySelectorAll('[data-shop-exp-set]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const v = btn.dataset.shopExpSet;
+    setShopExpiry(btn.dataset.shopExpRow, v ? addDaysIso(parseInt(v, 10)) : '');
+  }));
+  document.querySelectorAll('[data-shop-exp-date]').forEach(inp=> inp.addEventListener('change', e=> setShopExpiry(inp.dataset.shopExpDate, e.target.value || '')));
   document.querySelectorAll('[data-scan-barcode]').forEach(btn=> btn.addEventListener('click', ()=> openBarcodeScanner()));
   const pantryAddBtn = document.getElementById('pantry-add-btn');
   if(pantryAddBtn) pantryAddBtn.addEventListener('click', ()=>{
