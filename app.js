@@ -4371,10 +4371,11 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-20',
+  version: '2027-01-21',
   title: 'Novità',
   items: [
-    'Consumi ricorrenti: oltre ad "A tempo" (es. latte 1 ogni 3 giorni) c\'è "Con i pasti": il pane si conta insieme alla ricetta, in "Ricetta fatta!" (cena e weekend a pranzo) e in Spesa. Per il pane scegli "Con i pasti".'
+    'Gestisci ingredienti: c\'è "+ Nuovo ingrediente" in alto, come in Gruppi, Categorie e Consumi ricorrenti.',
+    'Nelle liste che si aprono sul posto (Gruppi, Categorie, Consumi) la freccia è in giù e la voce aperta è un riquadro con titolo e freccia in su per richiuderla.'
   ]
 };
 
@@ -6993,6 +6994,8 @@ function pantryExpiryDays(it){
 // resto). `last` è l'ultimo giorno già scalato: aprire l'app dopo qualche
 // giorno recupera i cicli passati. Solo voci con unità (non "solo presenza").
 let recurringRanOn = '';
+const CHEV_DOWN_SVG = '<svg class="manage-chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9l6 6l6-6"/></svg>';
+const CHEV_UP_SVG = '<svg class="manage-chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15l6-6l6 6"/></svg>';
 function recurringList(){
   return Object.entries(state.recurringItems || {}).map(([id, r]) => Object.assign({ id }, r));
 }
@@ -7090,6 +7093,7 @@ function recurringEditCardHtml(id){
   const names = Object.values(state.pantryItems).map(it => it.nome).sort((a, b) => IT_COLLATOR.compare(a, b));
   return `
       <div class="manage-edit" data-recurring-edit-card="${escapeAttr(id)}">
+        ${isNew ? '' : `<button type="button" class="manage-edit-head" data-recurring-cancel aria-expanded="true"><span>${escapeHtml((d.nome || '').charAt(0).toUpperCase() + (d.nome || '').slice(1))}</span>${CHEV_UP_SVG}</button>`}
         <label class="manage-field"><span>Ingrediente</span>
           <input type="text" id="recurring-name" list="recurring-names" value="${escapeAttr(d.nome || '')}" placeholder="Es. Pane" autocomplete="off"></label>
         <datalist id="recurring-names">${names.map(n => `<option value="${escapeAttr(n)}"></option>`).join('')}</datalist>
@@ -7130,7 +7134,7 @@ function renderRecurringPage(){
         <span class="manage-row-icon">${uiIcon('refresh')}</span>
         <span class="manage-row-main">${escapeHtml(r.nome.charAt(0).toUpperCase() + r.nome.slice(1))}
           <span class="manage-row-sub">${escapeHtml(sub)}</span></span>
-        <span class="manage-row-chevron" aria-hidden="true">›</span>
+        <span class="manage-row-chevron" aria-hidden="true">${CHEV_DOWN_SVG}</span>
       </button>`;
   }).join('');
   const body = `
@@ -7418,6 +7422,7 @@ function deptEditCardHtml(id){
   const customized = isBase && state.customDepts && state.customDepts[id];
   return `
       <div class="manage-edit" data-dept-edit-card="${escapeAttr(id)}">
+        ${isNew ? '' : `<button type="button" class="manage-edit-head" data-dept-edit-cancel aria-expanded="true"><span>${escapeHtml(d.label || DEPT_LABEL[id] || '')}</span>${CHEV_UP_SVG}</button>`}
         <div class="manage-edit-row">
           <input type="text" class="dept-icon-input" id="dept-edit-icon" value="${escapeAttr(d.icon || '')}" placeholder="🏷️" aria-label="Emoji" autocomplete="off">
           <input type="text" id="dept-edit-label" value="${escapeAttr(d.label || '')}" placeholder="${escapeAttr(isBase ? BASE_DEPT_LABEL[id] : 'Nome (es. Animali)')}" aria-label="Nome" autocomplete="off">
@@ -7445,7 +7450,7 @@ function renderDeptsPage(){
         <span class="manage-row-icon">${DEPT_ICON[id] || ''}</span>
         <span class="manage-row-main">${escapeHtml(DEPT_LABEL[id])}${BASE_DEPT_LABEL[id] ? '' : ' <span class="manage-tag">tua</span>'}</span>
         <span class="manage-row-side">${(n => n ? `${n} in Dispensa` : '')(deptItemCount(id))}</span>
-        <span class="manage-row-chevron" aria-hidden="true">›</span>
+        <span class="manage-row-chevron" aria-hidden="true">${CHEV_DOWN_SVG}</span>
       </button>`;
   const section = (title, ids) => `
       <section class="settings-section">
@@ -7480,6 +7485,7 @@ function groupEditCardHtml(id){
   const exact = q && Object.values(state.pantryItems).some(it => it.nome.toLowerCase() === q);
   return `
       <div class="manage-edit" data-group-edit-card="${escapeAttr(id)}">
+        ${isNew ? '' : `<button type="button" class="manage-edit-head" data-group-edit-cancel aria-expanded="true"><span>${escapeHtml(g.label || '')}</span>${CHEV_UP_SVG}</button>`}
         <label class="manage-field"><span>Nome</span>
           <input type="text" id="group-edit-label" value="${escapeAttr(g.label || '')}" placeholder="Es. Pasta corta" autocomplete="off"></label>
         <label class="manage-field"><span>Nelle ricette si chiama</span>
@@ -7516,7 +7522,7 @@ function renderGroupsPage(){
         <span class="manage-row-icon">${g.cat && DEPT_ICON[g.cat] ? DEPT_ICON[g.cat] : '🗂️'}</span>
         <span class="manage-row-main">${escapeHtml(g.label)}
           <span class="manage-row-sub">${members.length ? escapeHtml(members.join(', ')) : 'nessun formato ancora'}</span></span>
-        <span class="manage-row-chevron" aria-hidden="true">›</span>
+        <span class="manage-row-chevron" aria-hidden="true">${CHEV_DOWN_SVG}</span>
       </button>`;
   }).join('');
   const body = `
@@ -7560,6 +7566,9 @@ function renderIngredientManagerPage(){
   };
   const filters = [['tutti', 'Tutti'], ['casa', 'In Dispensa'], ['no', 'Non in Dispensa']];
   const body = `
+      <section class="settings-section">
+        <button type="button" class="btn is-outline is-block" data-manage-ingredient-new>+ Nuovo ingrediente</button>
+      </section>
       <div class="manage-toolbar">
         <div class="search-field">
           <input class="input-search" type="search" id="ingredient-manager-search" placeholder="Cerca ingrediente…" value="${escapeAttr(state.ingredientManagerSearch || '')}" autocomplete="off">
@@ -9290,6 +9299,7 @@ function attachHandlers(){
   // (titolo/categoria di ripiego seguono la vista Cibo/Casa aperta).
   const pantryFab = document.getElementById('pantry-fab');
   if(pantryFab) pantryFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
+  document.querySelectorAll('[data-manage-ingredient-new]').forEach(btn=> btn.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); }));
 
   document.querySelectorAll('.chip-row [data-f]').forEach(btn=>{
     btn.addEventListener('click', e=>{

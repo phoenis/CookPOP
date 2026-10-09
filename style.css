@@ -1525,3 +1525,10 @@ body{ overflow-x:clip; }
 button.dish-ic{ border:0; padding:0; font:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .dish-tab .dish-ic{ cursor:pointer; }
+
+.manage-chev{ width:1.125rem; height:1.125rem; display:block; }
+.manage-row-chevron{ display:inline-flex; align-items:center; }
+.manage-list .manage-edit{ background:var(--surface-2); border-radius:var(--radius-modal); padding:0 var(--space-small) var(--space-small); margin:var(--space-xxsmall) 0; }
+.manage-edit-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); width:100%; padding:var(--space-small) 0; border:0; border-bottom:1px solid var(--line); background:none; color:var(--ink); font-family:var(--font-family); font-size:var(--text-small); font-weight:var(--weight-bold); text-align:left; cursor:pointer; }
+.manage-edit-head .manage-chev{ color:var(--ink-light); }
+.manage-list .manage-edit input[type=text], .manage-list .manage-edit input[type=number], .manage-list .manage-edit select{ background:var(--surface); }
