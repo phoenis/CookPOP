@@ -2229,6 +2229,27 @@ test('consumi ricorrenti: scalano dalla Dispensa ogni N giorni, pagina dal menù
   });
   eq([r.qty, r.last, r.again, r.menu, r.page, r.saved], [4, true, 4, true, true, true], JSON.stringify(r));
 });
+test('consumi "con i pasti": il pane si conta in Ricetta fatta! e in Spesa, e si toglie alla conferma', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.extraWeeks = []; generateWeek(1);
+    upsertPantryItem('Pane', 'dispensa', 6, ''); resolvePantryItem('Pane').qty = 6;
+    state.recurringItems = { p: { nome: 'Pane', qty: 1, every: 1, mode: 'meal', last: isoLocalDate(new Date()) } };
+    writeMealPrincipale(weekOverridesRef(1), 1, 'cena', 'Carbonara');
+    state.tab = 'menu'; render();
+    const out = { dinner: mealUsesRecurring(1, 'cena'), lunchMon: mealUsesRecurring(0, 'pranzo'), lunchSat: mealUsesRecurring(5, 'pranzo') };
+    document.querySelector('[data-toggle-done="1_1_cena"]').click();
+    out.row = !!document.querySelector('[data-done-rec="p"]');
+    document.querySelector('[data-done-rec="p"][data-done-rec-delta="1"]').click();
+    document.querySelector('[data-confirm-done="1_1_cena"]').click();
+    out.qty = resolvePantryItem('Pane').qty;
+    resolvePantryItem('Pane').qty = 0;
+    out.shop = buildShopFlat().some(x => /^rec_p_/.test(x.key));
+    return out;
+  });
+  eq([r.dinner, r.lunchMon, r.lunchSat, r.row, r.qty, r.shop], [true, false, true, true, 4, true], JSON.stringify(r));
+});
+
 
 (async () => {
   const filter = process.argv[2] || '';

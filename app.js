@@ -1693,6 +1693,7 @@ const state = {
   freezerMerge1: false,
   userColorsBright1: false,
   userColorsLight1: false,
+  breadRecurring1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -1730,6 +1731,7 @@ const state = {
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
   recurringItems: {}, // id -> { nome, qty, every, last }: ingredienti che si consumano a ritmo fisso (qty ogni `every` giorni); `last` = ultimo giorno già scalato dalla Dispensa
+  doneModalMeal: {}, // ephemeral: id consumo ricorrente "a pasto" -> quanto togliere dalla Dispensa alla conferma di "Ricetta fatta!"
   recurringOpen: false, // non persistito: pagina "Consumi ricorrenti" aperta
   recurringEditId: null, // non persistito: 'new' o id in modifica
   recurringDraft: null, // non persistito: { nome, qty, every }
@@ -2286,6 +2288,14 @@ const MIGRATIONS = [
   // già scelti passano al corrispondente della nuova tavolozza.
   // 24. Una tantum: colori dei turni più chiari; chi aveva la versione "luminosa"
   // di poco fa passa a quella chiara corrispondente.
+  { flag: 'breadRecurring1', run(){
+    // Il pane a pasto (cena + weekend a pranzo) era un conteggio a parte: ora è
+    // un consumo ricorrente "con i pasti", gestito da Dispensa ⋯.
+    if(!state.recurringItems) state.recurringItems = {};
+    if(Object.values(state.recurringItems).some(r => r.mode === 'meal')) return;
+    const it = ['pane', 'panini', 'panino'].map(k => state.pantryItems && state.pantryItems[k]).find(Boolean);
+    if(it) state.recurringItems['rpane'] = { nome: it.nome, qty: 1, every: 1, mode: 'meal', last: isoLocalDate(new Date()) };
+  } },
   { flag: 'userColorsLight1', run(){
     Object.keys(state.userColors || {}).forEach(u=>{
       const i = USER_COLOR_PRESETS_BRIGHT.indexOf(state.userColors[u]);
@@ -4361,10 +4371,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-01-19',
+  version: '2027-01-20',
   title: 'Novità',
   items: [
-    'Il pane si gestisce solo da Dispensa ⋯ → Consumi ricorrenti: tolto il conteggio a pasto (riga "Pane" in Ricetta fatta! e "Pane per i pasti" in Spesa).'
+    'Consumi ricorrenti: oltre ad "A tempo" (es. latte 1 ogni 3 giorni) c\'è "Con i pasti": il pane si conta insieme alla ricetta, in "Ricetta fatta!" (cena e weekend a pranzo) e in Spesa. Per il pane scegli "Con i pasti".'
   ]
 };
 
@@ -4579,7 +4589,7 @@ const MODAL_CHECKS = [
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> !!state.doneModalLeftoverPickerOpen, ()=>{ state.doneModalLeftoverPickerOpen = false; }],
   [()=> !!state.doneModalLeftoverCatPickerOpen, ()=>{ state.doneModalLeftoverCatPickerOpen = false; }],
-  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalLeftover = ''; state.doneModalLeftoverLuogo = 'frigo'; state.doneModalLeftoverCat = 'avanzi'; state.doneModalLeftoverChecked = false; state.doneModalLeftoverPickerOpen = false; state.doneModalLeftoverCatPickerOpen = false; }],
+  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalMeal = {}; state.doneModalLeftover = ''; state.doneModalLeftoverLuogo = 'frigo'; state.doneModalLeftoverCat = 'avanzi'; state.doneModalLeftoverChecked = false; state.doneModalLeftoverPickerOpen = false; state.doneModalLeftoverCatPickerOpen = false; }],
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen && !!state.groupEditId, ()=>{ closeGroupEdit(); }],
@@ -6007,6 +6017,23 @@ function renderMenu(){
     });
     const normalRowsHtml = qtyRows.concat(restRows).join('');
     const finishedSectionHtml = '';
+    const mealRecRows = mealRecurringList().filter(r => state.doneModalMeal && Object.prototype.hasOwnProperty.call(state.doneModalMeal, r.id)).map(r=>{
+      const it = recurringPantryItem(r);
+      const n = state.doneModalMeal[r.id];
+      if(!recurringCountable(it)) return `<div class="done-ing-list done-bread"><div class="done-ing-row untracked"><span>${escapeHtml(r.nome)}</span><span class="done-ing-hint">${it ? 'in Dispensa non si conta' : 'non in dispensa'}</span></div></div>`;
+      const uTxt = it.unit ? ' ' + escapeHtml(UNIT_SHORT[it.unit] || it.unit) : '';
+      return `
+      <div class="done-ing-list done-bread">
+        <div class="done-ing-row">
+          <span>${escapeHtml(it.nome)}<span class="done-bread-left">${it.qty > 0 ? `In Dispensa: ${it.qty}${uTxt}, ne restano ${Math.max(0, Math.round((it.qty - n) * 100) / 100)}${uTxt}` : 'Finito in Dispensa'}</span></span>
+          <span class="qty-stepper">
+            <button class="qty-btn" type="button" data-done-rec="${escapeAttr(r.id)}" data-done-rec-delta="-1" aria-label="Meno">−</button>
+            <span class="qty-num">${n}${uTxt}</span>
+            <button class="qty-btn" type="button" data-done-rec="${escapeAttr(r.id)}" data-done-rec-delta="1" aria-label="Più">+</button>
+          </span>
+        </div>
+      </div>`;
+    }).join('');
     doneModal = `
     <div class="filters-modal-backdrop" data-close-done-modal>
       <div class="filters-modal" data-stop-close>
@@ -6016,6 +6043,7 @@ function renderMenu(){
         </div>
         <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Quanto ne è servito per questo pasto (dalla ricetta): alla conferma lo tolgo dalla Dispensa. Col carrello metti in lista spesa quelli che non hai più.</p>
         ${doneName && getRecipeMeta(doneName) ? `<div class="done-grad">${gradimentoPickerHtml(doneName)}</div>` : ''}
+        ${mealRecRows}
         ${uniqueIng.length ? `
         ${normalRowsHtml ? `<div class="done-ing-list">${normalRowsHtml}</div>` : ''}
         ${finishedSectionHtml}
@@ -6240,6 +6268,10 @@ function buildShopFlat(){
         flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context, contextShort, isRecipe: true });
       });
     });
+  });
+  recurringShopNeeds().forEach(n=>{
+    if(state.shopDismissed[n.key]) return;
+    flat.push({ key: n.key, ingrediente: n.nome, qta: String(n.need), dove:'', note:'', context: `${n.nome} per i pasti`, contextShort: `${n.nome} per ${n.meals} pasti` });
   });
   DATA.generalShopping.forEach((it,idx)=>{
     const key = `gen_${idx}`;
@@ -6966,7 +6998,70 @@ function recurringList(){
 }
 function recurringSummary(r, unit){
   const u = unit && unit !== 'none' ? ' ' + (UNIT_SHORT[unit] || unit) : '';
+  if(r.mode === 'meal') return `${r.qty}${u} a pasto (cena, sabato e domenica a pranzo)`;
   return `${r.qty}${u} ${r.every === 1 ? 'al giorno' : `ogni ${r.every} giorni`}`;
+}
+// Consumi "con i pasti" (mode 'meal', es. il pane): `qty` a pasto, a cena ogni
+// giorno e a pranzo sabato e domenica; un pasto non impostato non conta. Si
+// toglie dalla Dispensa quando il pasto si segna come mangiato (con − / + in
+// "Ricetta fatta!"), e in Spesa si compra quanto serve per i pasti ancora da
+// mangiare, meno la scorta. Se la ricetta lo elenca già tra gli ingredienti,
+// lo conta la ricetta.
+function mealRecurringList(){ return recurringList().filter(r => r.mode === 'meal'); }
+function mealUsesRecurring(i, meal){
+  return meal === 'cena' || (meal === 'pranzo' && (Number(i) === 5 || Number(i) === 6));
+}
+function recurringPantryItem(r){ return resolvePantryItem(r.nome); }
+function recurringCountable(it){ return !!(it && typeof it.qty === 'number' && it.unit !== 'none'); }
+function recipeListsRecurring(ingredients, r){
+  const it = recurringPantryItem(r);
+  const nm = (r.nome || '').trim().toLowerCase();
+  return ingredients.some(x => (it && resolvePantryItem(x.ingrediente) === it) || (nm && (x.ingrediente || '').trim().toLowerCase().split(/[\s(]/)[0] === nm.split(/\s/)[0] && /^(pane|panini|panino)$/.test(nm)));
+}
+function recurringMealsAhead(){
+  let count = 0;
+  const startPos = findTodayPos() ?? 0;
+  const weeks = [0, ...state.extraWeeks.map((_,n)=>n+1)];
+  weeks.forEach(weekIdx=>{
+    const done = weekMealsDoneRef(weekIdx);
+    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{
+      if(weekIdx === 0 && pos < startPos) return;
+      ['pranzo','cena'].forEach(meal=>{
+        if(!mealUsesRecurring(i, meal)) return;
+        if(weekIdx === 0 && pos === startPos && meal === 'pranzo' && isTodayLunchPast()) return;
+        if(done[i] && done[i][meal]) return;
+        if(effectiveMeal(weekIdx, i, meal).principale) count++;
+      });
+    });
+  });
+  return count;
+}
+// Righe di Spesa: una per consumo a pasto. La chiave cambia col numero, così
+// dopo aver comprato meno del necessario (o se il menù cambia) la riga torna.
+function recurringShopNeeds(){
+  const list = mealRecurringList();
+  if(!list.length) return [];
+  const meals = recurringMealsAhead();
+  return list.map(r=>{
+    const it = recurringPantryItem(r);
+    if(it && !recurringCountable(it)) return null;
+    const have = it && typeof it.qty === 'number' ? Math.max(0, it.qty) : 0;
+    const need = Math.round((meals * r.qty - have) * 100) / 100;
+    if(need <= 0) return null;
+    return { key: `rec_${r.id}_${need}`, nome: it ? it.nome : r.nome, need, meals };
+  }).filter(Boolean);
+}
+function takeRecurringMeal(counts){
+  const took = [];
+  Object.entries(counts || {}).forEach(([id, n])=>{
+    const r = (state.recurringItems || {})[id];
+    const it = r && recurringPantryItem(r);
+    if(!(n > 0) || !recurringCountable(it) || !(it.qty > 0)) return;
+    const prev = it.qty;
+    it.qty = Math.max(0, Math.round((prev - n) * 100) / 100);
+    took.push({ it, prev });
+  });
+  return took;
 }
 function applyRecurringConsumption(){
   const list = recurringList();
@@ -6976,6 +7071,7 @@ function applyRecurringConsumption(){
   recurringRanOn = today;
   let changed = false;
   list.forEach(r=>{
+    if(r.mode === 'meal') return;
     const every = Math.max(1, parseInt(r.every, 10) || 1);
     const since = r.last ? -daysUntilDate(r.last) : 0;
     const cycles = Math.floor(since / every);
@@ -6989,7 +7085,7 @@ function applyRecurringConsumption(){
   if(changed) persist();
 }
 function recurringEditCardHtml(id){
-  const d = state.recurringDraft || { nome: '', qty: 1, every: 1 };
+  const d = state.recurringDraft || { nome: '', qty: 1, every: 1, mode: 'time' };
   const isNew = id === 'new';
   const names = Object.values(state.pantryItems).map(it => it.nome).sort((a, b) => IT_COLLATOR.compare(a, b));
   return `
@@ -6997,10 +7093,15 @@ function recurringEditCardHtml(id){
         <label class="manage-field"><span>Ingrediente</span>
           <input type="text" id="recurring-name" list="recurring-names" value="${escapeAttr(d.nome || '')}" placeholder="Es. Pane" autocomplete="off"></label>
         <datalist id="recurring-names">${names.map(n => `<option value="${escapeAttr(n)}"></option>`).join('')}</datalist>
-        <label class="manage-field"><span>Quanto ne consumo</span>
+        <div class="manage-field"><span>Come si consuma</span>
+          <div class="chip-row">
+            <button type="button" class="btn is-chip${d.mode === 'meal' ? '' : ' active'}" data-recurring-mode="time">A tempo</button>
+            <button type="button" class="btn is-chip${d.mode === 'meal' ? ' active' : ''}" data-recurring-mode="meal">Con i pasti</button>
+          </div></div>
+        <label class="manage-field"><span>${d.mode === 'meal' ? 'Quanto ne consumo a pasto' : 'Quanto ne consumo'}</span>
           <input type="number" inputmode="decimal" min="0" step="0.5" id="recurring-qty" value="${escapeAttr(d.qty)}"></label>
-        <label class="manage-field"><span>Ogni quanti giorni</span>
-          <input type="number" inputmode="numeric" min="1" step="1" id="recurring-every" value="${escapeAttr(d.every)}"></label>
+        ${d.mode === 'meal' ? '<p class="settings-note">Si conta insieme alla ricetta: lo trovi in "Ricetta fatta!" (a cena e sabato e domenica a pranzo) e in Spesa quanto ne serve per i pasti in menù.</p>' : `<label class="manage-field"><span>Ogni quanti giorni</span>
+          <input type="number" inputmode="numeric" min="1" step="1" id="recurring-every" value="${escapeAttr(d.every)}"></label>`}
         ${d.error ? '<p class="settings-note color-delete">Scrivi ingrediente, quantità e ogni quanti giorni.</p>' : ''}
         <div class="manage-edit-actions">
           ${isNew ? '<span></span>' : `<button type="button" class="btn is-text color-delete" data-recurring-delete="${escapeAttr(id)}">Elimina</button>`}
@@ -7021,7 +7122,8 @@ function renderRecurringPage(){
     if(!it) sub += ' · non in Dispensa';
     else if(typeof it.qty === 'number' && it.unit !== 'none'){
       const left = r.qty > 0 ? Math.floor(it.qty / r.qty) * r.every : 0;
-      sub += it.qty > 0 ? ` · ne hai ${it.qty}${unit ? ' ' + (UNIT_SHORT[unit] || unit) : ''}, bastano ~${left} ${left === 1 ? 'giorno' : 'giorni'}` : ' · finito';
+      const uTxt = unit ? ' ' + (UNIT_SHORT[unit] || unit) : '';
+      sub += it.qty <= 0 ? ' · finito' : (r.mode === 'meal' ? ` · ne hai ${it.qty}${uTxt}` : ` · ne hai ${it.qty}${uTxt}, bastano ~${left} ${left === 1 ? 'giorno' : 'giorni'}`);
     }
     return `
       <button type="button" class="manage-row" data-recurring-edit="${escapeAttr(r.id)}">
@@ -7032,7 +7134,7 @@ function renderRecurringPage(){
       </button>`;
   }).join('');
   const body = `
-      <p class="settings-note manage-intro">Ingredienti che finiscono a ritmo fisso, come il pane o il latte. Dici quanto ne consumi e ogni quanti giorni: la Dispensa li scala da sola, e quando finiscono vanno in Spesa tra i Finiti.</p>
+      <p class="settings-note manage-intro">Ingredienti che finiscono a ritmo fisso. "A tempo" (es. latte 1 ogni 3 giorni): la Dispensa li scala da sola. "Con i pasti" (es. il pane): si contano insieme alla ricetta. Quando finiscono vanno in Spesa.</p>
       <section class="settings-section">
         ${editing === 'new' ? `<div class="settings-card">${recurringEditCardHtml('new')}</div>` : `<button type="button" class="btn is-outline is-block" data-recurring-edit="new">+ Nuovo consumo</button>`}
       </section>
@@ -8603,10 +8705,19 @@ function attachHandlers(){
       } else if(linkedSourceMealKey(weekIdx, i, meal)){
         // pasto "avanzo": nessun nuovo ingrediente consumato (già scalato sul
         // pasto sorgente), quindi si segna direttamente senza passare dalla
-        // modale di aggiornamento Dispensa.
+        // modale di aggiornamento Dispensa. I consumi "con i pasti" (pane)
+        // valgono anche con l'avanzo: si tolgono qui, con Annulla.
         if(!mealsDone[i]) mealsDone[i] = {};
         mealsDone[i][meal] = true;
+        const counts = {};
+        mealRecurringList().forEach(r=>{ if(mealUsesRecurring(i, meal)) counts[r.id] = r.qty; });
+        const took = takeRecurringMeal(counts);
         persist(); render();
+        if(took.length) showUndoToast(`Tolto ${took.map(t => t.it.nome.toLowerCase()).join(', ')}`, ()=>{
+          took.forEach(t => { t.it.qty = t.prev; });
+          clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
+          persist(); render();
+        });
       } else {
         const mealData = effectiveMeal(weekIdx, i, meal);
         // Stessa scala porzioni usata ovunque (Spesa, dettaglio ricetta): la
@@ -8632,6 +8743,8 @@ function attachHandlers(){
         state.doneModalQty = qtyMap;
         state.doneQtyEditingKey = null;
         state.doneModalFinished = {};
+        state.doneModalMeal = {};
+        mealRecurringList().forEach(r=>{ if(mealUsesRecurring(i, meal) && !recipeListsRecurring(allIng, r)) state.doneModalMeal[r.id] = r.qty; });
         state.doneModalLeftover = mealData.principale || '';
         state.doneModalLeftoverLuogo = 'frigo';
         state.doneModalLeftoverCat = 'avanzi';
@@ -8684,13 +8797,20 @@ function attachHandlers(){
       state.doneModalDay = null;
       state.doneModalQty = {};
       state.doneQtyEditingKey = null;
-      state.doneModalFinished = {};
+      state.doneModalFinished = {}; state.doneModalMeal = {};
       state.doneModalLeftover = '';
       state.doneModalLeftoverLuogo = 'frigo';
       state.doneModalLeftoverCat = 'avanzi';
       state.doneModalLeftoverChecked = false;
       state.doneModalLeftoverPickerOpen = false;
       state.doneModalLeftoverCatPickerOpen = false;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-done-rec]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.doneRec;
+      state.doneModalMeal[id] = Math.max(0, Math.round(((state.doneModalMeal[id] || 0) + parseFloat(btn.dataset.doneRecDelta)) * 100) / 100);
       render();
     });
   });
@@ -8822,6 +8942,7 @@ function attachHandlers(){
         // ingrediente vero già in Dispensa, che deve restare tale.
         if(!existing || existing.leftover) state.pantryItems[leftoverKey].leftover = true;
       }
+      takeRecurringMeal(state.doneModalMeal);
       const doneMealData = effectiveMeal(weekIdx, i, meal);
       // Freezer: le porzioni prese per questo pasto scendono; la metà in più
       // di una doppia dose (se non già messa via dal prep) ci va adesso.
@@ -8837,7 +8958,7 @@ function attachHandlers(){
       state.doneModalDay = null;
       state.doneModalQty = {};
       state.doneQtyEditingKey = null;
-      state.doneModalFinished = {};
+      state.doneModalFinished = {}; state.doneModalMeal = {};
       state.doneModalLeftover = '';
       state.doneModalLeftoverLuogo = 'frigo';
       state.doneModalLeftoverCat = 'avanzi';
@@ -9449,7 +9570,7 @@ function attachHandlers(){
     const id = btn.dataset.recurringEdit;
     const r = state.recurringItems[id];
     state.recurringEditId = id;
-    state.recurringDraft = r ? { nome: r.nome, qty: r.qty, every: r.every } : { nome: '', qty: 1, every: 1 };
+    state.recurringDraft = r ? { nome: r.nome, qty: r.qty, every: r.every, mode: r.mode === 'meal' ? 'meal' : 'time' } : { nome: '', qty: 1, every: 1, mode: 'time' };
     render();
     const inp = document.getElementById('recurring-name');
     if(inp && id === 'new') inp.focus();
@@ -9459,16 +9580,20 @@ function attachHandlers(){
     const inp = document.getElementById(elId);
     if(inp && state.recurringDraft) inp.addEventListener('input', e=>{ state.recurringDraft[field] = e.target.value; });
   });
+  document.querySelectorAll('[data-recurring-mode]').forEach(btn=> btn.addEventListener('click', ()=>{
+    if(state.recurringDraft){ state.recurringDraft.mode = btn.dataset.recurringMode; render(); }
+  }));
   const recurringSave = document.getElementById('recurring-save');
   if(recurringSave) recurringSave.addEventListener('click', ()=>{
     const d = state.recurringDraft; if(!d) return;
     const nome = String(d.nome || '').trim();
     const qty = parseFloat(String(d.qty).replace(',', '.'));
-    const every = parseInt(d.every, 10);
+    const isMeal = d.mode === 'meal';
+    const every = isMeal ? 1 : parseInt(d.every, 10);
     if(!nome || !(qty > 0) || !(every >= 1)){ d.error = true; render(); return; }
     const id = state.recurringEditId === 'new' ? 'r' + Date.now().toString(36) : state.recurringEditId;
     const prev = state.recurringItems[id];
-    state.recurringItems[id] = { nome, qty, every, last: prev ? prev.last : isoLocalDate(new Date()) };
+    state.recurringItems[id] = { nome, qty, every, mode: isMeal ? 'meal' : 'time', last: prev ? prev.last : isoLocalDate(new Date()) };
     state.recurringEditId = null; state.recurringDraft = null;
     persist(); render();
   });
