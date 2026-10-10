@@ -2445,6 +2445,7 @@ test('spesa: ingredienti per un\'altra persona restano righe a sé e non vanno i
   await page.click('#shop-add-btn'); // per noi
   await page.evaluate(() => { state.addIngModalOpen = true; state.addIngName = 'Pane'; state.addIngDraft = null; render(); });
   await page.selectOption('#shop-add-per', 'Papà');
+  assert(await page.evaluate(() => document.activeElement.id !== 'shop-add-name'), 'il fuoco non torna sul nome');
   await page.fill('#shop-add-qta', '2');
   await page.click('#shop-add-btn'); // per papà
   const r = await page.evaluate(() => {

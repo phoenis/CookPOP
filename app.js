@@ -8485,7 +8485,7 @@ function attachHandlers(){
       if(el) el.addEventListener(el === qtaInput || el === perNewInput ? 'input' : 'change', saveDraft);
     });
     // Cambiare "Per chi" mostra/nasconde il nome e gruppo/luogo: ridisegna.
-    if(perSelect) perSelect.addEventListener('change', ()=>{ saveDraft(); render(); });
+    if(perSelect) perSelect.addEventListener('change', ()=>{ saveDraft(); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); /* niente fuoco che torna sul nome */ state.addIngSuggestOpen = false; state.addIngKeepFocus = perSelect.value === '__new' ? 'per' : 'none'; render(); });
     // Come in Dispensa: scelto un gruppo con la Categoria ancora su
     // "Automatica", la si precompila dal gruppo.
     if(groupSelect) groupSelect.addEventListener('change', e=>{
@@ -8555,6 +8555,7 @@ function attachHandlers(){
     });
     nameInput.addEventListener('input', e=>{
       state.addIngName = e.target.value;
+      state.addIngKeepFocus = null;
       state.addIngSuggestOpen = true;
       state.addIngCursorPos = e.target.selectionStart;
       render();
@@ -8562,7 +8563,10 @@ function attachHandlers(){
     nameInput.addEventListener('focus', ()=>{ state.addIngSuggestOpen = true; });
     // il re-render sostituisce l'input con uno nuovo: rimette a fuoco e
     // ripristina la posizione del cursore, altrimenti si perderebbero a ogni tasto.
-    if(document.activeElement !== nameInput){
+    // (tranne dopo "Per chi": lì il fuoco non deve tornare sul nome.)
+    const keepFocus = state.addIngKeepFocus;
+    if(keepFocus === 'per'){ const pn = document.getElementById('shop-add-per-new'); if(pn) pn.focus(); }
+    else if(!keepFocus && document.activeElement !== nameInput){
       nameInput.focus();
       if(typeof state.addIngCursorPos === 'number') nameInput.setSelectionRange(state.addIngCursorPos, state.addIngCursorPos);
     }
@@ -8576,7 +8580,7 @@ function attachHandlers(){
     });
   });
   const spesaFab = document.getElementById('spesa-fab');
-  if(spesaFab) spesaFab.addEventListener('click', ()=>{ state.addIngModalOpen = true; render(); });
+  if(spesaFab) spesaFab.addEventListener('click', ()=>{ state.addIngModalOpen = true; state.addIngKeepFocus = null; render(); });
   document.querySelectorAll('[data-close-add-ing-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
