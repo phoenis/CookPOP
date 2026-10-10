@@ -1786,6 +1786,7 @@ const state = {
   expiryRules1: false,
   expiryRules2: false,
   futureDone1: false,
+  frozenOn1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -2657,6 +2658,11 @@ const MIGRATIONS = [
   // Pasti di giorni futuri rimasti "cucinati" dopo il passaggio di settimana
   // (un telefono non aggiornato rimetteva i vecchi segni sulla nuova
   // settimana): si tolgono una volta sola. Vedi anche onChange in loadState.
+  // Ciò che è già in freezer non ha una data di congelamento nota: resta senza
+  // (stringa vuota), solo quello che ci entra da ora la segna.
+  { flag: 'frozenOn1', run(){
+    Object.values(state.pantryItems || {}).forEach(it=>{ if(it && it.luogo === 'freezer' && it.frozenOn === undefined) it.frozenOn = ''; });
+  }},
   { flag: 'futureDone1', run(){
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const dates = weekDatesFor(0);
@@ -4612,6 +4618,7 @@ function render(){
   if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
   if(personalSynced || !window.cookpopSync) applyRecurringConsumption();
   if(personalSynced || !window.cookpopSync) reconcileAllLots();
+  if(personalSynced || !window.cookpopSync) reconcileFreezer();
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
@@ -7227,6 +7234,46 @@ function normalizeLots(it){
   }
   return sig() !== before;
 }
+// Freezer: quando un ingrediente o un piatto ci entra (da qualunque strada:
+// icona del luogo, scheda, avanzo congelato...) si salva la data (it.frozenOn)
+// e la scadenza stimata dal congelamento (it.freezerExp = la scadenza è una
+// stima, si può correggere a mano). Quando esce o finisce, la data sparisce.
+// Giorni di conservazione in freezer per reparto; avanzi e piatti pronti 90.
+const FREEZER_DAYS = { verdura:300, carne:150, salumi:60, pesce:90, latticini:90, pane:90, avanzi:90 };
+const FREEZER_DEFAULT_DAYS = 90;
+function freezerDaysFor(it){
+  if(it.frozenMeal || it.leftover) return 90;
+  const dept = knownDept(it.cat) || classifyDept(it.nome || '');
+  return FREEZER_DAYS[dept] || FREEZER_DEFAULT_DAYS;
+}
+function addDaysToIso(iso, days){
+  const [y, m, d] = iso.split('-').map(Number);
+  return isoLocalDate(new Date(y, m - 1, d + days));
+}
+function applyFreezerExpiry(it){
+  if(!it.frozenOn) return;
+  const est = addDaysToIso(it.frozenOn, freezerDaysFor(it));
+  if(Array.isArray(it.lots)) it.lots = [{ qty: it.qty, scadenza: est }];
+  it.scadenza = est;
+  it.freezerExp = true;
+}
+function clearFreezerExpiry(it){
+  if(it.freezerExp){ delete it.scadenza; delete it.lots; }
+  delete it.freezerExp;
+}
+function reconcileFreezer(){
+  let changed = false;
+  Object.values(state.pantryItems || {}).forEach(it=>{
+    if(!it) return;
+    const stocked = typeof it.qty === 'number' && it.qty > 0;
+    if(it.luogo === 'freezer' && stocked){
+      if(it.frozenOn === undefined){ it.frozenOn = isoLocalDate(new Date()); applyFreezerExpiry(it); changed = true; }
+    } else if(it.frozenOn !== undefined){
+      delete it.frozenOn; clearFreezerExpiry(it); changed = true;
+    }
+  });
+  if(changed) persist();
+}
 function reconcileAllLots(){
   let changed = false;
   Object.values(state.pantryItems || {}).forEach(it => { if(it.lots && normalizeLots(it)) changed = true; });
@@ -7467,6 +7514,10 @@ function renderExpiryConfirmModal(){
         </div>
       </div>
     </div>`;
+}
+function frozenOnShort(iso){
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('it-IT', { day:'numeric', month:'short' });
 }
 function expiryBadgeHtml(days, iso){
   if(days === null) return '';
@@ -7745,7 +7796,15 @@ function renderIngredientSheet(it, isNew){
           </div>
           <button type="button" class="btn is-outline is-block" data-lot-add>+ Altra scadenza</button>
         </div>` : '';
-  const scadenzaHtml = home ? '' : lotsHtml || `
+  const frozenHtml = (!isNew && !home && it.luogo === 'freezer' && it.frozenOn !== undefined) ? `
+        <div class="settings-field">
+          <div class="settings-field-label">❄️ Congelato il ${it.frozenOn ? '' : '<span class="sheet-hint-inline">data non nota</span>'}</div>
+          <div class="chip-row">
+            <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} ${it.frozenOn ? escapeHtml(frozenOnShort(it.frozenOn)) : 'Data…'}<input type="date" id="pantry-edit-frozen" value="${escapeAttr(it.frozenOn || '')}" aria-label="Data di congelamento"></label>
+          </div>
+          ${it.freezerExp ? '<div class="sheet-hint-inline">La scadenza qui sotto è una stima per il freezer: la puoi cambiare.</div>' : ''}
+        </div>` : '';
+  const scadenzaHtml = home ? '' : frozenHtml + (lotsHtml || `
         <div class="settings-field">
           <div class="settings-field-label">${addsLot ? 'Scadenza della nuova confezione' : 'Scadenza'} ${it.scadenza ? expiryBadgeHtml(days, it.scadenza) : '<span class="sheet-hint-inline">nessuna</span>'}</div>
           <div class="chip-row scadenza-quick">
@@ -7756,7 +7815,7 @@ function renderIngredientSheet(it, isNew){
             <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} Data…<input type="date" id="pantry-edit-scadenza" value="${escapeAttr(it.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
           </div>
           ${canLots ? '<button type="button" class="btn is-text lot-add-link" data-lot-add>+ Altra scadenza (un\'altra confezione)</button>' : ''}
-        </div>`;
+        </div>`);
   // Righe che si aprono in un elenco (categoria, gruppo), una alla volta.
   const pickRow = (key, label, valueHtml) => `
         <button type="button" class="sheet-row" data-sheet-picker="${key}" aria-expanded="${picker === key}">
@@ -8166,7 +8225,7 @@ function renderDispensa(){
   // vede solo una volta impostato.
   const searchTerm = state.pantrySearch.trim().toLowerCase();
   const items = Object.entries(state.pantryItems)
-    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat, scadenza: it.scadenza || '' }))
+    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat, scadenza: it.scadenza || '', frozenOn: it.frozenOn || '' }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0)
     .filter(it => !searchTerm || it.nome.toLowerCase().includes(searchTerm));
 
@@ -8197,7 +8256,7 @@ function renderDispensa(){
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M17 17H6V3H4"/><path d="m6 5l14 1l-1 7H6"/></g></svg></button>
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-trash="${escapeAttr(it.key)}" title="Metti tra i Finiti" aria-label="Metti tra i Finiti">${TRASH_ICON_SVG}</button>
       </div>` : ''}
-      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}</button>
+      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">❄️ ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>
       ${it.unit === 'none'
         ? `<label class="presence-toggle"><input type="checkbox" ${it.qty > 0 ? 'checked' : ''} data-presence-toggle="${escapeAttr(it.key)}"></label>`
         : `<span class="qty-stepper">
@@ -10421,14 +10480,23 @@ function attachHandlers(){
     it.luogo = btn.dataset.sheetLuogo;
     sheetChanged();
   }));
+  const frozenInput = document.getElementById('pantry-edit-frozen');
+  if(frozenInput) frozenInput.addEventListener('change', e=>{
+    const it = sheetTarget(); if(!it) return;
+    it.frozenOn = e.target.value || '';
+    if(it.frozenOn && (it.freezerExp || !it.scadenza)) applyFreezerExpiry(it);
+    sheetChanged();
+  });
   const setEditScadenza = iso=>{
     const it = sheetTarget(); if(!it) return;
     if(iso) it.scadenza = iso; else delete it.scadenza;
+    delete it.freezerExp; // scelta a mano: non è più una stima
     sheetChanged();
   };
   const lotsOf = it => Array.isArray(it.lots) ? it.lots.map(l => ({ qty: l.qty, scadenza: l.scadenza || '' })) : [{ qty: it.qty, scadenza: it.scadenza || '' }];
   const setLots = (it, lots)=>{
     it.lots = lots;
+    delete it.freezerExp; // scadenze scelte a mano
     it.qty = Math.round(lots.reduce((n, l) => n + (Number(l.qty) || 0), 0) * 100) / 100;
     normalizeLots(it);
     sheetChanged();

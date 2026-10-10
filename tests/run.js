@@ -2527,6 +2527,31 @@ test('spesa: vista Categoria (ordine Dispensa) e Ordine spesa trascinabile', asy
   eq(page.errors, [], 'errori JS');
 });
 
+test('freezer: si salva la data di congelamento e una scadenza stimata; uscendo spariscono', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {};
+    upsertPantryItem('Carote', 'frigo', 3, '', 'verdura');
+    state.pantryItems['carote'].scadenza = addDaysIso(4);
+    upsertPantryItem('Sugo avanzato', 'dispensa', 2, '', 'avanzi');
+    // già in freezer prima: data non nota, nessuna stima
+    upsertPantryItem('Piselli', 'freezer', 1, '', 'verdura'); state.frozenOn1 = false; runMigrations();
+    state.pantryItems['carote'].luogo = 'freezer';
+    state.pantryItems['sugo avanzato'].luogo = 'freezer';
+    reconcileFreezer();
+    const c = state.pantryItems['carote'], s = state.pantryItems['sugo avanzato'], p = state.pantryItems['piselli'];
+    const out = { today: isoLocalDate(new Date()), carote: [c.frozenOn, c.scadenza, c.freezerExp], sugo: [s.frozenOn, s.scadenza], piselli: [p.frozenOn, p.scadenza] };
+    out.expCarote = addDaysIso(300); out.expSugo = addDaysIso(90);
+    c.luogo = 'frigo'; reconcileFreezer();
+    out.back = [c.frozenOn, c.scadenza, c.freezerExp];
+    return out;
+  });
+  eq(r.carote, [r.today, r.expCarote, true], 'carote');
+  eq(r.sugo, [r.today, r.expSugo], 'sugo');
+  eq(r.piselli, ['', undefined], 'già in freezer: data non nota');
+  eq(r.back, [undefined, undefined, undefined], 'fuori dal freezer');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
