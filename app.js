@@ -5304,7 +5304,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
     const dBase = baseOf(dsh.name);
     const ratio = (dBase && currentPortions) ? currentPortions / dBase : 1;
     const ctx = { weekIdx, i, meal, role: dsh.role, persone: currentPortions || 0, canPortions: !!basePortions };
-    missing.push(...missingIngredients(getIngredientsFor(dsh.name), ratio, ctx));
+    if(dishCookFactor(mk, dsh.name)) missing.push(...missingIngredients(getIngredientsFor(dsh.name), ratio, ctx)); // dal freezer: niente da comprare
     return { dsh, ratio, ctx };
   });
   const mancantiHtml = mancantiButtonHtml(missing);
@@ -8832,8 +8832,17 @@ function attachHandlers(){
           state.shopChecked[it.key] = false;
           return;
         }
-        const already = Object.values(state.shopExtras).some(x => x.ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
-        if(already) return;
+        // Già tra gli "Aggiunti a mano": se era stato comprato o tolto (la riga
+        // resta salvata ma nascosta) va rimessa in vista, non saltata.
+        const sameId = Object.keys(state.shopExtras).find(id => state.shopExtras[id].ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
+        if(sameId){
+          if(state.shopDismissed[sameId]){
+            delete state.shopDismissed[sameId];
+            state.shopChecked[sameId] = false;
+            if(it.qta) state.shopExtras[sameId].qta = it.qta;
+          }
+          return;
+        }
         const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
         state.shopExtras[id] = { ingrediente: it.ingrediente, qta: it.qta || '' };
       });
