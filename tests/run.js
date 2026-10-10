@@ -2418,6 +2418,24 @@ test('impostazioni: voce Consumi ricorrenti apre la pagina in Dispensa', async (
   eq(r, { link: true, open: true, tab: 'dispensa', page: true });
 });
 
+test('mancanti in Spesa: un aggiunto a mano già comprato torna in lista', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const name = 'Ingrediente di prova';
+    state.shopExtras['extra_t1'] = { ingrediente: name, qta: '1' };
+    state.shopDismissed['extra_t1'] = true; // comprato/tolto: riga nascosta
+    const hidden = !buildShopFlat().some(x => x.key === 'extra_t1');
+    const btn = document.createElement('button');
+    btn.dataset.mancantiInSpesa = JSON.stringify([{ ingrediente: name, qta: '2', key: null }]);
+    document.body.appendChild(btn);
+    attachHandlers();
+    btn.click();
+    const row = buildShopFlat().find(x => x.key === 'extra_t1');
+    return { hidden, shown: !!row, qta: row && row.qta, copies: Object.keys(state.shopExtras).length };
+  });
+  assert(r.hidden, 'riga nascosta in partenza');
+  eq([r.shown, r.qta, r.copies], [true, '2', 1], 'torna in lista senza duplicati');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
