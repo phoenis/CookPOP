@@ -158,6 +158,35 @@ function shopAisles(){
   const custom = ((typeof state !== 'undefined' && state.shopAisleCustom) || []).filter(d => def.includes(d));
   return custom.concat(def.filter(d => !custom.includes(d)));
 }
+// "Ordine spesa": parte dall'ordine corsia (poi A–Z dentro la corsia) e
+// applica l'ordine scelto a mano (state.shopOrderCustom). Gli ingredienti con
+// una posizione scelta si dispongono nei posti che occupano, secondo quella
+// scelta; i nuovi restano dove li metterebbe la corsia.
+function shopOrderApply(items, aisleIdx){
+  const base = items.slice().sort((a, b) => (aisleIdx(a) - aisleIdx(b)) || IT_COLLATOR.compare(a.ingrediente, b.ingrediente));
+  const custom = (typeof state !== 'undefined' && state.shopOrderCustom) || [];
+  const pos = new Map(custom.map((n, i) => [n, i]));
+  const slots = [];
+  base.forEach((it, i) => { if(pos.has(shopOrderKey(it))) slots.push(i); });
+  const known = base.filter(it => pos.has(shopOrderKey(it))).sort((a, b) => pos.get(shopOrderKey(a)) - pos.get(shopOrderKey(b)));
+  slots.forEach((slot, n) => { base[slot] = known[n]; });
+  return base;
+}
+function shopOrderKey(it){ return (it.ingrediente || '').trim().toLowerCase() + (it.per ? '\u0001' + it.per : ''); }
+// Dopo un trascinamento: l'ordine visibile diventa quello scelto, e chi non è
+// in lista oggi tiene il suo posto accanto al vicino che aveva prima.
+function shopOrderMerge(visible){
+  const old = (state.shopOrderCustom || []).slice();
+  const result = visible.slice();
+  const vis = new Set(visible);
+  old.forEach((n, i)=>{
+    if(vis.has(n)) return;
+    let at = 0;
+    for(let k = i - 1; k >= 0; k--){ const idx = result.indexOf(old[k]); if(idx >= 0){ at = idx + 1; break; } }
+    result.splice(at, 0, n);
+  });
+  return result;
+}
 function shopAisleOrder(){
   return ['avanzi'].concat(shopAisles(), ['finiti']);
 }
@@ -1784,6 +1813,7 @@ const state = {
   cookbooks: [], // Libro di cucina: album di ricette [{ id, name, recipes:[nomi] }] (vedi renderCookbooksView)
   prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
+  shopOrderCustom: [], // ordine "Ordine spesa" scelto a mano: nomi (minuscoli) degli ingredienti, anche di quelli non più in lista (vedi shopOrderApply)
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
   backupOpen: false, // non persistito: pagina "Backup"
@@ -2989,6 +3019,7 @@ function buildPersonalPayload(){
     freezerDishes: state.freezerDishes,
     loyaltyCards: state.loyaltyCards,
     shopAisleCustom: state.shopAisleCustom,
+    shopOrderCustom: state.shopOrderCustom,
     cookbooks: state.cookbooks
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
@@ -6555,7 +6586,7 @@ function renderSpesa(){
     completedMap[k].qtas.push(...(it.qtas || [it.qta]));
     completedMap[k].keys.push(...(it.keys || [it.key]));
   };
-  if(state.shopView === 'reparto' || state.shopView === 'az'){
+  if(['reparto','categoria','az','ordine'].includes(state.shopView)){
     // Solo reparto merceologico, niente più negozio: si compra dove capita.
     // I "Finiti in Dispensa" vanno nel loro reparto dedicato invece che in "Altro"
     // (o nel reparto merceologico vero, che a colpo d'occhio non spiegherebbe il perché sono lì)
@@ -6595,10 +6626,17 @@ function renderSpesa(){
 
     // In ordine di corsia (vedi shopAisleOrder), "Finiti" ultimo.
     const deptsPresent = DEPT_ORDER.filter(dept => byDept[dept] && byDept[dept].length);
-    let sortedDepts = shopAisleOrder().filter(d => deptsPresent.includes(d));
+    // "Categoria": reparti nell'ordine che hanno in Dispensa (DEPT_ORDER).
+    let sortedDepts = (state.shopView === 'categoria' ? DEPT_ORDER : shopAisleOrder()).filter(d => deptsPresent.includes(d));
     // "Dalla A alla Z": una lista sola senza sezioni (i Finiti restano a parte, in fondo).
     if(state.shopView === 'az'){
       byDept.__az = mergedList.filter(it => it.dept !== 'finiti' && !isItemChecked(it.keys, it.ingrediente)).sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente));
+      sortedDepts = (byDept.__az.length ? ['__az'] : []).concat(deptsPresent.includes('finiti') ? ['finiti'] : []);
+    }
+    // "Ordine spesa": lista unica, senza titoli, trascinabile (vedi shopOrderApply).
+    if(state.shopView === 'ordine'){
+      const aisleRank = new Map(shopAisleOrder().map((d, i) => [d, i]));
+      byDept.__az = shopOrderApply(mergedList.filter(it => it.dept !== 'finiti' && !isItemChecked(it.keys, it.ingrediente)), it => aisleRank.has(it.dept) ? aisleRank.get(it.dept) : 999);
       sortedDepts = (byDept.__az.length ? ['__az'] : []).concat(deptsPresent.includes('finiti') ? ['finiti'] : []);
     }
     hasFinitiThisView = deptsPresent.includes('finiti');
@@ -6623,6 +6661,9 @@ function renderSpesa(){
           <div class="accordion-body${state.shopFinitiOpen ? '' : ' is-collapsed'}">${rowsHtml}</div>
           ${finishedActions}
         </div>`;
+      }
+      if(dept === '__az' && state.shopView === 'ordine'){
+        return `<div class="shop-day-group shop-az shop-order-list">${items.map(it => `<div class="shop-order-row" data-order-row="${escapeAttr(shopOrderKey(it))}"><span class="aisle-handle" data-order-handle aria-label="Trascina per spostare" role="button">⠿</span><div class="shop-order-item">${itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per)}</div></div>`).join('')}</div>`;
       }
       if(dept === '__az') return `<div class="shop-day-group shop-az">${rowsHtml}</div>`;
       const sectionId = `reparto_${dept}`;
@@ -6871,7 +6912,7 @@ function renderSpesa(){
       </div>
       <label class="shop-group-by"><span>Ordina per</span>
         <select data-shop-group aria-label="Ordina per">
-          ${[['reparto','Corsia'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
+          ${[['reparto','Corsia'],['categoria','Categoria'],['ordine','Ordine spesa'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
     </div>
@@ -6881,7 +6922,7 @@ function renderSpesa(){
   ${addIngModal}
   ${renderExpiryConfirmModal()}
     <div class="buttons-fixed">
-      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' ? 'reparto_' : 'giorno_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
+      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
       <button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
         ${displayDoneShoppable ? `
 
@@ -11585,6 +11626,51 @@ document.addEventListener('click', e=>{
     drag = null;
     if(order.join() !== shopAisles().join()){ state.shopAisleCustom = order; persist(); }
     render();
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
+
+// Trascinamento delle righe in "Ordine spesa": stessa idea delle corsie, con
+// la maniglia ⠿ a sinistra di ogni riga.
+(function(){
+  let drag = null; // { row, list, pointerId, lastY, raf }
+  const reorder = () => {
+    const rows = [...drag.list.querySelectorAll('[data-order-row]')].filter(r => r !== drag.row);
+    const next = rows.find(r => { const b = r.getBoundingClientRect(); return drag.lastY < b.top + b.height / 2; });
+    if(next){ if(drag.row.nextElementSibling !== next) drag.list.insertBefore(drag.row, next); }
+    else if(drag.list.lastElementChild !== drag.row) drag.list.appendChild(drag.row);
+  };
+  const autoScroll = () => {
+    if(!drag) return;
+    const edge = 70, h = window.innerHeight;
+    const dy = drag.lastY < edge ? -10 : drag.lastY > h - edge ? 10 : 0;
+    if(dy){ window.scrollBy(0, dy); reorder(); }
+    drag.raf = requestAnimationFrame(autoScroll);
+  };
+  document.addEventListener('pointerdown', e=>{
+    const handle = e.target.closest && e.target.closest('[data-order-handle]');
+    if(!handle) return;
+    const row = handle.closest('[data-order-row]');
+    e.preventDefault();
+    drag = { row, list: row.parentElement, pointerId: e.pointerId, lastY: e.clientY };
+    row.classList.add('is-dragging');
+    drag.raf = requestAnimationFrame(autoScroll);
+  });
+  document.addEventListener('pointermove', e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    e.preventDefault();
+    drag.lastY = e.clientY;
+    reorder();
+  }, { passive: false });
+  const end = e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    cancelAnimationFrame(drag.raf);
+    const order = [...drag.list.querySelectorAll('[data-order-row]')].map(r => r.dataset.orderRow);
+    drag.row.classList.remove('is-dragging');
+    drag = null;
+    state.shopOrderCustom = shopOrderMerge(order);
+    persist(); render();
   };
   document.addEventListener('pointerup', end);
   document.addEventListener('pointercancel', end);

@@ -1201,7 +1201,7 @@ test('dispensa come la spesa: Cibo/Casa restano, Raggruppa per Categoria/Luogo/A
   eq(luogo.includes('Frigo') && luogo.includes('Freezer'), true, 'sezioni per luogo');
   eq(az.titles, 0, 'A-Z senza sezioni');
   eq(az.names.slice().sort((a, b) => a.localeCompare(b, 'it')), az.names, 'A-Z in ordine');
-  eq(pasto, ['Corsia', 'Pasto', 'Dalla A alla Z']);
+  eq(pasto, ['Corsia', 'Categoria', 'Ordine spesa', 'Pasto', 'Dalla A alla Z']);
   eq(page.errors, [], 'errori JS');
 });
 
@@ -2497,6 +2497,34 @@ test('pasti futuri rimasti cucinati: la migrazione li toglie, quelli di oggi e p
   });
   if(!r) return;
   eq(r, { today: true, past: true, future: false, extra: '{}' });
+});
+
+test('spesa: vista Categoria (ordine Dispensa) e Ordine spesa trascinabile', async ({ page }) => {
+  await page.evaluate(() => {
+    state.shopExtras = { a: { ingrediente: 'Pane', qta: '1' }, b: { ingrediente: 'Latte', qta: '1' }, c: { ingrediente: 'Uova', qta: '6' }, d: { ingrediente: 'Carote', qta: '1' } };
+    state.shopDismissed = {}; state.shopChecked = {}; state.shopOrderCustom = [];
+    state.tab = 'spesa'; state.shopView = 'categoria'; render();
+  });
+  const cat = await page.evaluate(() => [...document.querySelectorAll('.dept-title')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).filter(t => /verdura|Latticini|Pane/i.test(t)).map(t => t.replace(/\s*\(.*$/, '')));
+  const expected = await page.evaluate(() => DEPT_ORDER.filter(d => ['verdura', 'latticini', 'pane'].includes(d)).map(d => DEPT_LABEL[d]));
+  eq(cat.map(t => t.replace(/^[^A-Za-zÀ-ú]+/, '').trim()), expected, 'categorie nell\'ordine di Dispensa');
+  await page.evaluate(() => { state.shopView = 'ordine'; render(); });
+  const noTitles = await page.evaluate(() => !document.querySelector('.shop-list .dept-title'));
+  assert(noTitles, 'niente titoli di categoria');
+  const before = await page.evaluate(() => [...document.querySelectorAll('[data-order-row]')].map(r => r.dataset.orderRow));
+  const last = before[before.length - 1];
+  const box = async sel => (await page.locator(sel).boundingBox());
+  const h = await box(`[data-order-row="${last}"] [data-order-handle]`);
+  const first = await box(`[data-order-row="${before[0]}"]`);
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(h.x + h.width / 2, first.y + 2, { steps: 8 });
+  await page.mouse.up();
+  const after = await page.evaluate(() => [...document.querySelectorAll('[data-order-row]')].map(r => r.dataset.orderRow));
+  eq(after[0], last, 'trascinato in cima');
+  eq(after.length, before.length, 'stesse righe');
+  eq(await page.evaluate(() => state.shopOrderCustom[0]), last, 'ordine salvato');
+  eq(page.errors, [], 'errori JS');
 });
 
 (async () => {

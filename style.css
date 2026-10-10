@@ -1617,3 +1617,8 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .manage-edit .manage-field .add-ing-combo{ width:100%; }
 
 .add-per-new{ width:100%; margin-top:0.5rem; }
+
+.shop-order-row{ display:flex; align-items:stretch; gap:0.125rem; }
+.shop-order-row .shop-order-item{ flex:1; min-width:0; }
+.shop-order-row .aisle-handle{ height:auto; }
+.shop-order-row.is-dragging{ opacity:0.6; border-radius:0.5rem; background:var(--surface, rgba(0,0,0,0.05)); }
