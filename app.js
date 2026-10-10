@@ -6338,9 +6338,17 @@ function shopPeople(){
   });
   return names;
 }
+// Un pasto già cucinato ("Fatto") ha già scalato gli ingredienti dalla
+// Dispensa: non deve più chiederli in Spesa (prima, scesa la scorta, le sue
+// righe ricomparivano una dopo l'altra a ogni pasto fatto).
+function isMealDoneAt(weekIdx, i, meal){
+  const done = weekMealsDoneRef(weekIdx);
+  return !!(done && done[i] && done[i][meal]);
+}
 function buildShopFlat(){
   const flat = [];
   allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,principale,contorni,dishLabel})=>{
+    if(isMealDoneAt(weekIdx, i, meal)) return;
     // Le porzioni sono per pasto (non per singola ricetta): il rapporto si
     // calcola una volta sola dal principale e si applica uniformemente anche
     // agli ingredienti dei contorni, così basta un solo stepper per pasto.
@@ -6621,7 +6629,7 @@ function renderSpesa(){
     // (stesso motivo del ricalcolo già fatto per "Per reparto" sotto).
     const giornoMergedAll = [];
     body = allPlannedShoppingMeals()
-      .filter(({weekIdx, i}) => weekIdx !== 0 || WEEK_DISPLAY_ORDER.indexOf(i) >= todayPos)
+      .filter(({weekIdx, i, meal}) => (weekIdx !== 0 || WEEK_DISPLAY_ORDER.indexOf(i) >= todayPos) && !isMealDoneAt(weekIdx, i, meal))
       .map(({weekIdx,i,meal,giorno,dateLabel,dishLabel,principale,contorni})=>{
       const context = `${giorno} ${dateLabel} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
       const dayItems = mainFlat.filter(it => it.context === context);
