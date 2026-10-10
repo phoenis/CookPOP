@@ -2469,6 +2469,21 @@ test('spesa: ingredienti per un\'altra persona restano righe a sé e non vanno i
   eq(page.errors, [], 'errori JS');
 });
 
+test('spesa: un pasto già cucinato non rimette i suoi ingredienti in lista', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(0);
+    const m = allPlannedShoppingMeals()[0];
+    const rows = () => buildShopFlat().filter(x => x.isRecipe && x.key.startsWith(`d${m.i}_${m.meal}_`)).length;
+    getIngredientsFor(m.principale).forEach(it => upsertPantryItem(it.ingrediente, 'dispensa', 0, 'g'));
+    const before = rows();
+    const done = weekMealsDoneRef(0); if(!done[m.i]) done[m.i] = {}; done[m.i][m.meal] = true;
+    return { before, after: rows() };
+  });
+  assert(r.before > 0, 'prima del Fatto servono ingredienti');
+  eq(r.after, 0, 'dopo il Fatto niente righe del pasto');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
