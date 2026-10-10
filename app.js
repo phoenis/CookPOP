@@ -990,6 +990,12 @@ function applyShopExpiry(pantryKey, added, iso, before){
 }
 function moveShopRowToPantry(cb){
   const rowKey = cb.dataset.shopKeys;
+  // Per un'altra persona: si è comprato, ma non entra nella nostra Dispensa.
+  if(cb.dataset.shopPer){
+    rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
+    if(state.shopExpiry) delete state.shopExpiry[rowKey];
+    return;
+  }
   const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
   const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
   const rawQty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 0 : fallback);
@@ -6322,6 +6328,16 @@ function renderMenu(){
 // con contesto e chiave stabile. Fattorizzata fuori da renderSpesa perché
 // serve anche a "Svuota spunte" per sapere quali chiavi esistono davvero,
 // a prescindere da cosa sia visibile/aperto in quel momento sullo schermo.
+// Persone per cui si fa la spesa oltre a noi: quelle già usate nella lista,
+// "Papà" sempre proposto.
+function shopPeople(){
+  const names = ['Papà'];
+  Object.values(state.shopExtras || {}).forEach(it=>{
+    const p = (it && it.per || '').trim();
+    if(p && !names.some(n => n.toLowerCase() === p.toLowerCase())) names.push(p);
+  });
+  return names;
+}
 function buildShopFlat(){
   const flat = [];
   allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,principale,contorni,dishLabel})=>{
@@ -6370,7 +6386,10 @@ function buildShopFlat(){
   });
   Object.entries(state.shopExtras).forEach(([id, it])=>{
     if(state.shopDismissed[id]) return;
-    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:'Aggiunti a mano', contextShort:'Aggiunti a mano', cat: it.cat });
+    // Per un'altra persona (it.per, es. "Papà"): si compra insieme ma resta una
+    // riga a sé, in una sezione sua, e non entra mai nella nostra Dispensa.
+    const ctx = it.per ? `Per ${it.per}` : 'Aggiunti a mano';
+    flat.push({ key:id, ingrediente:it.ingrediente, qta:it.qta, dove:'', note:'', context:ctx, contextShort:ctx, cat: it.cat, per: it.per || '' });
   });
   // Ingredienti finiti in Dispensa (qty scesa a 0): la voce di Dispensa non
   // viene mai cancellata quando arriva a 0, resta lì con la sua unità/luogo/
@@ -6429,7 +6448,7 @@ function renderSpesa(){
   let displayDone = done;
   let displayDoneShoppable = doneShoppable;
 
-  function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked){
+  function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked, per){
     const checked = forcedChecked !== undefined ? forcedChecked : isItemChecked(keys, ingrediente);
     const rowKey = keys.join(',');
     // La quantità/unità di partenza viene dal testo della ricetta ("300 g",
@@ -6473,7 +6492,7 @@ function renderSpesa(){
     <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(ingrediente)}">${TRASH_ICON_SVG}</button>
     <div class="shop-item-row swipe-content">
       <label class="shop-item ${checked?'checked':''}">
-        <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
+        <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" ${per ? `data-shop-per="${escapeAttr(per)}" ` : ''}data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
         <span>
           <span class="item-name">${escapeHtml(ingrediente)}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}${!ingNote && !editingIngNote ? `<button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Aggiungi una nota">${PENCIL_ICON_SVG}</button>` : ''}</span>
           ${(subtitle || note) ? `<span class="item-detail">${escapeHtml(subtitle||'')}${subtitle && note ? ' · ' : ''}${escapeHtml(note||'')}</span>` : ''}
@@ -6502,8 +6521,8 @@ function renderSpesa(){
   // posto della vecchia "Modalità spesa", che spostava subito in Dispensa).
   const completedMap = {};
   const addCompleted = it => {
-    const k = (it.ingrediente || '').trim().toLowerCase();
-    if(!completedMap[k]) completedMap[k] = { ingrediente: it.ingrediente, qtas: [], keys: [] };
+    const k = (it.ingrediente || '').trim().toLowerCase() + (it.per ? '\u0001' + it.per : '');
+    if(!completedMap[k]) completedMap[k] = { ingrediente: it.ingrediente, qtas: [], keys: [], per: it.per || '' };
     completedMap[k].qtas.push(...(it.qtas || [it.qta]));
     completedMap[k].keys.push(...(it.keys || [it.key]));
   };
@@ -6524,9 +6543,9 @@ function renderSpesa(){
     // sommando le quantità invece di tenerne una sola (vedi combineQtyTexts)
     const merged = {};
     classified.forEach(it=>{
-      const mergeKey = (it.ingrediente||'').trim().toLowerCase();
+      const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.per ? '\u0001' + it.per : '');
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [it.contextShort] : [] };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [it.contextShort] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
       } else {
         merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
@@ -6559,7 +6578,7 @@ function renderSpesa(){
       const isFinitiDept = dept === 'finiti';
       const items = byDept[dept];
       const finitiCheckedCount = isFinitiDept ? items.filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
-      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '))).join('');
+      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per)).join('');
       const finishedActions = finitiCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${finitiCheckedCount})</button>
@@ -6658,6 +6677,21 @@ function renderSpesa(){
         <div class="accordion-body${genOpen ? '' : ' is-collapsed'}">${genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('')}</div>
       </div>`;
     }
+    const perSections = [...new Set(mainFlat.filter(it => it.per).map(it => it.per))].map(per => {
+      const rowsPer = mainFlat.filter(it => it.per === per).filter(notDone);
+      if(!rowsPer.length) return '';
+      const secId = 'giorno_per-' + per.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const perOpen = !state.shopSectionCollapsed[secId];
+      return `
+      <div class="shop-day-group">
+        <div class="shop-day-title finished-toggle${perOpen ? ' open' : ''}" data-toggle-shop-section="${escapeAttr(secId)}">
+          Per ${escapeHtml(per)}
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/></svg>
+        </div>
+        <div class="accordion-body${perOpen ? '' : ' is-collapsed'}">${rowsPer.map(it=>itemRow([it.key], it.ingrediente, it.qta, '', '', undefined, per)).join('')}</div>
+      </div>`;
+    }).join('');
+    body += perSections;
     const extraContext = mainFlat.filter(it => it.context === 'Aggiunti a mano').filter(notDone);
     if(extraContext.length){
       const extraOpen = !state.shopSectionCollapsed['giorno_aggiunti-a-mano'];
@@ -6698,7 +6732,7 @@ function renderSpesa(){
     body += `
       <div class="shop-day-group shop-completed">
         <div class="dept-title">Completati</div>
-        <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', '', true)).join('')}</div>
+        <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', it.per ? `Per ${it.per}` : '', true, it.per)).join('')}</div>
         <div class="shop-completed-actions">
           <button type="button" class="btn is-text" id="reset-shop">Togli le spunte</button>
           <button type="button" class="btn is-outline color-delete" id="delete-checked-shop">Elimina</button>
@@ -6727,11 +6761,12 @@ function renderSpesa(){
   // Ingrediente che non è ancora in Dispensa: come in "Aggiungi ingrediente"
   // di Dispensa si sceglie anche gruppo e luogo, e la voce entra subito
   // nell'anagrafica ingredienti (vedi "Aggiungi" in attachHandlers).
-  const addIngIsNew = !!addIngQuery && !state.pantryItems[addIngQuery];
   const addIngDraft = state.addIngDraft || {};
+  const addIngIsNew = !!addIngQuery && !state.pantryItems[addIngQuery] && !addIngDraft.per;
   const addIngQta = addIngDraft.qta !== undefined ? addIngDraft.qta : (matchedPantryUnit ? '1' : '');
   const addIngUnit = addIngDraft.unit !== undefined ? addIngDraft.unit : matchedPantryUnit;
   const addIngCat = addIngDraft.cat !== undefined ? addIngDraft.cat : matchedPantryCat;
+  const addIngPer = addIngDraft.per || '';
   const addIngModal = state.addIngModalOpen ? `
     <div class="filters-modal-backdrop" data-close-add-ing-modal>
       <div class="filters-modal" data-stop-close>
@@ -6758,6 +6793,15 @@ function renderSpesa(){
                 ${UNIT_ORDER.filter(u=>u!=='none').map(u=>`<option value="${u}" ${addIngUnit===u?'selected':''}>${escapeHtml(UNIT_LABEL[u])}</option>`).join('')}
               </select>
             </div>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Per chi</div>
+            <select id="shop-add-per">
+              <option value="">Noi</option>
+              ${shopPeople().map(p=>`<option value="${escapeAttr(p)}" ${addIngPer===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}
+              <option value="__new" ${addIngPer==='__new'?'selected':''}>Un'altra persona…</option>
+            </select>
+            ${addIngPer === '__new' ? `<input type="text" id="shop-add-per-new" class="add-per-new" placeholder="Nome (es. Nonna)" value="${escapeAttr(addIngDraft.perNew || '')}" autocomplete="off">` : ''}
           </div>
           <div class="filter-group">
             <div class="filter-group-label">Categoria (reparto in "Per reparto")</div>
@@ -8422,6 +8466,8 @@ function attachHandlers(){
     const catSelect = document.getElementById('shop-add-cat');
     const groupSelect = document.getElementById('shop-add-group');
     const luogoSelect = document.getElementById('shop-add-luogo');
+    const perSelect = document.getElementById('shop-add-per');
+    const perNewInput = document.getElementById('shop-add-per-new');
     // Il modale si ridisegna a ogni tasto nel nome: quello che hai già scelto
     // negli altri campi va tenuto da parte, altrimenti tornerebbe ai default.
     const saveDraft = ()=>{
@@ -8429,13 +8475,17 @@ function attachHandlers(){
         qta: qtaInput.value,
         unit: unitSelect ? unitSelect.value : '',
         cat: catSelect ? catSelect.value : '',
+        per: perSelect ? perSelect.value : '',
+        perNew: perNewInput ? perNewInput.value : '',
         ...(groupSelect ? { group: groupSelect.value } : {}),
         ...(luogoSelect ? { luogo: luogoSelect.value } : {})
       });
     };
-    [qtaInput, unitSelect, catSelect, groupSelect, luogoSelect].forEach(el=>{
-      if(el) el.addEventListener(el === qtaInput ? 'input' : 'change', saveDraft);
+    [qtaInput, unitSelect, catSelect, groupSelect, luogoSelect, perNewInput].forEach(el=>{
+      if(el) el.addEventListener(el === qtaInput || el === perNewInput ? 'input' : 'change', saveDraft);
     });
+    // Cambiare "Per chi" mostra/nasconde il nome e gruppo/luogo: ridisegna.
+    if(perSelect) perSelect.addEventListener('change', ()=>{ saveDraft(); render(); });
     // Come in Dispensa: scelto un gruppo con la Categoria ancora su
     // "Automatica", la si precompila dal gruppo.
     if(groupSelect) groupSelect.addEventListener('change', e=>{
@@ -8457,7 +8507,15 @@ function attachHandlers(){
       const qta = (unitSelect && unitSelect.value && /^[\d.,]*$/.test(rawQta))
         ? `${rawQta || '1'} ${unitSelect.value}`
         : rawQta;
-      if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
+      const perChoice = perSelect ? perSelect.value : '';
+      const per = perChoice === '__new' ? (perNewInput ? perNewInput.value.trim() : '') : perChoice;
+      if(perChoice === '__new' && !per){ if(perNewInput) perNewInput.focus(); return; }
+      if(per){
+        // Per un'altra persona: una riga a sé (anche se lo stesso ingrediente è
+        // già in lista per noi), e niente voce nuova nella nostra Dispensa.
+        const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+        state.shopExtras[id] = Object.assign({ ingrediente: name, qta, per }, catSelect && catSelect.value ? { cat: catSelect.value } : {});
+      } else if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
         // La quantità scritta resta sulla riga riattivata (prima si perdeva:
         // la riga dei Finiti non ha quantità sua).
         state.pantryConfirmedShop[pantryKey] = qta || true;
@@ -8834,7 +8892,7 @@ function attachHandlers(){
         }
         // Già tra gli "Aggiunti a mano": se era stato comprato o tolto (la riga
         // resta salvata ma nascosta) va rimessa in vista, non saltata.
-        const sameId = Object.keys(state.shopExtras).find(id => state.shopExtras[id].ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
+        const sameId = Object.keys(state.shopExtras).find(id => !state.shopExtras[id].per && state.shopExtras[id].ingrediente.trim().toLowerCase() === it.ingrediente.trim().toLowerCase());
         if(sameId){
           if(state.shopDismissed[sameId]){
             delete state.shopDismissed[sameId];
@@ -9722,7 +9780,7 @@ function attachHandlers(){
       } else {
         // Ce l'hai ancora ma lo vuoi comunque in lista (es. sta per finire):
         // stessa strada di un'aggiunta manuale da Spesa, solo se non c'è già.
-        const already = Object.values(state.shopExtras).some(ex => (ex.ingrediente||'').trim().toLowerCase() === key);
+        const already = Object.values(state.shopExtras).some(ex => !ex.per && (ex.ingrediente||'').trim().toLowerCase() === key);
         if(!already){
           const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
           state.shopExtras[id] = { ingrediente: it.nome, qta: '' };
