@@ -2484,6 +2484,21 @@ test('spesa: un pasto già cucinato non rimette i suoi ingredienti in lista', as
   eq(page.errors, [], 'errori JS');
 });
 
+test('pasti futuri rimasti cucinati: la migrazione li toglie, quelli di oggi e passati restano', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const pos = findTodayPos(); if(pos === null) return null;
+    const idx = pos => WEEK_DISPLAY_ORDER[pos];
+    state.mealsDone = {}; state.extraWeeks = [{ baseline: {}, overrides: {}, overridePicked: {}, mealsDone: { 1: { cena: true } } }];
+    state.mealsDone[idx(pos)] = { cena: true };
+    if(pos > 0) state.mealsDone[idx(pos - 1)] = { cena: true };
+    if(pos < 6) state.mealsDone[idx(pos + 1)] = { cena: true };
+    state.futureDone1 = false; runMigrations();
+    return { today: !!(state.mealsDone[idx(pos)]), past: pos > 0 ? !!state.mealsDone[idx(pos - 1)] : true, future: pos < 6 ? !!state.mealsDone[idx(pos + 1)] : false, extra: JSON.stringify(state.extraWeeks[0].mealsDone) };
+  });
+  if(!r) return;
+  eq(r, { today: true, past: true, future: false, extra: '{}' });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
