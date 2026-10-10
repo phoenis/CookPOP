@@ -1758,7 +1758,7 @@ const state = {
   shopExtras: {},
   shopQty: {},
   shopQtyEditingKey: null,
-  shopView: 'categoria', // non persistito (vedi persist()): riparte sempre da qui, non "ricorda" l'ultima vista scelta tra un caricamento e l'altro
+  shopView: 'reparto', // non persistito (vedi persist()): riparte sempre da qui, non "ricorda" l'ultima vista scelta tra un caricamento e l'altro
   addIngModalOpen: false,
   addIngName: '', // ephemeral, non persistito: testo corrente del campo "Ingrediente" in Aggiungi (Spesa)
   addIngSuggestOpen: false, // ephemeral: se il menu dei suggerimenti è visibile
@@ -6912,7 +6912,7 @@ function renderSpesa(){
       </div>
       <label class="shop-group-by"><span>Ordina per</span>
         <select data-shop-group aria-label="Ordina per">
-          ${[['categoria','Categoria'],['ordine','rossetto'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
+          ${[['reparto','Corsia'],['categoria','Categoria'],['ordine','Spesa'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
     </div>
