@@ -1756,6 +1756,7 @@ const state = {
   breadRecurring1: false,
   expiryRules1: false,
   expiryRules2: false,
+  futureDone1: false,
   orphanWeekKeysPurged1: false,
   week0Start: null, // 'AAAA-MM-GG': il sabato a cui appartengono i dati della settimana 0 (vedi rolloverWeeksIfNeeded)
   pantryGroups: {
@@ -2623,6 +2624,18 @@ const MIGRATIONS = [
   // rimessi in categoria con le regole nuove, anche quelli scelti a mano in
   // una categoria di base. Restano dove sono: le categorie create a mano, gli
   // avanzi, i prodotti per la casa e ciò che il nome non fa riconoscere.
+  // Pasti di giorni futuri rimasti "cucinati" dopo il passaggio di settimana
+  // (un telefono non aggiornato rimetteva i vecchi segni sulla nuova
+  // settimana): si tolgono una volta sola. Vedi anche onChange in loadState.
+  { flag: 'futureDone1', run(){
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dates = weekDatesFor(0);
+    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{
+      const d = new Date(dates[pos]); d.setHours(0, 0, 0, 0);
+      if(d > today && state.mealsDone && state.mealsDone[i]) delete state.mealsDone[i];
+    });
+    (state.extraWeeks || []).forEach(w => { if(w) w.mealsDone = {}; });
+  }},
   { flag: 'deptsRegrouped3', run(){
     const fix = (cat, name) => {
       if(!cat || cat === 'avanzi' || !BASE_DEPT_LABEL[cat] || isNonFoodDept(cat)) return cat;
@@ -2695,6 +2708,14 @@ async function loadState(){
         // la riapplico subito dopo, così resta (ed è quella che poi
         // personalSaveDeferred/persist manda davvero su Firebase).
         const localEdits = buildFirebasePatch(buildPersonalPayload(), lastSyncedPersonal, PERSONAL_DICT_FIELDS);
+        // Passaggio di settimana fatto da un altro telefono: Firebase non
+        // salva i campi svuotati, quindi qui mancano e la Object.assign li
+        // lascerebbe com'erano — i vecchi "cucinato" e blocchi della
+        // settimana passata finivano sulla nuova. Si svuotano.
+        if(saved.week0Start && state.week0Start && saved.week0Start !== state.week0Start){
+          WEEK_KEYED_FIELDS.concat(WEEK_SHOP_FIELDS, ['mealsDone','weekOverrides','weekOverridePicked','weekBaseline']).forEach(f=>{ if(!(f in saved)) saved[f] = {}; });
+          if(!('extraWeeks' in saved)) saved.extraWeeks = [];
+        }
         Object.assign(state, saved);
         applyFirebasePatch(localEdits);
         try{ localStorage.setItem(personalKey, JSON.stringify(saved)); }catch(e){}
