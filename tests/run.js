@@ -2436,6 +2436,38 @@ test('mancanti in Spesa: un aggiunto a mano già comprato torna in lista', async
   eq([r.shown, r.qta, r.copies], [true, '2', 1], 'torna in lista senza duplicati');
 });
 
+test('spesa: ingredienti per un\'altra persona restano righe a sé e non vanno in Dispensa', async ({ page }) => {
+  await page.evaluate(() => {
+    state.shopExtras = {}; state.shopDismissed = {}; state.shopChecked = {}; state.pantryItems = {};
+    state.tab = 'spesa'; state.shopView = 'giorno'; state.addIngModalOpen = true; state.addIngName = 'Pane'; render();
+  });
+  await page.fill('#shop-add-qta', '1');
+  await page.click('#shop-add-btn'); // per noi
+  await page.evaluate(() => { state.addIngModalOpen = true; state.addIngName = 'Pane'; state.addIngDraft = null; render(); });
+  await page.selectOption('#shop-add-per', 'Papà');
+  await page.fill('#shop-add-qta', '2');
+  await page.click('#shop-add-btn'); // per papà
+  const r = await page.evaluate(() => {
+    const flat = buildShopFlat().filter(x => x.ingrediente === 'Pane');
+    const sections = [...document.querySelectorAll('.shop-day-title')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    // reparto: due righe distinte
+    state.shopView = 'reparto'; render();
+    const rows = [...document.querySelectorAll('.shop-item-row')].filter(e => e.querySelector('.item-name').textContent.trim().startsWith('Pane')).length;
+    // compro quello di papà
+    const cb = document.querySelector('input[data-shop-per="Papà"]');
+    cb.click();
+    const stato = { perChecked: !!cb };
+    document.getElementById('move-checked-to-pantry').click();
+    return { n: flat.length, pers: flat.map(x => x.per), sections, rows, pantry: (state.pantryItems['pane'] || {}).qty, left: buildShopFlat().filter(x => x.ingrediente === 'Pane').map(x => x.per), stato };
+  });
+  eq([r.n, r.pers], [2, ['', 'Papà']], 'due righe distinte');
+  assert(r.sections.some(t => t.startsWith('Per Papà')), 'sezione Per Papà');
+  eq(r.rows, 2, 'in Per reparto non si uniscono');
+  eq(r.left, [''], 'comprato quello di papà');
+  eq(r.pantry, 0, 'niente in Dispensa (la scorta resta a 0)');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
