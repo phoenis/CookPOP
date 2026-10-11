@@ -2663,15 +2663,7 @@ const MIGRATIONS = [
   { flag: 'frozenOn1', run(){
     Object.values(state.pantryItems || {}).forEach(it=>{ if(it && it.luogo === 'freezer' && it.frozenOn === undefined) it.frozenOn = ''; });
   }},
-  { flag: 'futureDone1', run(){
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const dates = weekDatesFor(0);
-    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{
-      const d = new Date(dates[pos]); d.setHours(0, 0, 0, 0);
-      if(d > today && state.mealsDone && state.mealsDone[i]) delete state.mealsDone[i];
-    });
-    (state.extraWeeks || []).forEach(w => { if(w) w.mealsDone = {}; });
-  }},
+  { flag: 'futureDone1', run(){ clearFutureMealsDone(); }},
   { flag: 'deptsRegrouped3', run(){
     const fix = (cat, name) => {
       if(!cat || cat === 'avanzi' || !BASE_DEPT_LABEL[cat] || isNonFoodDept(cat)) return cat;
@@ -4619,6 +4611,7 @@ function render(){
   if(personalSynced || !window.cookpopSync) applyRecurringConsumption();
   if(personalSynced || !window.cookpopSync) reconcileAllLots();
   if(personalSynced || !window.cookpopSync) reconcileFreezer();
+  if((personalSynced || !window.cookpopSync) && clearFutureMealsDone()) persist();
   document.querySelectorAll('nav.tabs button').forEach(b=>{ b.classList.toggle('active', b.dataset.tab === state.tab); });
   const topbarTitle = document.getElementById('topbar-title');
   if(topbarTitle) topbarTitle.textContent = TOPBAR_TITLE[state.tab] || 'CookPOP';
@@ -7273,6 +7266,20 @@ function reconcileFreezer(){
     }
   });
   if(changed) persist();
+}
+// Un pasto di un giorno futuro non può essere già cucinato: se compare "cucinato"
+// è un segno vecchio (settimana passata) rimesso da un telefono non aggiornato
+// che lo risincronizza. Lo si toglie ogni volta, non solo una volta.
+function clearFutureMealsDone(){
+  let changed = false;
+  const todayPos = findTodayPos();
+  if(todayPos !== null){
+    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{
+      if(pos > todayPos && state.mealsDone && state.mealsDone[i]){ delete state.mealsDone[i]; changed = true; }
+    });
+  }
+  (state.extraWeeks || []).forEach(w => { if(w && w.mealsDone && Object.keys(w.mealsDone).length){ w.mealsDone = {}; changed = true; } });
+  return changed;
 }
 function reconcileAllLots(){
   let changed = false;

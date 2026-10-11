@@ -2552,6 +2552,18 @@ test('freezer: si salva la data di congelamento e una scadenza stimata; uscendo 
   eq(page.errors, [], 'errori JS');
 });
 
+test('pasti futuri cucinati: a ogni render si tolgono (segni vecchi rimessi da un altro telefono)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const pos = findTodayPos(); if(pos === null || pos >= 6) return null;
+    const next = WEEK_DISPLAY_ORDER[pos + 1], today = WEEK_DISPLAY_ORDER[pos];
+    state.mealsDone = { [next]: { cena: true }, [today]: { cena: true } };
+    render();
+    return { future: !!state.mealsDone[next], today: !!state.mealsDone[today] };
+  });
+  if(!r) return;
+  eq(r, { future: false, today: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
