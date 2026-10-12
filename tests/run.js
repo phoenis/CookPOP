@@ -2572,6 +2572,41 @@ test('ricetta dall\'etichetta: Pollo alla ligure ha ingredienti e procedimento',
   eq(r, { meta: true, ing: 9, steps: 5, porz: '4 porzioni' });
 });
 
+test('Ricetta fatta!: un avanzo possibile per ogni piatto; spuntati vanno in Dispensa; quello pianificato parte spuntato e uscendo (mangiato) sparisce', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(0); state.pantryItems = {}; state.dayLinks = {};
+    // un pasto con almeno un contorno
+    const m = allPlannedShoppingMeals().find(x => x.contorni.length >= 1 && !(state.mealsDone[x.i] && state.mealsDone[x.i][x.meal]));
+    if(!m) return null;
+    const dishes = mealDishes(0, m.i, m.meal).map(d => d.name);
+    toggleMealDoneFn(m.key);
+    const rows = state.doneModalLeftovers.map(x => [x.name, x.checked]);
+    state.doneModalLeftovers[1].checked = true; render();
+    document.querySelector('[data-confirm-done]').click();
+    const kept = Object.keys(state.pantryItems).filter(k => state.pantryItems[k].leftover);
+    return { dishes, rows, kept, second: dishes[1].toLowerCase() };
+  });
+  if(!r) return;
+  eq(r.rows.map(x => x[0]), r.dishes, 'una riga per piatto');
+  eq(r.rows.map(x => x[1]), r.dishes.map(() => false), 'di norma non spuntati');
+  eq(r.kept, [r.second], 'solo quello spuntato va in Dispensa');
+  const link = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(0); state.pantryItems = {}; state.mealsDone = {}; state.dayLinks = {};
+    const metas = allPlannedShoppingMeals();
+    const src = metas[0], dst = metas[1];
+    state.dayLinks[dst.key] = src.key; // il secondo mangia l'avanzo del primo
+    toggleMealDoneFn(src.key);
+    const pre = state.doneModalLeftovers[0].checked;
+    document.querySelector('[data-confirm-done]').click();
+    const inPantry = !!state.pantryItems[src.principale.toLowerCase()];
+    toggleMealDoneFn(dst.key); // mangiato l'avanzo
+    const after = !!state.pantryItems[src.principale.toLowerCase()];
+    return { pre, inPantry, after };
+  });
+  eq(link, { pre: true, inPantry: true, after: false });
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
