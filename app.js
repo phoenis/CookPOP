@@ -1934,12 +1934,7 @@ const state = {
   doneModalQty: {},
   doneQtyEditingKey: null, // ephemeral: nome ingrediente il cui campo "quanto ne hai usato" è in modifica diretta (modale "Ricetta fatta!")
   doneModalFinished: {}, // ephemeral: nome ingrediente "a spanne" (unit 'none') -> true se spuntato "L'hai finito?" nella modale "Ricetta fatta!"; non presente = non spuntato
-  doneModalLeftover: '', // ephemeral: testo libero "cosa è avanzato" nella modale "Ricetta fatta!", precompilato col nome della ricetta
-  doneModalLeftoverLuogo: 'frigo', // ephemeral: luogo scelto per l'avanzo (icona con luogo-picker, come in Dispensa)
-  doneModalLeftoverCat: 'avanzi', // ephemeral: reparto scelto per l'avanzo; di default "Avanzi", ma modificabile (es. un sugo che ricongeli va in "Legumi e conserve")
-  doneModalLeftoverChecked: false, // ephemeral: se spuntato, l'avanzo va in Dispensa alla conferma; sempre deselezionato al caricamento
-  doneModalLeftoverPickerOpen: false, // ephemeral: luogo-picker dell'avanzo aperto/chiuso
-  doneModalLeftoverCatPickerOpen: false, // ephemeral: cat-picker (reparto) dell'avanzo aperto/chiuso
+  doneModalLeftovers: [], // ephemeral: una riga per piatto del pasto in "Ricetta fatta!" ({name, luogo, cat, checked, pickerOpen, catPickerOpen}); spuntata = va in Dispensa alla conferma
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
   filters: { cat:[], tipo:[], tempo:'', pian:'', stagione:'', freezer:'', grad:'', attrezz:'', search:'' } // cat e tipo sono multi-selezione (array), gli altri restano a valore singolo
 };
@@ -4732,9 +4727,9 @@ const MODAL_CHECKS = [
   [()=> !!state.albumForRecipe, ()=>{ state.albumForRecipe = null; }],
   [()=> expiryConfirmKeys().length > 0, ()=>{ closeExpiryConfirm(); }],
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
-  [()=> !!state.doneModalLeftoverPickerOpen, ()=>{ state.doneModalLeftoverPickerOpen = false; }],
-  [()=> !!state.doneModalLeftoverCatPickerOpen, ()=>{ state.doneModalLeftoverCatPickerOpen = false; }],
-  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalMeal = {}; state.doneModalLeftover = ''; state.doneModalLeftoverLuogo = 'frigo'; state.doneModalLeftoverCat = 'avanzi'; state.doneModalLeftoverChecked = false; state.doneModalLeftoverPickerOpen = false; state.doneModalLeftoverCatPickerOpen = false; }],
+  [()=> state.doneModalLeftovers.some(r => r.pickerOpen), ()=>{ state.doneModalLeftovers.forEach(r => { r.pickerOpen = false; }); }],
+  [()=> state.doneModalLeftovers.some(r => r.catPickerOpen), ()=>{ state.doneModalLeftovers.forEach(r => { r.catPickerOpen = false; }); }],
+  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalMeal = {}; state.doneModalLeftovers = []; }],
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen && !!state.groupEditId, ()=>{ closeGroupEdit(); }],
@@ -6197,26 +6192,27 @@ function renderMenu(){
         ` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
         <div class="filter-group done-finished-title">
           <div class="filter-group-label">È avanzato qualcosa?</div>
-          <div class="inv-item is-avanzi">
+          ${state.doneModalLeftovers.map((row, idx) => `
+          <div class="inv-item is-avanzi" data-done-leftover-row="${idx}">
             <div class="picker-anchor">
-              <button type="button" class="btn is-icon luogo-picker-opt" data-luogo-value="${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])}" data-done-leftover-luogo-toggle title="Luogo: ${escapeAttr(LUOGO_LABEL[state.doneModalLeftoverLuogo])} — tocca per scegliere">${LUOGO_ICON[state.doneModalLeftoverLuogo]}</button>
-              ${state.doneModalLeftoverPickerOpen ? `
+              <button type="button" class="btn is-icon luogo-picker-opt" data-luogo-value="${escapeAttr(LUOGO_LABEL[row.luogo])}" data-done-leftover-luogo-toggle="${idx}" title="Luogo: ${escapeAttr(LUOGO_LABEL[row.luogo])} — tocca per scegliere">${LUOGO_ICON[row.luogo]}</button>
+              ${row.pickerOpen ? `
               <div class="luogo-picker-backdrop" data-done-leftover-luogo-close></div>
               <div class="luogo-picker">
-                ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===state.doneModalLeftoverLuogo?' active':''}" data-done-leftover-luogo-set="${l}" data-luogo-value="${escapeAttr(LUOGO_LABEL[l])}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
+                ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===row.luogo?' active':''}" data-done-leftover-luogo-set="${idx}:${l}" data-luogo-value="${escapeAttr(LUOGO_LABEL[l])}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
               </div>` : ''}
             </div>
             <div class="picker-anchor">
-              <button type="button" class="btn is-icon luogo-picker-opt" data-done-leftover-cat-toggle title="Reparto: ${escapeAttr(DEPT_LABEL[state.doneModalLeftoverCat])} — tocca per scegliere">${DEPT_ICON[state.doneModalLeftoverCat]}</button>
-              ${state.doneModalLeftoverCatPickerOpen ? `
+              <button type="button" class="btn is-icon luogo-picker-opt" data-done-leftover-cat-toggle="${idx}" title="Reparto: ${escapeAttr(DEPT_LABEL[row.cat])} — tocca per scegliere">${DEPT_ICON[row.cat]}</button>
+              ${row.catPickerOpen ? `
               <div class="luogo-picker-backdrop" data-done-leftover-cat-close></div>
               <div class="luogo-picker is-category">
-                ${DEPT_ORDER.filter(d=>d!=='finiti' && !isNonFoodDept(d)).map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===state.doneModalLeftoverCat?' active':''}" data-done-leftover-cat-set="${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
+                ${DEPT_ORDER.filter(d=>d!=='finiti' && !isNonFoodDept(d)).map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===row.cat?' active':''}" data-done-leftover-cat-set="${idx}:${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
               </div>` : ''}
             </div>
-            <input type="text" placeholder="es. ${escapeAttr(doneName || 'Avanzo')}" value="${escapeAttr(state.doneModalLeftover || '')}" data-done-leftover-input>
-            <label class="presence-toggle"><input type="checkbox" ${state.doneModalLeftoverChecked ? 'checked' : ''} data-done-leftover-toggle></label>
-          </div>
+            <input type="text" placeholder="es. ${escapeAttr(row.name || 'Avanzo')}" value="${escapeAttr(row.name || '')}" data-done-leftover-input="${idx}">
+            <label class="presence-toggle"><input type="checkbox" ${row.checked ? 'checked' : ''} data-done-leftover-toggle="${idx}"></label>
+          </div>`).join('')}
         </div>
         <div class="filters-modal-footer">
           <button class="btn is-ghost reset-btn" data-close-done-modal>Annulla</button>
@@ -9240,9 +9236,17 @@ function attachHandlers(){
         const counts = {};
         mealRecurringList().forEach(r=>{ if(mealUsesRecurring(i, meal)) counts[r.id] = r.qty; });
         const took = takeRecurringMeal(counts);
+        // L'avanzo mangiato esce dalla Dispensa (se c'era come avanzo).
+        const eaten = [];
+        mealDishes(weekIdx, i, meal).forEach(dsh=>{
+          const k = (dsh.name || '').trim().toLowerCase();
+          const it = state.pantryItems[k];
+          if(it && isLeftoverPantryItem(it) && !it.frozenMeal && typeof it.qty === 'number' && it.qty > 0){ eaten.push({ k, item: { ...it } }); it.qty = 0; }
+        });
         persist(); render();
-        if(took.length) showUndoToast(`Tolto ${took.map(t => t.it.nome.toLowerCase()).join(', ')}`, ()=>{
+        if(took.length || eaten.length) showUndoToast(`Tolto ${took.map(t => t.it.nome.toLowerCase()).concat(eaten.map(e => e.item.nome.toLowerCase())).join(', ')}`, ()=>{
           took.forEach(t => { t.it.qty = t.prev; });
+          eaten.forEach(e => { state.pantryItems[e.k] = e.item; });
           clearMealFlag(weekMealsDoneRef(weekIdx), i, meal);
           persist(); render();
         });
@@ -9273,12 +9277,13 @@ function attachHandlers(){
         state.doneModalFinished = {};
         state.doneModalMeal = {};
         mealRecurringList().forEach(r=>{ if(mealUsesRecurring(i, meal) && !recipeListsRecurring(allIng, r)) state.doneModalMeal[r.id] = r.qty; });
-        state.doneModalLeftover = mealData.principale || '';
-        state.doneModalLeftoverLuogo = 'frigo';
-        state.doneModalLeftoverCat = 'avanzi';
-        state.doneModalLeftoverChecked = false;
-        state.doneModalLeftoverPickerOpen = false;
-        state.doneModalLeftoverCatPickerOpen = false;
+        // Un avanzo possibile per ogni piatto del pasto (tranne quelli presi dal
+        // freezer). Quello che un pasto futuro mangerà come avanzo ("Segna come
+        // avanzata") parte già spuntato: deve finire in Dispensa.
+        const linkedAhead = Object.values(state.dayLinks).includes(key);
+        state.doneModalLeftovers = mealDishes(weekIdx, i, meal)
+          .filter(dsh => dsh.name && !isFreezerDish(key, dsh.name))
+          .map(dsh => ({ name: dsh.name, luogo: 'frigo', cat: 'avanzi', checked: linkedAhead && dsh.role === 'p', pickerOpen: false, catPickerOpen: false }));
         render();
       }
   };
@@ -9326,12 +9331,7 @@ function attachHandlers(){
       state.doneModalQty = {};
       state.doneQtyEditingKey = null;
       state.doneModalFinished = {}; state.doneModalMeal = {};
-      state.doneModalLeftover = '';
-      state.doneModalLeftoverLuogo = 'frigo';
-      state.doneModalLeftoverCat = 'avanzi';
-      state.doneModalLeftoverChecked = false;
-      state.doneModalLeftoverPickerOpen = false;
-      state.doneModalLeftoverCatPickerOpen = false;
+      state.doneModalLeftovers = [];
       render();
     });
   });
@@ -9387,49 +9387,55 @@ function attachHandlers(){
     doneQtyEditInput.addEventListener('blur', commitDoneQtyEdit);
     doneQtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') doneQtyEditInput.blur(); });
   }
+  const leftRow = idx => state.doneModalLeftovers[parseInt(idx, 10)];
   document.querySelectorAll('[data-done-leftover-input]').forEach(inp=>{
     inp.addEventListener('input', e=>{
-      state.doneModalLeftover = e.target.value;
+      const row = leftRow(e.target.dataset.doneLeftoverInput); if(!row) return;
+      row.name = e.target.value;
       render(); // fuoco e cursore: vedi restoreFocus
     });
   });
   document.querySelectorAll('[data-done-leftover-toggle]').forEach(cb=>{
     cb.addEventListener('change', e=>{
-      state.doneModalLeftoverChecked = e.currentTarget.checked;
+      const row = leftRow(e.currentTarget.dataset.doneLeftoverToggle); if(!row) return;
+      row.checked = e.currentTarget.checked;
       render();
     });
   });
   document.querySelectorAll('[data-done-leftover-luogo-toggle]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.doneModalLeftoverPickerOpen = !state.doneModalLeftoverPickerOpen;
-      state.doneModalLeftoverCatPickerOpen = false;
+    btn.addEventListener('click', e=>{
+      const row = leftRow(e.currentTarget.dataset.doneLeftoverLuogoToggle); if(!row) return;
+      const open = !row.pickerOpen;
+      state.doneModalLeftovers.forEach(r => { r.pickerOpen = false; r.catPickerOpen = false; });
+      row.pickerOpen = open;
       render();
     });
   });
-  document.querySelectorAll('[data-done-leftover-luogo-close]').forEach(el=>{
-    el.addEventListener('click', ()=>{ state.doneModalLeftoverPickerOpen = false; render(); });
+  document.querySelectorAll('[data-done-leftover-luogo-close],[data-done-leftover-cat-close]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.doneModalLeftovers.forEach(r => { r.pickerOpen = false; r.catPickerOpen = false; }); render(); });
   });
   document.querySelectorAll('[data-done-leftover-luogo-set]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      state.doneModalLeftoverLuogo = e.currentTarget.dataset.doneLeftoverLuogoSet;
-      state.doneModalLeftoverPickerOpen = false;
+      const [idx, luogo] = e.currentTarget.dataset.doneLeftoverLuogoSet.split(':');
+      const row = leftRow(idx); if(!row) return;
+      row.luogo = luogo; row.pickerOpen = false;
       render();
     });
   });
   document.querySelectorAll('[data-done-leftover-cat-toggle]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.doneModalLeftoverCatPickerOpen = !state.doneModalLeftoverCatPickerOpen;
-      state.doneModalLeftoverPickerOpen = false;
+    btn.addEventListener('click', e=>{
+      const row = leftRow(e.currentTarget.dataset.doneLeftoverCatToggle); if(!row) return;
+      const open = !row.catPickerOpen;
+      state.doneModalLeftovers.forEach(r => { r.pickerOpen = false; r.catPickerOpen = false; });
+      row.catPickerOpen = open;
       render();
     });
   });
-  document.querySelectorAll('[data-done-leftover-cat-close]').forEach(el=>{
-    el.addEventListener('click', ()=>{ state.doneModalLeftoverCatPickerOpen = false; render(); });
-  });
   document.querySelectorAll('[data-done-leftover-cat-set]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      state.doneModalLeftoverCat = e.currentTarget.dataset.doneLeftoverCatSet;
-      state.doneModalLeftoverCatPickerOpen = false;
+      const [idx, cat] = e.currentTarget.dataset.doneLeftoverCatSet.split(':');
+      const row = leftRow(idx); if(!row) return;
+      row.cat = cat; row.catPickerOpen = false;
       render();
     });
   });
@@ -9460,16 +9466,17 @@ function attachHandlers(){
       // un pasto futuro preciso, questo è solo "c'è in dispensa/frigo/...").
       // Il checkbox (deselezionato di default) decide se va aggiunto: il
       // testo da solo non basta, va spuntato esplicitamente.
-      const leftover = (state.doneModalLeftover || '').trim();
-      if(state.doneModalLeftoverChecked && leftover){
+      state.doneModalLeftovers.forEach(row=>{
+        const leftover = (row.name || '').trim();
+        if(!row.checked || !leftover) return;
         const leftoverKey = leftover.toLowerCase();
         const existing = state.pantryItems[leftoverKey];
-        upsertPantryItem(leftover, state.doneModalLeftoverLuogo, 1, 'none', state.doneModalLeftoverCat);
+        upsertPantryItem(leftover, row.luogo, 1, 'none', row.cat);
         // Segnato come avanzo (vedi isLeftoverPantryItem) anche se il reparto
         // scelto non è "Avanzi" — ma non se il nome coincide con un
         // ingrediente vero già in Dispensa, che deve restare tale.
         if(!existing || existing.leftover) state.pantryItems[leftoverKey].leftover = true;
-      }
+      });
       takeRecurringMeal(state.doneModalMeal);
       const doneMealData = effectiveMeal(weekIdx, i, meal);
       // Freezer: le porzioni prese per questo pasto scendono; la metà in più
@@ -9487,12 +9494,7 @@ function attachHandlers(){
       state.doneModalQty = {};
       state.doneQtyEditingKey = null;
       state.doneModalFinished = {}; state.doneModalMeal = {};
-      state.doneModalLeftover = '';
-      state.doneModalLeftoverLuogo = 'frigo';
-      state.doneModalLeftoverCat = 'avanzi';
-      state.doneModalLeftoverChecked = false;
-      state.doneModalLeftoverPickerOpen = false;
-      state.doneModalLeftoverCatPickerOpen = false;
+      state.doneModalLeftovers = [];
       persist(); render();
     });
   });
