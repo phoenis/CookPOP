@@ -1624,3 +1624,10 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .shop-order-row.is-dragging{ opacity:0.6; border-radius:0.5rem; background:var(--surface, rgba(0,0,0,0.05)); }
 
 .frozen-on{ margin-left:0.375rem; font-size:0.75rem; font-weight:500; opacity:0.75; white-space:nowrap; }
+
+/* Dispensa: nome, scadenza e data di congelamento vanno a capo se non ci stanno. */
+.is-text.inv-name{ display:block; white-space:normal; height:auto; line-height:1.4; text-align:left; overflow-wrap:anywhere; }
+.inv-name .exp-badge, .inv-name .frozen-on{ margin-top:0.125rem; }
+
+/* Dispensa: spazio in fondo, così l ultima riga (con la quantità) sta sopra il selettore e il + */
+.pantry-list{ padding-bottom:calc(9rem + env(safe-area-inset-bottom)); }

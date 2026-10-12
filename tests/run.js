@@ -2607,6 +2607,19 @@ test('Ricetta fatta!: un avanzo possibile per ogni piatto; spuntati vanno in Dis
   eq(page.errors, [], 'errori JS');
 });
 
+test('Dispensa: nome lungo con scadenza e data di congelamento va a capo, senza sbordare', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const r = await page.evaluate(() => {
+    state.pantryItems = {};
+    upsertPantryItem('Pollo alla ligure avanzato con patate e olive', 'freezer', 2, '', 'avanzi'); reconcileFreezer();
+    state.tab = 'dispensa'; state.pantryGroupBy = 'cat'; render();
+    const b = document.querySelector('.inv-name');
+    return { fits: b.scrollWidth <= b.clientWidth + 1, lines: Math.round(b.getBoundingClientRect().height / parseFloat(getComputedStyle(b).lineHeight)) };
+  });
+  assert(r.fits, 'il testo sborda');
+  assert(r.lines >= 2, 'doveva andare a capo');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
