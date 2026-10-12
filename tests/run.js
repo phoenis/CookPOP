@@ -2564,6 +2564,14 @@ test('pasti futuri cucinati: a ogni render si tolgono (segni vecchi rimessi da u
   eq(r, { future: false, today: true });
 });
 
+test('ricetta dall\'etichetta: Pollo alla ligure ha ingredienti e procedimento', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const d = getRecipeDetails('Pollo alla ligure');
+    return { meta: !!getRecipeMeta('Pollo alla ligure'), ing: getIngredientsFor('Pollo alla ligure').length, steps: d && d.procedimento.length, porz: d && d.porzioni };
+  });
+  eq(r, { meta: true, ing: 9, steps: 5, porz: '4 porzioni' });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

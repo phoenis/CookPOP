@@ -4513,10 +4513,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-02-07',
+  version: '2027-02-08',
   title: 'Novità',
   items: [
-    'Impostazioni: ora c\'è anche "Consumi ricorrenti" (oltre che nel ⋯ della Dispensa).'
+    'Nuova ricetta dall\'etichetta del pollo: Pollo alla ligure (pollo, patate, olive taggiasche e vermouth, tutto in teglia). Le porzioni sono 4: l\'etichetta non le indicava.'
   ]
 };
 
