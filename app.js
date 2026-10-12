@@ -4508,9 +4508,10 @@ const SEARCH_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 // Solo le novità dell'ultimo aggiornamento (richiesta di Mara): a ogni
 // aggiornamento si sostituiscono le voci, non si aggiungono in cima.
 const WHATS_NEW = {
-  version: '2027-02-08',
+  version: '2027-02-09',
   title: 'Novità',
   items: [
+    'Menù: nella scheda del pasto compaiono le note dei piatti ("Da ricordare") e il promemoria di cucinare una porzione in più di pasta o riso quando il giorno dopo c\'è una ricetta che lo riusa (es. Frittata di pasta).',
     'Nuova ricetta dall\'etichetta del pollo: Pollo alla ligure (pollo, patate, olive taggiasche e vermouth, tutto in teglia). Le porzioni sono 4: l\'etichetta non le indicava.'
   ]
 };
@@ -5112,6 +5113,53 @@ function renderRecipeEditModal(){
 // ephemeral (espanso, swap aperto, modale fatta, chi cucina...). d/dateLabel/
 // isToday sono già calcolati una volta sola dal giorno (renderDayCard) e
 // passati qui, uguali per pranzo e cena dello stesso giorno.
+// Note del piatto nella schedina del pasto: il "Da ricordare" della ricetta e,
+// per chi riusa un avanzo (es. Frittata di pasta, recipe.riusaAvanzo =
+// ['pasta','riso']), il promemoria sul pasto che lo precede: "cuoci una
+// porzione in più di pasta", che altrimenti per abitudine non si fa.
+function mealSlotsInOrder(){
+  const out = [];
+  [0].concat(state.extraWeeks.map((_, n) => n + 1)).forEach(w => WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => out.push({ weekIdx: w, i, meal }))));
+  return out;
+}
+function leftoverSourceFor(slots, idx, bases){
+  for(let k = idx - 1; k >= Math.max(0, idx - 4); k--){
+    let sl = slots[k];
+    const link = linkedSourceMealKey(sl.weekIdx, sl.i, sl.meal);
+    if(link){ const p = parseMealKey(link); sl = { weekIdx: parseInt(p.weekIdx, 10), i: parseInt(p.i, 10), meal: p.meal }; }
+    const meta = effectiveRecipeMeta(sl.weekIdx, sl.i, sl.meal);
+    if(!meta) continue;
+    const b = recipeBase(meta);
+    if(bases.includes(b)) return { ...sl, base: b };
+  }
+  return null;
+}
+function reuseNotesFor(weekIdx, i, meal){
+  const mk = mealKey(weekIdx, i, meal);
+  const slots = mealSlotsInOrder();
+  const notes = [];
+  slots.forEach((t, idx)=>{
+    const meta = effectiveRecipeMeta(t.weekIdx, t.i, t.meal);
+    if(!meta || !Array.isArray(meta.riusaAvanzo) || !meta.riusaAvanzo.length) return;
+    if(linkedSourceMealKey(t.weekIdx, t.i, t.meal)) return;
+    const done = weekMealsDoneRef(t.weekIdx);
+    if(done[t.i] && done[t.i][t.meal]) return;
+    const src = leftoverSourceFor(slots, idx, meta.riusaAvanzo);
+    if(!src || mealKey(src.weekIdx, src.i, src.meal) !== mk) return;
+    notes.push(`Cuoci una porzione in più di ${(BASE_LABEL[src.base] || src.base).toLowerCase()}: ${DATA.week1[t.i].giorno.toLowerCase()} serve per ${meta.nome}.`);
+  });
+  return notes;
+}
+function mealNotesHtml(weekIdx, i, meal, dishes){
+  const notes = reuseNotesFor(weekIdx, i, meal).map(t => ({ t, hot: true }));
+  dishes.forEach(dsh=>{
+    const det = getRecipeDetails(dsh.name);
+    const r = det && det.ricordare && det.ricordare !== 'Niente' ? String(det.ricordare).trim() : '';
+    if(r) notes.push({ t: (dishes.length > 1 ? dsh.name + ': ' : '') + r, hot: false });
+  });
+  if(!notes.length) return '';
+  return `<div class="meal-notes">${notes.map(n => `<div class="meal-note${n.hot ? ' is-hot' : ''}"><span class="meal-note-ic" aria-hidden="true">💡</span><span>${escapeHtml(n.t)}</span></div>`).join('')}</div>`;
+}
 function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLabel, isToday){
   const mk = mealKey(weekIdx, i, meal);
   const linkSource = linkedSourceMealKey(weekIdx, i, meal);
@@ -5288,7 +5336,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         ${currentCat ? `<span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>` : ''}
       </div>
     </div>
-    ${name ? dishesHtml : `
+    ${name ? dishesHtml + (isDone ? '' : mealNotesHtml(weekIdx, i, meal, dishes)) : `
     <button type="button" class="day-menu-row day-menu-empty" data-open-swap="${mk}">+</button>`}
     ${(doneTag || statusBadges.trim()) ? `<div class="recipe-info">
       ${doneTag}

@@ -2620,6 +2620,25 @@ test('Dispensa: nome lungo con scadenza e data di congelamento va a capo, senza 
   assert(r.lines >= 2, 'doveva andare a capo');
 });
 
+test('Menù: nella schedina le note del piatto e "cuoci una porzione in più di pasta" prima della Frittata di pasta', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(0); state.dayLinks = {}; state.mealsDone = {}; state.weekOverrides = {};
+    const pasta = allRecipeMetas().find(x => x.base === 'pasta' && isMainDish(x) && !/frittata/i.test(x.nome));
+    const a = WEEK_DISPLAY_ORDER[2], b = WEEK_DISPLAY_ORDER[3]; // due giorni di fila, senza il fine settimana
+    state.weekBaseline[a].cena = { principale: pasta.nome, contorni: [] };
+    state.weekBaseline[b].cena = { principale: 'Frittata di pasta', contorni: [] };
+    state.weekBaseline[b].pranzo = emptyMealSlot();
+    state.weekBaseline[a].pranzo = emptyMealSlot();
+    state.tab = 'menu'; render();
+    return { notes: reuseNotesFor(0, a, 'cena'), other: reuseNotesFor(0, b, 'cena'), html: mealNotesHtml(0, a, 'cena', mealDishes(0, a, 'cena')), frittata: mealNotesHtml(0, b, 'cena', mealDishes(0, b, 'cena')) };
+  });
+  assert(r.notes.length === 1 && /una porzione in più di pasta/.test(r.notes[0]) && /Frittata di pasta/.test(r.notes[0]), 'promemoria sulla pasta del giorno prima: ' + JSON.stringify(r.notes));
+  eq(r.other, [], 'nessun promemoria sulla frittata');
+  assert(r.html.includes('meal-note is-hot'), 'nota in evidenza');
+  assert(r.frittata.includes('riciclare la pasta avanzata'), 'Da ricordare della ricetta');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
