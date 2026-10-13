@@ -1405,7 +1405,7 @@ test('dispensa +: suggerisce gli ingredienti che hai già e ne copia luogo/unit�
   });
   await page.fill('#pantry-add-name', 'parm');
   eq(await page.locator('[data-pantry-suggest="Parmigiano"]').count(), 1, 'suggerito');
-  await page.locator('[data-pantry-suggest="Parmigiano"]').dispatchEvent('pointerdown');
+  await page.locator('[data-pantry-suggest="Parmigiano"]').click();
   eq(await page.evaluate(() => { const d = state.pantryDraft; return [d.nome, d.luogo, d.unit, d.cat, document.getElementById('pantry-add-name').value]; }), ['Parmigiano', 'frigo', 'g', 'latticini', 'Parmigiano'], 'bozza compilata');
   await page.click('[data-sheet-luogo="freezer"]');
   await page.fill('#pantry-edit-qty', '100');
@@ -2637,6 +2637,28 @@ test('Menù: nella schedina le note del piatto e "cuoci una porzione in più di 
   assert(r.html.includes('meal-note is-hot'), 'nota in evidenza');
   assert(r.frittata.includes('riciclare la pasta avanzata'), 'Da ricordare della ricetta');
   eq(page.errors, [], 'errori JS');
+});
+
+test('Aggiungi ingrediente in Dispensa: toccare un suggerimento sul telefono non attiva "Scansiona il codice a barre" sotto', async ({ page: desktop }) => {
+  const base = new URL(desktop.url()).origin;
+  const ctx = await desktop.context().browser().newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+  await ctx.route(/gstatic\.com|firebase/, r => r.abort());
+  try{
+    const page = await openApp(ctx, base);
+    await page.evaluate(() => {
+      window.__scans = 0; window.openBarcodeScanner = () => { window.__scans++; };
+      state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryAddModalOpen = true; render();
+    });
+    await page.tap('#pantry-add-name'); await page.keyboard.type('pomodor');
+    await page.waitForSelector('[data-pantry-suggest]');
+    const pt = await page.evaluate(() => { const e = document.querySelector('[data-pantry-suggest]'); const b = document.querySelector('.scan-open-btn'); const r = e.getBoundingClientRect(), s = b.getBoundingClientRect(); const y = r.y + r.height / 2; return { x: r.x + r.width / 2, y, over: y > s.top && y < s.bottom }; });
+    assert(pt.over, 'il primo suggerimento deve coprire il bottone (altrimenti il test non prova niente)');
+    await page.touchscreen.tap(pt.x, pt.y);
+    await page.waitForTimeout(400);
+    eq(await page.evaluate(() => window.__scans), 0, 'il lettore non deve aprirsi');
+  }finally{
+    await ctx.close();
+  }
 });
 
 (async () => {

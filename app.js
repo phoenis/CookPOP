@@ -1740,13 +1740,17 @@ function attachIngredientCombobox(input, opts){
   }
   input.addEventListener('input', renderSuggestions);
   input.addEventListener('focus', renderSuggestions);
-  // mousedown, non click: precede il blur dell'input, altrimenti la lista
-  // sparirebbe (per il blur) prima che il tap sul suggerimento venga registrato.
-  list.addEventListener('mousedown', e=>{
+  // mousedown con preventDefault: il campo non perde il fuoco (e la lista non
+  // sparisce per il blur) prima che il tap sul suggerimento venga registrato.
+  // La scelta si fa però al click, non al mousedown: se la lista sparisce
+  // prima, su telefono il click del tap cade sull'elemento che sta sotto (es.
+  // "Scansiona il codice a barre") e lo attiva.
+  list.addEventListener('mousedown', e=>{ if(e.target.closest('[data-combo-pick],[data-combo-create]')) e.preventDefault(); });
+  list.addEventListener('click', e=>{
     const pick = e.target.closest('[data-combo-pick]');
-    if(pick){ e.preventDefault(); input.value = pick.textContent; list.innerHTML = ''; input.dispatchEvent(new Event('change', {bubbles:true})); }
+    if(pick){ e.preventDefault(); e.stopPropagation(); input.value = pick.textContent; list.innerHTML = ''; input.dispatchEvent(new Event('change', {bubbles:true})); return; }
     const create = e.target.closest('[data-combo-create]');
-    if(create){ e.preventDefault(); list.innerHTML = ''; input.dispatchEvent(new Event('change', {bubbles:true})); }
+    if(create){ e.preventDefault(); e.stopPropagation(); list.innerHTML = ''; input.dispatchEvent(new Event('change', {bubbles:true})); }
   });
   input.addEventListener('blur', ()=>{ setTimeout(()=>{ list.innerHTML = ''; }, 150); });
 }
@@ -10495,21 +10499,27 @@ function attachHandlers(){
       fillDraftFromPantry(d, d.nome.trim());
       render();
     });
-    // pointerdown, non click: precede il blur del campo, che altrimenti
-    // svuoterebbe l'elenco prima del tocco.
-    if(suggestEl) suggestEl.addEventListener('pointerdown', e=>{
-      const btn = e.target.closest('[data-pantry-suggest]');
-      if(!btn) return;
-      e.preventDefault();
-      fillDraftFromPantry(state.pantryDraft, btn.dataset.pantrySuggest);
-      state.pantrySheetPicker = null;
-      render();
-      // Scelto: via la tastiera e l'elenco, si passa a quantità e luogo.
-      const inp = document.getElementById('pantry-add-name');
-      if(inp) inp.blur();
-      const sug = document.getElementById('pantry-add-suggest');
-      if(sug) sug.innerHTML = '';
-    });
+    // pointerdown con preventDefault: il campo non perde il fuoco, quindi
+    // l'elenco non si svuota prima del tocco. La scelta si fa però al click:
+    // se l'elenco sparisse già al pointerdown, su telefono il click cadrebbe
+    // sul bottone che sta sotto ("Scansiona il codice a barre") e lo
+    // attiverebbe.
+    if(suggestEl){
+      suggestEl.addEventListener('pointerdown', e=>{ if(e.target.closest('[data-pantry-suggest]')) e.preventDefault(); });
+      suggestEl.addEventListener('click', e=>{
+        const btn = e.target.closest('[data-pantry-suggest]');
+        if(!btn) return;
+        e.preventDefault(); e.stopPropagation();
+        fillDraftFromPantry(state.pantryDraft, btn.dataset.pantrySuggest);
+        state.pantrySheetPicker = null;
+        render();
+        // Scelto: via la tastiera e l'elenco, si passa a quantità e luogo.
+        const inp = document.getElementById('pantry-add-name');
+        if(inp) inp.blur();
+        const sug = document.getElementById('pantry-add-suggest');
+        if(sug) sug.innerHTML = '';
+      });
+    }
     addNameInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') addNameInput.blur(); });
   }
   document.querySelectorAll('[data-sheet-qty]').forEach(btn=> btn.addEventListener('click', ()=>{
