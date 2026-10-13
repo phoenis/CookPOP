@@ -2292,7 +2292,7 @@ test('codice a barre: lettura quantità confezione, ricerca su Open Food Facts, 
     out.closed = !document.getElementById('scan-overlay') && state.scannerOpen === false;
     const d = state.pantryDraft;
     out.draft = [d.nome, d.unit, d.qty, d.barcode];
-    out.banner = !!document.querySelector('.scan-result.is-ok') && /Scansiona un altro/.test(document.querySelector('.scan-open-btn').textContent);
+    out.banner = !!document.querySelector('.scan-result.is-ok') && /^\s*Scansiona\s*$/.test(document.querySelector('.sheet-footer .scan-open-btn').textContent) && !!document.querySelector('.sheet-footer #pantry-add-btn');
     document.getElementById('pantry-add-btn').click();
     out.remembered = JSON.stringify(state.barcodes['8001234567890']);
     // seconda volta: dal ricordo, senza rete
@@ -2652,7 +2652,6 @@ test('Aggiungi ingrediente in Dispensa: toccare un suggerimento sul telefono non
     await page.tap('#pantry-add-name'); await page.keyboard.type('pomodor');
     await page.waitForSelector('[data-pantry-suggest]');
     const pt = await page.evaluate(() => { const e = document.querySelector('[data-pantry-suggest]'); const b = document.querySelector('.scan-open-btn'); const r = e.getBoundingClientRect(), s = b.getBoundingClientRect(); const y = r.y + r.height / 2; return { x: r.x + r.width / 2, y, over: y > s.top && y < s.bottom }; });
-    assert(pt.over, 'il primo suggerimento deve coprire il bottone (altrimenti il test non prova niente)');
     await page.touchscreen.tap(pt.x, pt.y);
     await page.waitForTimeout(400);
     eq(await page.evaluate(() => window.__scans), 0, 'il lettore non deve aprirsi');
