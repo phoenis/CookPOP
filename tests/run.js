@@ -2627,8 +2627,8 @@ test('Menù: nella schedina le note del piatto e "cuoci una porzione in più di 
     const a = WEEK_DISPLAY_ORDER[2], b = WEEK_DISPLAY_ORDER[3]; // due giorni di fila, senza il fine settimana
     state.weekBaseline[a].cena = { principale: pasta.nome, contorni: [] };
     state.weekBaseline[b].cena = { principale: 'Frittata di pasta', contorni: [] };
-    state.weekBaseline[b].pranzo = emptyMealSlot();
-    state.weekBaseline[a].pranzo = emptyMealSlot();
+    // tutti gli altri pasti vuoti: la settimana generata a caso potrebbe avere altre ricette che riusano un avanzo
+    WEEK_DISPLAY_ORDER.forEach(d => { state.weekBaseline[d].pranzo = emptyMealSlot(); if(d !== a && d !== b) state.weekBaseline[d].cena = emptyMealSlot(); });
     state.tab = 'menu'; render();
     return { notes: reuseNotesFor(0, a, 'cena'), other: reuseNotesFor(0, b, 'cena'), html: mealNotesHtml(0, a, 'cena', mealDishes(0, a, 'cena')), frittata: mealNotesHtml(0, b, 'cena', mealDishes(0, b, 'cena')) };
   });
