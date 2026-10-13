@@ -7906,7 +7906,7 @@ function renderIngredientSheet(it, isNew){
       <section class="settings-section">
         <div class="settings-card">
           ${isNew ? '<div class="add-ing-combo">' : ''}<input type="text" class="sheet-name${it.scanFlash ? ' scan-flash' : ''}" id="${isNew ? 'pantry-add-name' : 'pantry-edit-name'}" value="${escapeAttr(it.nome)}" placeholder="${home ? 'Es. Detersivo piatti' : 'Es. Zucchine'}" aria-label="Nome" autocomplete="off">${isNew ? '<div class="add-ing-suggestions" id="pantry-add-suggest"></div></div>' : ''}
-          ${isNew ? `${it.scanMsg ? `<div class="scan-result ${it.scanOk ? 'is-ok' : 'is-miss'}" role="status"><span class="scan-result-ic" aria-hidden="true">${it.scanOk ? '✓' : '!'}</span><span>${escapeHtml(it.scanMsg)}</span></div>` : ''}<button type="button" class="btn is-outline is-block scan-open-btn" data-scan-barcode>${uiIcon('barcode')} ${it.barcode ? 'Scansiona un altro codice' : 'Scansiona il codice a barre'}</button>` : ''}
+          ${isNew ? `${it.scanMsg ? `<div class="scan-result ${it.scanOk ? 'is-ok' : 'is-miss'}" role="status"><span class="scan-result-ic" aria-hidden="true">${it.scanOk ? '✓' : '!'}</span><span>${escapeHtml(it.scanMsg)}</span></div>` : ''}` : ''}
           <div class="settings-field sheet-qty-row">
             <div class="settings-field-label">${unit === 'none' ? 'Ce l\'hai?' : (isNew && existingPantryFor(it.nome) ? 'Quanto ne aggiungi' : 'Quantità')}${isNew ? pantryHaveHintHtml(it.nome) : ''}</div>
             ${qtyHtml}
@@ -7940,7 +7940,7 @@ function renderIngredientSheet(it, isNew){
     </div>
     <div class="sheet-footer">
       ${isNew
-        ? `<button class="btn is-solid is-block" id="pantry-add-btn" type="button">Aggiungi</button>`
+        ? `<div class="edit-footer"><button type="button" class="btn is-outline scan-open-btn" data-scan-barcode>${uiIcon('barcode')} Scansiona</button><button class="btn is-solid" id="pantry-add-btn" type="button">Aggiungi</button></div>`
         : `<button class="btn is-solid is-block" type="button" data-close-pantry-edit>Fatto</button>`}
     </div>
   </div>`;

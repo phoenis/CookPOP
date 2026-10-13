@@ -1636,3 +1636,7 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .meal-note{ display:flex; gap:0.375rem; align-items:flex-start; font-size:var(--text-xsmall, 0.8rem); line-height:1.35; color:var(--ink-light); }
 .meal-note.is-hot{ color:inherit; font-weight:var(--weight-medium); }
 .meal-note-ic{ flex:0 0 auto; }
+
+/* "Scansiona" accanto ad "Aggiungi": bordo, icona e testo neri (colore del testo, chiaro nel tema scuro). */
+.sheet-footer .edit-footer .scan-open-btn{ margin:0; background:var(--surface); color:var(--ink); border:1.5px solid var(--ink); font-weight:var(--weight-medium); flex:0 0 auto; }
+.sheet-footer .edit-footer .scan-open-btn svg{ color:var(--ink); }
