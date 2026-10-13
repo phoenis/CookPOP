@@ -2639,6 +2639,28 @@ test('Menù: nella schedina le note del piatto e "cuoci una porzione in più di 
   eq(page.errors, [], 'errori JS');
 });
 
+test('Aggiungi ingrediente in Dispensa: toccare un suggerimento sul telefono non attiva "Scansiona il codice a barre" sotto', async ({ page: desktop }) => {
+  const base = new URL(desktop.url()).origin;
+  const ctx = await desktop.context().browser().newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+  await ctx.route(/gstatic\.com|firebase/, r => r.abort());
+  try{
+    const page = await openApp(ctx, base);
+    await page.evaluate(() => {
+      window.__scans = 0; window.openBarcodeScanner = () => { window.__scans++; };
+      state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryAddModalOpen = true; render();
+    });
+    await page.tap('#pantry-add-name'); await page.keyboard.type('pomodor');
+    await page.waitForSelector('[data-pantry-suggest]');
+    const pt = await page.evaluate(() => { const e = document.querySelector('[data-pantry-suggest]'); const b = document.querySelector('.scan-open-btn'); const r = e.getBoundingClientRect(), s = b.getBoundingClientRect(); const y = r.y + r.height / 2; return { x: r.x + r.width / 2, y, over: y > s.top && y < s.bottom }; });
+    assert(pt.over, 'il primo suggerimento deve coprire il bottone (altrimenti il test non prova niente)');
+    await page.touchscreen.tap(pt.x, pt.y);
+    await page.waitForTimeout(400);
+    eq(await page.evaluate(() => window.__scans), 0, 'il lettore non deve aprirsi');
+  }finally{
+    await ctx.close();
+  }
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
