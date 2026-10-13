@@ -1405,7 +1405,7 @@ test('dispensa +: suggerisce gli ingredienti che hai giÃ  e ne copia luogo/unitÃ
   });
   await page.fill('#pantry-add-name', 'parm');
   eq(await page.locator('[data-pantry-suggest="Parmigiano"]').count(), 1, 'suggerito');
-  await page.locator('[data-pantry-suggest="Parmigiano"]').dispatchEvent('pointerdown');
+  await page.locator('[data-pantry-suggest="Parmigiano"]').click();
   eq(await page.evaluate(() => { const d = state.pantryDraft; return [d.nome, d.luogo, d.unit, d.cat, document.getElementById('pantry-add-name').value]; }), ['Parmigiano', 'frigo', 'g', 'latticini', 'Parmigiano'], 'bozza compilata');
   await page.click('[data-sheet-luogo="freezer"]');
   await page.fill('#pantry-edit-qty', '100');
