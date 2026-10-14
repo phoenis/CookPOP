@@ -2660,6 +2660,22 @@ test('Aggiungi ingrediente in Dispensa: toccare un suggerimento sul telefono non
   }
 });
 
+test('Dispensa: selezione + "Aggiungi alla lista spesa" rimette in lista anche un ingrediente già comprato', async ({ page }) => {
+  await page.evaluate(() => {
+    state.pantryItems = {}; upsertPantryItem('Latte', 'frigo', 2, 'l', 'latticini'); upsertPantryItem('Burro', 'frigo', 0, 'g', 'latticini');
+    // Latte: comprato in passato da Spesa (riga aggiunta a mano ormai nascosta)
+    state.shopExtras = { extra_old: { ingrediente: 'Latte', qta: '1' } }; state.shopDismissed = { extra_old: true }; state.shopChecked = {};
+    delete state.pantryConfirmedShop['burro']; state.shopDismissed['oos_burro'] = true;
+    state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantrySelectMode = true; state.pantrySelected = { latte: true, burro: true }; render();
+  });
+  await page.click('#pantry-selection-mark');
+  const r = await page.evaluate(() => { const flat = buildShopFlat(); return { latte: flat.some(x => x.ingrediente === 'Latte'), burro: flat.some(x => /burro/i.test(x.ingrediente)), toast: state.undoToast && state.undoToast.message, extras: Object.keys(state.shopExtras).length }; });
+  eq(r, { latte: true, burro: true, toast: '2 ingredienti aggiunti alla lista spesa', extras: 1 });
+  await page.click('.undo-toast button');
+  eq(await page.evaluate(() => buildShopFlat().some(x => x.ingrediente === 'Latte')), false, 'annullato');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

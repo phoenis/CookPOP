@@ -9964,18 +9964,27 @@ function attachHandlers(){
   });
   const pantrySelectionMarkBtn = document.getElementById('pantry-selection-mark');
   if(pantrySelectionMarkBtn) pantrySelectionMarkBtn.addEventListener('click', ()=>{
+    const snap = JSON.parse(JSON.stringify({ e: state.shopExtras, d: state.shopDismissed, c: state.shopChecked, p: state.pantryConfirmedShop }));
+    let added = 0;
     Object.keys(state.pantrySelected).forEach(key=>{
       const it = state.pantryItems[key];
       if(!it) return;
+      added++;
       if(typeof it.qty === 'number' && it.qty <= 0){
         // Finito: riusa lo stesso record già in Spesa, non ne crea uno nuovo.
         state.pantryConfirmedShop[key] = true;
         delete state.shopDismissed[`oos_${key}`];
+        delete state.shopChecked[`oos_${key}`];
       } else {
         // Ce l'hai ancora ma lo vuoi comunque in lista (es. sta per finire):
-        // stessa strada di un'aggiunta manuale da Spesa, solo se non c'è già.
-        const already = Object.values(state.shopExtras).some(ex => !ex.per && (ex.ingrediente||'').trim().toLowerCase() === key);
-        if(!already){
+        // stessa strada di un'aggiunta manuale da Spesa. Se era già tra gli
+        // "Aggiunti a mano" ma comprato o tolto (la riga resta salvata,
+        // nascosta) si rimette in vista: prima veniva saltato e non compariva.
+        const sameId = Object.keys(state.shopExtras).find(id => !state.shopExtras[id].per && (state.shopExtras[id].ingrediente||'').trim().toLowerCase() === key);
+        if(sameId){
+          delete state.shopDismissed[sameId];
+          state.shopChecked[sameId] = false;
+        } else {
           const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
           state.shopExtras[id] = { ingrediente: it.nome, qta: '' };
         }
@@ -9984,6 +9993,10 @@ function attachHandlers(){
     state.pantrySelectMode = false;
     state.pantrySelected = {};
     persist(); render();
+    if(added) showUndoToast(added === 1 ? 'Aggiunto alla lista spesa' : `${added} ingredienti aggiunti alla lista spesa`, ()=>{
+      state.shopExtras = snap.e; state.shopDismissed = snap.d; state.shopChecked = snap.c; state.pantryConfirmedShop = snap.p;
+      persist(); render();
+    });
   });
   document.querySelectorAll('[data-luogo-toggle]').forEach(btn=>{
     btn.addEventListener('click', e=>{
