@@ -6977,13 +6977,6 @@ function renderSpesa(){
   return `
     ${missingBanner}
     ${listSearchHtml('shop-search', state.shopSearch, 'Cerca nella lista…')}
-    <div class="shop-progress">
-      <div class="shop-progress-row">
-        <span><b>${displayDone}</b> di ${displayTotal} nel carrello</span>
-        <span class="shop-sync">${(personalSynced && catalogSynced && navigator.onLine !== false) ? '' : 'Offline · salvo e invio dopo'}</span>
-      </div>
-      <div class="shop-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${displayTotal}" aria-valuenow="${displayDone}"><span style="width:${displayTotal ? Math.round(100 * displayDone / displayTotal) : 0}%"></span></div>
-    </div>
     <div class="shop-head">
       ${(total && ['reparto','categoria','giorno'].includes(state.shopView)) ? `<button type="button" class="btn is-text shop-toggle-all" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? 'Apri tutti' : 'Chiudi tutti'}</button>` : '<span></span>'}
       <label class="shop-group-by"><span>Ordina per</span>
@@ -7896,6 +7889,25 @@ document.addEventListener('click', e=>{
   const lu = t.closest('[data-add-luogo]');
   if(lu){ d.luogo = lu.dataset.addLuogo; a.luogoUser = true; render(); return; }
   if(t.closest('[data-add-confirm]')){ addSheetCommit(); return; }
+}, true);
+// L'elenco dei suggerimenti si chiude quando il campo nome perde il fuoco (es.
+// tocchi la quantità). pointerdown con preventDefault sulle righe: toccando un
+// suggerimento il campo non perde il fuoco, così la scelta (al click) funziona.
+document.addEventListener('pointerdown', e=>{
+  if(state.addSheet && e.target.closest && e.target.closest('.add-suggest')) e.preventDefault();
+}, true);
+document.addEventListener('focusout', e=>{
+  const a = state.addSheet;
+  if(!a || !e.target.matches || !e.target.matches('[data-add-name]')) return;
+  setTimeout(()=>{
+    if(state.addSheet !== a || !a.suggestOpen) return;
+    if(document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-add-name]')) return;
+    a.suggestOpen = false; render();
+  }, 120);
+});
+document.addEventListener('keydown', e=>{
+  const a = state.addSheet;
+  if(a && a.suggestOpen && e.key === 'Escape'){ e.stopPropagation(); a.suggestOpen = false; render(); }
 }, true);
 document.addEventListener('input', e=>{
   const a = state.addSheet; if(!a) return;

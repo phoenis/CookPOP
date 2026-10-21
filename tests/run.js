@@ -2755,6 +2755,20 @@ test('Aggiungi unico: da telefono, toccare un suggerimento non apre il lettore',
   }finally{ await ctx.close(); }
 });
 
+test('Aggiungi unico: la tendina dei suggerimenti si chiude toccando altrove o con Esc, e riappare scrivendo', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'spesa'; openAddSheet('spesa'); });
+  await page.fill('#add-name', 'pomodor');
+  eq(await page.evaluate(() => document.querySelectorAll('[data-add-pick]').length > 0), true, 'aperta');
+  await page.click('#add-qty');
+  await page.waitForTimeout(300);
+  eq(await page.evaluate(() => document.querySelectorAll('[data-add-pick]').length), 0, 'chiusa toccando la quantità');
+  await page.click('#add-name'); await page.keyboard.type('i');
+  eq(await page.evaluate(() => document.querySelectorAll('[data-add-pick]').length > 0), true, 'riaperta scrivendo');
+  await page.keyboard.press('Escape');
+  eq(await page.evaluate(() => [document.querySelectorAll('[data-add-pick]').length, !!state.addSheet]), [0, true], 'Esc chiude solo la tendina');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
