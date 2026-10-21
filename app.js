@@ -1869,6 +1869,7 @@ const state = {
   groupEditId: null, // non persistito: gruppo aperto in modifica ('new' per uno nuovo)
   groupDraft: null, // non persistito: { label, matchName, cat, matchTouched }
   groupMemberSearch: '', // non persistito: ricerca "Aggiungi un formato" nel gruppo in modifica
+  addSheet: null, // non persistito: finestra "Aggiungi" unica ({mode:'spesa'|'casa', d: bozza come newPantryDraft, per, perNew, detailsOpen, suggestOpen, luogoUser})
   moveModal: null, // non persistito: finestra "Metti in dispensa" ({rows:[{rowKey,name,unit,per,qtyDefault,qtyLabel,luogo,scad,userScad}], open})
   expiryConfirm: [], // non persistito: chiavi di Dispensa con scadenza stimata da confermare (renderExpiryConfirmModal)
   balanceDetailsOpen: false, // non persistito: spiegazione sotto la riga dell'equilibrio nel Menù
@@ -4652,7 +4653,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -4753,6 +4754,7 @@ const MODAL_CHECKS = [
   [()=> !!state.cookbookNameDraft, ()=>{ state.cookbookNameDraft = null; }],
   [()=> !!state.recipeImport, ()=>{ state.recipeImport = null; }],
   [()=> !!state.albumForRecipe, ()=>{ state.albumForRecipe = null; }],
+  [()=> !!state.addSheet, ()=>{ state.addSheet = null; }],
   [()=> !!state.moveModal, ()=>{ closeMoveModal(); }],
   [()=> expiryConfirmKeys().length > 0, ()=>{ closeExpiryConfirm(); }],
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
@@ -6993,7 +6995,6 @@ function renderSpesa(){
     <div class="shop-list">${body}</div>
           
     
-  ${addIngModal}
   ${renderExpiryConfirmModal()}
   ${renderMoveModal()}
     <div class="shop-bar">
@@ -7717,6 +7718,209 @@ function expiryBadgeHtml(days, iso){
 // categoria e gruppo come righe che si aprono in un elenco; unità, "Unisci
 // con…" ed Elimina sotto "Altro". Il pulsante in fondo resta sempre visibile.
 const UNIT_SHORT = { '':'pezzi', g:'g', kg:'kg', ml:'ml', l:'l', none:"solo c'è / non c'è" };
+// Aggiunge alla Dispensa quello che c'è nella bozza (scheda Aggiungi, o foglio
+// Aggiungi unico in modalità "in casa"). Ritorna false se manca il nome.
+function commitPantryDraft(d){
+    const nome = (d.nome || '').trim();
+    if(!nome) return false;
+    // Dalla vista Casa, un prodotto che la categoria automatica non
+    // riconosce come "di casa" finisce in Casa › Altro invece che nel cibo.
+    let cat = d.cat || '';
+    if(!cat && d.home && !isNonFoodDept(classifyDept(nome))) cat = 'altro-casa';
+    const key = nome.toLowerCase();
+    const prevItem = state.pantryItems[key] ? Object.assign({}, state.pantryItems[key]) : null;
+    upsertPantryItem(nome, d.luogo, d.unit === 'none' ? (d.qty > 0 ? 1 : 0) : d.qty, d.unit || '', cat, d.group || '');
+    if(d.barcode){
+      if(!state.barcodes) state.barcodes = {};
+      state.barcodes[d.barcode] = { nome, cat: d.cat || '', unit: d.unit || '', qty: d.packQty || 0 };
+    }
+    const added = state.pantryItems[key];
+    if(added){
+      // Voce che c'era già: vale quello scelto nella scheda (es. il luogo).
+      added.luogo = d.luogo || added.luogo;
+      if(d.unit === 'none') added.qty = d.qty > 0 ? 1 : 0;
+      if(d.scadenza){
+        // Voce già in casa con un'altra scadenza: la nuova confezione è un lotto.
+        if(prevItem && typeof prevItem.qty === 'number' && prevItem.qty > 0 && d.unit !== 'none'){
+          const lots = (Array.isArray(prevItem.lots) ? prevItem.lots : [{ qty: prevItem.qty, scadenza: prevItem.scadenza || '' }]).map(l => ({ qty: l.qty, scadenza: l.scadenza || '' }));
+          lots.push({ qty: d.qty, scadenza: d.scadenza });
+          added.lots = lots;
+          normalizeLots(added);
+        } else added.scadenza = d.scadenza;
+      }
+    }
+    // Se è finito nell'altra vista (es. "Detersivo" aggiunto da Cibo), ci
+    // si sposta lì: altrimenti sembrerebbe non essere stato aggiunto.
+    state.pantryView = isNonFoodDept(knownDept(cat) || classifyDept(nome)) ? 'casa' : 'cibo';
+    closeIngredientSheet();
+    state.addSheet = null;
+    persist(); render();
+    showUndoToast(`${nome} aggiunto`, ()=>{ if(prevItem) state.pantryItems[key] = prevItem; else delete state.pantryItems[key]; persist(); render(); });
+  return true;
+}
+
+// --- Aggiungi (foglio unico: alla Spesa / in casa) ---------------------------
+// Una sola finestra per aggiungere un ingrediente, dalla Spesa (+) o dalla
+// Dispensa (+): in alto si sceglie se va in lista ("alla Spesa") o già in
+// Dispensa ("in casa"). Nome con suggerimenti e codice a barre, quantità con
+// unità, e gli "Altri dettagli" (per chi, reparto, dove sta, scadenza) a scomparsa.
+function openAddSheet(mode){
+  const d = newPantryDraft(mode === 'casa' && state.tab === 'dispensa' && state.pantryView === 'casa');
+  state.addSheet = { mode, d, per: '', perNew: '', detailsOpen: false, suggestOpen: false, luogoUser: false };
+  render();
+}
+function addSheetSummary(a){
+  const d = a.d;
+  const per = a.per === '__new' ? (a.perNew || 'un\'altra persona') : a.per;
+  const cat = knownDept(d.cat) ? DEPT_LABEL[d.cat] : 'reparto automatico';
+  return `${per ? 'Per ' + per : 'Per noi'} · ${cat.toLowerCase()} · ${a.mode === 'casa' ? 'sta in' : 'va in'} ${LUOGO_LABEL[d.luogo || 'dispensa']}`;
+}
+function renderAddSheet(){
+  const a = state.addSheet;
+  if(!a) return '';
+  const d = a.d, name = (d.nome || '').trim(), q = name.toLowerCase();
+  const casa = a.mode === 'casa';
+  const unit = d.unit || '';
+  const sugg = (a.suggestOpen && q) ? pantryAddSuggestions(q).slice(0, 4) : [];
+  const exact = !!q && (sugg.some(n => n.toLowerCase() === q) || !!existingPantryFor(name));
+  const matchBold = n => { const i = n.toLowerCase().indexOf(q); return i < 0 ? escapeHtml(n) : `${escapeHtml(n.slice(0, i))}<b>${escapeHtml(n.slice(i, i + q.length))}</b>${escapeHtml(n.slice(i + q.length))}`; };
+  const suggHtml = (sugg.length || (a.suggestOpen && q && !exact)) ? `<div class="add-suggest">
+      ${sugg.map(n => { const ex = existingPantryFor(n); const meta = ex ? `${escapeHtml(DEPT_LABEL[knownDept(ex.cat) || classifyDept(n)] || '')} · ${typeof ex.qty === 'number' && ex.qty > 0 ? (ex.unit === 'none' ? 'in casa' : ex.qty + ' ' + escapeHtml(UNIT_SHORT[ex.unit || ''] || ex.unit) + ' in casa') : '0 in casa'}` : escapeHtml(DEPT_LABEL[classifyDept(n)] || ''); return `<button type="button" class="add-suggest-row" data-add-pick="${escapeAttr(n)}"><span>${matchBold(n)}</span><span class="add-suggest-meta">${meta}</span></button>`; }).join('')}
+      ${!exact ? `<button type="button" class="add-suggest-row add-suggest-new" data-add-create>+ Crea “${escapeHtml(name)}”</button>` : ''}
+    </div>` : '';
+  const step = qtyStepFor(unit);
+  const units = UNIT_ORDER.filter(u => casa || u !== 'none');
+  const detail = a.detailsOpen ? `<div class="add-details">
+      ${!casa ? `<div class="add-field-label">Per chi</div>
+      <select data-add-per aria-label="Per chi"><option value="">Noi</option>${shopPeople().map(p=>`<option value="${escapeAttr(p)}" ${a.per===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}<option value="__new" ${a.per==='__new'?'selected':''}>Un'altra persona…</option></select>
+      ${a.per === '__new' ? `<input type="text" class="add-per-new" data-add-per-new placeholder="Nome (es. Nonna)" value="${escapeAttr(a.perNew || '')}" autocomplete="off">` : ''}` : ''}
+      <div class="add-field-label">Categoria (reparto in "Per reparto")</div>
+      <select data-add-cat aria-label="Categoria"><option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(name || '')] || '')})</option>${deptOptionsHtml(d.cat || '')}</select>
+      <div class="add-field-label">${casa ? 'Dove sta' : 'Dove va quando lo compri'}</div>
+      <div class="move-chips">${LUOGO_ORDER.map(l => `<button type="button" class="btn is-chip move-chip${(d.luogo || 'dispensa') === l ? ' active' : ''}" data-add-luogo="${l}">${LUOGO_ICON[l] || ''} ${escapeHtml(LUOGO_LABEL[l])}</button>`).join('')}</div>
+      ${casa ? `<div class="add-field-label">Scadenza</div><input type="date" data-add-scad value="${escapeAttr(d.scadenza || '')}" aria-label="Scadenza">` : ''}
+      ${(!existingPantryFor(name) && name) ? `<div class="add-field-label">Gruppo (es. un formato di pasta)</div>
+      <select data-add-group aria-label="Gruppo"><option value="">Nessuno</option>${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${d.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}</select>` : ''}
+    </div>` : '';
+  return `
+  <div class="move-backdrop" data-add-bg>
+    <div class="move-sheet add-sheet" role="dialog" aria-label="Aggiungi" data-stop-close>
+      <div class="move-handle" aria-hidden="true"></div>
+      <div class="add-head">
+        <h2 class="move-title">Aggiungi</h2>
+        <div class="add-seg" role="group" aria-label="Dove aggiungere">
+          <button type="button" class="${!casa ? 'active' : ''}" data-add-mode="spesa" aria-pressed="${!casa}">alla Spesa</button>
+          <button type="button" class="${casa ? 'active' : ''}" data-add-mode="casa" aria-pressed="${casa}">in casa</button>
+        </div>
+      </div>
+      <div class="add-body">
+        <div class="add-field${d.scanFlash ? ' scan-flash' : ''}">
+          <input type="text" id="add-name" data-add-name placeholder="Es. Zucchine" value="${escapeAttr(d.nome || '')}" aria-label="Nome" autocomplete="off">
+          <button type="button" class="add-scan" data-add-scan aria-label="Scansiona il codice a barre">${uiIcon('barcode')}</button>
+        </div>
+        ${d.scanMsg ? `<div class="scan-result ${d.scanOk ? 'is-ok' : 'is-miss'}" role="status"><span class="scan-result-ic" aria-hidden="true">${d.scanOk ? '✓' : '!'}</span><span>${escapeHtml(d.scanMsg)}</span></div>` : ''}
+        ${suggHtml}
+        <div class="add-qty-row">
+          <span class="add-field-label">Quantità</span>
+          <span class="qty-stepper">
+            <button class="qty-btn" type="button" data-add-qty="-1" aria-label="Diminuisci">−</button>
+            <input type="number" min="0" step="${step}" class="qty-input" id="add-qty" data-add-qty-input value="${d.qty > 0 ? d.qty : ''}" placeholder="–" aria-label="Quantità">
+            <button class="qty-btn" type="button" data-add-qty="1" aria-label="Aumenta">+</button>
+          </span>
+          <select class="add-unit" data-add-unit aria-label="Unità">${units.map(u=>`<option value="${u}" ${unit===u?'selected':''}>${escapeHtml(UNIT_SHORT[u] || u)}</option>`).join('')}</select>
+        </div>
+        <button type="button" class="add-details-toggle" data-add-details aria-expanded="${a.detailsOpen}">Altri dettagli: <b>${escapeHtml(addSheetSummary(a))}</b> <span class="add-chev" aria-hidden="true">${a.detailsOpen ? '⌃' : '⌄'}</span></button>
+        ${detail}
+      </div>
+      <div class="move-footer add-footer"><button type="button" class="btn is-solid" data-add-confirm>${name ? 'Aggiungi ' + escapeHtml(name.toLowerCase()) : 'Aggiungi'}</button></div>
+    </div>
+  </div>`;
+}
+function addSheetCommit(){
+  const a = state.addSheet; if(!a) return;
+  const d = a.d, nome = (d.nome || '').trim();
+  if(!nome){ const inp = document.getElementById('add-name'); if(inp) inp.focus(); return; }
+  if(a.mode === 'casa'){ commitPantryDraft(d); return; }
+  // alla Spesa
+  const per = a.per === '__new' ? (a.perNew || '').trim() : a.per;
+  if(a.per === '__new' && !per){ const p = document.querySelector('[data-add-per-new]'); if(p) p.focus(); return; }
+  const unit = d.unit && d.unit !== 'none' ? d.unit : '';
+  const qta = d.qty > 0 ? `${d.qty}${unit ? ' ' + unit : ''}` : '';
+  const snap = JSON.parse(JSON.stringify({ e: state.shopExtras, d: state.shopDismissed, p: state.pantryConfirmedShop, i: state.pantryItems }));
+  const pantryKey = nome.toLowerCase();
+  const pantryIt = state.pantryItems[pantryKey];
+  const catChoice = d.cat || '';
+  if(per){
+    const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    state.shopExtras[id] = Object.assign({ ingrediente: nome, qta, per }, catChoice ? { cat: catChoice } : {});
+  } else if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
+    // Finito in Dispensa: si riattiva quella voce (resta un unico record).
+    state.pantryConfirmedShop[pantryKey] = qta || true;
+    delete state.shopDismissed[`oos_${pantryKey}`];
+    if(catChoice) pantryIt.cat = catChoice;
+  } else {
+    const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    state.shopExtras[id] = catChoice ? { ingrediente: nome, qta, cat: catChoice } : { ingrediente: nome, qta };
+    // Ingrediente nuovo: entra subito nell'anagrafica a scorta 0 (categoria,
+    // gruppo, luogo e unità scelti qui), in scorta solo quando lo compri.
+    if(!pantryIt){
+      upsertPantryItem(nome, d.luogo || 'dispensa', 0, unit, catChoice, d.group || '');
+      state.shopDismissed[`oos_${pantryKey}`] = true;
+    }
+  }
+  if(d.barcode){
+    if(!state.barcodes) state.barcodes = {};
+    state.barcodes[d.barcode] = { nome, cat: catChoice, unit: d.unit || '', qty: d.packQty || 0 };
+  }
+  state.addSheet = null;
+  persist(); render();
+  showUndoToast(`${nome} aggiunto alla lista`, ()=>{
+    state.shopExtras = snap.e; state.shopDismissed = snap.d; state.pantryConfirmedShop = snap.p; state.pantryItems = snap.i;
+    persist(); render();
+  });
+}
+document.addEventListener('click', e=>{
+  const a = state.addSheet;
+  if(!a) return;
+  const t = e.target, d = a.d;
+  if(t.closest('[data-add-bg]') && !t.closest('[data-stop-close]')){ state.addSheet = null; render(); return; }
+  const mode = t.closest('[data-add-mode]');
+  if(mode){ a.mode = mode.dataset.addMode; render(); return; }
+  if(t.closest('[data-add-scan]')){ a.suggestOpen = false; openBarcodeScanner(); return; }
+  const pick = t.closest('[data-add-pick]');
+  if(pick){ fillDraftFromPantry(d, pick.dataset.addPick); a.suggestOpen = false; if(!a.luogoUser && !existingPantryFor(d.nome)) d.luogo = inventoryGuessLuogo(d.nome, classifyDept(d.nome)); render(); const inp = document.getElementById('add-name'); if(inp) inp.blur(); return; }
+  if(t.closest('[data-add-create]')){ a.suggestOpen = false; render(); return; }
+  const qtyBtn = t.closest('[data-add-qty]');
+  if(qtyBtn){ const step = qtyStepFor(d.unit || '') * parseInt(qtyBtn.dataset.addQty, 10); d.qty = Math.max(0, Math.round(((typeof d.qty === 'number' ? d.qty : 0) + step) * 100) / 100); render(); return; }
+  if(t.closest('[data-add-details]')){ a.detailsOpen = !a.detailsOpen; render(); return; }
+  const lu = t.closest('[data-add-luogo]');
+  if(lu){ d.luogo = lu.dataset.addLuogo; a.luogoUser = true; render(); return; }
+  if(t.closest('[data-add-confirm]')){ addSheetCommit(); return; }
+}, true);
+document.addEventListener('input', e=>{
+  const a = state.addSheet; if(!a) return;
+  const t = e.target;
+  if(t.matches && t.matches('[data-add-name]')){
+    a.d.nome = t.value; a.suggestOpen = true; a.d.scanMsg = ''; a.d.scanOk = false;
+    if(!a.luogoUser && !existingPantryFor(t.value)) a.d.luogo = inventoryGuessLuogo(t.value, classifyDept(t.value));
+    render();
+  } else if(t.matches && t.matches('[data-add-qty-input]')){
+    const n = parseFloat(String(t.value).replace(',', '.')); a.d.qty = Number.isNaN(n) ? 0 : Math.max(0, n);
+  } else if(t.matches && t.matches('[data-add-per-new]')){ a.perNew = t.value; }
+});
+document.addEventListener('change', e=>{
+  const a = state.addSheet; if(!a) return;
+  const t = e.target; if(!t.matches) return;
+  if(t.matches('[data-add-unit]')){ a.d.unit = t.value; if(t.value === 'none') a.d.qty = 1; render(); }
+  else if(t.matches('[data-add-cat]')){ a.d.cat = t.value; render(); }
+  else if(t.matches('[data-add-group]')){ a.d.group = t.value; }
+  else if(t.matches('[data-add-per]')){ a.per = t.value; render(); }
+  else if(t.matches('[data-add-scad]')){ a.d.scadenza = t.value; }
+  else if(t.matches('[data-add-name]')){
+    // scritto a mano il nome di una voce che c'è già: stessi dati che se l'avessi scelta dall'elenco
+    if(existingPantryFor(a.d.nome)){ fillDraftFromPantry(a.d, a.d.nome.trim()); render(); }
+  }
+});
 function newPantryDraft(home){
   return { nome:'', qty:1, luogo:'dispensa', unit:'', cat:'', group:'', scadenza:'', home: !!home };
 }
@@ -7828,7 +8032,7 @@ async function lookupBarcode(code){
   finally{ if(timer) clearTimeout(timer); }
 }
 function applyScannedProduct(code, product){
-  const d = state.pantryDraft; if(!d) return;
+  const d = state.addSheet ? state.addSheet.d : state.pantryDraft; if(!d) return;
   d.barcode = code;
   if(!product || product.failed){
     d.scanOk = false;
@@ -7890,10 +8094,12 @@ function openBarcodeScanner(){
       await new Promise(res => setTimeout(res, 1600));
     }
     closeBarcodeScanner();
-    if(state.pantryDraft) applyScannedProduct(code, product);
+    const scanDraft = state.addSheet ? state.addSheet.d : state.pantryDraft;
+    if(scanDraft) applyScannedProduct(code, product);
+    if(state.addSheet) state.addSheet.suggestOpen = false;
     render();
-    if(state.pantryDraft && !state.pantryDraft.scanOk){ const nm = document.getElementById('pantry-add-name'); if(nm) nm.focus(); }
-    if(state.pantryDraft) setTimeout(()=>{ state.pantryDraft && (state.pantryDraft.scanFlash = false); }, 1600);
+    if(scanDraft && !scanDraft.scanOk){ const nm = document.getElementById(state.addSheet ? 'add-name' : 'pantry-add-name'); if(nm) nm.focus(); }
+    if(scanDraft) setTimeout(()=>{ scanDraft.scanFlash = false; }, 1600);
   };
   document.getElementById('scan-close').addEventListener('click', ()=>{ closeBarcodeScanner(); render(); });
   const go = ()=>{ const v = (document.getElementById('scan-code').value || '').replace(/\D/g, ''); if(v.length >= 6) finish(v); else msg('Scrivi tutte le cifre del codice.'); };
@@ -8872,7 +9078,7 @@ function attachHandlers(){
     });
   });
   const spesaFab = document.getElementById('spesa-fab');
-  if(spesaFab) spesaFab.addEventListener('click', ()=>{ state.addIngModalOpen = true; state.addIngKeepFocus = null; render(); });
+  if(spesaFab) spesaFab.addEventListener('click', ()=> openAddSheet('spesa'));
   document.querySelectorAll('[data-close-add-ing-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
@@ -9984,8 +10190,8 @@ function attachHandlers(){
   // "+" di Dispensa: stesso modale di "+ Aggiungi ingrediente" nel menu ⋯
   // (titolo/categoria di ripiego seguono la vista Cibo/Casa aperta).
   const pantryFab = document.getElementById('pantry-fab');
-  if(pantryFab) pantryFab.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); });
-  document.querySelectorAll('[data-manage-ingredient-new]').forEach(btn=> btn.addEventListener('click', ()=>{ state.pantryAddModalOpen = true; render(); }));
+  if(pantryFab) pantryFab.addEventListener('click', ()=> openAddSheet('casa'));
+  document.querySelectorAll('[data-manage-ingredient-new]').forEach(btn=> btn.addEventListener('click', ()=> openAddSheet('casa')));
 
   document.querySelectorAll('.chip-row [data-f]').forEach(btn=>{
     btn.addEventListener('click', e=>{
@@ -10773,40 +10979,7 @@ function attachHandlers(){
   const pantryAddBtn = document.getElementById('pantry-add-btn');
   if(pantryAddBtn) pantryAddBtn.addEventListener('click', ()=>{
     const d = state.pantryDraft; if(!d) return;
-    const nome = (d.nome || '').trim();
-    if(!nome){ const inp = document.getElementById('pantry-add-name'); if(inp) inp.focus(); return; }
-    // Dalla vista Casa, un prodotto che la categoria automatica non
-    // riconosce come "di casa" finisce in Casa › Altro invece che nel cibo.
-    let cat = d.cat || '';
-    if(!cat && d.home && !isNonFoodDept(classifyDept(nome))) cat = 'altro-casa';
-    const key = nome.toLowerCase();
-    const prevItem = state.pantryItems[key] ? Object.assign({}, state.pantryItems[key]) : null;
-    upsertPantryItem(nome, d.luogo, d.unit === 'none' ? (d.qty > 0 ? 1 : 0) : d.qty, d.unit || '', cat, d.group || '');
-    if(d.barcode){
-      if(!state.barcodes) state.barcodes = {};
-      state.barcodes[d.barcode] = { nome, cat: d.cat || '', unit: d.unit || '', qty: d.packQty || 0 };
-    }
-    const added = state.pantryItems[key];
-    if(added){
-      // Voce che c'era già: vale quello scelto nella scheda (es. il luogo).
-      added.luogo = d.luogo || added.luogo;
-      if(d.unit === 'none') added.qty = d.qty > 0 ? 1 : 0;
-      if(d.scadenza){
-        // Voce già in casa con un'altra scadenza: la nuova confezione è un lotto.
-        if(prevItem && typeof prevItem.qty === 'number' && prevItem.qty > 0 && d.unit !== 'none'){
-          const lots = (Array.isArray(prevItem.lots) ? prevItem.lots : [{ qty: prevItem.qty, scadenza: prevItem.scadenza || '' }]).map(l => ({ qty: l.qty, scadenza: l.scadenza || '' }));
-          lots.push({ qty: d.qty, scadenza: d.scadenza });
-          added.lots = lots;
-          normalizeLots(added);
-        } else added.scadenza = d.scadenza;
-      }
-    }
-    // Se è finito nell'altra vista (es. "Detersivo" aggiunto da Cibo), ci
-    // si sposta lì: altrimenti sembrerebbe non essere stato aggiunto.
-    state.pantryView = isNonFoodDept(knownDept(cat) || classifyDept(nome)) ? 'casa' : 'cibo';
-    closeIngredientSheet();
-    persist(); render();
-    showUndoToast(`${nome} aggiunto`, ()=>{ if(prevItem) state.pantryItems[key] = prevItem; else delete state.pantryItems[key]; persist(); render(); });
+    if(!commitPantryDraft(d)){ const inp = document.getElementById('pantry-add-name'); if(inp) inp.focus(); }
   });
   const editDeleteBtn = document.getElementById('pantry-edit-delete');
   if(editDeleteBtn){

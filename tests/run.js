@@ -1352,15 +1352,16 @@ test('scheda pasto: ⋯ in alto, chi cucina in basso a sinistra, Da cucinare in 
 test('spesa: aggiungere un ingrediente finito in Dispensa tiene la quantità scritta', async ({ page }) => {
   await page.evaluate(() => {
     upsertPantryItem('Carote', 'frigo', 0); delete state.pantryConfirmedShop['carote'];
-    state.shopExtras = {}; state.tab = 'spesa'; state.shopView = 'reparto'; state.addIngModalOpen = true; state.addIngName = 'Carote'; render();
+    state.shopExtras = {}; state.tab = 'spesa'; state.shopView = 'reparto'; openAddSheet('spesa');
   });
-  await page.fill('#shop-add-qta', '3');
-  await page.click('#shop-add-btn');
+  await page.fill('#add-name', 'Carote');
+  await page.fill('#add-qty', '3');
+  await page.click('[data-add-confirm]');
   const r = await page.evaluate(() => {
     const row = [...document.querySelectorAll('.shop-item-row')].find(e => e.querySelector('.item-name') && e.querySelector('.item-name').textContent.trim().startsWith('Carote'));
-    return { confirmed: state.pantryConfirmedShop['carote'], qty: row ? row.querySelector('.qty-num').textContent.trim() : null };
+    return { confirmed: state.pantryConfirmedShop['carote'], qty: row ? row.querySelector('.qty-num').textContent.trim() : null, sheet: !!document.querySelector('.add-sheet') };
   });
-  eq(r, { confirmed: '3', qty: '3' });
+  eq(r, { confirmed: '3', qty: '3', sheet: false });
   eq(page.errors, [], 'errori JS');
 });
 
@@ -2447,15 +2448,17 @@ test('mancanti in Spesa: un aggiunto a mano già comprato torna in lista', async
 test('spesa: ingredienti per un\'altra persona restano righe a sé e non vanno in Dispensa', async ({ page }) => {
   await page.evaluate(() => {
     state.shopExtras = {}; state.shopDismissed = {}; state.shopChecked = {}; state.pantryItems = {};
-    state.tab = 'spesa'; state.shopView = 'giorno'; state.addIngModalOpen = true; state.addIngName = 'Pane'; render();
+    state.tab = 'spesa'; state.shopView = 'giorno'; openAddSheet('spesa');
   });
-  await page.fill('#shop-add-qta', '1');
-  await page.click('#shop-add-btn'); // per noi
-  await page.evaluate(() => { state.addIngModalOpen = true; state.addIngName = 'Pane'; state.addIngDraft = null; render(); });
-  await page.selectOption('#shop-add-per', 'Papà');
-  assert(await page.evaluate(() => document.activeElement.id !== 'shop-add-name'), 'il fuoco non torna sul nome');
-  await page.fill('#shop-add-qta', '2');
-  await page.click('#shop-add-btn'); // per papà
+  await page.fill('#add-name', 'Pane');
+  await page.fill('#add-qty', '1');
+  await page.click('[data-add-confirm]'); // per noi
+  await page.evaluate(() => openAddSheet('spesa'));
+  await page.fill('#add-name', 'Pane');
+  await page.click('[data-add-details]');
+  await page.selectOption('[data-add-per]', 'Papà');
+  await page.fill('#add-qty', '2');
+  await page.click('[data-add-confirm]'); // per papà
   const r = await page.evaluate(() => {
     const flat = buildShopFlat().filter(x => x.ingrediente === 'Pane');
     const sections = [...document.querySelectorAll('.shop-day-title')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
@@ -2715,6 +2718,41 @@ test('Ricette: chip rapidi Con quello che ho / Preferite / ≤30 min, senza il c
     return { chips, noCount, quickOk, gradOk, gradOff: state.filters.grad === '' };
   });
   eq(r, { chips: ['Con quello che ho', 'Preferite', '≤30 min'], noCount: true, quickOk: true, gradOk: true, gradOff: true });
+});
+
+test('Aggiungi unico: in casa mette in Dispensa con luogo e unità; il tasto codice a barre apre il lettore; i suggerimenti si scelgono con un tocco', async ({ page }) => {
+  await page.evaluate(() => { window.__scans = 0; window.openBarcodeScanner = () => { window.__scans++; }; upsertPantryItem('Passata di pomodoro', 'dispensa', 700, 'ml', 'conserve'); state.tab = 'dispensa'; state.pantryView = 'cibo'; openAddSheet('casa'); });
+  eq(await page.evaluate(() => document.querySelector('.add-seg .active').textContent.trim()), 'in casa', 'da Dispensa parte "in casa"');
+  await page.click('[data-add-scan]');
+  eq(await page.evaluate(() => window.__scans), 1, 'lettore');
+  await page.fill('#add-name', 'pom');
+  const sugg = await page.evaluate(() => [...document.querySelectorAll('[data-add-pick]')].map(e => e.dataset.addPick));
+  assert(sugg.includes('Passata di pomodoro'), 'suggerimento: ' + sugg.join(','));
+  await page.click('[data-add-pick="Passata di pomodoro"]');
+  const afterPick = await page.evaluate(() => ({ nome: state.addSheet.d.nome, unit: state.addSheet.d.unit, open: state.addSheet.suggestOpen }));
+  eq(afterPick, { nome: 'Passata di pomodoro', unit: 'ml', open: false });
+  await page.click('[data-add-details]');
+  await page.click('[data-add-luogo="ripostiglio"]');
+  await page.fill('#add-qty', '300');
+  await page.click('[data-add-confirm]');
+  eq(await page.evaluate(() => { const it = state.pantryItems['passata di pomodoro']; return [it.qty, it.luogo, !!state.addSheet]; }), [1000, 'ripostiglio', false]);
+  eq(page.errors, [], 'errori JS');
+});
+
+test('Aggiungi unico: da telefono, toccare un suggerimento non apre il lettore', async ({ page: desktop }) => {
+  const base = new URL(desktop.url()).origin;
+  const ctx = await desktop.context().browser().newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+  await ctx.route(/gstatic\.com|firebase/, r => r.abort());
+  try{
+    const page = await openApp(ctx, base);
+    await page.evaluate(() => { window.__scans = 0; window.openBarcodeScanner = () => { window.__scans++; }; state.tab = 'spesa'; openAddSheet('spesa'); });
+    await page.tap('#add-name'); await page.keyboard.type('pomodor');
+    await page.waitForSelector('[data-add-pick]');
+    const pt = await page.evaluate(() => { const r = document.querySelector('[data-add-pick]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await page.touchscreen.tap(pt.x, pt.y);
+    await page.waitForTimeout(300);
+    eq(await page.evaluate(() => [window.__scans, /pomodor/i.test(state.addSheet.d.nome), state.addSheet.suggestOpen]), [0, true, false]);
+  }finally{ await ctx.close(); }
 });
 
 (async () => {
