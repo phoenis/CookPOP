@@ -1209,7 +1209,7 @@ test('dispensa come la spesa: Cibo/Casa restano, Raggruppa per Categoria/Luogo/A
   eq(luogo.includes('Frigo') && luogo.includes('Freezer'), true, 'sezioni per luogo');
   eq(az.titles, 0, 'A-Z senza sezioni');
   eq(az.names.slice().sort((a, b) => a.localeCompare(b, 'it')), az.names, 'A-Z in ordine');
-  eq(pasto, ['Reparti (mio supermercato)', 'Categoria', 'Spesa', 'Pasto', 'Dalla A alla Z']);
+  eq(pasto, ['Corsie', 'Categoria', 'Spesa', 'Pasto', 'Dalla A alla Z']);
   eq(page.errors, [], 'errori JS');
 });
 
