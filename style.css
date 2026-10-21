@@ -1690,3 +1690,31 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .move-footer .btn{ height:3rem; font-weight:var(--weight-bold); }
 .move-footer .btn.is-outline{ flex:0 0 auto; padding:0 1.5rem; border:1.5px solid var(--ink); color:var(--ink); }
 .move-footer .btn.is-solid{ flex:1; }
+
+/* Aggiungi (foglio unico) */
+.add-sheet{ max-height:92vh; }
+.add-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); margin-bottom:0.5rem; }
+.add-head .move-title{ margin:0; }
+.add-seg{ display:inline-flex; padding:0.1875rem; border-radius:var(--radius-pill); background:var(--surface-2, rgba(0,0,0,0.07)); }
+.add-seg button{ border:0; background:transparent; color:var(--ink); font:inherit; font-size:var(--text-small); font-weight:var(--weight-bold); padding:0.375rem 0.875rem; border-radius:var(--radius-pill); }
+.add-seg button.active{ background:var(--surface); box-shadow:0 1px 3px rgba(0,0,0,0.15); }
+.add-body{ overflow-y:auto; flex:1; min-height:0; padding-bottom:0.5rem; }
+.add-field{ position:relative; display:flex; align-items:center; border:2px solid var(--accent, #e03c1f); border-radius:0.75rem; background:var(--surface); }
+.add-field input{ flex:1; min-width:0; border:0; background:transparent; font-size:1.125rem; padding:0.75rem 0.875rem; color:var(--ink); outline:none; }
+.add-scan{ margin:0.25rem; width:2.5rem; height:2.5rem; border:0; border-radius:0.5rem; background:var(--surface-2, rgba(0,0,0,0.07)); color:var(--ink); display:inline-flex; align-items:center; justify-content:center; }
+.add-scan .ui-ico{ width:1.375rem; height:1.375rem; }
+.add-suggest{ display:flex; flex-direction:column; margin-top:0.25rem; }
+.add-suggest-row{ display:flex; justify-content:space-between; align-items:center; gap:var(--space-small); text-align:left; border:0; border-bottom:1px solid var(--line); background:transparent; color:var(--ink); font:inherit; padding:0.75rem 0.25rem; }
+.add-suggest-meta{ font-size:var(--text-xsmall); color:var(--ink-light); text-align:right; }
+.add-suggest-new{ color:var(--accent, #e03c1f); font-weight:var(--weight-bold); justify-content:flex-start; }
+.add-qty-row{ display:flex; align-items:center; gap:var(--space-small); margin-top:0.875rem; }
+.add-qty-row .add-field-label{ flex:1; font-weight:var(--weight-bold); margin:0; }
+.add-unit{ width:auto; field-sizing:content; border:1px solid var(--line); border-radius:var(--radius-pill); padding:0.375rem 0.75rem; background:var(--surface); color:var(--ink); font:inherit; font-size:var(--text-small); font-weight:var(--weight-bold); }
+.add-details-toggle{ display:block; width:100%; text-align:left; margin-top:0.875rem; padding:0.5rem 0; border:0; background:transparent; color:var(--ink-light); font:inherit; font-size:var(--text-small); }
+.add-details-toggle b{ color:var(--ink); }
+.add-details{ padding:0.25rem 0 0.5rem; }
+.add-details select, .add-details input[type=date], .add-details .add-per-new{ width:100%; margin-bottom:0.25rem; }
+.add-field-label{ margin:0.625rem 0 0.25rem; font-size:var(--text-xsmall); font-weight:var(--weight-bold); color:var(--ink-light); }
+.add-footer .btn.is-solid{ width:100%; flex:1; }
+.add-sheet .scan-result{ margin-top:0.5rem; }
+.add-details select, .add-details input[type=date], .add-details .add-per-new{ background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:0.75rem; padding:0.625rem 0.75rem; font:inherit; font-size:var(--text-small); }
