@@ -1869,6 +1869,7 @@ const state = {
   groupEditId: null, // non persistito: gruppo aperto in modifica ('new' per uno nuovo)
   groupDraft: null, // non persistito: { label, matchName, cat, matchTouched }
   groupMemberSearch: '', // non persistito: ricerca "Aggiungi un formato" nel gruppo in modifica
+  sheetFull: false, // non persistito: i fogli dal basso (Aggiungi, Metti in dispensa) tirati su a tutto schermo
   addSheet: null, // non persistito: finestra "Aggiungi" unica ({mode:'spesa'|'casa', d: bozza come newPantryDraft, per, perNew, detailsOpen, suggestOpen, luogoUser})
   moveModal: null, // non persistito: finestra "Metti in dispensa" ({rows:[{rowKey,name,unit,per,qtyDefault,qtyLabel,luogo,scad,userScad}], open})
   expiryConfirm: [], // non persistito: chiavi di Dispensa con scadenza stimata da confermare (renderExpiryConfirmModal)
@@ -7574,6 +7575,7 @@ function openMoveModal(){
   });
   if(!rows.length) return;
   state.moveModal = { rows, open: -1 };
+  state.sheetFull = false;
   render();
 }
 function moveScadOptions(row){
@@ -7610,7 +7612,7 @@ function renderMoveModal(){
   }).join('');
   return `
   <div class="move-backdrop" data-move-back-bg>
-    <div class="move-sheet" role="dialog" aria-label="Metti in dispensa" data-stop-close>
+    <div class="move-sheet${state.sheetFull ? ' is-full' : ''}" role="dialog" aria-label="Metti in dispensa" data-stop-close>
       <div class="move-handle" aria-hidden="true"></div>
       <h2 class="move-title">Metti in dispensa</h2>
       <p class="move-sub">Dove sta e scadenza sono già proposte. Tocca solo quello che cambia.</p>
@@ -7623,8 +7625,9 @@ function renderMoveModal(){
   </div>`;
 }
 function closeMoveModal(){ state.moveModal = null; }
-// Trascinando verso il basso la barretta in cima, i fogli ("Aggiungi", "Metti in
-// dispensa") si chiudono: sotto una certa distanza tornano su.
+// Barretta in cima ai fogli ("Aggiungi", "Metti in dispensa"): trascinandola in
+// giù il foglio si chiude (o, se è a tutto schermo, torna a metà); tirandola in
+// su si apre a tutto schermo. Sotto una certa distanza torna dov'era.
 (function(){
   let drag = null;
   document.addEventListener('pointerdown', e=>{
@@ -7638,22 +7641,25 @@ function closeMoveModal(){ state.moveModal = null; }
   });
   document.addEventListener('pointermove', e=>{
     if(!drag || e.pointerId !== drag.pointerId) return;
-    drag.dy = Math.max(0, e.clientY - drag.startY);
-    drag.sheet.style.transform = `translateY(${drag.dy}px)`;
-    const bg = drag.sheet.parentElement; if(bg) bg.style.background = `rgba(0,0,0,${0.45 * Math.max(0, 1 - drag.dy / 400)})`;
+    drag.dy = e.clientY - drag.startY;
+    const shown = drag.dy > 0 ? drag.dy : Math.max(drag.dy / 3, -30);
+    drag.sheet.style.transform = `translateY(${shown}px)`;
+    const bg = drag.sheet.parentElement; if(bg && drag.dy > 0) bg.style.background = `rgba(0,0,0,${0.45 * Math.max(0, 1 - drag.dy / 400)})`;
   });
   const end = e=>{
     if(!drag || e.pointerId !== drag.pointerId) return;
     const { sheet, dy, t0 } = drag; drag = null;
-    const fast = dy > 40 && (Date.now() - t0) < 250;
-    if(dy > 90 || fast){
+    const fast = Math.abs(dy) > 40 && (Date.now() - t0) < 250;
+    if(dy < -50 || (fast && dy < 0)){
+      if(!state.sheetFull){ state.sheetFull = true; render(); return; }
+    } else if(dy > 90 || (fast && dy > 0)){
+      if(state.sheetFull){ state.sheetFull = false; render(); return; }
       if(state.addSheet) state.addSheet = null;
       else if(state.moveModal) closeMoveModal();
-      render();
-    } else {
-      sheet.style.transition = 'transform .15s'; sheet.style.transform = '';
-      const bg = sheet.parentElement; if(bg) bg.style.background = '';
+      render(); return;
     }
+    sheet.style.transition = 'transform .15s'; sheet.style.transform = '';
+    const bg = sheet.parentElement; if(bg) bg.style.background = '';
   };
   document.addEventListener('pointerup', end);
   document.addEventListener('pointercancel', end);
@@ -7795,6 +7801,7 @@ function commitPantryDraft(d){
 function openAddSheet(mode){
   const d = newPantryDraft(mode === 'casa' && state.tab === 'dispensa' && state.pantryView === 'casa');
   state.addSheet = { mode, d, per: '', perNew: '', detailsOpen: false, suggestOpen: false, luogoUser: false };
+  state.sheetFull = false;
   render();
 }
 function addSheetSummary(a){
@@ -7832,7 +7839,7 @@ function renderAddSheet(){
     </div>` : '';
   return `
   <div class="move-backdrop" data-add-bg>
-    <div class="move-sheet add-sheet" role="dialog" aria-label="Aggiungi" data-stop-close>
+    <div class="move-sheet add-sheet${state.sheetFull ? ' is-full' : ''}" role="dialog" aria-label="Aggiungi" data-stop-close>
       <div class="move-handle" aria-hidden="true"></div>
       <div class="add-head">
         <h2 class="move-title">Aggiungi</h2>
@@ -7911,6 +7918,7 @@ document.addEventListener('click', e=>{
   const a = state.addSheet;
   if(!a) return;
   const t = e.target, d = a.d;
+  if(a.suggestOpen && !t.closest('.add-suggest') && !t.closest('[data-add-name]')) a.suggestOpen = false;
   if(t.closest('[data-add-bg]') && !t.closest('[data-stop-close]')){ state.addSheet = null; render(); return; }
   const mode = t.closest('[data-add-mode]');
   if(mode){ a.mode = mode.dataset.addMode; render(); return; }
@@ -7934,11 +7942,14 @@ document.addEventListener('pointerdown', e=>{
 document.addEventListener('focusout', e=>{
   const a = state.addSheet;
   if(!a || !e.target.matches || !e.target.matches('[data-add-name]')) return;
+  // Con un po' di ritardo: se chiudessi l'elenco subito, il layout si sposta tra
+  // il tocco e il rilascio e il primo tocco su un bottone sotto andrebbe perso.
   setTimeout(()=>{
-    if(state.addSheet !== a || !a.suggestOpen) return;
+    if(state.addSheet !== a) return;
     if(document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-add-name]')) return;
-    a.suggestOpen = false; render();
-  }, 120);
+    a.suggestOpen = false;
+    if(document.querySelector('[data-add-pick],[data-add-create]')) render();
+  }, 450);
 });
 document.addEventListener('keydown', e=>{
   const a = state.addSheet;

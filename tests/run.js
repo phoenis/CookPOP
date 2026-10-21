@@ -2760,7 +2760,7 @@ test('Aggiungi unico: la tendina dei suggerimenti si chiude toccando altrove o c
   await page.fill('#add-name', 'pomodor');
   eq(await page.evaluate(() => document.querySelectorAll('[data-add-pick]').length > 0), true, 'aperta');
   await page.click('#add-qty');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(700);
   eq(await page.evaluate(() => document.querySelectorAll('[data-add-pick]').length), 0, 'chiusa toccando la quantità');
   await page.click('#add-name'); await page.keyboard.type('i');
   eq(await page.evaluate(() => document.querySelectorAll('[data-add-pick]').length > 0), true, 'riaperta scrivendo');
@@ -2778,6 +2778,23 @@ test('fogli dal basso: trascinando giù la barretta in cima si chiudono, con un 
   p = await pos();
   await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x, p.y + 220, { steps: 8 }); await page.waitForTimeout(300); await page.mouse.up();
   eq(await page.evaluate(() => [!!state.addSheet, !!document.querySelector('.move-sheet')]), [false, false], 'tratto lungo: chiuso');
+  eq(page.errors, [], 'errori JS');
+});
+
+test('fogli dal basso: tirando su la barretta vanno a tutto schermo, giù tornano a metà e poi si chiudono; il primo tocco su + funziona con l\'elenco aperto', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'spesa'; openAddSheet('spesa'); });
+  const drag = async dy => { const p = await page.evaluate(() => { const r = document.querySelector('.move-handle').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }); await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x, p.y + dy, { steps: 8 }); await page.waitForTimeout(350); await page.mouse.up(); await page.waitForTimeout(350); };
+  await drag(-120);
+  const full = await page.evaluate(() => ({ full: state.sheetFull, h: Math.round(document.querySelector('.move-sheet').getBoundingClientRect().height), vh: window.innerHeight }));
+  eq([full.full, full.h >= full.vh - 2], [true, true], 'tutto schermo');
+  await drag(220);
+  eq(await page.evaluate(() => [state.sheetFull, !!state.addSheet]), [false, true], 'giù: torna a metà');
+  await drag(220);
+  eq(await page.evaluate(() => !!state.addSheet), false, 'ancora giù: chiuso');
+  await page.evaluate(() => { openAddSheet('spesa'); });
+  await page.fill('#add-name', 'pomodor');
+  await page.click('[data-add-qty="1"]');
+  eq(await page.evaluate(() => state.addSheet.d.qty), 2, 'primo tocco su +');
   eq(page.errors, [], 'errori JS');
 });
 
