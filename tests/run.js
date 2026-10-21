@@ -559,20 +559,28 @@ test('ricette: "Con quello che ho" mostra ciò che si fa con la Dispensa, prima 
   eq(page.errors, [], 'errori JS');
 });
 
-test('spesa: i freschi spostati in Dispensa hanno la scadenza stimata, da confermare o sistemare', async ({ page }) => {
+test('spesa: "Metti in dispensa" propone luogo e scadenza stimata, si cambia solo quello che serve, Conferma', async ({ page }) => {
   await page.evaluate(() => {
     ['zucchine','petto di pollo','spaghetti'].forEach(k => delete state.pantryItems[k]);
     state.shopExtras = { e1: { ingrediente: 'Zucchine', qta: '4' }, e2: { ingrediente: 'Petto di pollo', qta: '1' }, e3: { ingrediente: 'Spaghetti', qta: '1' } };
     state.shopChecked = { e1: true, e2: true, e3: true }; state.tab = 'spesa'; state.shopView = 'reparto'; render();
   });
   await page.click('#move-checked-to-pantry');
-  const r1 = await page.evaluate(() => ({ keys: expiryConfirmKeys().sort(), zucchine: daysUntilDate(state.pantryItems['zucchine'].scadenza), pollo: daysUntilDate(state.pantryItems['petto di pollo'].scadenza), spaghetti: state.pantryItems['spaghetti'].scadenza || null, modal: !!document.querySelector('[data-exp-confirm-shift]') }));
-  eq(r1, { keys: ['petto di pollo', 'zucchine'], zucchine: 5, pollo: 2, spaghetti: null, modal: true });
-  await page.click('[data-exp-confirm-shift="zucchine"][data-exp-shift="1"]');
-  await page.click('[data-exp-confirm-toggle="petto di pollo"]');
-  eq(await page.evaluate(() => ({ z: daysUntilDate(state.pantryItems['zucchine'].scadenza), p: state.pantryItems['petto di pollo'].scadenza || null })), { z: 6, p: null }, 'sistemate');
-  await page.click('.filters-modal-footer [data-exp-confirm-close]');
-  eq(await page.evaluate(() => ({ open: !!document.querySelector('[data-exp-confirm-shift]'), z: daysUntilDate(state.pantryItems['zucchine'].scadenza) })), { open: false, z: 6 }, 'chiusa');
+  const r1 = await page.evaluate(() => {
+    const idx = n => state.moveModal.rows.findIndex(r => r.name === n);
+    const row = n => state.moveModal.rows[idx(n)];
+    return { open: !!document.querySelector('.move-sheet'), zu: [row('Zucchine').luogo, daysUntilDate(row('Zucchine').scad)], po: [row('Petto di pollo').luogo, daysUntilDate(row('Petto di pollo').scad)], sp: [row('Spaghetti').luogo, row('Spaghetti').scad], iz: idx('Zucchine'), ip: idx('Petto di pollo'), is: idx('Spaghetti'), plusSeven: addDaysIso(7) };
+  });
+  eq({ open: r1.open, zu: r1.zu, po: r1.po, sp: r1.sp }, { open: true, zu: ['frigo', 5], po: ['frigo', 2], sp: ['dispensa', ''] }, 'proposte');
+  await page.click(`[data-move-open="${r1.iz}"]`);
+  await page.click(`[data-move-scad="${r1.iz}:${r1.plusSeven}"]`);
+  await page.click(`[data-move-open="${r1.ip}"]`);
+  await page.click(`[data-move-scad="${r1.ip}:"]`);
+  await page.click(`[data-move-open="${r1.is}"]`);
+  await page.click(`[data-move-luogo="${r1.is}:freezer"]`);
+  await page.click('[data-move-confirm]');
+  const r2 = await page.evaluate(() => { const z = state.pantryItems['zucchine'], p = state.pantryItems['petto di pollo'], s = state.pantryItems['spaghetti']; return { open: !!document.querySelector('.move-sheet'), z: [z.luogo, daysUntilDate(z.scadenza)], p: [p.luogo, p.scadenza || null], s: [s.luogo, s.frozenOn === isoLocalDate(new Date()), daysUntilDate(s.scadenza), !!s.freezerExp] }; });
+  eq(r2, { open: false, z: ['frigo', 7], p: ['frigo', null], s: ['freezer', true, 90, true] }, 'dopo Conferma');
   eq(page.errors, [], 'errori JS');
 });
 
@@ -2459,6 +2467,7 @@ test('spesa: ingredienti per un\'altra persona restano righe a sé e non vanno i
     cb.click();
     const stato = { perChecked: !!cb };
     document.getElementById('move-checked-to-pantry').click();
+    document.querySelector('[data-move-confirm]').click();
     return { n: flat.length, pers: flat.map(x => x.per), sections, rows, pantry: (state.pantryItems['pane'] || {}).qty, left: buildShopFlat().filter(x => x.ingrediente === 'Pane').map(x => x.per), stato };
   });
   eq([r.n, r.pers], [2, ['', 'Papà']], 'due righe distinte');

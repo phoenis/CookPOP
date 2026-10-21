@@ -1017,35 +1017,54 @@ function applyShopExpiry(pantryKey, added, iso, before){
   it.lots = lots;
   normalizeLots(it);
 }
-function moveShopRowToPantry(cb){
-  const rowKey = cb.dataset.shopKeys;
+// Dati di una riga di Spesa (dal checkbox nel DOM, o già pronti): chiave/i
+// della riga, nome, unità, "per chi" e quantità di partenza dello stepper.
+function shopRowInfo(cb){
+  if(!cb.dataset) return cb;
+  const stepperBtn = cb.closest && cb.closest('.shop-item-row') ? cb.closest('.shop-item-row').querySelector('[data-shop-qty-inc]') : null;
+  const qtyEl = cb.closest && cb.closest('.shop-item-row') ? cb.closest('.shop-item-row').querySelector('.qty-num') : null;
+  return { rowKey: cb.dataset.shopKeys, name: cb.dataset.shopName, unit: cb.dataset.shopUnit, per: cb.dataset.shopPer || '',
+    qtyDefault: parseFloat(stepperBtn && stepperBtn.dataset.shopQtyDefault), qtyLabel: qtyEl ? qtyEl.textContent.trim() : '' };
+}
+// opts (dalla finestra "Metti in dispensa"): luogo scelto e scadenza ('' = nessuna,
+// data ISO); senza opts vale la scadenza segnata in negozio o la stima.
+function moveShopRowToPantry(cb, opts){
+  const info = shopRowInfo(cb);
+  const rowKey = info.rowKey;
   // Per un'altra persona: si è comprato, ma non entra nella nostra Dispensa.
-  if(cb.dataset.shopPer){
+  if(info.per){
     rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
     if(state.shopExpiry) delete state.shopExpiry[rowKey];
     return;
   }
-  const stepperBtn = cb.closest('.shop-item-row')?.querySelector('[data-shop-qty-inc]');
-  const fallback = parseFloat(stepperBtn?.dataset.shopQtyDefault);
-  const rawQty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) ? 0 : fallback);
+  const fallback = info.qtyDefault;
+  const rawQty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (Number.isNaN(fallback) || fallback === undefined ? 0 : fallback);
   // Quantità non indicata (segnaposto "–"): conta come 1, cioè "c'è".
   const qty = rawQty > 0 ? rawQty : 1;
   // Se in Dispensa è già impostata "Non mostrare" per questo ingrediente,
   // quella scelta manuale vince sempre: la quantità della ricetta ("12 g"
   // di sale, es.) non deve poterla resettare a un'unità tracciabile.
-  const existingUnit = (state.pantryItems[(cb.dataset.shopName||'').trim().toLowerCase()] || {}).unit;
-  const unit = existingUnit === 'none' ? 'none' : (cb.dataset.shopUnit || undefined);
-  const pantryKey = (cb.dataset.shopName||'').trim().toLowerCase();
+  const existingUnit = (state.pantryItems[(info.name||'').trim().toLowerCase()] || {}).unit;
+  const unit = existingUnit === 'none' ? 'none' : (info.unit || undefined);
+  const pantryKey = (info.name||'').trim().toLowerCase();
   const before = state.pantryItems[pantryKey];
   const hadStock = !!(before && typeof before.qty === 'number' && before.qty > 0);
-  upsertPantryItem(cb.dataset.shopName, 'dispensa', qty, unit);
+  upsertPantryItem(info.name, (opts && opts.luogo) || 'dispensa', qty, unit);
+  if(opts && opts.luogo && state.pantryItems[pantryKey]) state.pantryItems[pantryKey].luogo = opts.luogo;
   rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
-  const shopChoice = (state.shopExpiry || {})[rowKey];
+  const shopChoice = opts ? (opts.scad ? opts.scad : 'none') : (state.shopExpiry || {})[rowKey];
   if(shopChoice && shopChoice !== 'none') applyShopExpiry(pantryKey, qty, shopChoice, before);
   if(state.shopExpiry) delete state.shopExpiry[rowKey];
+  const it = state.pantryItems[pantryKey];
+  // In freezer: la data di congelamento è oggi; se la scadenza è quella stimata
+  // per il freezer resta segnata come stima (vedi reconcileFreezer).
+  if(it && opts && opts.luogo === 'freezer' && it.frozenOn === undefined){
+    it.frozenOn = isoLocalDate(new Date());
+    if(opts.scad && opts.scad === addDaysToIso(it.frozenOn, freezerDaysFor(it))) it.freezerExp = true; else delete it.freezerExp;
+  }
+  if(opts) return;
   // Senza una scelta in negozio vale la scadenza stimata dal reparto (freschi):
   // da confermare subito se non ne avevi, altrimenti nuovo lotto con la stima.
-  const it = state.pantryItems[pantryKey];
   const est = shopChoice === undefined ? estimateExpiryDays(it) : null;
   if(it && est !== null){
     if(!hadStock){
@@ -1061,8 +1080,9 @@ function moveShopRowToPantry(cb){
 // eseguirla, per poter offrire "Annulla" sia sulla spunta singola in
 // Modalità spesa sia sullo spostamento multiplo dal foglio di selezione.
 function snapshotShopRowForUndo(cb){
-  const rowKeys = cb.dataset.shopKeys.split(',');
-  const pantryKey = (cb.dataset.shopName||'').trim().toLowerCase();
+  const info = shopRowInfo(cb);
+  const rowKeys = info.rowKey.split(',');
+  const pantryKey = (info.name||'').trim().toLowerCase();
   return {
     pantryKey,
     hadPantryItem: Object.prototype.hasOwnProperty.call(state.pantryItems, pantryKey),
@@ -1070,8 +1090,8 @@ function snapshotShopRowForUndo(cb){
     hadConfirmedShop: Object.prototype.hasOwnProperty.call(state.pantryConfirmedShop, pantryKey),
     prevConfirmedShop: state.pantryConfirmedShop[pantryKey],
     rowKeys,
-    rowKey: cb.dataset.shopKeys,
-    prevExpiry: (state.shopExpiry || {})[cb.dataset.shopKeys],
+    rowKey: info.rowKey,
+    prevExpiry: (state.shopExpiry || {})[info.rowKey],
     prevDismissed: rowKeys.map(k=>state.shopDismissed[k])
   };
 }
@@ -1849,6 +1869,7 @@ const state = {
   groupEditId: null, // non persistito: gruppo aperto in modifica ('new' per uno nuovo)
   groupDraft: null, // non persistito: { label, matchName, cat, matchTouched }
   groupMemberSearch: '', // non persistito: ricerca "Aggiungi un formato" nel gruppo in modifica
+  moveModal: null, // non persistito: finestra "Metti in dispensa" ({rows:[{rowKey,name,unit,per,qtyDefault,qtyLabel,luogo,scad,userScad}], open})
   expiryConfirm: [], // non persistito: chiavi di Dispensa con scadenza stimata da confermare (renderExpiryConfirmModal)
   balanceDetailsOpen: false, // non persistito: spiegazione sotto la riga dell'equilibrio nel Menù
   prepPantryMode: false, // non persistito: Ricette in modalità "Con quello che ho"
@@ -4732,6 +4753,7 @@ const MODAL_CHECKS = [
   [()=> !!state.cookbookNameDraft, ()=>{ state.cookbookNameDraft = null; }],
   [()=> !!state.recipeImport, ()=>{ state.recipeImport = null; }],
   [()=> !!state.albumForRecipe, ()=>{ state.albumForRecipe = null; }],
+  [()=> !!state.moveModal, ()=>{ closeMoveModal(); }],
   [()=> expiryConfirmKeys().length > 0, ()=>{ closeExpiryConfirm(); }],
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> state.doneModalLeftovers.some(r => r.pickerOpen), ()=>{ state.doneModalLeftovers.forEach(r => { r.pickerOpen = false; }); }],
@@ -6609,7 +6631,6 @@ function renderSpesa(){
           ${ingNoteHtml}
         </span>
       </label>
-      ${checked ? shopExpiryHtml(rowKey, ingrediente) : ''}
       <span class="qty-stepper" title="Quantità da prendere">
         <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Diminuisci quantità">−</button>
         ${editingQty
@@ -6974,6 +6995,7 @@ function renderSpesa(){
     
   ${addIngModal}
   ${renderExpiryConfirmModal()}
+  ${renderMoveModal()}
     <div class="shop-bar">
       <button class="btn is-outline shop-bar-add" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente">${uiIcon('plus')} Aggiungi</button>
       ${displayDoneShoppable ? `<button type="button" class="btn is-solid shop-bar-move" id="move-checked-to-pantry">Metti in dispensa (${displayDoneShoppable})</button>` : ''}
@@ -7535,6 +7557,106 @@ function expiryConfirmKeys(){
   return state.expiryConfirm.filter(k => state.pantryItems[k] && state.pantryItems[k].qty > 0);
 }
 function closeExpiryConfirm(){ state.expiryConfirm = []; }
+// --- "Metti in dispensa": riepilogo di quello che hai comprato ---------------
+// Per ogni riga spuntata luogo e scadenza sono già proposti (luogo dove sta di
+// solito, scadenza stimata, in freezer la durata del congelamento): si tocca
+// solo quello che cambia, poi Conferma.
+function moveDefaultScad(name, luogo){
+  if(luogo === 'freezer'){
+    const it = state.pantryItems[(name || '').trim().toLowerCase()] || { nome: name };
+    return addDaysIso(freezerDaysFor({ ...it, nome: name }));
+  }
+  return shopExpiryEstimate(name);
+}
+function openMoveModal(){
+  const rows = [];
+  document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
+    if(cb.closest('.finished-shop-group')) return;
+    const info = shopRowInfo(cb);
+    const ex = resolvePantryItem(info.name);
+    const luogo = (ex && ex.luogo) || inventoryGuessLuogo(info.name, inventoryDept(info.name));
+    const chosen = (state.shopExpiry || {})[info.rowKey];
+    rows.push({ ...info, luogo, scad: chosen === 'none' ? '' : (chosen || moveDefaultScad(info.name, luogo)), userScad: !!chosen });
+  });
+  if(!rows.length) return;
+  state.moveModal = { rows, open: -1 };
+  render();
+}
+function moveScadOptions(row){
+  const opts = row.luogo === 'freezer' ? [[3, '+3 giorni'], [30, '+1 mese'], [90, '+3 mesi']] : [[3, '+3 giorni'], [7, '+1 sett.'], [30, '+1 mese']];
+  const est = moveDefaultScad(row.name, row.luogo);
+  return [...new Set((est ? [est] : []).concat(opts.map(([d]) => addDaysIso(d))))].sort();
+}
+function moveDateLabel(iso){ return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day:'numeric', month:'short' }); }
+function renderMoveModal(){
+  const m = state.moveModal;
+  if(!m) return '';
+  const rowsHtml = m.rows.map((r, i)=>{
+    const head = `<div class="move-row-head"><span class="move-row-name">${escapeHtml(r.name)}</span><span class="move-row-qty">${escapeHtml(r.qtyLabel || '')}</span></div>`;
+    if(r.per) return `<div class="move-row">${head}<div class="move-row-note">Per ${escapeHtml(r.per)} · non entra nella tua Dispensa</div></div>`;
+    const open = m.open === i;
+    const scadLabel = r.scad ? `scade ${r.userScad ? '' : '~'}${moveDateLabel(r.scad)}` : (r.userScad ? 'nessuna scadenza' : 'Scrivi la data');
+    const chips = `<div class="move-chips">
+        <button type="button" class="btn is-chip move-chip" data-move-open="${i}">${LUOGO_ICON[r.luogo] || ''} ${escapeHtml(LUOGO_LABEL[r.luogo])}</button>
+        <button type="button" class="btn is-chip move-chip${r.scad ? '' : ' is-dashed'}" data-move-open="${i}">${escapeHtml(scadLabel)}</button>
+      </div>`;
+    const detail = open ? `
+      <div class="move-detail">
+        <div class="move-label">Dove sta</div>
+        <div class="move-chips">${LUOGO_ORDER.map(l => `<button type="button" class="btn is-chip move-chip${r.luogo === l ? ' active' : ''}" data-move-luogo="${i}:${l}">${LUOGO_ICON[l] || ''} ${escapeHtml(LUOGO_LABEL[l])}</button>`).join('')}</div>
+        <div class="move-label">Scadenza</div>
+        <div class="move-chips">
+          ${moveScadOptions(r).map(iso => `<button type="button" class="btn is-chip move-chip${r.scad === iso ? ' active' : ''}" data-move-scad="${i}:${iso}">${escapeHtml(moveDateLabel(iso))}</button>`).join('')}
+          <label class="btn is-chip move-chip${r.scad && !moveScadOptions(r).includes(r.scad) ? ' active' : ''}">Altra data…<input type="date" data-move-date="${i}" value="${escapeAttr(r.scad || '')}"></label>
+          <button type="button" class="btn is-chip move-chip${!r.scad ? ' active' : ''}" data-move-scad="${i}:">Nessuna</button>
+        </div>
+        <p class="move-help">Date proposte da oggi. Si cambiano quando vuoi dalla scheda dell'ingrediente.</p>
+      </div>` : '';
+    return `<div class="move-row${open ? ' is-open' : ''}">${head}${chips}${detail}</div>`;
+  }).join('');
+  return `
+  <div class="move-backdrop" data-move-back-bg>
+    <div class="move-sheet" role="dialog" aria-label="Metti in dispensa" data-stop-close>
+      <div class="move-handle" aria-hidden="true"></div>
+      <h2 class="move-title">Metti in dispensa</h2>
+      <p class="move-sub">Dove sta e scadenza sono già proposte. Tocca solo quello che cambia.</p>
+      <div class="move-list">${rowsHtml}</div>
+      <div class="move-footer">
+        <button type="button" class="btn is-outline" data-move-back>Indietro</button>
+        <button type="button" class="btn is-solid" data-move-confirm>Conferma ${m.rows.length}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function closeMoveModal(){ state.moveModal = null; }
+document.addEventListener('click', e=>{
+  const m = state.moveModal;
+  if(!m) return;
+  const t = e.target;
+  const row = i => m.rows[parseInt(i, 10)];
+  if(t.closest('[data-move-back]') || (t.closest('[data-move-back-bg]') && !t.closest('[data-stop-close]'))){ closeMoveModal(); render(); return; }
+  const open = t.closest('[data-move-open]');
+  if(open){ const i = parseInt(open.dataset.moveOpen, 10); m.open = m.open === i ? -1 : i; render(); return; }
+  const lu = t.closest('[data-move-luogo]');
+  if(lu){ const [i, l] = lu.dataset.moveLuogo.split(':'); const r = row(i); if(r){ r.luogo = l; if(!r.userScad) r.scad = moveDefaultScad(r.name, l); } render(); return; }
+  const sc = t.closest('[data-move-scad]');
+  if(sc){ const idx = sc.dataset.moveScad.indexOf(':'); const r = row(sc.dataset.moveScad.slice(0, idx)); if(r){ r.scad = sc.dataset.moveScad.slice(idx + 1); r.userScad = true; } render(); return; }
+  if(t.closest('[data-move-confirm]')){
+    const snaps = [];
+    m.rows.forEach(r=>{ snaps.push(snapshotShopRowForUndo(r)); moveShopRowToPantry(r, { luogo: r.luogo, scad: r.scad }); });
+    closeMoveModal(); persist(); render();
+    if(snaps.length) showUndoToast(snaps.length === 1 ? 'Spostato in Dispensa' : `${snaps.length} articoli spostati in Dispensa`, ()=>{
+      snaps.forEach(restoreShopRowSnapshot);
+      persist(); render();
+    });
+  }
+}, true);
+document.addEventListener('change', e=>{
+  const inp = e.target.closest && e.target.closest('[data-move-date]');
+  if(!inp || !state.moveModal) return;
+  const r = state.moveModal.rows[parseInt(inp.dataset.moveDate, 10)];
+  if(r){ r.scad = inp.value || ''; r.userScad = true; render(); }
+});
 function renderExpiryConfirmModal(){
   const keys = expiryConfirmKeys();
   if(!keys.length) return '';
@@ -8602,23 +8724,7 @@ function attachHandlers(){
     });
   }
   const moveToPantryBtn = document.getElementById('move-checked-to-pantry');
-  if(moveToPantryBtn){
-    // Per quello che hai appena comprato: aggiunge alla Dispensa (con la
-    // quantità impostata nello stepper) e poi esce dalla lista.
-    moveToPantryBtn.addEventListener('click', ()=>{
-      const snaps = [];
-      document.querySelectorAll('.shop-item input[type=checkbox]:checked').forEach(cb=>{
-        if(cb.closest('.finished-shop-group')) return;
-        snaps.push(snapshotShopRowForUndo(cb));
-        moveShopRowToPantry(cb);
-      });
-      persist(); render();
-      if(snaps.length) showUndoToast(snaps.length === 1 ? 'Spostato in Dispensa' : `${snaps.length} articoli spostati in Dispensa`, ()=>{
-        snaps.forEach(restoreShopRowSnapshot);
-        persist(); render();
-      });
-    });
-  }
+  if(moveToPantryBtn) moveToPantryBtn.addEventListener('click', ()=> openMoveModal());
   // Selezionati nella sezione "Finiti" (checkbox spuntata = presa in carico):
   // o si scartano (non li vuoi comprare ora) o si "promuovono" nel loro
   // reparto vero, mescolandosi alle sezioni normali sopra invece di restare
