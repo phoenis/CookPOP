@@ -1652,7 +1652,7 @@ test('app: Carte nella barra in alto (solo Spesa), titolo Menù, ricerca alta ug
     at('spesa'); out.cardsSpesa = document.getElementById('topbar-cards-btn').hidden; out.noOldBtn = !document.querySelector('.shop-top-actions');
     out.hSpesa = Math.round(document.querySelector('.list-search').getBoundingClientRect().height);
     at('prep'); out.hPrep = Math.round(document.querySelector('.list-search').getBoundingClientRect().height);
-    out.check = !!document.querySelector('.shop-head .pantry-check[data-toggle-pantry-mode]');
+    out.check = !!document.querySelector('.prep-quick .is-chip[data-toggle-pantry-mode]') && !document.querySelector('.shop-head-sub');
     out.menuExtras = ['dispensa', 'prep'].map(t => TAB_MENU_ITEMS[t].some(i => /\+ Aggiungi/.test(i.label)));
     return out;
   });
@@ -2690,6 +2690,22 @@ test('carte fedeltà: le più aperte salgono in alto; Ordina per frequenza d\'us
   await page.selectOption('[data-cards-sort]', 'az');
   eq(await names(), ['Conad', 'Coop', 'Esselunga'], 'alfabetico');
   eq(page.errors, [], 'errori JS');
+});
+
+test('Ricette: chip rapidi Con quello che ho / Preferite / ≤30 min, senza il conteggio delle ricette', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.tab = 'prep'; state.filters = { cat: [], tipo: [], tempo: '', pian: '', stagione: '', freezer: '', grad: '', attrezz: '', quick: false, search: '' }; render();
+    const chips = [...document.querySelectorAll('.prep-quick .is-chip')].map(e => e.textContent.trim());
+    const noCount = !/\d+\s+ricett/.test(document.getElementById('panel').textContent.slice(0, 400));
+    const all = document.querySelectorAll('.prep-card, .recipe-card, [data-recipe]').length;
+    document.querySelector('[data-quick-filter="quick"]').click();
+    const quickOk = allRecipeMetas().filter(r => ['express', 'veloce'].includes(r.tempoBucket)).length > 0 && state.filters.quick === true && document.querySelector('[data-quick-filter="quick"]').classList.contains('active');
+    document.querySelector('[data-quick-filter="grad"]').click();
+    const gradOk = state.filters.grad === 'preferita' && document.querySelector('[data-quick-filter="grad"]').classList.contains('active');
+    document.querySelector('[data-quick-filter="grad"]').click();
+    return { chips, noCount, quickOk, gradOk, gradOff: state.filters.grad === '' };
+  });
+  eq(r, { chips: ['Con quello che ho', 'Preferite', '≤30 min'], noCount: true, quickOk: true, gradOk: true, gradOff: true });
 });
 
 (async () => {

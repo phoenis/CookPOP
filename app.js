@@ -1941,7 +1941,7 @@ const state = {
   doneModalFinished: {}, // ephemeral: nome ingrediente "a spanne" (unit 'none') -> true se spuntato "L'hai finito?" nella modale "Ricetta fatta!"; non presente = non spuntato
   doneModalLeftovers: [], // ephemeral: una riga per piatto del pasto in "Ricetta fatta!" ({name, luogo, cat, checked, pickerOpen, catPickerOpen}); spuntata = va in Dispensa alla conferma
   filtersOpen: false, // { [dayIndex]: {search:'', cat:'same'|'all'} }
-  filters: { cat:[], tipo:[], tempo:'', pian:'', stagione:'', freezer:'', grad:'', attrezz:'', search:'' } // cat e tipo sono multi-selezione (array), gli altri restano a valore singolo
+  filters: { cat:[], tipo:[], tempo:'', pian:'', stagione:'', freezer:'', grad:'', attrezz:'', quick:false, search:'' } // cat e tipo sono multi-selezione (array), gli altri restano a valore singolo
 };
 
 // Le 4 tab vivono anche come "pagine" via anchor (#menu/#spesa/#prep/#dispensa):
@@ -7052,6 +7052,7 @@ function renderPrep(){
     if(state.filters.cat.length && !state.filters.cat.includes(r.categoriaNew)) return false;
     if(state.filters.tipo.length && !state.filters.tipo.includes(r.tipologia)) return false;
     if(state.filters.tempo && r.tempoBucket !== state.filters.tempo) return false;
+    if(state.filters.quick && !['express','veloce'].includes(r.tempoBucket)) return false;
     if(state.filters.pian && r.pianificazione !== state.filters.pian) return false;
     if(state.filters.stagione && !(r.stagioni.includes(state.filters.stagione) || r.stagioni.includes('tutto'))) return false;
     if(state.filters.freezer && r.freezerNew !== state.filters.freezer) return false;
@@ -7114,7 +7115,7 @@ function renderPrep(){
     return `<select id="${id}"><option value="">${label}</option>${order.map(v=>`<option value="${v}" ${current===v?'selected':''}>${escapeHtml(stripHtml(labelMap[v]))}</option>`).join('')}</select>`;
   }
 
-  const activeCount = ['tempo','pian','stagione','freezer','grad','attrezz'].filter(k=>state.filters[k]).length + (state.filters.cat.length ? 1 : 0) + (state.filters.tipo.length ? 1 : 0);
+  const activeCount = ['tempo','pian','stagione','freezer','grad','attrezz','quick'].filter(k=>state.filters[k]).length + (state.filters.cat.length ? 1 : 0) + (state.filters.tipo.length ? 1 : 0);
 
   const filtersModal = state.filtersOpen ? `
     <div class="filters-modal-backdrop" data-close-filters>
@@ -7195,17 +7196,17 @@ function renderPrep(){
   }
 
   return `
-    <p class="section-sub">${totalCount} ricette — tocca una ricetta per vedere gli ingredienti</p>
+    <p class="section-sub">Tocca una ricetta per vedere gli ingredienti</p>
     <div class="prep-search-row">
       ${listSearchHtml('f-search', state.filters.search, 'Cerca una ricetta…')}
       <button class="btn is-filters prep-filters-btn${activeCount ? ' active' : ''}" type="button" data-open-filters><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 18h4v-2h-4zM3 6v2h18V6zm3 7h12v-2H6z"></path></svg>Filtri${activeCount ? ` (${activeCount})` : ''}</button>
     </div>
 
     ${filtersModal}
-    <div class="shop-head">
-      <div class="shop-head-title"><span class="shop-head-sub">${list.length} ${list.length === 1 ? 'ricetta' : 'ricette'}</span></div>
-      <button type="button" class="pantry-check${pantryMode ? ' active' : ''}" data-toggle-pantry-mode role="checkbox" aria-checked="${pantryMode}"><span class="pantry-check-box" aria-hidden="true"></span>Con quello che ho</button>
-    </div>
+    <div class="chip-row prep-quick">
+      <button type="button" class="btn is-chip${pantryMode ? ' active' : ''}" data-toggle-pantry-mode aria-pressed="${pantryMode}">Con quello che ho</button>
+      <button type="button" class="btn is-chip${state.filters.grad === 'preferita' ? ' active' : ''}" data-quick-filter="grad" aria-pressed="${state.filters.grad === 'preferita'}">Preferite</button>
+      <button type="button" class="btn is-chip${state.filters.quick ? ' active' : ''}" data-quick-filter="quick" aria-pressed="${!!state.filters.quick}">≤30 min</button>
     </div>
     ${pantryMode ? `<p class="pantry-mode-note">Ricette con almeno metà degli ingredienti in Dispensa, prima quelle che usano cose in scadenza. Sale, olio e spezie non contano.</p>` : ''}
     <div class="accordion-body">${cards || (pantryMode
@@ -9831,7 +9832,7 @@ function attachHandlers(){
   if(stopClose) stopClose.addEventListener('click', e=>{ e.stopPropagation(); });
   const clearFilters = document.getElementById('clear-filters');
   if(clearFilters) clearFilters.addEventListener('click', ()=>{
-    state.filters = { cat:[], tipo:[], tempo:'', pian:'', stagione:'', freezer:'', grad:'', attrezz:'', search: state.filters.search };
+    state.filters = { cat:[], tipo:[], tempo:'', pian:'', stagione:'', freezer:'', grad:'', attrezz:'', quick:false, search: state.filters.search };
     render();
   });
 
@@ -9864,6 +9865,11 @@ function attachHandlers(){
   }));
   document.querySelectorAll('[data-toggle-balance-details]').forEach(btn=> btn.addEventListener('click', ()=>{
     state.balanceDetailsOpen = !state.balanceDetailsOpen;
+    render();
+  }));
+  document.querySelectorAll('[data-quick-filter]').forEach(btn=> btn.addEventListener('click', ()=>{
+    if(btn.dataset.quickFilter === 'grad') state.filters.grad = state.filters.grad === 'preferita' ? '' : 'preferita';
+    else state.filters.quick = !state.filters.quick;
     render();
   }));
   document.querySelectorAll('[data-toggle-pantry-mode]').forEach(btn=> btn.addEventListener('click', ()=>{

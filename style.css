@@ -1642,3 +1642,8 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .sheet-footer .edit-footer .scan-open-btn svg{ color:var(--ink); }
 
 .cards-sort{ margin:0.5rem 0 0.75rem; }
+
+/* Ricette: chip rapidi (Con quello che ho, Preferite, ≤30 min) */
+.prep-quick{ display:flex; flex-wrap:wrap; gap:0.5rem; padding:0 var(--padding-page); margin:0.5rem 0 0.75rem; }
+.prep-quick .btn.is-chip{ height:auto; padding:0.5rem 0.875rem; font-size:var(--text-small); border:1px solid var(--line); background:var(--surface); color:var(--ink); font-weight:var(--weight-bold); border-radius:var(--radius-pill); }
+.prep-quick .btn.is-chip.active{ background:color-mix(in srgb, var(--accent, #e03c1f) 14%, var(--surface)); border-color:var(--accent, #e03c1f); color:var(--accent, #e03c1f); }
