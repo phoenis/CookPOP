@@ -1769,12 +1769,14 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
     document.querySelector('[data-topbar-menu-settings]').click();
     const out = { titles: [...document.querySelectorAll('#settings-backdrop .settings-section-title')].map(e => e.textContent.trim()) };
     // ricerca
-    const s = document.getElementById('settings-search'); s.value = 'corsie'; s.dispatchEvent(new Event('input', { bubbles: true }));
+    const s = document.getElementById('settings-search'); s.value = 'supermercato'; s.dispatchEvent(new Event('input', { bubbles: true }));
     out.visible = [...document.querySelectorAll('#settings-backdrop .settings-section')].filter(x => !x.hidden).map(x => x.querySelector('.settings-section-title').textContent.trim());
     out.visibleLinks = [...document.querySelectorAll('#settings-backdrop .settings-link')].filter(x => !x.hidden).map(x => x.dataset.settingsGo);
     s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true }));
     // voci
+    document.querySelector('[data-settings-go="depts"]').click();
     document.querySelector('[data-settings-go="aisles"]').click();
+    state.deptsModalOpen = false;
     out.aisles = state.aisleOrderOpen === true && document.getElementById('settings-backdrop').classList.contains('open');
     state.aisleOrderOpen = false; render();
     document.getElementById('topbar-menu-btn').click();
@@ -1796,9 +1798,9 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
     try{ localStorage.removeItem(AUTO_BACKUP_OFF_KEY); }catch(e){}
     return out;
   });
-  eq(r.titles, ['Profilo', 'Aspetto', 'Il mio menù', 'Ricette', 'Ingredienti e Dispensa', 'Carte fedeltà', 'Backup dei dati', 'App']);
-  eq(r.visible, ['Ingredienti e Dispensa']);
-  eq(r.visibleLinks, ['aisles']);
+  eq(r.titles, ['Menù', 'Ingredienti e reparti', 'Spesa e ricette', 'App']);
+  eq(r.visible, ['Ingredienti e reparti']);
+  eq(r.visibleLinks, ['depts']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
   eq(r.menus, { dispensa: 5, spesa: 1, menu: 2, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
@@ -1927,7 +1929,7 @@ test('ricette: "Aggiungi ricetta" è una pagina dalle Impostazioni, "Importa ric
     const out = { noFab: !document.getElementById('prep-fab'), noMenu: TAB_MENU_ITEMS.prep.map(i => i.label.replace(/<[^>]*>/g, '').trim()).join('|') === 'Aggiungi ricetta|Importa ricetta' && TAB_MENU_ITEMS.prep.every(i => i.label.includes('<svg')) };
     state.tab = 'spesa'; render();
     document.getElementById('topbar-menu-btn').click(); document.querySelector('[data-topbar-menu-settings]').click();
-    out.links = [...document.querySelectorAll('#settings-backdrop [data-settings-go="newrecipe"], #settings-backdrop [data-settings-go="import"]')].length;
+    out.links = [...document.querySelectorAll('#settings-backdrop [data-settings-go="newrecipe"]')].length;
     document.querySelector('[data-settings-go="newrecipe"]').click();
     out.page = !!document.querySelector('[data-page="new-recipe"]') && document.getElementById('settings-backdrop').classList.contains('open');
     const inp = document.getElementById('new-recipe-name');
@@ -1938,7 +1940,9 @@ test('ricette: "Aggiungi ricetta" è una pagina dalle Impostazioni, "Importa ric
     out.created = !!state.customRecipes['Torta di prova'] && state.recipeEditName === 'Torta di prova' && !state.newRecipeModalOpen && !!document.querySelector('.recipe-edit-page');
     state.recipeEditName = null; render();
     out.backInSettings = document.getElementById('settings-backdrop').classList.contains('open');
+    document.querySelector('[data-settings-go="newrecipe"]').click();
     document.querySelector('[data-settings-go="import"]').click();
+    state.newRecipeModalOpen = false;
     out.import = !!state.recipeImport && !!document.querySelector('[data-page^="import"], .sheet-page');
     state.recipeImport = null; render();
     document.getElementById('settings-close').click();
@@ -1946,7 +1950,7 @@ test('ricette: "Aggiungi ricetta" è una pagina dalle Impostazioni, "Importa ric
     delete state.customRecipes['Torta di prova']; persist();
     return out;
   });
-  eq(r, { noFab: true, noMenu: true, links: 2, page: true, empty: true, created: true, backInSettings: true, import: true, tabBack: true });
+  eq(r, { noFab: true, noMenu: true, links: 1, page: true, empty: true, created: true, backInSettings: true, import: true, tabBack: true });
 });
 
 test('catalogo: otto ricette dal ricettario (pesce, polpo, polpette, buccette, pizza con la scarola)', async ({ page }) => {
