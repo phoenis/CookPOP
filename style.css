@@ -1722,3 +1722,6 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 /* Fogli dal basso a tutto schermo (barretta tirata in su) */
 .move-sheet{ transition:max-height .2s, height .2s, border-radius .2s; }
 .move-sheet.is-full{ max-height:100dvh; height:100dvh; border-radius:0; padding-top:calc(0.5rem + env(safe-area-inset-top)); }
+
+/* Niente zoom con doppio tocco: il secondo tocco ravvicinato (es. + dopo aver chiuso un foglio) deve essere un click normale */
+html, body, button, .btn, input, select{ touch-action:manipulation; }

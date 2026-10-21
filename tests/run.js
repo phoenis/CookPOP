@@ -2787,15 +2787,37 @@ test('fogli dal basso: tirando su la barretta vanno a tutto schermo, giù tornan
   await drag(-120);
   const full = await page.evaluate(() => ({ full: state.sheetFull, h: Math.round(document.querySelector('.move-sheet').getBoundingClientRect().height), vh: window.innerHeight }));
   eq([full.full, full.h >= full.vh - 2], [true, true], 'tutto schermo');
+  eq(await page.evaluate(() => state.addSheet.detailsOpen), true, 'a tutto schermo si espandono gli altri dettagli');
   await drag(220);
-  eq(await page.evaluate(() => [state.sheetFull, !!state.addSheet]), [false, true], 'giù: torna a metà');
-  await drag(220);
-  eq(await page.evaluate(() => !!state.addSheet), false, 'ancora giù: chiuso');
+  eq(await page.evaluate(() => [state.sheetFull, !!state.addSheet]), [false, false], 'giù da tutto schermo: si chiude');
   await page.evaluate(() => { openAddSheet('spesa'); });
   await page.fill('#add-name', 'pomodor');
   await page.click('[data-add-qty="1"]');
   eq(await page.evaluate(() => state.addSheet.d.qty), 2, 'primo tocco su +');
   eq(page.errors, [], 'errori JS');
+});
+
+test('fogli: richiudendo con la barretta e premendo + subito, si riapre al primo tocco', async ({ page: desktop }) => {
+  const base = new URL(desktop.url()).origin;
+  const ctx = await desktop.context().browser().newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 800 } });
+  await ctx.route(/gstatic\.com|firebase/, r => r.abort());
+  try{
+    const page = await openApp(ctx, base);
+    await page.evaluate(() => { state.tab = 'spesa'; render(); });
+    const cdp = await ctx.newCDPSession(page);
+    for(const wait of [0, 100, 300]){
+      await page.tap('#spesa-fab'); await page.waitForTimeout(300);
+      eq(await page.evaluate(() => !!state.addSheet), true, 'aperto');
+      const h = await page.evaluate(() => { const r = document.querySelector('.move-handle').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+      const touch = (type, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: h.x, y }] });
+      await touch('touchStart', h.y); for(let k = 1; k <= 8; k++){ await touch('touchMove', h.y + k * 30); await page.waitForTimeout(20); } await touch('touchEnd', h.y + 240);
+      await page.waitForTimeout(wait);
+      eq(await page.evaluate(() => !!state.addSheet), false, 'chiuso con la barretta');
+      await page.tap('#spesa-fab'); await page.waitForTimeout(900);
+      eq(await page.evaluate(() => !!state.addSheet), true, `riaperto al primo tocco (dopo ${wait} ms)`);
+      await page.evaluate(() => { state.addSheet = null; render(); }); await page.waitForTimeout(700);
+    }
+  }finally{ await ctx.close(); }
 });
 
 (async () => {
