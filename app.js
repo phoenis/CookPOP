@@ -1826,6 +1826,7 @@ const state = {
   gradPicker: null, // ephemeral: nome della ricetta con il menu del gradimento aperto
   profileOpen: false, // non persistito: pagina "Profilo"
   aisleOrderOpen: false, // non persistito: pagina "Ordine corsie"
+  cardsSort: 'freq', // ordine delle carte fedeltà: 'freq' (le più aperte in alto) | 'az'
   loyaltyCards: [], // carte fedeltà [{ id, name, number, color, format }] (vedi renderCardsPages)
   cardsOpen: null, cardViewId: null, cardDraft: null, cardScanMsg: '', cardsImport: null, cardsSearch: '', cardsListUnder: false, // non persistiti: pagine Carte
   expiryEstimates: {}, // reparto -> giorni di scadenza stimata scelti da te (0 = nessuna stima); assente = valore di partenza
@@ -3015,6 +3016,7 @@ function buildPersonalPayload(){
     dishPlan: state.dishPlan,
     freezerDishes: state.freezerDishes,
     loyaltyCards: state.loyaltyCards,
+    cardsSort: state.cardsSort,
     shopAisleCustom: state.shopAisleCustom,
     shopOrderCustom: state.shopOrderCustom,
     cookbooks: state.cookbooks
@@ -11404,7 +11406,13 @@ function cardTileHtml(card, attr){
     : `<span class="card-tile-name">${escapeHtml(card.name)}</span>`;
   return `<button type="button" class="card-tile${card.logo ? ' has-logo' : ''}" ${attr} style="${cardStyle(cardColor(card))}" aria-label="${escapeAttr(card.name)}">${inner}</button>`;
 }
-function sortedCards(){ return (state.loyaltyCards || []).slice().sort((a, b) => IT_COLLATOR.compare(a.name, b.name)); }
+// Ordine delle tessere: per frequenza d'uso (quante volte le apri, c.uses; a
+// parità, alfabetico) oppure solo alfabetico.
+function sortedCards(){
+  const byName = (a, b) => IT_COLLATOR.compare(a.name, b.name);
+  const freq = state.cardsSort !== 'az';
+  return (state.loyaltyCards || []).slice().sort((a, b) => (freq ? ((b.uses || 0) - (a.uses || 0)) : 0) || byName(a, b));
+}
 // La pagina (elenco/gestione) resta sotto anche con una carta aperta o
 // l'import da confermare: sono finestre sopra, non un cambio di pagina, così
 // chiudendole l'elenco non rifà l'animazione d'ingresso.
@@ -12215,6 +12223,10 @@ document.addEventListener('click', e=>{
 }, true);
 
 function renderCardsPages(){ return cardsPageHtml() + cardsOverlayHtml(); }
+document.addEventListener('change', e=>{
+  const sel = e.target.closest && e.target.closest('[data-cards-sort]');
+  if(sel){ state.cardsSort = sel.value === 'az' ? 'az' : 'freq'; persist(); render(); }
+});
 function cardsOverlayHtml(){
   const cards = state.loyaltyCards || [];
   if(state.cardsImport && state.cardsImport.length){
@@ -12268,6 +12280,12 @@ function cardsPageHtml(){
       <div class="search-field card-search">
         <input class="input-search" type="search" id="cards-search" placeholder="Cerca una carta…" value="${escapeAttr(state.cardsSearch || '')}" autocomplete="off">
       </div>
+      <label class="shop-group-by cards-sort"><span>Ordina per</span>
+        <select data-cards-sort aria-label="Ordina per">
+          <option value="freq" ${state.cardsSort !== 'az' ? 'selected' : ''}>Frequenza d'uso</option>
+          <option value="az" ${state.cardsSort === 'az' ? 'selected' : ''}>Ordine alfabetico</option>
+        </select>
+      </label>
       ${shown.length ? `<div class="card-grid">${shown.map(c => cardTileHtml(c, `data-card-view="${escapeAttr(c.id)}"`)).join('')}</div>` : '<p class="settings-note">Nessuna carta con questo nome.</p>'}` : `
       <p class="settings-note">Nessuna carta salvata. Tocca + in alto per aggiungere le tessere dei negozi che usi, poi le mostri in cassa da qui.</p>`;
     html += managePageHtml({ key: 'cards', title: 'Carte fedeltà', closeAttr: 'data-close-cards', body,
@@ -12391,7 +12409,12 @@ document.addEventListener('click', e=>{
   const manage = t.closest('[data-cards-manage]');
   if(manage){ state.cardsOpen = 'list'; state.cardsListUnder = false; render(); return; }
   const view = t.closest('[data-card-view]');
-  if(view){ state.cardViewId = view.dataset.cardView; render(); return; }
+  if(view){
+    state.cardViewId = view.dataset.cardView;
+    const opened = (state.loyaltyCards || []).find(c => c.id === state.cardViewId);
+    if(opened){ opened.uses = (opened.uses || 0) + 1; persist(); }
+    render(); return;
+  }
   const color = t.closest('[data-card-color]');
   if(color && state.cardDraft){ state.cardDraft.color = color.dataset.cardColor; render(); return; }
   const edit = t.closest('[data-card-edit]');

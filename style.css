@@ -1640,3 +1640,5 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 /* "Scansiona" accanto ad "Aggiungi": bordo, icona e testo neri (colore del testo, chiaro nel tema scuro). */
 .sheet-footer .edit-footer .scan-open-btn{ margin:0; background:var(--surface); color:var(--ink); border:1.5px solid var(--ink); font-weight:var(--weight-medium); flex:0 0 auto; }
 .sheet-footer .edit-footer .scan-open-btn svg{ color:var(--ink); }
+
+.cards-sort{ margin:0.5rem 0 0.75rem; }

@@ -2676,6 +2676,22 @@ test('Dispensa: selezione + "Aggiungi alla lista spesa" rimette in lista anche u
   eq(page.errors, [], 'errori JS');
 });
 
+test('carte fedeltà: le più aperte salgono in alto; Ordina per frequenza d\'uso / alfabetico', async ({ page }) => {
+  await page.evaluate(() => {
+    state.loyaltyCards = ['Coop', 'Esselunga', 'Conad'].map((name, k) => ({ id: 'c' + k, name, number: '123456789012' + k, color: CARD_COLORS[0] }));
+    state.cardsOpen = 'list'; state.cardsSort = 'freq'; render();
+  });
+  const names = () => page.evaluate(() => [...document.querySelectorAll('.card-grid .card-tile')].map(e => e.getAttribute('aria-label')));
+  eq(await names(), ['Conad', 'Coop', 'Esselunga'], 'senza uso: alfabetico');
+  for(let k = 0; k < 2; k++){ await page.click('[data-card-view="c1"]'); await page.click('.card-view-close'); }
+  await page.click('[data-card-view="c0"]'); await page.click('.card-view-close');
+  eq(await names(), ['Esselunga', 'Coop', 'Conad'], 'per frequenza');
+  eq(await page.evaluate(() => state.loyaltyCards.map(c => c.uses || 0)), [1, 2, 0]);
+  await page.selectOption('[data-cards-sort]', 'az');
+  eq(await names(), ['Conad', 'Coop', 'Esselunga'], 'alfabetico');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
