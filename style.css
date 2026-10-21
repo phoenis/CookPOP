@@ -1718,3 +1718,7 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 /* "Chiudi tutti / Apri tutti" (Spesa e Dispensa): testo normale, non in grassetto */
 .shop-head .shop-toggle-all{ font-weight:400; }
 .buttons-fixed.is-checked .shop-move-btn{ flex:1; width:auto; font-size:var(--text-body); }
+
+/* Fogli dal basso a tutto schermo (barretta tirata in su) */
+.move-sheet{ transition:max-height .2s, height .2s, border-radius .2s; }
+.move-sheet.is-full{ max-height:100dvh; height:100dvh; border-radius:0; padding-top:calc(0.5rem + env(safe-area-inset-top)); }
