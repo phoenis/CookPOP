@@ -1186,7 +1186,7 @@ test('spesa: le righe spuntate vanno in Completati in fondo, togliendo la spunta
   const r1 = await page.evaluate(() => ({
     completed: [...document.querySelectorAll('.shop-completed .item-name')].map(e => e.textContent.trim()),
     last: document.querySelector('.shop-list').lastElementChild.classList.contains('shop-completed'),
-    move: !!document.querySelector('.shop-bar #move-checked-to-pantry'),
+    move: !!document.querySelector('.buttons-fixed.is-checked #move-checked-to-pantry'),
     mode: !!document.getElementById('shop-mode-toggle')
   }));
   await page.click('.shop-completed input[data-shop-keys="a"]');
