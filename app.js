@@ -6988,7 +6988,7 @@ function renderSpesa(){
       ${(total && ['reparto','categoria','giorno'].includes(state.shopView)) ? `<button type="button" class="btn is-text shop-toggle-all" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? 'Apri tutti' : 'Chiudi tutti'}</button>` : '<span></span>'}
       <label class="shop-group-by"><span>Ordina per</span>
         <select data-shop-group aria-label="Ordina per">
-          ${[['reparto','Reparti (mio supermercato)'],['categoria','Categoria'],['ordine','Spesa'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
+          ${[['reparto','Corsie'],['categoria','Categoria'],['ordine','Spesa'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
     </div>
