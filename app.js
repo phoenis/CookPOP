@@ -4941,21 +4941,35 @@ document.addEventListener('keydown', e=>{
 
 let modalHistoryDepth = 0;
 let suppressPopstateNav = false;
+let pushAfterPop = false;
+let suppressTimer = null;
 function reconcileModalHistory(){
   syncDialogs();
   const openCount = countOpenModals();
   if(openCount > modalHistoryDepth){
+    // Un "indietro" per una finestra appena chiusa è ancora in corso (arriva
+    // dopo qualche centinaio di ms): aggiungere subito la nuova entry la farebbe
+    // saltare e la finestra appena riaperta si richiuderebbe. Si aspetta il
+    // popstate e poi si registra.
+    if(suppressPopstateNav){ pushAfterPop = true; return; }
     for(let i = modalHistoryDepth; i < openCount; i++) history.pushState({ cookpopModalDepth: i + 1 }, '');
     modalHistoryDepth = openCount;
   } else if(openCount < modalHistoryDepth){
     const delta = modalHistoryDepth - openCount;
     modalHistoryDepth = openCount;
     suppressPopstateNav = true;
+    clearTimeout(suppressTimer);
+    // Se il popstate non arriva (es. cronologia senza entry): non resta in attesa.
+    suppressTimer = setTimeout(()=>{ if(suppressPopstateNav){ suppressPopstateNav = false; if(pushAfterPop){ pushAfterPop = false; reconcileModalHistory(); } } }, 1500);
     history.go(-delta);
   }
 }
 window.addEventListener('popstate', ()=>{
-  if(suppressPopstateNav){ suppressPopstateNav = false; return; }
+  if(suppressPopstateNav){
+    suppressPopstateNav = false; clearTimeout(suppressTimer);
+    if(pushAfterPop){ pushAfterPop = false; reconcileModalHistory(); }
+    return;
+  }
   // Se non avevamo entry nostre in cima, questo indietro riguarda solo la
   // normale cronologia delle tab (#menu/#spesa/...): niente da chiudere qui,
   // se ne occupa già il listener hashchange più sopra.
@@ -7651,9 +7665,10 @@ function closeMoveModal(){ state.moveModal = null; }
     const { sheet, dy, t0 } = drag; drag = null;
     const fast = Math.abs(dy) > 40 && (Date.now() - t0) < 250;
     if(dy < -50 || (fast && dy < 0)){
-      if(!state.sheetFull){ state.sheetFull = true; render(); return; }
+      if(!state.sheetFull){ state.sheetFull = true; if(state.addSheet) state.addSheet.detailsOpen = true; render(); return; }
     } else if(dy > 90 || (fast && dy > 0)){
-      if(state.sheetFull){ state.sheetFull = false; render(); return; }
+      // Giù chiude, anche da tutto schermo.
+      state.sheetFull = false;
       if(state.addSheet) state.addSheet = null;
       else if(state.moveModal) closeMoveModal();
       render(); return;
@@ -7798,6 +7813,21 @@ function commitPantryDraft(d){
 // Dispensa (+): in alto si sceglie se va in lista ("alla Spesa") o già in
 // Dispensa ("in casa"). Nome con suggerimenti e codice a barre, quantità con
 // unità, e gli "Altri dettagli" (per chi, reparto, dove sta, scadenza) a scomparsa.
+// Tocco su un bottone che deve rispondere sempre al primo tocco: su telefono il
+// browser può non generare il click per un tocco subito dopo un trascinamento
+// (es. + premuto subito dopo aver chiuso un foglio), ma pointerup arriva. Su
+// tocco si agisce al pointerup, col mouse al click; mai due volte.
+function onFastTap(el, fn){
+  let done = false;
+  el.addEventListener('pointerup', e=>{
+    if(e.pointerType === 'mouse') return;
+    done = true; fn();
+  });
+  el.addEventListener('click', ()=>{
+    if(done){ done = false; return; }
+    fn();
+  });
+}
 function openAddSheet(mode){
   const d = newPantryDraft(mode === 'casa' && state.tab === 'dispensa' && state.pantryView === 'casa');
   state.addSheet = { mode, d, per: '', perNew: '', detailsOpen: false, suggestOpen: false, luogoUser: false };
@@ -9135,7 +9165,7 @@ function attachHandlers(){
     });
   });
   const spesaFab = document.getElementById('spesa-fab');
-  if(spesaFab) spesaFab.addEventListener('click', ()=> openAddSheet('spesa'));
+  if(spesaFab) onFastTap(spesaFab, ()=>{ if(!state.addSheet) openAddSheet('spesa'); });
   document.querySelectorAll('[data-close-add-ing-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
@@ -10247,7 +10277,7 @@ function attachHandlers(){
   // "+" di Dispensa: stesso modale di "+ Aggiungi ingrediente" nel menu ⋯
   // (titolo/categoria di ripiego seguono la vista Cibo/Casa aperta).
   const pantryFab = document.getElementById('pantry-fab');
-  if(pantryFab) pantryFab.addEventListener('click', ()=> openAddSheet('casa'));
+  if(pantryFab) onFastTap(pantryFab, ()=>{ if(!state.addSheet) openAddSheet('casa'); });
   document.querySelectorAll('[data-manage-ingredient-new]').forEach(btn=> btn.addEventListener('click', ()=> openAddSheet('casa')));
 
   document.querySelectorAll('.chip-row [data-f]').forEach(btn=>{
