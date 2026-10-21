@@ -2769,6 +2769,18 @@ test('Aggiungi unico: la tendina dei suggerimenti si chiude toccando altrove o c
   eq(page.errors, [], 'errori JS');
 });
 
+test('fogli dal basso: trascinando giù la barretta in cima si chiudono, con un tratto breve tornano su', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'spesa'; openAddSheet('spesa'); });
+  const pos = async () => page.evaluate(() => { const r = document.querySelector('.move-handle').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  let p = await pos();
+  await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x, p.y + 30, { steps: 4 }); await page.waitForTimeout(300); await page.mouse.up(); await page.waitForTimeout(250);
+  eq(await page.evaluate(() => !!state.addSheet), true, 'tratto breve: resta aperto');
+  p = await pos();
+  await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x, p.y + 220, { steps: 8 }); await page.waitForTimeout(300); await page.mouse.up();
+  eq(await page.evaluate(() => [!!state.addSheet, !!document.querySelector('.move-sheet')]), [false, false], 'tratto lungo: chiuso');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
