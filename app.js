@@ -6856,7 +6856,6 @@ function renderSpesa(){
         <div class="shop-completed-actions">
           <button type="button" class="btn is-text" id="reset-shop">Togli le spunte</button>
           <button type="button" class="btn is-outline color-delete" id="delete-checked-shop">Elimina</button>
-          <button type="button" class="btn is-solid" id="move-checked-to-pantry">Sposta in dispensa</button>
         </div>
       </div>`;
   }
@@ -6953,16 +6952,20 @@ function renderSpesa(){
 /*           <button class="btn is-ghost reset-btn" data-close-add-ing-modal>Annulla</button>
  */
   return `
-    <p class="section-sub">Si aggiorna in automatico in base al menù attuale — quello che hai già in Dispensa non compare qui</p>
     ${missingBanner}
     ${listSearchHtml('shop-search', state.shopSearch, 'Cerca nella lista…')}
-    <div class="shop-head">
-      <div class="shop-head-title">
-        <span class="shop-head-sub">${displayTotal} ${displayTotal === 1 ? 'articolo' : 'articoli'}${displayDone ? ` · ${displayDone} ${displayDone === 1 ? 'preso' : 'presi'}` : ''}</span>
+    <div class="shop-progress">
+      <div class="shop-progress-row">
+        <span><b>${displayDone}</b> di ${displayTotal} nel carrello</span>
+        <span class="shop-sync">${(personalSynced && catalogSynced && navigator.onLine !== false) ? '' : 'Offline · salvo e invio dopo'}</span>
       </div>
+      <div class="shop-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${displayTotal}" aria-valuenow="${displayDone}"><span style="width:${displayTotal ? Math.round(100 * displayDone / displayTotal) : 0}%"></span></div>
+    </div>
+    <div class="shop-head">
+      ${(total && ['reparto','categoria','giorno'].includes(state.shopView)) ? `<button type="button" class="btn is-text shop-toggle-all" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? 'Apri tutti' : 'Chiudi tutti'}</button>` : '<span></span>'}
       <label class="shop-group-by"><span>Ordina per</span>
         <select data-shop-group aria-label="Ordina per">
-          ${[['reparto','Corsia'],['categoria','Categoria'],['ordine','Spesa'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
+          ${[['reparto','Reparti (mio supermercato)'],['categoria','Categoria'],['ordine','Spesa'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
     </div>
@@ -6971,13 +6974,9 @@ function renderSpesa(){
     
   ${addIngModal}
   ${renderExpiryConfirmModal()}
-    <div class="buttons-fixed">
-      ${total ? `<button type="button" class="btn is-fixed is-secondary" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 8l-5-5l-5 5m10 8l-5 5l-5-5"></path></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--iconoir" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m17 4l-5 5l-5-5m10 16l-5-5l-5 5"></path></svg>'}</button>` : ''}
-      <button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>
-        ${displayDoneShoppable ? `
-
-    ` : ''}
-
+    <div class="shop-bar">
+      <button class="btn is-outline shop-bar-add" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente">${uiIcon('plus')} Aggiungi</button>
+      ${displayDoneShoppable ? `<button type="button" class="btn is-solid shop-bar-move" id="move-checked-to-pantry">Metti in dispensa (${displayDoneShoppable})</button>` : ''}
     </div>
   `;
 }

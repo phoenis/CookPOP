@@ -1178,7 +1178,7 @@ test('spesa: le righe spuntate vanno in Completati in fondo, togliendo la spunta
   const r1 = await page.evaluate(() => ({
     completed: [...document.querySelectorAll('.shop-completed .item-name')].map(e => e.textContent.trim()),
     last: document.querySelector('.shop-list').lastElementChild.classList.contains('shop-completed'),
-    move: !!document.querySelector('.shop-completed #move-checked-to-pantry'),
+    move: !!document.querySelector('.shop-bar #move-checked-to-pantry'),
     mode: !!document.getElementById('shop-mode-toggle')
   }));
   await page.click('.shop-completed input[data-shop-keys="a"]');
@@ -1201,7 +1201,7 @@ test('dispensa come la spesa: Cibo/Casa restano, Raggruppa per Categoria/Luogo/A
   eq(luogo.includes('Frigo') && luogo.includes('Freezer'), true, 'sezioni per luogo');
   eq(az.titles, 0, 'A-Z senza sezioni');
   eq(az.names.slice().sort((a, b) => a.localeCompare(b, 'it')), az.names, 'A-Z in ordine');
-  eq(pasto, ['Corsia', 'Categoria', 'Spesa', 'Pasto', 'Dalla A alla Z']);
+  eq(pasto, ['Reparti (mio supermercato)', 'Categoria', 'Spesa', 'Pasto', 'Dalla A alla Z']);
   eq(page.errors, [], 'errori JS');
 });
 
