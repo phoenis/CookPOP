@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=185">
+<link rel="stylesheet" href="style.css?v=187">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -83,58 +83,34 @@
     <div class="settings-body">
       <div class="settings-search-wrap"><input class="input-search settings-search" type="search" id="settings-search" placeholder="Cerca nelle impostazioni…" autocomplete="off" aria-label="Cerca nelle impostazioni"></div>
       <section class="settings-section">
-        <h3 class="settings-section-title">Profilo</h3>
+        <h3 class="settings-section-title">Menù</h3>
         <div class="settings-card is-links">
-          <button type="button" class="settings-link settings-profile" data-settings-go="profile"><span class="settings-avatar" id="settings-avatar" aria-hidden="true"></span><span class="settings-link-text" id="settings-profile-text">Il tuo profilo<small>Nome, email, esci</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="gen"><span class="settings-link-ico" data-ico="gear"></span><span class="settings-link-text">Regole di generazione<small>Tempi, porzioni, eccezioni</small></span></button>
         </div>
       </section>
       <section class="settings-section">
-        <h3 class="settings-section-title">Aspetto</h3>
+        <h3 class="settings-section-title">Ingredienti e reparti</h3>
         <div class="settings-card is-links">
-          <button type="button" class="settings-link" data-settings-go="appearance"><span class="settings-link-ico" data-ico="palette"></span><span class="settings-link-text">Tema e colori<small>Chiaro o scuro, colore d'accento</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="ingredients"><span class="settings-link-ico" data-ico="list-details"></span><span class="settings-link-text">Ingredienti<small>Nomi, sinonimi, doppioni</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="depts"><span class="settings-link-ico" data-ico="category"></span><span class="settings-link-text">Reparti<small>Nomi, ordine nel supermercato, scadenze stimate</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="groups"><span class="settings-link-ico" data-ico="tag"></span><span class="settings-link-text">Equivalenti<small>Ingredienti intercambiabili: es. Pasta corta</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="recurring"><span class="settings-link-ico" data-ico="refresh"></span><span class="settings-link-text">Consumi ricorrenti</span></button>
         </div>
       </section>
       <section class="settings-section">
-        <h3 class="settings-section-title">Il mio menù</h3>
+        <h3 class="settings-section-title">Spesa e ricette</h3>
         <div class="settings-card is-links">
-          <button type="button" class="settings-link" data-settings-go="gen"><span class="settings-link-ico" data-ico="gear"></span><span class="settings-link-text">Regole di generazione<small>Tempi, proteine, avanzi, solo con quello che hai</small></span></button>
-        </div>
-      </section>
-      <section class="settings-section">
-        <h3 class="settings-section-title">Ricette</h3>
-        <div class="settings-card is-links">
-          <button type="button" class="settings-link" data-settings-go="newrecipe"><span class="settings-link-ico" data-ico="plus"></span><span class="settings-link-text">Aggiungi ricetta<small>Scrivi una ricetta da zero</small></span></button>
-          <button type="button" class="settings-link" data-settings-go="import"><span class="settings-link-ico" data-ico="download"></span><span class="settings-link-text">Importa ricetta<small>Da un reel, un sito o un testo</small></span></button>
-        </div>
-      </section>
-      <section class="settings-section">
-        <h3 class="settings-section-title">Ingredienti e Dispensa</h3>
-        <div class="settings-card is-links">
-          <button type="button" class="settings-link" data-settings-go="ingredients"><span class="settings-link-ico" data-ico="list-details"></span><span class="settings-link-text">Gestisci ingredienti<small>Nomi, sinonimi, unione dei doppioni</small></span></button>
-          <button type="button" class="settings-link" data-settings-go="groups"><span class="settings-link-ico" data-ico="category"></span><span class="settings-link-text">Gruppi<small>Ingredienti equivalenti, come pasta corta</small></span></button>
-          <button type="button" class="settings-link" data-settings-go="depts"><span class="settings-link-ico" data-ico="tag"></span><span class="settings-link-text">Gestisci categorie<small>Reparti di Spesa e Dispensa</small></span></button>
-          <button type="button" class="settings-link" data-settings-go="aisles"><span class="settings-link-ico" data-ico="sort"></span><span class="settings-link-text">Ordine corsie<small>L'ordine dei reparti nella lista della spesa</small></span></button>
-          <button type="button" class="settings-link" data-settings-go="recurring"><span class="settings-link-ico" data-ico="refresh"></span><span class="settings-link-text">Consumi ricorrenti<small>Pane, latte e simili che finiscono a ritmo fisso</small></span></button>
-          <button type="button" class="settings-link" data-settings-go="expiry"><span class="settings-link-ico" data-ico="calendar"></span><span class="settings-link-text">Scadenze stimate<small>Quanti giorni durano i freschi</small></span></button>
-        </div>
-      </section>
-      <section class="settings-section">
-        <h3 class="settings-section-title">Carte fedeltà</h3>
-        <div class="settings-card is-links">
-          <button type="button" class="settings-link" data-cards-manage><span class="settings-link-ico" data-ico="cards"></span><span class="settings-link-text">Le tue carte<small>Le tessere dei negozi, da mostrare in cassa</small></span></button>
-        </div>
-      </section>
-      <section class="settings-section">
-        <h3 class="settings-section-title">Backup dei dati</h3>
-        <div class="settings-card is-links">
-          <button type="button" class="settings-link" data-settings-go="backup"><span class="settings-link-ico" data-ico="database"></span><span class="settings-link-text">Backup<small>Scarica e ripristina, backup automatico mensile</small></span></button>
+          <button type="button" class="settings-link" data-cards-manage><span class="settings-link-ico" data-ico="cards"></span><span class="settings-link-text">Carte fedeltà</span></button>
+          <button type="button" class="settings-link" data-settings-go="newrecipe"><span class="settings-link-ico" data-ico="plus"></span><span class="settings-link-text">Aggiungi o importa ricetta<small>Scrivila, o prendila da un reel, un sito o un testo</small></span></button>
         </div>
       </section>
       <section class="settings-section">
         <h3 class="settings-section-title">App</h3>
-        <div class="settings-card">
-          <p class="settings-card-text">Se qualcosa non si vede come dovrebbe, scarica l'ultima versione.</p>
-          <button class="btn is-outline is-block" id="refresh-btn" type="button"><span class="ui-ico-wrap" data-ico="refresh"></span> Aggiorna app</button>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link settings-profile" data-settings-go="profile"><span class="settings-avatar" id="settings-avatar" aria-hidden="true"></span><span class="settings-link-text" id="settings-profile-text">Profilo e condivisione<small>Nome, email, esci</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="appearance"><span class="settings-link-ico" data-ico="palette"></span><span class="settings-link-text">Tema e colori</span></button>
+          <button type="button" class="settings-link" data-settings-go="backup"><span class="settings-link-ico" data-ico="database"></span><span class="settings-link-text">Backup<small>Scarica e ripristina, backup automatico mensile</small></span></button>
+          <button type="button" class="settings-link" id="refresh-btn"><span class="settings-link-ico" data-ico="refresh"></span><span class="settings-link-text">Aggiorna app<small>Se qualcosa non si vede bene, scarica l'ultima versione</small></span></button>
         </div>
       </section>
       <p class="settings-credit">AGGIORNATO A MANO, CUCINATO CON CURA</p>
@@ -148,6 +124,6 @@
 });
 </script>
 <script src="catalog.js?v=16"></script>
-<script src="app.js?v=272"></script>
+<script src="app.js?v=273"></script>
 </body>
 </html>

@@ -1725,3 +1725,14 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 
 /* Niente zoom con doppio tocco: il secondo tocco ravvicinato (es. + dopo aver chiuso un foglio) deve essere un click normale */
 html, body, button, .btn, input, select{ touch-action:manipulation; }
+
+/* Impostazioni raggruppate: titoli di gruppo e schede arrotondate con righe divise */
+#settings-backdrop .settings-section-title{ display:block; margin:var(--space-medium) 0 var(--space-xsmall); font-size:var(--text-xsmall); font-weight:var(--weight-bold); letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-light); }
+#settings-backdrop .settings-section + .settings-section{ border-top:0; padding-top:0; margin-top:0; }
+#settings-backdrop .settings-card.is-links{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-large, 1.25rem); padding:0 var(--space-small); }
+#settings-backdrop .settings-link{ padding:0.75rem 0; }
+#settings-backdrop .settings-link + .settings-link{ border-top:1px solid var(--line); }
+#settings-backdrop .settings-link-ico{ width:2.5rem; height:2.5rem; margin-right:var(--space-xsmall); border-radius:0.75rem; background:var(--bg); align-items:center; }
+#settings-backdrop .settings-link .settings-avatar{ width:2.5rem; height:2.5rem; font-size:1.125rem; margin-right:var(--space-xsmall); border-radius:0.75rem; }
+#settings-backdrop .settings-link-text small{ margin-top:0.125rem; }
+.sheet-page .settings-card.is-links .settings-link{ padding-left:0; padding-right:0; }

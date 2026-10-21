@@ -8414,13 +8414,19 @@ function renderDeptsPage(){
         <div class="settings-card manage-list">${ids.map(row).join('')}</div>
       </section>`;
   const body = `
-      <p class="settings-note manage-intro">Sono i reparti della Spesa e le sezioni della Dispensa. Tocca una categoria per cambiarle nome o emoji.</p>
+      <p class="settings-note manage-intro">Sono i reparti della Spesa e le sezioni della Dispensa. Tocca un reparto per cambiargli nome o emoji.</p>
       <section class="settings-section">
-        ${editing === 'new' ? `<div class="settings-card">${deptEditCardHtml('new')}</div>` : `<button type="button" class="btn is-outline is-block" data-dept-edit="new">+ Nuova categoria</button>`}
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="aisles"><span class="settings-link-ico" data-ico="sort"></span><span class="settings-link-text">Ordine nel supermercato<small>L'ordine dei reparti nella lista della spesa</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="expiry"><span class="settings-link-ico" data-ico="calendar"></span><span class="settings-link-text">Scadenze stimate<small>Quanti giorni durano i freschi</small></span></button>
+        </div>
+      </section>
+      <section class="settings-section">
+        ${editing === 'new' ? `<div class="settings-card">${deptEditCardHtml('new')}</div>` : `<button type="button" class="btn is-outline is-block" data-dept-edit="new">+ Nuovo reparto</button>`}
       </section>
       ${section('Cibo', sorted.filter(d => !isNonFoodDept(d)))}
       ${section('Casa', sorted.filter(isNonFoodDept))}`;
-  return managePageHtml({ key: 'depts', title: 'Categorie', closeAttr: 'data-close-depts', body });
+  return managePageHtml({ key: 'depts', title: 'Reparti', closeAttr: 'data-close-depts', body });
 }
 
 // --- Gestisci gruppi ---------------------------------------------------------
@@ -11802,6 +11808,12 @@ function renderNewRecipePage(){
           <input type="text" id="new-recipe-name" class="input-search settings-search" placeholder="Es. Pasta al pesto" value="${escapeAttr(state.newRecipeName || '')}" autocomplete="off">
         </div>
         ${state.newRecipeError ? `<p class="settings-note" style="color:var(--tomato);">${escapeHtml(state.newRecipeError)}</p>` : '<p class="settings-note">Poi potrai aggiungere ingredienti, passaggi, foto e tutto il resto.</p>'}
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Oppure importala</h3>
+        <div class="settings-card is-links">
+          <button type="button" class="settings-link" data-settings-go="import"><span class="settings-link-ico" data-ico="download"></span><span class="settings-link-text">Importa ricetta<small>Da un reel, un sito o un testo</small></span></button>
+        </div>
       </section>`;
   return managePageHtml({ key: 'new-recipe', title: 'Aggiungi ricetta', closeAttr: 'data-close-new-recipe', body,
     footer: `<button type="button" class="btn is-solid is-block" data-new-recipe-create>Crea</button>` });
