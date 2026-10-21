@@ -7623,6 +7623,41 @@ function renderMoveModal(){
   </div>`;
 }
 function closeMoveModal(){ state.moveModal = null; }
+// Trascinando verso il basso la barretta in cima, i fogli ("Aggiungi", "Metti in
+// dispensa") si chiudono: sotto una certa distanza tornano su.
+(function(){
+  let drag = null;
+  document.addEventListener('pointerdown', e=>{
+    const handle = e.target.closest && e.target.closest('.move-handle');
+    if(!handle) return;
+    const sheet = handle.closest('.move-sheet'); if(!sheet) return;
+    e.preventDefault();
+    drag = { sheet, handle, pointerId: e.pointerId, startY: e.clientY, dy: 0, t0: Date.now() };
+    sheet.style.transition = 'none';
+    try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  document.addEventListener('pointermove', e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    drag.dy = Math.max(0, e.clientY - drag.startY);
+    drag.sheet.style.transform = `translateY(${drag.dy}px)`;
+    const bg = drag.sheet.parentElement; if(bg) bg.style.background = `rgba(0,0,0,${0.45 * Math.max(0, 1 - drag.dy / 400)})`;
+  });
+  const end = e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    const { sheet, dy, t0 } = drag; drag = null;
+    const fast = dy > 40 && (Date.now() - t0) < 250;
+    if(dy > 90 || fast){
+      if(state.addSheet) state.addSheet = null;
+      else if(state.moveModal) closeMoveModal();
+      render();
+    } else {
+      sheet.style.transition = 'transform .15s'; sheet.style.transform = '';
+      const bg = sheet.parentElement; if(bg) bg.style.background = '';
+    }
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
 document.addEventListener('click', e=>{
   const m = state.moveModal;
   if(!m) return;
