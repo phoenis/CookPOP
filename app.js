@@ -834,7 +834,7 @@ function cookLastNote(cm){
   const list = state.cookSession || [];
   const others = list.filter(x => x.name !== cm.name);
   const meal = cm.mk ? MEAL_LABEL[parseMealKey(cm.mk).meal].toLowerCase() : '';
-  if(!others.length) return meal ? `Ultimo passaggio. Con “Ho finito” si apre il foglio della ${meal} intera.` : '';
+  if(!others.length) return meal ? `Ultimo passaggio. Con “Ho finito” si apre il foglio della ${meal} intera.` : 'Ultimo passaggio. Con “Ho finito” si apre il foglio “Ricetta fatta”.';
   const open = others.filter(x => !x.done);
   const lab = x => (COOK_ARTICLE[dishCourse(x.name)] || 'Il piatto');
   if(open.length){
@@ -895,7 +895,7 @@ function renderCookModePage(){
       ${tipHtml}
     </div>
     <div class="cook-footer">
-      ${lastNote ? `<div class="cook-last-note"><span class="cook-last-ic" aria-hidden="true">✓</span><span>${escapeHtml(lastNote)}</span></div>` : `<div class="cook-awake">${sun}<span>Lo schermo resta acceso</span></div>`}
+      ${lastNote ? `<div class="cook-last-note"><span class="cook-last-ic" aria-hidden="true">✓</span><span>${escapeHtml(lastNote)}</span></div>` : `<div class="cook-awake">${sun}<span>Lo schermo resta acceso${multi || cm.mk ? '' : ' · all\'ultimo passaggio: “Ho finito” → Ricetta fatta'}</span></div>`}
       <div class="cook-nav">
         <button type="button" class="cook-nav-back" data-cook-prev ${isFirst ? 'disabled' : ''}>Indietro</button>
         <button type="button" class="cook-nav-next" ${isLast ? 'data-cook-finish' : 'data-cook-next'}>${isLast ? 'Ho finito' : 'Avanti'}</button>
@@ -2243,6 +2243,9 @@ const state = {
   swapFilters: {},
   mealsDone: {}, // {i: {pranzo:bool, cena:bool}}
   menuPick: null, // ephemeral: nome della ricetta per cui è aperto "Metti nel menù"
+  doneModalRecipe: null, // ephemeral: { name, ratio } se "Ricetta fatta" è aperta da una ricetta (senza pasto)
+  doneGradIdx: 0, // ephemeral: di quale piatto si sta dando il voto nel foglio "Cena fatta"
+  doneRestOpen: false, // ephemeral: aperta la lista "Altri N non erano in Dispensa"
   doneModalDay: null, // chiave "weekIdx_i" del giorno per cui è aperta la modale "Ricetta fatta!" (sempre riferita alla cena, come il resto della UI in questo stadio)
   doneModalQty: {},
   doneQtyEditingKey: null, // ephemeral: nome ingrediente il cui campo "quanto ne hai usato" è in modifica diretta (modale "Ricetta fatta!")
@@ -5047,7 +5050,7 @@ const MODAL_CHECKS = [
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> state.doneModalLeftovers.some(r => r.pickerOpen), ()=>{ state.doneModalLeftovers.forEach(r => { r.pickerOpen = false; }); }],
   [()=> state.doneModalLeftovers.some(r => r.catPickerOpen), ()=>{ state.doneModalLeftovers.forEach(r => { r.catPickerOpen = false; }); }],
-  [()=> state.doneModalDay !== null, ()=>{ state.doneModalDay = null; state.doneModalQty = {}; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalMeal = {}; state.doneModalLeftovers = []; }],
+  [()=> state.doneModalDay !== null, ()=>{ closeDoneSheet(); }],
   [()=> !!state.mealOverflowOpen, ()=>{ state.mealOverflowOpen = null; }],
   [()=> state.genSettingsOpen !== null, ()=>{ state.genSettingsOpen = null; }],
   [()=> !!state.pantryGroupsModalOpen && !!state.groupEditId, ()=>{ closeGroupEdit(); }],
@@ -6412,6 +6415,157 @@ function isTodayLunchPast(){
 // dispensa in esaurimento, domani) — la cena di stasera non è più ripetuta
 // qui perché la scheda del giorno corrente è già aperta di default subito
 // sotto, nella lista della settimana.
+// --- Foglio "Cena fatta" / "Ricetta fatta" ----------------------------------
+// Foglio dal basso: quanto togliere dalla Dispensa (− e +), gli ingredienti che
+// non c'erano (chiusi), i consumi "con i pasti", cosa è avanzato (No/Sì) e,
+// una ricetta alla volta, com'era (facoltativo).
+// "Cena fatta": Sì/No dell'avanzo, lista "Altri N", voto un piatto alla volta.
+document.addEventListener('click', e=>{
+  if(state.doneModalDay === null || !e.target.closest) return;
+  const left = e.target.closest('[data-done-left]');
+  if(left){
+    const [idx, v] = left.dataset.doneLeft.split(':');
+    const row = state.doneModalLeftovers[parseInt(idx, 10)];
+    if(row){ row.checked = v === '1'; render(); }
+    return;
+  }
+  if(e.target.closest('[data-done-rest-toggle]')){ state.doneRestOpen = !state.doneRestOpen; render(); return; }
+  if(e.target.closest('[data-done-grad-next]')){ state.doneGradIdx = (state.doneGradIdx || 0) + 1; render(); return; }
+  if(e.target.closest('.done-sheet [data-set-gradimento]')){ state.doneGradIdx = (state.doneGradIdx || 0) + 1; render(); }
+}, true); // in cattura: il foglio ferma la risalita dei tocchi ([data-stop-close])
+// "Ricetta fatta" da una ricetta (senza pasto): stesse quantità, scalate sulle persone.
+function openRecipeDone(name, ratio){
+  const qtyMap = {};
+  getIngredientsFor(name).forEach(it=>{
+    const pantryIt = resolvePantryItem(it.ingrediente);
+    if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.unit !== 'none') qtyMap[it.ingrediente] = (qtyMap[it.ingrediente] || 0) + usedQtyForPantry(pantryIt.unit, it.qta, ratio || 1);
+  });
+  state.doneModalRecipe = { name, ratio: ratio || 1 };
+  state.doneModalDay = 'recipe';
+  state.doneModalQty = qtyMap; state.doneQtyEditingKey = null; state.doneModalFinished = {}; state.doneModalMeal = {};
+  state.doneModalLeftovers = [{ name, luogo: 'frigo', cat: 'avanzi', checked: false, pickerOpen: false, catPickerOpen: false }];
+  state.doneGradIdx = 0; state.doneRestOpen = false;
+  render();
+}
+function closeDoneSheet(){
+  state.doneModalDay = null; state.doneModalRecipe = null;
+  state.doneModalQty = {}; state.doneQtyEditingKey = null;
+  state.doneModalFinished = {}; state.doneModalMeal = {};
+  state.doneModalLeftovers = []; state.doneGradIdx = 0; state.doneRestOpen = false;
+}
+function renderDoneSheet(){
+  if(state.doneModalDay === null){ state.doneGradIdx = 0; return ''; }
+  const doneRecipe = state.doneModalRecipe;
+  let dishNames, doneIng, title, persone;
+  if(doneRecipe){
+    dishNames = [doneRecipe.name];
+    doneIng = getIngredientsFor(doneRecipe.name).map(it => Object.assign({}, it, { factor: 1 }));
+    title = 'Ricetta fatta';
+    const base = parsePortionsBase((getRecipeDetails(doneRecipe.name) || {}).porzioni);
+    persone = base ? Math.round(base * (doneRecipe.ratio || 1)) : 0;
+  } else {
+    const { weekIdx, i, meal } = parseMealKey(state.doneModalDay);
+    const mealData = effectiveMeal(weekIdx, i, meal);
+    dishNames = mealDishes(weekIdx, i, meal).map(d => d.name).filter(Boolean);
+    doneIng = mealCookIngredients(state.doneModalDay, mealData);
+    title = `${MEAL_LABEL[meal]} ${meal === 'cena' ? 'fatta' : 'fatto'}`;
+    persone = mealPortions(state.doneModalDay, mealData.principale);
+  }
+  const qtyMap = state.doneModalQty || {};
+  const finishedMap = state.doneModalFinished || {};
+  const seen = new Set();
+  const uniqueIng = doneIng.filter(it=>{
+    const key = (it.ingrediente || '').trim().toLowerCase();
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const CART_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1.25em" height="1.25em" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><circle cx="9" cy="20" r="1.25"/><circle cx="18" cy="20" r="1.25"/><path d="M3 4h2l2.4 11h11l2-8H6.2"/></g></svg>';
+  const unitTxt = (n, unit) => `${n}${unit ? ' ' + escapeHtml(unit) : ''}`;
+  const stepperHtml = (decAttr, incAttr, valueHtml) => `<span class="done-stepper"><button type="button" class="rd-round" ${decAttr} aria-label="Diminuisci">−</button>${valueHtml}<button type="button" class="rd-round" ${incAttr} aria-label="Aumenta">+</button></span>`;
+  const qtyRows = [], restRows = [];
+  uniqueIng.forEach(it=>{
+    const name = it.ingrediente;
+    const pantryIt = resolvePantryItem(name);
+    if(!pantryIt){
+      restRows.push(`<div class="done-rest-row"><span>${escapeHtml(name)}</span><small>non in Dispensa</small></div>`);
+      return;
+    }
+    if(Object.prototype.hasOwnProperty.call(qtyMap, name) && pantryIt.unit !== 'none'){
+      const unit = pantryIt.unit || '';
+      const step = qtyStepFor(unit);
+      const used = qtyMap[name];
+      const have = pantryIt.qty || 0;
+      const left = Math.max(0, Math.round((have - used) * 100) / 100);
+      const editingThis = state.doneQtyEditingKey === name;
+      qtyRows.push(`
+      <div class="done-row">
+        <div class="done-row-main"><b>${escapeHtml(name)}</b><small>${have > 0 ? (left > 0 ? `ne restano ${unitTxt(left, unit)}` : 'finiti') : 'finito in Dispensa'}</small></div>
+        ${stepperHtml(`data-done-qty-dec="${escapeAttr(name)}"`, `data-done-qty-inc="${escapeAttr(name)}"`, editingThis
+          ? `<span class="done-qty"><input type="number" min="0" step="${step}" class="qty-input" value="${used}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}</span>`
+          : `<span class="done-qty" data-done-qty-show="${escapeAttr(name)}">${unitTxt(used, unit)}</span>`)}
+      </div>`);
+      return;
+    }
+    const inCart = !!finishedMap[name];
+    restRows.push(`<div class="done-rest-row"><span>${escapeHtml(name)}</span><button type="button" class="btn is-icon done-cart-btn${inCart ? ' active' : ''}" data-done-cart-toggle="${escapeAttr(name)}" aria-pressed="${inCart}" title="${inCart ? 'In lista spesa' : 'È finito? Metti in lista spesa'}">${CART_SVG}</button></div>`);
+  });
+  const dispensaHtml = qtyRows.length ? `
+    <section class="done-sec"><h3>Tolgo dalla Dispensa</h3>${qtyRows.join('')}</section>` : '';
+  const restHtml = restRows.length ? `
+    <section class="done-sec done-rest">
+      <button type="button" class="done-rest-toggle${state.doneRestOpen ? ' open' : ''}" data-done-rest-toggle aria-expanded="${!!state.doneRestOpen}">${qtyRows.length ? `Altri ${restRows.length} non erano in Dispensa` : `${restRows.length} ingredienti non in Dispensa`}<span aria-hidden="true">${state.doneRestOpen ? '▴' : '▾'}</span></button>
+      ${state.doneRestOpen ? `<div class="done-rest-list">${restRows.join('')}</div>` : ''}
+    </section>` : '';
+  const recRows = doneRecipe ? '' : mealRecurringList().filter(r => state.doneModalMeal && Object.prototype.hasOwnProperty.call(state.doneModalMeal, r.id)).map(r=>{
+    const it = recurringPantryItem(r);
+    const n = state.doneModalMeal[r.id];
+    if(!recurringCountable(it)) return `<div class="done-row"><div class="done-row-main"><b>${escapeHtml(r.nome)}</b><small>${it ? 'in Dispensa non si conta' : 'non in Dispensa'}</small></div></div>`;
+    const uTxt = it.unit ? ' ' + escapeHtml(UNIT_SHORT[it.unit] || it.unit) : '';
+    const rest = Math.max(0, Math.round((it.qty - n) * 100) / 100);
+    return `
+    <div class="done-row">
+      <div class="done-row-main"><b>${escapeHtml(it.nome)}</b><small>${n}${uTxt} a pasto${it.qty > 0 && rest === 0 ? ' · era l\'ultimo' : ''}</small>${it.qty > 0 && rest === 0 ? '<span class="done-chip">va in Spesa</span>' : ''}</div>
+      ${stepperHtml(`data-done-rec="${escapeAttr(r.id)}" data-done-rec-delta="-1"`, `data-done-rec="${escapeAttr(r.id)}" data-done-rec-delta="1"`, `<span class="done-qty">${n}${uTxt}</span>`)}
+    </div>`;
+  }).join('');
+  const recHtml = recRows ? `<section class="done-sec"><h3>Consumi con i pasti</h3>${recRows}</section>` : '';
+  const leftHtml = state.doneModalLeftovers.length ? `
+    <section class="done-sec"><h3>Ne è avanzato?</h3>
+      ${state.doneModalLeftovers.map((row, idx) => `
+      <div class="done-left" data-done-leftover-row="${idx}">
+        <div class="done-left-top"><b>${escapeHtml(row.name || 'Avanzo')}</b>
+          <span class="done-seg" role="group"><button type="button" class="${row.checked ? '' : 'on'}" data-done-left="${idx}:0">No</button><button type="button" class="${row.checked ? 'on' : ''}" data-done-left="${idx}:1">Sì</button></span>
+        </div>
+        ${row.checked ? `<div class="done-left-where">${LUOGO_ORDER.filter(l => ['frigo', 'freezer', 'dispensa'].includes(l)).map(l => `<button type="button" class="move-chip done-where${l === row.luogo ? ' is-edited' : ''}" data-done-leftover-luogo-set="${idx}:${l}">${LUOGO_ICON[l] || ''} ${escapeHtml(LUOGO_LABEL[l])}</button>`).join('')}</div>` : ''}
+      </div>`).join('')}
+    </section>` : '';
+  const gradNames = dishNames.filter(n => getRecipeMeta(n));
+  const gi = Math.min(state.doneGradIdx || 0, gradNames.length);
+  const gradName = gradNames[gi];
+  const gradHtml = gradName ? `
+    <section class="done-sec"><h3>Com'era ${escapeHtml(gradName)}? <small>facoltativo${gradNames[gi + 1] ? ` · <button type="button" class="done-next" data-done-grad-next>poi ${escapeHtml(gradNames[gi + 1])} ›</button>` : ''}</small></h3>
+      <div class="done-grads">${GRAD_ORDER.map(g => `<button type="button" class="done-grad-chip${(getRecipeMeta(gradName) || {}).gradimento === g ? ' active' : ''}" data-set-gradimento="${escapeAttr(gradName)}" data-grad="${g}">${escapeHtml(GRAD_LABEL[g])}</button>`).join('')}</div>
+    </section>` : '';
+  return `
+  <div class="move-backdrop done-backdrop" data-close-done-modal>
+    <div class="move-sheet done-sheet${state.sheetFull ? ' is-full' : ''}" role="dialog" aria-label="${escapeAttr(title)}" data-stop-close>
+      <div class="move-handle" aria-hidden="true"></div>
+      <h2 class="move-title">${escapeHtml(title)}</h2>
+      <p class="move-sub">${escapeHtml(dishNames.join(' + '))}${persone ? ` · per ${persone}` : ''}</p>
+      <div class="move-list done-list">
+        ${uniqueIng.length ? dispensaHtml + restHtml : '<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>'}
+        ${recHtml}
+        ${leftHtml}
+        ${gradHtml}
+      </div>
+      <div class="move-footer">
+        <button type="button" class="btn is-outline" data-close-done-modal>Annulla</button>
+        <button type="button" class="btn is-solid" data-confirm-done="${escapeAttr(state.doneModalDay)}">Fatto</button>
+      </div>
+    </div>
+  </div>`;
+}
 function renderMenu(){
   const weekSections = [0, ...state.extraWeeks.map((_,n)=>n+1)]
     .map(weekIdx => renderWeekSection(weekIdx)).join('');
@@ -6484,129 +6638,7 @@ function renderMenu(){
     }
   }
 
-  let doneModal = '';
-  if(state.doneModalDay !== null){
-    const { weekIdx: doneWeekIdx, i: di, meal: doneMeal } = parseMealKey(state.doneModalDay);
-    const doneMealData = effectiveMeal(doneWeekIdx, di, doneMeal);
-    const doneName = doneMealData.principale || '';
-    const doneIng = mealCookIngredients(state.doneModalDay, doneMealData);
-    const qtyMap = state.doneModalQty || {};
-    const finishedMap = state.doneModalFinished || {};
-    // Stesso ingrediente può ripetersi tra principale e contorni: una riga sola.
-    const seenNames = new Set();
-    const uniqueIng = doneIng.filter(it=>{
-      const key = (it.ingrediente||'').trim().toLowerCase();
-      if(seenNames.has(key)) return false;
-      seenNames.add(key);
-      return true;
-    });
-    // Gli ingredienti "a spanne" (unit 'none' in Dispensa, es. sale/pepe) non
-    // hanno una quantità da tracciare: non vanno confusi con "non in
-    // dispensa" (ci sono, semplicemente non si conta quanto). Finiscono in
-    // una sezione a parte più sotto, "L'hai finito?" — di default non
-    // spuntata, perché usarne un po' non vuol dire averla esaurita.
-    // Una riga sola per ingrediente, come in Dispensa: nome, quantità usata
-    // (se si conta) e la spunta "finito" per tutti quelli che hai in Dispensa.
-    // Spuntato = scorta a 0, quindi finisce tra i Finiti della Spesa.
-    // Come il pane: per ogni ingrediente con quantità, quanto ne è servito
-    // (in teoria, dalla ricetta) con − / +. In fondo gli ingredienti senza
-    // quantità (c'è / non c'è): un carrello per metterli in lista spesa.
-    const CART_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M17 17H6V3H4"/><path d="m6 5l14 1l-1 7H6"/></g></svg>';
-    const qtyRows = [], restRows = [];
-    uniqueIng.forEach(it=>{
-      const name = it.ingrediente;
-      const pantryIt = resolvePantryItem(name);
-      if(!pantryIt){
-        restRows.push(`<div class="done-ing-row untracked"><span>${escapeHtml(name)}</span><span class="done-ing-hint">non in dispensa</span></div>`);
-        return;
-      }
-      if(Object.prototype.hasOwnProperty.call(qtyMap, name) && pantryIt.unit !== 'none'){
-        const unit = pantryIt.unit || '';
-        const step = qtyStepFor(unit);
-        const used = qtyMap[name];
-        const have = pantryIt.qty || 0;
-        const left = Math.max(0, Math.round((have - used) * 100) / 100);
-        const editingThis = state.doneQtyEditingKey === name;
-        qtyRows.push(`
-        <div class="done-ing-row">
-          <span>${escapeHtml(name)}<span class="done-bread-left">${have > 0 ? `In Dispensa: ${have}${unit ? ' ' + escapeHtml(unit) : ''}, ne restano ${left}${unit ? ' ' + escapeHtml(unit) : ''}` : 'Finito in Dispensa'}</span></span>
-          <span class="qty-stepper">
-            <button class="qty-btn" type="button" data-done-qty-dec="${escapeAttr(name)}" aria-label="Diminuisci">−</button>
-            ${editingThis
-              ? `<input type="number" min="0" step="${step}" class="qty-input" value="${used}" data-done-qty-edit="${escapeAttr(name)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
-              : `<span class="qty-num" data-done-qty-show="${escapeAttr(name)}">${used}${unit ? ' ' + escapeHtml(unit) : ''}</span>`}
-            <button class="qty-btn" type="button" data-done-qty-inc="${escapeAttr(name)}" aria-label="Aumenta">+</button>
-          </span>
-        </div>`);
-        return;
-      }
-      const inCart = !!finishedMap[name];
-      restRows.push(`<div class="done-ing-row"><span>${escapeHtml(name)}</span><button type="button" class="btn is-icon done-cart-btn${inCart ? ' active' : ''}" data-done-cart-toggle="${escapeAttr(name)}" aria-pressed="${inCart}" title="${inCart ? 'In lista spesa' : 'Aggiungi alla lista spesa'}" aria-label="${escapeAttr(name)}: aggiungi alla lista spesa">${CART_SVG}</button></div>`);
-    });
-    const normalRowsHtml = qtyRows.concat(restRows).join('');
-    const finishedSectionHtml = '';
-    const mealRecRows = mealRecurringList().filter(r => state.doneModalMeal && Object.prototype.hasOwnProperty.call(state.doneModalMeal, r.id)).map(r=>{
-      const it = recurringPantryItem(r);
-      const n = state.doneModalMeal[r.id];
-      if(!recurringCountable(it)) return `<div class="done-ing-list done-bread"><div class="done-ing-row untracked"><span>${escapeHtml(r.nome)}</span><span class="done-ing-hint">${it ? 'in Dispensa non si conta' : 'non in dispensa'}</span></div></div>`;
-      const uTxt = it.unit ? ' ' + escapeHtml(UNIT_SHORT[it.unit] || it.unit) : '';
-      return `
-      <div class="done-ing-list done-bread">
-        <div class="done-ing-row">
-          <span>${escapeHtml(it.nome)}<span class="done-bread-left">${it.qty > 0 ? `In Dispensa: ${it.qty}${uTxt}, ne restano ${Math.max(0, Math.round((it.qty - n) * 100) / 100)}${uTxt}` : 'Finito in Dispensa'}</span></span>
-          <span class="qty-stepper">
-            <button class="qty-btn" type="button" data-done-rec="${escapeAttr(r.id)}" data-done-rec-delta="-1" aria-label="Meno">−</button>
-            <span class="qty-num">${n}${uTxt}</span>
-            <button class="qty-btn" type="button" data-done-rec="${escapeAttr(r.id)}" data-done-rec-delta="1" aria-label="Più">+</button>
-          </span>
-        </div>
-      </div>`;
-    }).join('');
-    doneModal = `
-    <div class="filters-modal-backdrop" data-close-done-modal>
-      <div class="filters-modal" data-stop-close>
-        <div class="filters-modal-header">
-          <h3>Ricetta fatta! 🎉</h3>
-          <button class="btn is-icon filters-close-btn" data-close-done-modal>✕</button>
-        </div>
-        <p class="section-sub" style="margin-top:-8px;">Quanto ne hai usato per questo pasto? Alla conferma lo tolgo dalla Dispensa. Quanto ne è servito per questo pasto (dalla ricetta): alla conferma lo tolgo dalla Dispensa. Col carrello metti in lista spesa quelli che non hai più.</p>
-        ${doneName && getRecipeMeta(doneName) ? `<div class="done-grad">${gradimentoPickerHtml(doneName)}</div>` : ''}
-        ${mealRecRows}
-        ${uniqueIng.length ? `
-        ${normalRowsHtml ? `<div class="done-ing-list">${normalRowsHtml}</div>` : ''}
-        ${finishedSectionHtml}
-        ` : `<div class="ing-empty">Nessun ingrediente salvato per questa ricetta.</div>`}
-        <div class="filter-group done-finished-title">
-          <div class="filter-group-label">È avanzato qualcosa?</div>
-          ${state.doneModalLeftovers.map((row, idx) => `
-          <div class="inv-item is-avanzi" data-done-leftover-row="${idx}">
-            <div class="picker-anchor">
-              <button type="button" class="btn is-icon luogo-picker-opt" data-luogo-value="${escapeAttr(LUOGO_LABEL[row.luogo])}" data-done-leftover-luogo-toggle="${idx}" title="Luogo: ${escapeAttr(LUOGO_LABEL[row.luogo])} — tocca per scegliere">${LUOGO_ICON[row.luogo]}</button>
-              ${row.pickerOpen ? `
-              <div class="luogo-picker-backdrop" data-done-leftover-luogo-close></div>
-              <div class="luogo-picker">
-                ${LUOGO_ORDER.map(l=>`<button type="button" class="btn is-icon luogo-picker-opt${l===row.luogo?' active':''}" data-done-leftover-luogo-set="${idx}:${l}" data-luogo-value="${escapeAttr(LUOGO_LABEL[l])}" title="${escapeAttr(LUOGO_LABEL[l])}">${LUOGO_ICON[l]}</button>`).join('')}
-              </div>` : ''}
-            </div>
-            <div class="picker-anchor">
-              <button type="button" class="btn is-icon luogo-picker-opt" data-done-leftover-cat-toggle="${idx}" title="Reparto: ${escapeAttr(DEPT_LABEL[row.cat])} — tocca per scegliere">${DEPT_ICON[row.cat]}</button>
-              ${row.catPickerOpen ? `
-              <div class="luogo-picker-backdrop" data-done-leftover-cat-close></div>
-              <div class="luogo-picker is-category">
-                ${DEPT_ORDER.filter(d=>d!=='finiti' && !isNonFoodDept(d)).map(d=>`<button type="button" class="btn is-icon luogo-picker-opt${d===row.cat?' active':''}" data-done-leftover-cat-set="${idx}:${d}" title="${escapeAttr(DEPT_LABEL[d])}">${DEPT_ICON[d]}</button>`).join('')}
-              </div>` : ''}
-            </div>
-            <input type="text" placeholder="es. ${escapeAttr(row.name || 'Avanzo')}" value="${escapeAttr(row.name || '')}" data-done-leftover-input="${idx}">
-            <label class="presence-toggle"><input type="checkbox" ${row.checked ? 'checked' : ''} data-done-leftover-toggle="${idx}"></label>
-          </div>`).join('')}
-        </div>
-        <div class="filters-modal-footer">
-          <button class="btn is-ghost reset-btn" data-close-done-modal>Annulla</button>
-          <button class="btn is-solid mini-add-btn" data-confirm-done="${state.doneModalDay}">Conferma</button>
-        </div>
-      </div>
-    </div>`;
-  }
+  const doneModal = renderDoneSheet();
 
   const genSettingsTargetWeek = typeof state.genSettingsOpen === 'number' ? state.genSettingsOpen : null;
   const genSettingsModal = state.genSettingsOpen !== null ? (()=>{
@@ -7501,6 +7533,7 @@ function renderPrep(){
     ${renderRecipeEditModal()}
     ${recipeDetailScreen}
     ${renderMenuPickSheet()}
+    ${renderDoneSheet()}
     ${prepSwitch}
     <div class="buttons-fixed">
     </div>`;
@@ -7526,6 +7559,7 @@ function renderPrep(){
     ${renderRecipeEditModal()}
     ${recipeDetailScreen}
     ${renderMenuPickSheet()}
+    ${renderDoneSheet()}
     ${prepSwitch}
   `;
 }
@@ -7983,6 +8017,7 @@ function closeMoveModal(){ state.moveModal = null; }
       state.sheetFull = false;
       if(state.addSheet) state.addSheet = null;
       else if(state.moveModal) closeMoveModal();
+      else if(state.doneModalDay !== null) closeDoneSheet();
       render(); return;
     }
     sheet.style.transition = 'transform .15s'; sheet.style.transform = '';
@@ -10099,11 +10134,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-close-done-modal]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
-      state.doneModalDay = null;
-      state.doneModalQty = {};
-      state.doneQtyEditingKey = null;
-      state.doneModalFinished = {}; state.doneModalMeal = {};
-      state.doneModalLeftovers = [];
+      closeDoneSheet();
       render();
     });
   });
@@ -10214,7 +10245,8 @@ function attachHandlers(){
   document.querySelectorAll('[data-confirm-done]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       const key = e.currentTarget.dataset.confirmDone;
-      const { weekIdx, i, meal } = parseMealKey(key);
+      const recipeOnly = !!state.doneModalRecipe;
+      const { weekIdx, i, meal } = recipeOnly ? {} : parseMealKey(key);
       const qtyMap = state.doneModalQty || {};
       // Le quantità qui sono "quanto ne hai usato": si sottraggono dalla
       // scorta attuale invece di sovrascriverla (prima il campo era "quanto
@@ -10249,24 +10281,22 @@ function attachHandlers(){
         // ingrediente vero già in Dispensa, che deve restare tale.
         if(!existing || existing.leftover) state.pantryItems[leftoverKey].leftover = true;
       });
-      takeRecurringMeal(state.doneModalMeal);
-      const doneMealData = effectiveMeal(weekIdx, i, meal);
-      // Freezer: le porzioni prese per questo pasto scendono; la metà in più
-      // di una doppia dose (se non già messa via dal prep) ci va adesso.
-      const doneMk = mealKey(weekIdx, i, meal);
-      const donePortions = mealPortions(doneMk, doneMealData.principale);
-      mealDishes(weekIdx, i, meal).forEach(dsh => {
-        if(isFreezerDish(doneMk, dsh.name)) takeFreezerPortions(dsh.name, donePortions);
-        else freezeDoubleIfReady(weekIdx, i, meal, dsh.name);
-      });
-      const mealsDone = weekMealsDoneRef(weekIdx);
-      if(!mealsDone[i]) mealsDone[i] = {};
-      mealsDone[i][meal] = true;
-      state.doneModalDay = null;
-      state.doneModalQty = {};
-      state.doneQtyEditingKey = null;
-      state.doneModalFinished = {}; state.doneModalMeal = {};
-      state.doneModalLeftovers = [];
+      if(!recipeOnly){
+        takeRecurringMeal(state.doneModalMeal);
+        const doneMealData = effectiveMeal(weekIdx, i, meal);
+        // Freezer: le porzioni prese per questo pasto scendono; la metà in più
+        // di una doppia dose (se non già messa via dal prep) ci va adesso.
+        const doneMk = mealKey(weekIdx, i, meal);
+        const donePortions = mealPortions(doneMk, doneMealData.principale);
+        mealDishes(weekIdx, i, meal).forEach(dsh => {
+          if(isFreezerDish(doneMk, dsh.name)) takeFreezerPortions(dsh.name, donePortions);
+          else freezeDoubleIfReady(weekIdx, i, meal, dsh.name);
+        });
+        const mealsDone = weekMealsDoneRef(weekIdx);
+        if(!mealsDone[i]) mealsDone[i] = {};
+        mealsDone[i][meal] = true;
+      }
+      closeDoneSheet();
       persist(); render();
     });
   });
@@ -10334,7 +10364,7 @@ function attachHandlers(){
       if(next){ state.cookMode = { name: next.name, step: next.step || 0, ratio: next.ratio || 1, mk: cm.mk }; render(); return; }
       const mk = cm.mk;
       state.cookMode = null; render();
-      if(!mk) return;
+      if(!mk){ openRecipeDone(cm.name, cm.ratio); return; }
       const { weekIdx, i, meal } = parseMealKey(mk);
       const md = weekMealsDoneRef(weekIdx);
       if(!(md[i] && md[i][meal]) && toggleMealDoneFn) toggleMealDoneFn(mk);
