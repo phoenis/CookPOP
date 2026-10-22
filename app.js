@@ -627,7 +627,7 @@ function mancantiButtonHtml(mancanti){
 // procedimento, ognuno con la sua scala di porzioni. Si passa dall'una
 // all'altra restando al passo a cui si è arrivati in ciascuna.
 function cookSessionFor(name, ratio, mk){
-  const list = [{ name, step: 0, ratio: ratio || 1 }];
+  const list = [{ name, step: 0, ratio: ratio || 1, done: false }];
   if(!mk) return list;
   const { weekIdx, i, meal } = parseMealKey(mk);
   const dishes = mealDishes(weekIdx, i, meal);
@@ -640,7 +640,7 @@ function cookSessionFor(name, ratio, mk){
     const det = getRecipeDetails(d.name);
     if(!det || !det.procedimento || !det.procedimento.length) return;
     const b = baseOf(d.name);
-    list.push({ name: d.name, step: 0, ratio: (b && current) ? current / b : 1 });
+    list.push({ name: d.name, step: 0, ratio: (b && current) ? current / b : 1, done: false });
   });
   return list;
 }
@@ -657,17 +657,19 @@ function cookSwitcherHtml(cm){
   const list = state.cookSession;
   if(!list || list.length < 2) return '';
   const total = n => ((getRecipeDetails(n) || {}).procedimento || []).length;
-  // Come nelle schede del pasto: portata (Primo, Secondo, Contorno…) con la sua
-  // icona, numerata se ce ne sono due uguali, invece del nome lungo.
+  // Una scheda per piatto: portata (Primo, Secondo…) con la sua icona e, sotto,
+  // "2 di 8" oppure "finito" con la spunta. Fino a 3 piatti stanno in una riga
+  // (con 3 le schede sono in colonna), da 4 in poi scorrono in orizzontale.
+  const CHECK = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1em" height="1em"><path fill="currentColor" d="M229.66 77.66l-128 128a8 8 0 0 1-11.32 0l-56-56a8 8 0 0 1 11.32-11.32L96 188.69L218.34 66.34a8 8 0 0 1 11.32 11.32"/></svg>';
   const seen = {};
-  return `<div class="cook-switch" role="tablist" aria-label="Ricette in cucina">${list.map(x=>{
+  return `<div class="cook-cards n${Math.min(list.length, 4)}" role="tablist" aria-label="Piatti in cucina">${list.map(x=>{
     const active = x.name === cm.name;
     const step = active ? (cm.step || 0) : (x.step || 0);
-    const tipo = dishCourse(x.name);
-    const label = courseLabel(tipo);
+    const label = courseLabel(dishCourse(x.name));
     seen[label] = (seen[label] || 0) + 1;
     const text = seen[label] > 1 ? `${label} ${seen[label]}` : label;
-    return `<button type="button" class="cook-switch-chip${active ? ' active' : ''}" role="tab" aria-selected="${active}" aria-label="${escapeAttr(x.name)}" title="${escapeAttr(x.name)}" data-cook-switch="${escapeAttr(x.name)}"><span class="dish-ic" aria-hidden="true">${tipoIcon(tipo)}</span><span class="cook-switch-name">${escapeHtml(text)}</span><span class="cook-switch-step">${step + 1}/${total(x.name)}</span></button>`;
+    const status = x.done ? 'finito' : `${step + 1} di ${total(x.name)}`;
+    return `<button type="button" class="cook-card${active ? ' active' : ''}${x.done ? ' is-done' : ''}" role="tab" aria-selected="${active}" aria-label="${escapeAttr(x.name)}" title="${escapeAttr(x.name)}" data-cook-switch="${escapeAttr(x.name)}"><span class="cook-card-ic" aria-hidden="true">${x.done ? CHECK : tipoIcon(dishCourse(x.name))}</span><span class="cook-card-text"><b>${escapeHtml(text)}</b><small>${status}</small></span></button>`;
   }).join('')}</div>`;
 }
 function cookFabHtml(name, ratio, mk){
@@ -676,7 +678,6 @@ function cookFabHtml(name, ratio, mk){
   // Piè di pagina a due bottoni: a sinistra "Cena fatta" (dal pasto, se non è
   // ancora fatto: apre "Cena fatta" senza passare dalla cucina) oppure, da
   // Ricette, "Metti nel menù"; a destra "Cucina".
-  const play = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1em" height="1em"><path fill="currentColor" d="M232.4 114.49L88.32 26.35a16 16 0 0 0-16.2-.3A15.86 15.86 0 0 0 64 39.87v176.26A15.94 15.94 0 0 0 80 232a16.07 16.07 0 0 0 8.36-2.35l144.04-88.14a15.81 15.81 0 0 0 0-27"/></svg>';
   let left = '';
   if(mk){
     const { weekIdx, i, meal } = parseMealKey(mk);
@@ -686,7 +687,7 @@ function cookFabHtml(name, ratio, mk){
     left = `<button type="button" class="cook-fab cook-fab-done" data-recipe-to-menu="${escapeAttr(name)}">Metti nel menù</button>`;
   }
   if(!left && !hasSteps) return '';
-  return `<div class="cook-fab-bar">${left}${hasSteps ? `<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}"${mk ? ` data-cook-meal="${escapeAttr(mk)}"` : ''}>${play} Cucina</button>` : ''}</div>`;
+  return `<div class="cook-fab-bar">${left}${hasSteps ? `<button type="button" class="cook-fab" data-cook-start="${escapeAttr(name)}" data-cook-ratio="${ratio || 1}"${mk ? ` data-cook-meal="${escapeAttr(mk)}"` : ''}>Cucina</button>` : ''}</div>`;
 }
 // Tab Ingredienti | Passaggi dentro il piatto (stato in state.dishPane).
 function paneTabsHtml(paneKey, pane){
@@ -816,6 +817,35 @@ function cookTimerHtml(stepText){
   const btns = secs ? `<div class="cook-timer-row"><button type="button" class="cook-timer-btn" data-cook-timer-start="${secs}">⏱ Avvia timer ${formatTimerLabel(secs)}</button></div>` : '';
   return { bar, btns };
 }
+// "Consiglio" della ricetta: compare al passaggio che ne parla (una parola
+// lunga in comune), altrimenti al primo.
+function cookTipFor(det, steps, step){
+  const tip = (det && det.consigli || '').trim();
+  if(!tip) return '';
+  const words = t => (t.toLowerCase().match(/[a-zàèéìòù]{5,}/g) || []).map(w => w.slice(0, 5));
+  const tipWords = new Set(words(tip));
+  const hits = steps.map(t => words(t).filter(w => tipWords.has(w)).length);
+  const best = Math.max(...hits);
+  const target = best > 0 ? hits.indexOf(best) : 0;
+  return step === target ? tip : '';
+}
+const COOK_ARTICLE = { primo: 'Il primo', secondo: 'Il secondo', contorno: 'Il contorno', antipasto: "L'antipasto", dolce: 'Il dolce', unico: 'Il piatto unico' };
+function cookLastNote(cm){
+  const list = state.cookSession || [];
+  const others = list.filter(x => x.name !== cm.name);
+  const meal = cm.mk ? MEAL_LABEL[parseMealKey(cm.mk).meal].toLowerCase() : '';
+  if(!others.length) return meal ? `Ultimo passaggio. Con “Ho finito” si apre il foglio della ${meal} intera.` : '';
+  const open = others.filter(x => !x.done);
+  const lab = x => (COOK_ARTICLE[dishCourse(x.name)] || 'Il piatto');
+  if(open.length){
+    const art = x => (COOK_ARTICLE[dishCourse(x.name)] || 'Il piatto');
+    const to = x => ({ antipasto: "all'antipasto" }[dishCourse(x.name)] || `al ${courseLabel(dishCourse(x.name)).toLowerCase()}`);
+    const rest = open.map(x => art(x).toLowerCase()).join(' e ');
+    return `Ultimo passaggio di ${cm.name}. ${open.length === 1 ? 'Resta' : 'Restano'} ancora ${rest}: con “Ho finito” passi ${to(open[0])}.`;
+  }
+  const done = others.map(lab);
+  return `Ultimo passaggio della ${meal || 'ricetta'}. ${done.length === 1 ? `${done[0]} è già finito` : `${done.join(' e ').replace(/ (Il|L')/g, m => m.toLowerCase())} sono già finiti`}: con “Ho finito” si apre il foglio della ${meal} intera.`;
+}
 function renderCookModePage(){
   const cm = state.cookMode;
   if(!cm) return '';
@@ -825,34 +855,50 @@ function renderCookModePage(){
   const total = steps.length;
   const step = Math.min(Math.max(0, cm.step || 0), total - 1);
   const isFirst = step === 0, isLast = step === total - 1;
+  const multi = (state.cookSession || []).length > 1;
   const ings = cookStepIngredients(cm.name, steps[step], cm.ratio || 1);
+  const base = det ? parsePortionsBase(det.porzioni) : null;
+  const persone = base ? Math.round(base * (cm.ratio || 1)) : 0;
+  const hasQty = ings.some(i => i.qta && !/^q\.?\s?b/i.test(i.qta));
   const ingHtml = ings.length ? `
-    <section class="cook-section">
-      <h3 class="cook-section-title">Ingredienti</h3>
-      <ul class="cook-ings">${ings.map(i => `<li>${i.qta ? `<b>${escapeHtml(i.qta)}</b> ` : ''}${escapeHtml(i.nome.charAt(0).toLowerCase() + i.nome.slice(1))}</li>`).join('')}</ul>
+    <section class="cook-need">
+      <h3 class="cook-need-title">Ti serve${persone && hasQty ? ` · per ${persone}` : ''}</h3>
+      <ul class="cook-need-list">${ings.map(i => `<li><span>${escapeHtml(i.nome)}</span><b>${escapeHtml(i.qta || '')}</b></li>`).join('')}</ul>
     </section>` : '';
+  const tip = cookTipFor(det, steps, step);
+  const BULB = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M176 232a8 8 0 0 1-8 8H88a8 8 0 0 1 0-16h80a8 8 0 0 1 8 8m40-128a87.55 87.55 0 0 1-33.64 69.21A16.24 16.24 0 0 0 176 186v6a16 16 0 0 1-16 16H96a16 16 0 0 1-16-16v-6a16 16 0 0 0-6.23-12.66A87.59 87.59 0 0 1 40 104.49C39.74 56.83 78.26 17.14 125.88 16A88 88 0 0 1 216 104m-16 0a72 72 0 0 0-73.74-72c-39 .92-70.47 33.39-70.26 72.39a71.65 71.65 0 0 0 27.64 56.3A32 32 0 0 1 96 186v6h64v-6a32.15 32.15 0 0 1 12.47-25.35A71.65 71.65 0 0 0 200 104m-16.11-9.34a57.6 57.6 0 0 0-46.56-46.55a8 8 0 0 0-2.66 15.78c16.57 2.79 30.63 16.85 33.44 33.45A8 8 0 0 0 176 104a9 9 0 0 0 1.35-.11a8 8 0 0 0 6.54-9.23"/></svg>';
+  const tipHtml = tip ? `<p class="cook-tip">${BULB}<span><b>Consiglio:</b> ${escapeHtml(tip)}</span></p>` : '';
   const timerUi = cookTimerHtml(steps[step]);
+  const where = multi ? `${cm.name} · ${isLast ? 'ultimo passaggio' : `passaggio ${step + 1}`}` : '';
+  const lastNote = isLast ? cookLastNote(cm) : '';
+  const X = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M205.66 194.34a8 8 0 0 1-11.32 11.32L128 139.31l-66.34 66.35a8 8 0 0 1-11.32-11.32L116.69 128L50.34 61.66a8 8 0 0 1 11.32-11.32L128 116.69l66.34-66.35a8 8 0 0 1 11.32 11.32L139.31 128Z"/></svg>';
+  const sun = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.125em" height="1.125em"><path fill="currentColor" d="M120 40V16a8 8 0 0 1 16 0v24a8 8 0 0 1-16 0m72 88a64 64 0 1 1-64-64a64.07 64.07 0 0 1 64 64m-16 0a48 48 0 1 0-48 48a48.05 48.05 0 0 0 48-48M58.34 69.66a8 8 0 0 0 11.32-11.32l-16-16a8 8 0 0 0-11.32 11.32Zm0 116.68l-16 16a8 8 0 0 0 11.32 11.32l16-16a8 8 0 0 0-11.32-11.32M192 72a8 8 0 0 0 5.66-2.34l16-16a8 8 0 0 0-11.32-11.32l-16 16A8 8 0 0 0 192 72m5.66 114.34a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32-11.32ZM48 128a8 8 0 0 0-8-8H16a8 8 0 0 0 0 16h24a8 8 0 0 0 8-8m80 80a8 8 0 0 0-8 8v24a8 8 0 0 0 16 0v-24a8 8 0 0 0-8-8m112-88h-24a8 8 0 0 0 0 16h24a8 8 0 0 0 0-16"/></svg>';
+  const segs = Array.from({ length: total }, (_, i) => `<span class="${i <= step ? 'on' : ''}"></span>`).join('');
+  const mealTitle = cm.mk ? MEAL_LABEL[parseMealKey(cm.mk).meal] : cm.name;
   return `
   <div class="sheet-page cook-page${pageEntering('cook') ? ' is-entering' : ''}" data-page="cook">
     <header class="cook-head">
-      <button type="button" class="cook-end" data-close-cook>Termina</button>
-      <h2 class="cook-title">${escapeHtml(cm.name)}</h2>
+      <button type="button" class="cook-end" data-close-cook>${X} Esci</button>
+      <h2 class="cook-title">${escapeHtml(multi ? mealTitle : cm.name)}</h2>
+      ${multi ? '' : `<span class="cook-count">${step + 1} di ${total}</span>`}
     </header>
     ${cookSwitcherHtml(cm)}
     ${timerUi.bar}
-    <div class="cook-bar" role="progressbar" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${step + 1}"><span style="width:${Math.round((step + 1) / total * 100)}%"></span></div>
+    <div class="cook-segs" role="progressbar" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${step + 1}">${segs}</div>
     <div class="cook-body" data-cook-swipe>
-      <section class="cook-section cook-step">
-        <div class="cook-step-count">Passaggio ${step + 1}/${total}</div>
+      <section class="cook-step">
+        ${where ? `<div class="cook-step-count">${escapeHtml(where)}</div>` : ''}
         <p class="cook-step-text">${escapeHtml(steps[step])}</p>
         ${timerUi.btns}
       </section>
       ${ingHtml}
+      ${tipHtml}
     </div>
     <div class="cook-footer">
+      ${lastNote ? `<div class="cook-last-note"><span class="cook-last-ic" aria-hidden="true">✓</span><span>${escapeHtml(lastNote)}</span></div>` : `<div class="cook-awake">${sun}<span>Lo schermo resta acceso</span></div>`}
       <div class="cook-nav">
-        <button type="button" class="cook-nav-back" data-cook-prev aria-label="Passo precedente" ${isFirst ? 'disabled' : ''}>←</button>
-        <button type="button" class="cook-nav-next" ${isLast ? 'data-cook-finish' : 'data-cook-next'}>${isLast ? 'Fatto' : 'Avanti'}</button>
+        <button type="button" class="cook-nav-back" data-cook-prev ${isFirst ? 'disabled' : ''}>Indietro</button>
+        <button type="button" class="cook-nav-next" ${isLast ? 'data-cook-finish' : 'data-cook-next'}>${isLast ? 'Ho finito' : 'Avanti'}</button>
       </div>
     </div>
   </div>`;
@@ -10278,7 +10324,15 @@ function attachHandlers(){
   });
   document.querySelectorAll('[data-cook-finish]').forEach(el=>{
     el.addEventListener('click', ()=>{
-      const mk = state.cookMode && state.cookMode.mk;
+      const cm = state.cookMode; if(!cm) return;
+      // "Ho finito": il piatto risulta finito e si passa al prossimo ancora da
+      // fare; quando sono finiti tutti si apre il foglio del pasto.
+      const list = state.cookSession || [];
+      const cur = list.find(x => x.name === cm.name);
+      if(cur){ cur.done = true; cur.step = cm.step || 0; }
+      const next = list.find(x => !x.done);
+      if(next){ state.cookMode = { name: next.name, step: next.step || 0, ratio: next.ratio || 1, mk: cm.mk }; render(); return; }
+      const mk = cm.mk;
       state.cookMode = null; render();
       if(!mk) return;
       const { weekIdx, i, meal } = parseMealKey(mk);

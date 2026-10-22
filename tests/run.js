@@ -1529,22 +1529,23 @@ test('modalità cucina: un passo per schermata, avanti e indietro, Fatto in fond
     const k = ['0_5_cena', '0_6_cena', '0_0_cena', '0_1_cena'].find(k => { const m = parseMealKey(k); const n = effectiveMeal(m.weekIdx, m.i, m.meal).principale; return n && getRecipeDetails(n) && (getRecipeDetails(n).procedimento || []).length > 2; });
     state.tab = 'menu'; state.expandedDay = k; render();
     const name = effectiveMeal(0, +parseMealKey(k).i, parseMealKey(k).meal).principale;
+    writeMealDishes(0, +parseMealKey(k).i, parseMealKey(k).meal, name, []); render();
     return { name, steps: getRecipeDetails(name).procedimento, startBtn: !!document.querySelector('[data-page^="meal-"] [data-cook-start]') };
   });
   assert(r.startBtn, 'bottone Cucina sotto il procedimento');
   await page.click('[data-cook-start]');
   const text = () => page.locator('.cook-step-text').textContent();
-  const count = () => page.locator('.cook-step-count').textContent();
+  const count = () => page.evaluate(() => `Passaggio ${state.cookMode.step + 1}/${getRecipeDetails(state.cookMode.name).procedimento.length}`);
   eq([await text(), await count()], [r.steps[0], `Passaggio 1/${r.steps.length}`], 'primo passo');
   eq(await page.locator('[data-cook-prev]').isDisabled(), true, 'indietro spento al primo');
-  eq(await page.locator('.cook-nav-next').textContent(), r.steps.length > 1 ? 'Avanti' : 'Fatto', 'Avanti ai passi intermedi');
+  eq(await page.locator('.cook-nav-next').textContent(), r.steps.length > 1 ? 'Avanti' : 'Ho finito', 'Avanti ai passi intermedi');
   await page.click('[data-cook-next]');
   eq([await text(), await count()], [r.steps[1], `Passaggio 2/${r.steps.length}`], 'secondo passo');
   await page.click('[data-cook-prev]');
   eq(await text(), r.steps[0], 'si torna indietro');
   for(let i = 1; i < r.steps.length; i++) await page.click('[data-cook-next]');
   eq(await text(), r.steps[r.steps.length - 1], 'ultimo passo');
-  eq(await page.locator('.cook-nav-next').textContent(), 'Fatto', 'Fatto all\'ultimo passo');
+  eq(await page.locator('.cook-nav-next').textContent(), 'Ho finito', 'Ho finito all\'ultimo passo');
   await page.click('.cook-nav-next');
   eq(await page.evaluate(() => [state.cookMode, !!state.expandedDay, state.doneModalDay !== null]), [null, true, true], 'Fatto chiude e chiede gli ingredienti finiti (Ricetta fatta!)');
   await page.evaluate(() => { state.doneModalDay = null; render(); });
@@ -1680,7 +1681,7 @@ test('ricette: ritmo uniforme nel dettaglio, Cucina bianca senza bande, modifica
     out.cookBg = getComputedStyle(cp).backgroundColor; out.cookEndRight = getComputedStyle(document.querySelector('.cook-end')).order === '2';
     return out;
   });
-  eq(r, { gap: '0px', tab: 'none', cookBg: 'rgb(255, 255, 255)', cookEndRight: true });
+  eq(r, { gap: '0px', tab: 'none', cookBg: 'rgb(255, 255, 255)', cookEndRight: false });
 });
 
 test('modifica ricetta: si aggiungono ingredienti, il campo suggerisce gli esistenti (plurali/accenti) e il nome esistente evita doppioni', async ({ page }) => {
@@ -2879,6 +2880,38 @@ test('dettaglio ricetta: pagina unica con tempi, "Uova · tuorli", titolo del pa
   await page.click('[data-rd-go="steps"]');
   await page.waitForTimeout(700);
   eq(await page.evaluate(() => document.querySelector('.rd-tab.active').dataset.rdGo), 'steps', 'tab Passaggi attiva dopo lo scorrimento');
+  eq(page.errors, [], 'errori JS');
+});
+
+
+test('modalità cucina: "Ho finito" segna il piatto finito e passa al prossimo; finiti tutti si apre il foglio del pasto', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    ['Prova uno', 'Prova due'].forEach(n => { state.customRecipes[n] = { nome: n, categoriaNew: 'pasta', tempoBucket: 'veloce', stagioni: ['tutto'], tipologia: n === 'Prova uno' ? 'primo' : 'secondo' };
+      state.recipeEdits[n] = { ingredienti: [{ ingrediente: 'Pasta lunga', qta: '100 g' }], procedimento: ['A ' + n, 'B ' + n] }; });
+    state.extraWeeks = []; generateWeek(1);
+    writeMealDishes(1, 1, 'cena', 'Prova uno', ['Prova due']);
+    state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
+    document.querySelector('[data-cook-start]').click();
+    const out = { cards: [...document.querySelectorAll('.cook-card')].map(c => c.querySelector('b').textContent + ' ' + c.querySelector('small').textContent), head: document.querySelector('.cook-title').textContent };
+    document.querySelector('[data-cook-next]').click();
+    out.lastNote = document.querySelector('.cook-last-note').textContent.replace(/\s+/g, ' ').trim();
+    document.querySelector('[data-cook-finish]').click();
+    out.afterFirst = [state.cookMode.name, state.cookSession.map(x => x.done)];
+    out.cards2 = [...document.querySelectorAll('.cook-card')].map(c => c.querySelector('b').textContent + ' ' + c.querySelector('small').textContent);
+    document.querySelector('[data-cook-next]').click();
+    out.lastNote2 = document.querySelector('.cook-last-note').textContent.replace(/\s+/g, ' ').trim();
+    document.querySelector('[data-cook-finish]').click();
+    out.end = [state.cookMode, state.doneModalDay];
+    return out;
+  });
+  eq(r.cards, ['Primo 1 di 2', 'Secondo 1 di 2']);
+  eq(r.head, 'Cena');
+  assert(/Resta ancora il secondo.*passi al secondo/.test(r.lastNote), r.lastNote);
+  eq(r.afterFirst, ['Prova due', [true, false]]);
+  eq(r.cards2, ['Primo finito', 'Secondo 1 di 2']);
+  assert(/Il primo è già finito.*foglio della cena intera/.test(r.lastNote2), r.lastNote2);
+  eq(r.end, [null, '1_1_cena'], 'chiusa la cucina e aperto il foglio della cena');
   eq(page.errors, [], 'errori JS');
 });
 
