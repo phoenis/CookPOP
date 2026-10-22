@@ -856,8 +856,8 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
     page().querySelector('.persone-row [data-portions-inc]').click();
     out.portionsUp = state.dayPortions['1_1_cena'] !== before;
     out.fab = !!page().querySelector('.cook-fab');
-    page().querySelector('[data-rd-go="steps"]').click();
-    out.stepsShown = !!page().querySelector('.steps-list') && !!page().querySelector('.persone-row');
+    page().querySelector('[data-dish-pane-value="steps"]').click();
+    out.stepsShown = !!page().querySelector('.steps-list') && !page().querySelector('.persone-row');
     out.fabInSteps = !!page().querySelector('.cook-fab');
     page().querySelector('[data-meal-menu]').click();
     out.menu = [...page().querySelectorAll('.meal-menu .topbar-menu-item')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
@@ -2849,7 +2849,7 @@ test('ricette: tempo diviso in preparazione e cottura (la somma decide fascia e 
 });
 
 
-test('dettaglio ricetta: pagina unica con tempi, "Uova · tuorli", titolo del pasto, "Metti nel menù" e tab che scorrono', async ({ page }) => {
+test('dettaglio ricetta: tempi, "Uova · tuorli", titolo del pasto, "Metti nel menù" e tab Ingredienti | Passaggi con swipe', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.recipeEdits['Carbonara'] = { tPrep: 10, tCottura: 15, tempo: '25 min', tempoBucket: 'veloce', freezerNew: 'congelabile' };
@@ -2858,7 +2858,7 @@ test('dettaglio ricetta: pagina unica con tempi, "Uova · tuorli", titolo del pa
     const pg = document.querySelector('[data-page^="meal-"]');
     const out = { metaClean: !/[<>]/.test(pg.querySelector('.rd-meta-text').textContent) && !!pg.querySelector('.rd-meta-text svg'), sub: pg.querySelector('.meal-page-date').textContent, time: pg.querySelector('.rd-time').textContent.replace(/\s+/g, ' ').trim(),
       uova: [...pg.querySelectorAll('.ing-list li')].map(li => li.querySelector('.ing-list-name').textContent.replace(/\s+/g, ' ').trim()).filter(t => /^Uova/.test(t)),
-      bar: [...pg.querySelectorAll('.cook-fab-bar button')].map(b => b.textContent.trim()), both: !!pg.querySelector('[data-rd-sec="ing"]') && !!pg.querySelector('[data-rd-sec="steps"]') };
+      bar: [...pg.querySelectorAll('.cook-fab-bar button')].map(b => b.textContent.trim()), both: !!pg.querySelector('[data-rd-sec="ing"]') && !pg.querySelector('[data-rd-sec="steps"]') };
     state.expandedDay = null; state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = 'Carbonara'; render();
     const rp = document.querySelector('[data-page^="recipe-"]');
     out.recBar = [...rp.querySelectorAll('.cook-fab-bar button')].map(b => b.textContent.trim());
@@ -2876,10 +2876,21 @@ test('dettaglio ricetta: pagina unica con tempi, "Uova · tuorli", titolo del pa
   await page.click(`.menu-pick-chip[data-swap-day="${key}"]`);
   const after = await page.evaluate(k => { const { weekIdx, i, meal } = parseMealKey(k); return { sheet: !!document.querySelector('.menu-pick-chip'), name: effectiveMeal(weekIdx, i, meal).principale }; }, key);
   eq(after, { sheet: false, name: 'Carbonara' }, 'messa nel menù, foglio chiuso');
-  // le tab scorrono alla sezione Passaggi
-  await page.click('[data-rd-go="steps"]');
-  await page.waitForTimeout(700);
-  eq(await page.evaluate(() => document.querySelector('.rd-tab.active').dataset.rdGo), 'steps', 'tab Passaggi attiva dopo lo scorrimento');
+  // Ingredienti | Passaggi sono tab vere; lo swipe a sinistra/destra le cambia
+  const sw = dx => page.evaluate(dx => {
+    const rd = document.querySelector('.rd');
+    const mk = (type, x) => { const t = new Touch({ identifier: 1, target: rd, clientX: x, clientY: 300 }); return new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : [t], changedTouches: [t] }); };
+    rd.dispatchEvent(mk('touchstart', 200)); rd.dispatchEvent(mk('touchend', 200 + dx));
+    return document.querySelector('.rd-tab.active').dataset.dishPaneValue;
+  }, dx);
+  eq(await page.evaluate(() => document.querySelector('.rd-tab.active').dataset.dishPaneValue), 'ing', 'parte da Ingredienti');
+  eq(await sw(-120), 'steps', 'swipe a sinistra: Passaggi');
+  eq(await page.evaluate(() => [!!document.querySelector('.steps-list'), !document.querySelector('.ing-list')]), [true, true], 'solo i passaggi');
+  eq(await sw(-120), 'steps', 'a sinistra sull\'ultima tab non cambia');
+  eq(await sw(120), 'ing', 'swipe a destra: Ingredienti');
+  eq(await sw(30), 'ing', 'un tocco breve non cambia');
+  await page.click('[data-dish-pane-value="steps"]');
+  eq(await page.evaluate(() => document.querySelector('.rd-tab.active').dataset.dishPaneValue), 'steps', 'tab Passaggi col tocco');
   eq(page.errors, [], 'errori JS');
 });
 
