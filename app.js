@@ -1014,31 +1014,37 @@ document.addEventListener('click', e=>{
   const close = e.target.closest('[data-menu-pick-close]');
   if(close && !(e.target.closest('[data-stop-close]') && !close.matches('.btn'))){ state.menuPick = null; render(); }
 }, true);
-// Tab Ingredienti | Passaggi del dettaglio: scorrono alla sezione e si
-// illuminano in base a dove sei.
+// Tab Ingredienti | Passaggi del dettaglio: restano sotto l'intestazione mentre
+// si scorre; uno swipe a sinistra/destra sul contenuto passa all'altra tab.
 function rdHeaderOffset(page){
   const h = page.querySelector('.settings-header');
   return h ? h.getBoundingClientRect().height : 0;
 }
-document.addEventListener('click', e=>{
-  const go = e.target.closest && e.target.closest('[data-rd-go]');
-  if(!go) return;
-  const page = go.closest('.sheet-page'); if(!page) return;
-  const sec = page.querySelector(`[data-rd-sec="${go.dataset.rdGo}"]`); if(!sec) return;
-  const tabs = page.querySelector('.rd-tabs');
-  const off = rdHeaderOffset(page) + (tabs ? tabs.getBoundingClientRect().height : 0);
-  page.scrollTo({ top: page.scrollTop + sec.getBoundingClientRect().top - off - 4, behavior: 'smooth' });
-});
 document.addEventListener('scroll', e=>{
   const page = e.target;
   if(!page || !page.classList || !page.classList.contains('sheet-page')) return;
   const tabs = page.querySelector('.rd-tabs'); if(!tabs) return;
   tabs.style.setProperty('--rd-top', rdHeaderOffset(page) + 'px');
-  const steps = page.querySelector('[data-rd-sec="steps"]'); if(!steps) return;
-  const limit = tabs.getBoundingClientRect().bottom + 24;
-  const which = steps.getBoundingClientRect().top <= limit ? 'steps' : 'ing';
-  tabs.querySelectorAll('.rd-tab').forEach(t => t.classList.toggle('active', t.dataset.rdGo === which));
 }, true);
+(function(){
+  let t0 = null;
+  document.addEventListener('touchstart', e=>{
+    const rd = e.target.closest && e.target.closest('.rd');
+    if(!rd || e.touches.length !== 1 || e.target.closest('input, textarea, select, .grad-pop')){ t0 = null; return; }
+    t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, rd };
+  }, { passive: true });
+  document.addEventListener('touchend', e=>{
+    if(!t0) return;
+    const { x, y, rd } = t0; t0 = null;
+    const c = e.changedTouches[0]; if(!c) return;
+    const dx = c.clientX - x, dy = c.clientY - y;
+    if(Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+    const tabs = [...rd.querySelectorAll('.rd-tab')];
+    const cur = tabs.findIndex(b => b.classList.contains('active'));
+    const next = tabs[cur + (dx < 0 ? 1 : -1)];
+    if(next) next.click();
+  }, { passive: true });
+})();
 function rdTimeHtml(rec, det){
   const { prep, cottura } = recipeTimeParts(rec);
   const clock = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1em" height="1em"><path fill="currentColor" d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24m0 192a88 88 0 1 1 88-88a88.1 88.1 0 0 1-88 88m64-88a8 8 0 0 1-8 8h-56a8 8 0 0 1-8-8V72a8 8 0 0 1 16 0v48h48a8 8 0 0 1 8 8"/></svg>';
@@ -1090,28 +1096,27 @@ function recipeDetailBodyHtml(name, o){
   const head = rec ? `
     ${rdTimeHtml(rec, det)}
     <div class="rd-meta"><span class="rd-meta-text">${rdMetaText(rec)}</span>${rdGradHtml(name)}</div>` : `<div class="ing-empty">Ricetta non presente nel catalogo — solo ingredienti disponibili qui.</div>`;
+  const pane = state.dishPane[o.paneKey] || 'ing';
+  const tabBtn = (v, label) => `<button type="button" class="rd-tab${pane === v ? ' active' : ''}" role="tab" aria-selected="${pane === v}" data-dish-pane="${escapeAttr(o.paneKey)}" data-dish-pane-value="${v}">${label}</button>`;
   return `
   <div class="rd" data-rd="${escapeAttr(name)}">
     <h1 class="rd-title">${escapeHtml(name)}</h1>
     ${head}
     ${o.extraTop || ''}
-    <div class="rd-tabs" role="tablist">
-      <button type="button" class="rd-tab active" role="tab" data-rd-go="ing">Ingredienti</button>
-      <button type="button" class="rd-tab" role="tab" data-rd-go="steps">Passaggi${steps.length ? ` · ${steps.length}` : ''}</button>
-    </div>
+    <div class="rd-tabs" role="tablist">${tabBtn('ing', 'Ingredienti')}${tabBtn('steps', `Passaggi${steps.length ? ` · ${steps.length}` : ''}`)}</div>
+    ${pane === 'ing' ? `
     <section class="rd-sec" data-rd-sec="ing">
       <div class="rd-sec-head"><h2>Ingredienti</h2>${o.personeHtml || ''}</div>
       ${ingHtml}
       ${o.mancantiHtml || ''}
       ${addFormHtml}
-    </section>
+    </section>` : `
     <section class="rd-sec" data-rd-sec="steps">
-      <div class="rd-sec-head"><h2>Passaggi</h2></div>
       ${notes.before}
       ${stepsHtml}
       ${notes.after}
       ${o.linkHtml || ''}
-    </section>
+    </section>`}
   </div>`;
 }
 function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
@@ -1158,7 +1163,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
   <div class="dish-acc is-panel open">
     <div class="dish-acc-body">
       ${rec ? recipePhotoHtml(name) : ''}
-      ${recipeDetailBodyHtml(name, { ing, ratio, ctx, persone: ctx.persone,
+      ${recipeDetailBodyHtml(name, { paneKey: paneKey, ing, ratio, ctx, persone: ctx.persone,
         personeHtml: rdPersoneHtml(ctx.persone, ctx.canPortions ? mk : '', ''),
         mancantiHtml: dishCookFactor(mk, name) ? mancantiButtonHtml(missingIngredients(ing, ratio, ctx)) : '', extraTop: freezerInfo, linkHtml: linkHtml ? `<div class="button-wrapper">${linkHtml}</div>` : '' })}
     </div>
@@ -7383,7 +7388,7 @@ function renderRecipeDetailScreen(name){
   return managePageHtml({ key: 'recipe-' + name, title: '<span class="rd-back-label">Ricette</span>', closeAttr: `data-toggle-recipe="${escapeAttr(name)}"`, action: menuAction, body: `
     <div class="meal-detail-body${cookFab ? ' has-cook-fab' : ''}">
       ${recipePhotoHtml(name)}
-      ${recipeDetailBodyHtml(name, { ing, ratio: rRatio, ctx: {}, persone: nPers, personeHtml: rdPersoneHtml(nPers, '', name),
+      ${recipeDetailBodyHtml(name, { paneKey: 'r|' + name, ing, ratio: rRatio, ctx: {}, persone: nPers, personeHtml: rdPersoneHtml(nPers, '', name),
         mancantiHtml: mancantiTop, linkHtml: linkHtml ? `<div class="button-wrapper">${linkHtml}</div>` : '' })}
       ${menuHtml}
       ${cookFab}
