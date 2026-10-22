@@ -1925,3 +1925,18 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .done-grad-chip.active{ border-color:var(--accent, #e03c1f); background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--bg)); color:var(--accent, #e03c1f); }
 .done-next{ border:0; background:none; padding:0; color:var(--ink-light); font:inherit; cursor:pointer; }
 .done-row-main .done-chip{ align-self:flex-start; margin-top:0.375rem; }
+
+/* Coerenza: bottoni e note dei nuovi schermi come nel resto dell'app */
+:root{ --btn-footer-h:2.75rem; --btn-chip-h:2.5rem; --btn-round:2.25rem; }
+.rd .detail-section.note-box, .rd-sec .detail-section.note-box{ padding:var(--space-medium); margin:0 0 var(--space-small); }
+.cook-fab-bar{ padding-top:var(--space-small); padding-bottom:calc(var(--space-small) + env(safe-area-inset-bottom)); gap:var(--space-small); }
+.cook-fab-bar .cook-fab{ height:var(--btn-footer-h); font-size:var(--text-body); }
+.move-footer .btn, .cook-nav-back, .cook-nav-next{ height:var(--btn-footer-h); font-size:var(--text-body); }
+.cook-nav-back{ padding:0 1.5rem; }
+.rd .button-wrapper .btn.is-small{ height:var(--btn-footer-h); font-size:var(--text-body); }
+.rd-grad{ height:var(--btn-chip-h); padding:0 0.875rem; font-size:var(--text-small); }
+.rd-round{ width:var(--btn-round); height:var(--btn-round); font-size:1.125rem; }
+.rd .persone-row.rd-persone{ font-size:var(--text-body); gap:0.5rem; }
+.done-seg button{ height:var(--btn-round); min-width:3.75rem; font-size:var(--text-body); }
+.done-grad-chip{ height:var(--btn-chip-h); font-size:var(--text-small); padding:0 0.875rem; }
+.rd-tab{ padding:0.75rem var(--space-xsmall); font-size:var(--text-body); }
