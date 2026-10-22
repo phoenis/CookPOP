@@ -1795,3 +1795,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .steps-list li, .detail-section .steps-list li{ counter-increment:step; display:flex; gap:0.75rem; align-items:flex-start; margin:0; padding:0.75rem 0; line-height:1.5; border-bottom:1px solid var(--line); }
 .steps-list li:last-child{ border-bottom:0; }
 .steps-list li::before{ content:counter(step); flex:none; width:1.5rem; height:1.5rem; margin-top:0.0625rem; border-radius:50%; background:var(--surface-2); color:var(--ink-light); font-size:var(--text-xsmall); font-weight:var(--weight-bold); display:grid; place-items:center; }
+
+/* Menu di luogo/scadenza: fumetto fisso, non sposta né allunga la lista */
+.move-pop{ position:fixed; right:auto; top:auto; z-index:400; width:14rem; min-width:0; max-height:60vh; overflow-y:auto; }
+.move-list.has-pop{ padding-bottom:0; }
