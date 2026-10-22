@@ -369,10 +369,10 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
 
 test('ricette: gradimento visibile e modificabile con un tocco, senza perdere altre modifiche', async ({ page }) => {
   await page.evaluate(() => { state.recipeEdits['Carbonara'] = { ricordare: 'nota mia' }; state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render(); });
-  eq(await page.evaluate(() => ({ tag: document.querySelector('.grad-tag').textContent.trim(), grad: getRecipeMeta('Carbonara').gradimento })), { tag: 'Ti piace?', grad: '' }, 'senza gradimento di partenza');
+  eq(await page.evaluate(() => ({ tag: document.querySelector('.rd-grad').textContent.trim(), grad: getRecipeMeta('Carbonara').gradimento })), { tag: 'Ti piace?', grad: '' }, 'senza gradimento di partenza');
   await page.click('[data-grad-open="Carbonara"]');
   await page.click('[data-set-gradimento="Carbonara"][data-grad="preferita"]');
-  const r = await page.evaluate(() => ({ grad: getRecipeMeta('Carbonara').gradimento, nota: getRecipeDetails('Carbonara').ricordare, tag: document.querySelector('.grad-tag').textContent.trim(), menuClosed: !document.querySelector('.grad-pop') }));
+  const r = await page.evaluate(() => ({ grad: getRecipeMeta('Carbonara').gradimento, nota: getRecipeDetails('Carbonara').ricordare, tag: document.querySelector('.rd-grad').textContent.trim(), menuClosed: !document.querySelector('.grad-pop') }));
   eq(r, { grad: 'preferita', nota: 'nota mia', tag: '❤️ Preferita', menuClosed: true });
   await page.evaluate(() => { state.expandedRecipe = null; render(); });
   eq(await page.$eval('[data-toggle-recipe="Carbonara"] .grad-icon', el => el.textContent), '❤️', 'icona nella card');
@@ -847,16 +847,16 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
     const tabs = () => [...page().querySelectorAll('.dish-tab-label')].map(e => e.textContent.trim());
     const out = { tabs: tabs(), shown: page().querySelectorAll('.dish-acc').length, active: page().querySelector('.dish-tab.active .dish-tab-label').textContent.trim(), buttons: page().querySelectorAll('[data-mancanti-in-spesa]').length };
     page().querySelectorAll('.dish-tab')[1].click(); // Primo: ha ingredienti e procedimento
-    out.paneTabs = [...page().querySelectorAll('.pane-tab')].map(e => e.textContent.trim());
-    out.paneActive = page().querySelector('.pane-tab.active').textContent.trim();
+    out.paneTabs = [...page().querySelectorAll('.rd-tab')].map(e => e.textContent.replace(/\s*·\s*\d+/, '').trim());
+    out.paneActive = page().querySelector('.rd-tab.active').textContent.trim();
     out.persone = page().querySelector('.persone-row').textContent.replace(/\s+/g, ' ').trim();
     out.stepperInRow = !!page().querySelector('.persone-row [data-portions-inc]');
-    out.noTitleInIng = !page().querySelector('.dish-acc .detail-section-title');
+    out.noTitleInIng = !page().querySelector('[data-rd-sec="ing"] .detail-section-title');
     const before = state.dayPortions['1_1_cena'];
     page().querySelector('.persone-row [data-portions-inc]').click();
     out.portionsUp = state.dayPortions['1_1_cena'] !== before;
     out.fab = !!page().querySelector('.cook-fab');
-    page().querySelector('[data-dish-pane-value="steps"]').click();
+    page().querySelector('[data-rd-go="steps"]').click();
     out.stepsShown = !!page().querySelector('.steps-list') && !!page().querySelector('.persone-row');
     out.fabInSteps = !!page().querySelector('.cook-fab');
     page().querySelector('[data-meal-menu]').click();
@@ -868,7 +868,7 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
   eq([d.shown, d.active], [1, 'Antipasto'], 'visibile solo la tab attiva');
   eq(d.paneTabs, ['Ingredienti', 'Passaggi'], 'tab Ingredienti/Passaggi');
   eq(d.paneActive, 'Ingredienti', 'parte da Ingredienti');
-  assert(/^Per.*\d+.*person[ae]$/.test(d.persone) && d.stepperInRow && d.noTitleInIng && d.portionsUp, `porzioni nella tab: ${d.persone}`);
+  assert(/\d+\s+person[ae]/.test(d.persone) && d.stepperInRow && d.noTitleInIng && d.portionsUp, `porzioni nella tab: ${d.persone}`);
   assert(d.fab && d.stepsShown && d.fabInSteps, 'Cucina fisso in entrambe le tab');
   eq(d.menu.length, 4, 'menù ⋯: cambia, blocca, modifica, togli');
   assert(/Cambia piatto/.test(d.menu[0]) && /Blocca il piatto/.test(d.menu[1]) && /Modifica ricetta/.test(d.menu[2]) && /Togli/.test(d.menu[3]), `voci: ${d.menu.join(' | ')}`);
@@ -1560,23 +1560,23 @@ test('Ricettario: dettaglio ricetta come pagina (tab, persone, Aggiungi in alto,
     state.tab = 'prep'; state.expandedRecipe = 'Carbonara'; render();
     const pg = () => document.querySelector('[data-page^="recipe-"]');
     const out = { page: !!pg(), modal: !!document.querySelector('.meal-detail-screen'), title: pg().querySelector('.settings-title').textContent.trim() };
-    out.tabs = [...pg().querySelectorAll('.pane-tab')].map(e => e.textContent.trim());
-    const kids = [...pg().querySelector('.meal-detail-body').children].map(e => e.className.split(' ')[0] || e.tagName);
-    out.addBeforeList = kids.indexOf('button-wrapper') >= 0 && kids.indexOf('button-wrapper') < kids.indexOf('detail-section');
-    out.gradLast = !!pg().querySelector('.detail-tags .grad-tag') && !pg().querySelector('.grad-picker') && /Ti piace\?/.test(pg().querySelector('.grad-tag').textContent) && !!pg().querySelector('.detail-tags .tag:not(.grad-tag):not(.season)');
+    out.tabs = [...pg().querySelectorAll('.rd-tab')].map(e => e.textContent.replace(/\s*·\s*\d+/, '').trim());
+    const sec = pg().querySelector('[data-rd-sec="ing"]');
+    out.addAfterList = !!sec.querySelector('.ing-list') && !!sec.querySelector('.button-wrapper') && !!(sec.querySelector('.ing-list').compareDocumentPosition(sec.querySelector('.button-wrapper')) & Node.DOCUMENT_POSITION_FOLLOWING);
+    out.gradLast = !!pg().querySelector('.rd-grad') && /Ti piace\?/.test(pg().querySelector('.rd-grad').textContent) && /Pasta/.test(pg().querySelector('.rd-meta-text').textContent);
     out.fab = !!pg().querySelector('.cook-fab');
     const qty0 = pg().querySelector('.ing-list li:last-child, .ing-list li').textContent;
-    const n0 = parseInt(pg().querySelector('.persone-row .qty-num').textContent, 10);
+    const n0 = parseInt(pg().querySelector('.rd-persone-n b').textContent, 10);
     pg().querySelector('[data-recipe-portions-inc]').click();
-    out.persone = [n0, parseInt(pg().querySelector('.persone-row .qty-num').textContent, 10)];
+    out.persone = [n0, parseInt(pg().querySelector('.rd-persone-n b').textContent, 10)];
     out.qtyChanged = pg().querySelector('.ing-list li').textContent !== qty0;
     pg().querySelector('[data-recipe-menu]').click();
     out.menu = [...pg().querySelectorAll('.meal-menu .topbar-menu-item')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
     return out;
   });
-  eq([r.page, r.modal, r.title], [true, false, 'Carbonara'], 'pagina, non modale');
+  eq([r.page, r.modal, r.title], [true, false, 'Ricette'], 'pagina, non modale');
   eq(r.tabs, ['Ingredienti', 'Passaggi']);
-  assert(r.addBeforeList, '"Aggiungi N ingredienti" sopra l\'elenco');
+  assert(r.addAfterList, '"Aggiungi alla Spesa i mancanti" sotto l\'elenco');
   assert(r.gradLast, 'etichetta di gradimento (Ti piace?) e categoria nei tag');
   assert(r.fab, 'Cucina fisso');
   eq(r.persone[1], r.persone[0] + 1, 'persone +1');
@@ -1674,7 +1674,7 @@ test('ricette: ritmo uniforme nel dettaglio, Cucina bianca senza bande, modifica
     const nome = allRecipeMetas().find(x => getRecipeDetails(x.nome) && (getRecipeDetails(x.nome).procedimento || []).length).nome;
     state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = nome; render();
     const body = document.querySelector('.meal-detail-body');
-    const out = { gap: getComputedStyle(body).rowGap, tab: getComputedStyle(document.querySelector('.pane-tab')).textTransform };
+    const out = { gap: getComputedStyle(body).rowGap, tab: getComputedStyle(document.querySelector('.rd-tab')).textTransform };
     state.expandedRecipe = null; state.cookMode = { name: nome, step: 0, ratio: 1 }; render();
     const cp = document.querySelector('.cook-page');
     out.cookBg = getComputedStyle(cp).backgroundColor; out.cookEndRight = getComputedStyle(document.querySelector('.cook-end')).order === '2';
@@ -1734,9 +1734,9 @@ test('cucina: durata letta dal passo, timer con conto alla rovescia, allarme a f
 test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, tab e ingredienti', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
-    const gaps = root => { const q = s => root.querySelector(s); const bw = q('.button-wrapper'), pt = q('.pane-tabs'), ps = q('.persone-row'), li = q('.ing-list li');
+    const gaps = root => { const q = s => root.querySelector(s); const bw = q('.button-wrapper'), pt = q('.rd-tabs'), ps = q('.rd-sec-head'), li = q('.ing-list li');
       const cs = getComputedStyle(bw), top = e => e.getBoundingClientRect().top, bot = e => e.getBoundingClientRect().bottom;
-      return { btnTop: Math.round(top(bw) - bot(pt)), persToTabs: Math.round(top(pt) - bot(ps)), liPad: getComputedStyle(li).paddingTop }; };
+      return { btnTop: Math.round(top(bw) - bot(q('.ing-list'))), persToTabs: Math.round(top(ps) - bot(pt)), liPad: getComputedStyle(li).paddingTop }; };
     state.extraWeeks = []; generateWeek(1);
     writeMealDishes(1, 1, 'cena', 'Amatriciana', []); state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
     const meal = gaps(document.querySelector('[data-page^="meal-"] .dish-acc-body'));
@@ -1745,13 +1745,13 @@ test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, t
     return { meal, rec };
   });
   eq(r.meal, r.rec);
-  eq(r.rec.btnTop >= 16 && r.rec.persToTabs >= 8, true);
+  eq(r.rec.btnTop >= 8 && r.rec.persToTabs >= 8, true);
 });
 
 test('cucina: il bottone è al centro in basso, uguale nel pasto e nel Ricettario', async ({ page }) => {
   const open = (setup) => page.evaluate(setup);
   const pos = () => page.evaluate(() => { const b = document.querySelector('.cook-fab-bar').getBoundingClientRect(); const w = document.documentElement.clientWidth;
-    return { centered: Math.abs((b.left + b.right) / 2 - w / 2) < 1, gap: Math.round(window.innerHeight - b.bottom) >= 24 && Math.round(window.innerHeight - b.bottom) <= 32 }; });
+    return { centered: Math.abs((b.left + b.right) / 2 - w / 2) < 1, gap: Math.round(window.innerHeight - b.bottom) === 0 }; });
   await open(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.extraWeeks = []; generateWeek(1); writeMealDishes(1, 1, 'cena', 'Amatriciana', []); state.tab = 'menu'; state.expandedDay = '1_1_cena'; render(); });
   await page.waitForTimeout(400);
@@ -2844,6 +2844,41 @@ test('ricette: tempo diviso in preparazione e cottura (la somma decide fascia e 
   eq({ bucket: r.bucket, tempo: r.tempo, prep: r.prep, cottura: r.cottura, consigli: r.consigli, text: r.text, hasConsigli: /Consigli\s*Puoi aggiungere/.test(r.detail) },
     { bucket: 'lunga', tempo: '50 min', prep: 20, cottura: 30, consigli: 'Puoi aggiungere al pangrattato della curcuma.', text: '20 min prep. + 30 min cottura', hasConsigli: true });
   eq(await page.evaluate(() => tempoBucketForMinutes(20) + '|' + tempoBucketForMinutes(30) + '|' + tempoBucketForMinutes(45) + '|' + tempoBucketForMinutes(60) + '|' + tempoBucketForMinutes(61)), 'express|veloce|normale|lunga|progetto');
+  eq(page.errors, [], 'errori JS');
+});
+
+
+test('dettaglio ricetta: pagina unica con tempi, "Uova · tuorli", titolo del pasto, "Metti nel menù" e tab che scorrono', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.recipeEdits['Carbonara'] = { tPrep: 10, tCottura: 15, tempo: '25 min', tempoBucket: 'veloce' };
+    state.extraWeeks = []; generateWeek(1); writeMealDishes(1, 1, 'cena', 'Carbonara', []);
+    state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
+    const pg = document.querySelector('[data-page^="meal-"]');
+    const out = { sub: pg.querySelector('.meal-page-date').textContent, time: pg.querySelector('.rd-time').textContent.replace(/\s+/g, ' ').trim(),
+      uova: [...pg.querySelectorAll('.ing-list li')].map(li => li.querySelector('.ing-list-name').textContent.replace(/\s+/g, ' ').trim()).filter(t => /^Uova/.test(t)),
+      bar: [...pg.querySelectorAll('.cook-fab-bar button')].map(b => b.textContent.trim()), both: !!pg.querySelector('[data-rd-sec="ing"]') && !!pg.querySelector('[data-rd-sec="steps"]') };
+    state.expandedDay = null; state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = 'Carbonara'; render();
+    const rp = document.querySelector('[data-page^="recipe-"]');
+    out.recBar = [...rp.querySelectorAll('.cook-fab-bar button')].map(b => b.textContent.trim());
+    out.back = rp.querySelector('.settings-title').textContent.trim();
+    return out;
+  });
+  assert(/^\S+ \d+ \S+ · 1 piatto$/.test(r.sub), `titolo: ${r.sub}`);
+  eq([r.time, r.both], ['Preparazione 10 min · Cottura 15 min', true]);
+  eq(r.uova, ['Uova · tuorli', 'Uova · intero']);
+  eq([r.bar, r.recBar, r.back], [['Cena fatta', 'Cucina'], ['Metti nel menù', 'Cucina'], 'Ricette']);
+  // "Metti nel menù": scelgo un pasto e la ricetta ci va (come "Cambia piatto")
+  await page.click('[data-recipe-to-menu]');
+  await page.waitForSelector('.menu-pick-chip');
+  const key = await page.evaluate(() => document.querySelector('.menu-pick-chip:not(.active)').dataset.swapDay);
+  await page.click(`.menu-pick-chip[data-swap-day="${key}"]`);
+  const after = await page.evaluate(k => { const { weekIdx, i, meal } = parseMealKey(k); return { sheet: !!document.querySelector('.menu-pick-chip'), name: effectiveMeal(weekIdx, i, meal).principale }; }, key);
+  eq(after, { sheet: false, name: 'Carbonara' }, 'messa nel menù, foglio chiuso');
+  // le tab scorrono alla sezione Passaggi
+  await page.click('[data-rd-go="steps"]');
+  await page.waitForTimeout(700);
+  eq(await page.evaluate(() => document.querySelector('.rd-tab.active').dataset.rdGo), 'steps', 'tab Passaggi attiva dopo lo scorrimento');
   eq(page.errors, [], 'errori JS');
 });
 
