@@ -2852,11 +2852,11 @@ test('ricette: tempo diviso in preparazione e cottura (la somma decide fascia e 
 test('dettaglio ricetta: pagina unica con tempi, "Uova · tuorli", titolo del pasto, "Metti nel menù" e tab che scorrono', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
-    state.recipeEdits['Carbonara'] = { tPrep: 10, tCottura: 15, tempo: '25 min', tempoBucket: 'veloce' };
+    state.recipeEdits['Carbonara'] = { tPrep: 10, tCottura: 15, tempo: '25 min', tempoBucket: 'veloce', freezerNew: 'congelabile' };
     state.extraWeeks = []; generateWeek(1); writeMealDishes(1, 1, 'cena', 'Carbonara', []);
     state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
     const pg = document.querySelector('[data-page^="meal-"]');
-    const out = { sub: pg.querySelector('.meal-page-date').textContent, time: pg.querySelector('.rd-time').textContent.replace(/\s+/g, ' ').trim(),
+    const out = { metaClean: !/[<>]/.test(pg.querySelector('.rd-meta-text').textContent) && !!pg.querySelector('.rd-meta-text svg'), sub: pg.querySelector('.meal-page-date').textContent, time: pg.querySelector('.rd-time').textContent.replace(/\s+/g, ' ').trim(),
       uova: [...pg.querySelectorAll('.ing-list li')].map(li => li.querySelector('.ing-list-name').textContent.replace(/\s+/g, ' ').trim()).filter(t => /^Uova/.test(t)),
       bar: [...pg.querySelectorAll('.cook-fab-bar button')].map(b => b.textContent.trim()), both: !!pg.querySelector('[data-rd-sec="ing"]') && !!pg.querySelector('[data-rd-sec="steps"]') };
     state.expandedDay = null; state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = 'Carbonara'; render();
@@ -2866,7 +2866,7 @@ test('dettaglio ricetta: pagina unica con tempi, "Uova · tuorli", titolo del pa
     return out;
   });
   assert(/^\S+ \d+ \S+ · 1 piatto$/.test(r.sub), `titolo: ${r.sub}`);
-  eq([r.time, r.both], ['Preparazione 10 min · Cottura 15 min', true]);
+  eq([r.time, r.both, r.metaClean], ['Preparazione 10 min · Cottura 15 min', true, true]);
   eq(r.uova, ['Uova · tuorli', 'Uova · intero']);
   eq([r.bar, r.recBar, r.back], [['Cena fatta', 'Cucina'], ['Metti nel menù', 'Cucina'], 'Ricette']);
   // "Metti nel menù": scelgo un pasto e la ricetta ci va (come "Cambia piatto")

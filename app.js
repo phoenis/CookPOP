@@ -1051,9 +1051,10 @@ function rdTimeHtml(rec, det){
   return `<div class="rd-time">${clock}<span>${text}</span></div>`;
 }
 function rdMetaText(rec){
-  const bits = [CAT_LABEL[rec.categoriaNew], rec.stagioni.map(x => STAGIONE_LABEL[x]).join(', ')];
+  const bits = [CAT_LABEL[rec.categoriaNew], rec.stagioni.map(x => STAGIONE_LABEL[x]).join(', ')].filter(Boolean).map(escapeHtml);
+  // L'etichetta del freezer è già HTML (icona + testo): non va riscritta come testo.
   if(rec.freezerNew && rec.freezerNew !== 'non-adatta') bits.push(FREEZER_LABEL[rec.freezerNew]);
-  return bits.filter(Boolean).map(escapeHtml).join(' · ');
+  return bits.join(' · ');
 }
 function rdGradHtml(name){
   const r = getRecipeMeta(name); if(!r) return '';
