@@ -1775,3 +1775,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .edit-time-input{ display:flex; align-items:center; gap:0.5rem; color:var(--ink-light); }
 .edit-time-input input{ flex:1; min-width:0; }
 #edit-consigli{ box-sizing:border-box; width:100%; font-family:inherit; font-size:var(--text-body); color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:var(--space-small); resize:vertical; }
+
+/* Messaggio con "Annulla": sulla stessa riga del + tondo (a sinistra), in ogni schermata */
+.undo-toast{ left:auto; right:calc(1rem + 3rem + 0.5rem); transform:none; bottom:calc(4.5rem + env(safe-area-inset-bottom)); min-height:3rem; box-sizing:border-box; max-width:calc(100% - 1rem - 3rem - 0.5rem - 1rem); }
+.undo-toast-message{ white-space:normal; overflow:visible; text-overflow:clip; line-height:1.25; }
