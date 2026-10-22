@@ -1736,3 +1736,11 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 #settings-backdrop .settings-link .settings-avatar{ width:2.5rem; height:2.5rem; font-size:1.125rem; margin-right:var(--space-xsmall); border-radius:0.75rem; }
 #settings-backdrop .settings-link-text small{ margin-top:0.125rem; }
 .sheet-page .settings-card.is-links .settings-link{ padding-left:0; padding-right:0; }
+
+/* Dispensa: righe come quelle della Spesa (icona piccola come il cerchio, stessi spazi, voci un po' rientrate) */
+.pantry-list .accordion-body{ padding-left:calc(var(--padding-page) + 0.25rem); }
+.pantry-list .inv-item{ gap:0.8125rem; padding:0.375rem 0.125rem; }
+.pantry-list .inv-item > .luogo-picker-opt{ width:1.375rem; height:1.375rem; min-width:0; padding:0.1875rem; align-self:flex-start; margin-top:0.0625rem; }
+.pantry-list .inv-item > .luogo-picker-opt svg{ width:0.875rem !important; height:0.875rem !important; }
+.pantry-list .inv-item .qty-btn{ opacity:0.55; }
+.pantry-list .is-text.inv-name{ padding:0; font-weight:var(--weight-medium); }
