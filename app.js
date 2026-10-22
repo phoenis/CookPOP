@@ -884,7 +884,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
   const ingHtml = renderIngredientsSection(ing, ratio, Object.assign({ noButton: true, titleHtml: personeRowHtml(ctx.persone, ctx.canPortions ? mk : '') }, ctx));
   const tagsHtml = rec ? `
     <div class="detail-tags">
-      <span class="tag tempo">${det ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> ' + escapeHtml(det.tempo) : escapeHtml(TEMPO_LABEL[rec.tempoBucket])}</span>
+      <span class="tag tempo">${det ? '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> ' + escapeHtml(recipeTimeText(det) || det.tempo) : escapeHtml(TEMPO_LABEL[rec.tempoBucket])}</span>
       ${(rec.freezerNew && rec.freezerNew !== 'non-adatta') ? `<span class="tag freezer">${FREEZER_LABEL[rec.freezerNew]}</span>` : ''}
       ${rec.pianificazione!=='nessuna' ? `<span class="tag"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg> ${escapeHtml(PIAN_LABEL[rec.pianificazione])}</span>` : ''}
       ${gradTagHtml(name)}
@@ -894,6 +894,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
     : '';
   const noteExtra = det ? [
       det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
+      det.consigli ? `<b>Consigli:</b> ${escapeHtml(det.consigli)}` : '',
       det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
       det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
     ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
@@ -1220,6 +1221,41 @@ function renameRecipe(from, to){
   delete state.hiddenRecipes[to];
   renameRecipeRefs(from, to);
   moveRecipePhoto(from, to);
+}
+// Tempo di una ricetta: preparazione + cottura (minuti). Il totale decide la
+// fascia usata dai filtri e dal generatore; "tempo" resta il testo mostrato.
+function tempoBucketForMinutes(min){
+  return min <= 20 ? 'express' : min <= 30 ? 'veloce' : min <= 45 ? 'normale' : min <= 60 ? 'lunga' : 'progetto';
+}
+function formatMinutes(min){
+  if(min < 60) return `${min} min`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+function recipeTimeParts(x){
+  const p = x && x.tPrep != null && x.tPrep !== '' ? Number(x.tPrep) : null;
+  const c = x && x.tCottura != null && x.tCottura !== '' ? Number(x.tCottura) : null;
+  return { prep: Number.isFinite(p) ? p : null, cottura: Number.isFinite(c) ? c : null };
+}
+function recipeTimeText(x){
+  const { prep, cottura } = recipeTimeParts(x);
+  if(prep == null && cottura == null) return '';
+  return [prep != null ? `${formatMinutes(prep)} prep.` : '', cottura != null ? `${formatMinutes(cottura)} cottura` : ''].filter(Boolean).join(' + ');
+}
+function editTimeTotalHtml(prep, cottura, rec){
+  const { prep: p, cottura: c } = recipeTimeParts({ tPrep: prep, tCottura: cottura });
+  if(p == null && c == null) return rec && rec.tempo ? `Ora: ${escapeHtml(rec.tempo)} (${escapeHtml(TEMPO_LABEL[rec.tempoBucket] || '')}). Scrivi i minuti per cambiarlo.` : 'Scrivi i minuti di preparazione e di cottura: il totale decide la fascia dei filtri.';
+  const tot = (p || 0) + (c || 0);
+  return `Totale ${formatMinutes(tot)} · ${escapeHtml(TEMPO_LABEL[tempoBucketForMinutes(tot)])}`;
+}
+// Salvataggio dal form: con almeno un campo compilato il totale rifà testo e
+// fascia; vuoti, restano quelli che la ricetta aveva già.
+function editTimeFromForm(rec){
+  const raw = id => { const v = document.getElementById(id).value.trim(); return v === '' ? null : Math.max(0, parseInt(v, 10) || 0); };
+  const prep = raw('edit-tprep'), cottura = raw('edit-tcottura');
+  if(prep == null && cottura == null) return { tPrep: null, tCottura: null, tempo: rec.tempo || '', tempoBucket: rec.tempoBucket || 'normale' };
+  const tot = (prep || 0) + (cottura || 0);
+  return { tPrep: prep, tCottura: cottura, tempo: formatMinutes(tot), tempoBucket: tempoBucketForMinutes(tot) };
 }
 function getRecipeMeta(name){
   if(state.hiddenRecipes[name]) return null;
@@ -5050,14 +5086,12 @@ function renderRecipeEditModal(){
             <div id="edit-photo-area">${recipePhotoHtml(name, true)}</div>
           </div>
           <div class="filter-group">
-            <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> Tempo (etichetta mostrata)</div>
-            <input type="text" id="edit-tempo" value="${escapeAttr(rec.tempo || '')}">
-          </div>
-          <div class="filter-group">
-            <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> Fascia di tempo (usata per filtrare in Ricette)</div>
-            <select id="edit-tempo-bucket">
-              ${TEMPO_ORDER.map(t=>`<option value="${t}" ${rec.tempoBucket===t?'selected':''}>${escapeHtml(TEMPO_LABEL[t])}</option>`).join('')}
-            </select>
+            <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> Tempo</div>
+            <div class="edit-time-row">
+              <label class="edit-time-field"><span>Preparazione</span><span class="edit-time-input"><input type="number" inputmode="numeric" min="0" step="5" id="edit-tprep" value="${rec.tPrep != null ? escapeAttr(String(rec.tPrep)) : ''}" placeholder="–"> min</span></label>
+              <label class="edit-time-field"><span>Cottura</span><span class="edit-time-input"><input type="number" inputmode="numeric" min="0" step="5" id="edit-tcottura" value="${rec.tCottura != null ? escapeAttr(String(rec.tCottura)) : ''}" placeholder="–"> min</span></label>
+            </div>
+            <p class="settings-note" id="edit-time-total">${editTimeTotalHtml(rec.tPrep, rec.tCottura, rec)}</p>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Porzioni</div>
@@ -5127,6 +5161,10 @@ function renderRecipeEditModal(){
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Da ricordare</div>
             <input type="text" id="edit-ricordare" value="${escapeAttr((det && det.ricordare) || '')}">
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">${uiIcon('pencil')} Consigli</div>
+            <textarea id="edit-consigli" rows="3" placeholder="Es. Puoi aggiungere al pangrattato della curcuma, che darà colore e aroma">${escapeHtml((det && det.consigli) || '')}</textarea>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Nota avanzi</div>
@@ -5353,6 +5391,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     }
   } else {
     if(d.ricordare && d.ricordare !== 'Niente') metaLines.push(`<b>Da ricordare:</b> ${escapeHtml(d.ricordare)}`);
+    if(d.consigli) metaLines.push(`<b>Consigli:</b> ${escapeHtml(d.consigli)}`);
     if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
   }
 
@@ -5434,6 +5473,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
     }
   } else {
     if(d.ricordare && d.ricordare !== 'Niente') metaLines.push(`<b>Da ricordare:</b> ${escapeHtml(d.ricordare)}`);
+    if(d.consigli) metaLines.push(`<b>Consigli:</b> ${escapeHtml(d.consigli)}`);
     if(d.nota) metaLines.push(`<b>Nota:</b> ${escapeHtml(d.nota)}`);
   }
 
@@ -7040,6 +7080,7 @@ function renderRecipeDetailScreen(name){
   const noteExtra = det ? [
       det.porzioni ? `<b>Porzioni:</b> ${escapeHtml(det.porzioni)}` : '',
       det.ricordare ? `<b>Da ricordare:</b> ${escapeHtml(det.ricordare)}` : '',
+      det.consigli ? `<b>Consigli:</b> ${escapeHtml(det.consigli)}` : '',
       det.avanzi ? `<b>Avanzi:</b> ${escapeHtml(det.avanzi)}` : '',
       det.freezer ? `<b>Freezer:</b> ${escapeHtml(det.freezer)}` : ''
     ].filter(Boolean).map(l=>`<div class="detail-extra-note">${l}</div>`).join('') : '';
@@ -7588,7 +7629,7 @@ function openMoveModal(){
     rows.push({ ...info, luogo, scad: chosen === 'none' ? '' : (chosen || moveDefaultScad(info.name, luogo)), userScad: !!chosen });
   });
   if(!rows.length) return;
-  state.moveModal = { rows, open: -1 };
+  state.moveModal = { rows, pop: null };
   state.sheetFull = false;
   render();
 }
@@ -7598,39 +7639,50 @@ function moveScadOptions(row){
   return [...new Set((est ? [est] : []).concat(opts.map(([d]) => addDaysIso(d))))].sort();
 }
 function moveDateLabel(iso){ return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day:'numeric', month:'short' }); }
+// "tra 3 giorni", "tra 1 sett.", "tra 3 mesi" per le date proposte.
+function moveDateHint(iso){
+  const d = Math.round((new Date(iso + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000);
+  if(d <= 0) return 'oggi';
+  if(d === 1) return 'domani';
+  if(d < 14) return `tra ${d} giorni`;
+  if(d < 45) return `tra ${Math.round(d / 7)} sett.`;
+  return `tra ${Math.round(d / 30)} mesi`;
+}
+const MOVE_HOUSE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1em" height="1em"><path fill="currentColor" d="M219.31 108.68l-80-80a16 16 0 0 0-22.62 0l-80 80A15.87 15.87 0 0 0 32 120v96a8 8 0 0 0 8 8h64a8 8 0 0 0 8-8v-48h32v48a8 8 0 0 0 8 8h64a8 8 0 0 0 8-8v-96a15.87 15.87 0 0 0-4.69-11.32ZM208 208h-48v-48a8 8 0 0 0-8-8h-48a8 8 0 0 0-8 8v48H48v-88l80-80l80 80Z"/></svg>';
+// Roba per la casa (detersivi...): l'etichetta del luogo è "Casa".
+function moveIsHome(r){ return r.luogo === 'dispensa' && isNonFoodDept(inventoryDept(r.name)); }
+function moveLuogoChip(r){ return moveIsHome(r) ? `${MOVE_HOUSE_SVG} Casa` : `${LUOGO_ICON[r.luogo] || ''} ${escapeHtml(LUOGO_LABEL[r.luogo])}`; }
 function renderMoveModal(){
   const m = state.moveModal;
   if(!m) return '';
+  const pop = m.pop || null;
   const rowsHtml = m.rows.map((r, i)=>{
-    const head = `<div class="move-row-head"><span class="move-row-name">${escapeHtml(r.name)}</span><span class="move-row-qty">${escapeHtml(r.qtyLabel || '')}</span></div>`;
-    if(r.per) return `<div class="move-row">${head}<div class="move-row-note">Per ${escapeHtml(r.per)} · non entra nella tua Dispensa</div></div>`;
-    const open = m.open === i;
-    const scadLabel = r.scad ? `scade ${r.userScad ? '' : '~'}${moveDateLabel(r.scad)}` : (r.userScad ? 'nessuna scadenza' : 'Scrivi la data');
-    const chips = `<div class="move-chips">
-        <button type="button" class="btn is-chip move-chip" data-move-open="${i}">${LUOGO_ICON[r.luogo] || ''} ${escapeHtml(LUOGO_LABEL[r.luogo])}</button>
-        <button type="button" class="btn is-chip move-chip${r.scad ? '' : ' is-dashed'}" data-move-open="${i}">${escapeHtml(scadLabel)}</button>
-      </div>`;
-    const detail = open ? `
-      <div class="move-detail">
-        <div class="move-label">Dove sta</div>
-        <div class="move-chips">${LUOGO_ORDER.map(l => `<button type="button" class="btn is-chip move-chip${r.luogo === l ? ' active' : ''}" data-move-luogo="${i}:${l}">${LUOGO_ICON[l] || ''} ${escapeHtml(LUOGO_LABEL[l])}</button>`).join('')}</div>
-        <div class="move-label">Scadenza</div>
-        <div class="move-chips">
-          ${moveScadOptions(r).map(iso => `<button type="button" class="btn is-chip move-chip${r.scad === iso ? ' active' : ''}" data-move-scad="${i}:${iso}">${escapeHtml(moveDateLabel(iso))}</button>`).join('')}
-          <label class="btn is-chip move-chip${r.scad && !moveScadOptions(r).includes(r.scad) ? ' active' : ''}">Altra data…<input type="date" data-move-date="${i}" value="${escapeAttr(r.scad || '')}"></label>
-          <button type="button" class="btn is-chip move-chip${!r.scad ? ' active' : ''}" data-move-scad="${i}:">Nessuna</button>
-        </div>
-        <p class="move-help">Date proposte da oggi. Si cambiano quando vuoi dalla scheda dell'ingrediente.</p>
-      </div>` : '';
-    return `<div class="move-row${open ? ' is-open' : ''}">${head}${chips}${detail}</div>`;
+    const qty = escapeHtml(r.qtyLabel || '');
+    if(r.per) return `<div class="move-row is-per"><div class="move-row-main"><span class="move-row-name">${escapeHtml(r.name)}</span><span class="move-row-qty">${qty}</span></div><div class="move-row-note">Per ${escapeHtml(r.per)} · non entra nella tua Dispensa</div></div>`;
+    const scadLabel = r.scad ? moveDateLabel(r.scad) : (r.userScad ? 'nessuna' : (moveIsHome(r) ? 'nessuna' : 'Scrivi'));
+    const luogoPop = pop && pop.i === i && pop.kind === 'l' ? `
+        <div class="move-pop" role="listbox">${LUOGO_ORDER.map(l => `<button type="button" class="move-pop-opt${r.luogo === l ? ' active' : ''}" data-move-luogo="${i}:${l}">${LUOGO_ICON[l] || ''} <span>${escapeHtml(LUOGO_LABEL[l])}</span></button>`).join('')}</div>` : '';
+    const est = moveDefaultScad(r.name, r.luogo);
+    const scadPop = pop && pop.i === i && pop.kind === 's' ? `
+        <div class="move-pop" role="listbox">
+          ${moveScadOptions(r).map(iso => `<button type="button" class="move-pop-opt${r.scad === iso ? ' active' : ''}" data-move-scad="${i}:${iso}"><span>${escapeHtml(moveDateLabel(iso))}</span><small>${iso === est && r.luogo === 'freezer' ? `freezer, ${moveDateHint(iso).replace('tra ', '')}` : escapeHtml(moveDateHint(iso))}</small></button>`).join('')}
+          <label class="move-pop-opt is-other">Altra data…<input type="date" data-move-date="${i}" value="${escapeAttr(r.scad || '')}"></label>
+          <button type="button" class="move-pop-opt${!r.scad ? ' active' : ''}" data-move-scad="${i}:"><span>Nessuna scadenza</span></button>
+        </div>` : '';
+    return `<div class="move-row${r.edited ? ' is-edited' : ''}">
+      <div class="move-row-main"><span class="move-row-name">${escapeHtml(r.name)}</span><span class="move-row-qty">${qty}${r.edited ? ' · modificato' : ''}</span></div>
+      <div class="move-cell"><button type="button" class="move-chip${r.edited ? ' is-edited' : ''}" data-move-pop="${i}:l" aria-haspopup="listbox">${moveLuogoChip(r)}</button>${luogoPop}</div>
+      <div class="move-cell"><button type="button" class="move-chip${r.scad ? '' : ' is-empty'}${r.edited && r.userScad ? ' is-edited' : ''}" data-move-pop="${i}:s" aria-haspopup="listbox">${escapeHtml(scadLabel)}</button>${scadPop}</div>
+    </div>`;
   }).join('');
   return `
   <div class="move-backdrop" data-move-back-bg>
     <div class="move-sheet${state.sheetFull ? ' is-full' : ''}" role="dialog" aria-label="Metti in dispensa" data-stop-close>
       <div class="move-handle" aria-hidden="true"></div>
       <h2 class="move-title">Metti in dispensa</h2>
-      <p class="move-sub">Dove sta e scadenza sono già proposte. Tocca solo quello che cambia.</p>
-      <div class="move-list">${rowsHtml}</div>
+      <p class="move-sub">Dove sta e scadenza sono già proposte. Tocca un valore per cambiarlo.</p>
+      <div class="move-colhead"><span>${m.rows.length} ${m.rows.length === 1 ? 'articolo' : 'articoli'}</span><span>Dove sta</span><span>Scadenza</span></div>
+      <div class="move-list${pop ? ' has-pop' : ''}">${rowsHtml}</div>
       <div class="move-footer">
         <button type="button" class="btn is-outline" data-move-back>Indietro</button>
         <button type="button" class="btn is-solid" data-move-confirm>Conferma ${m.rows.length}</button>
@@ -7638,6 +7690,11 @@ function renderMoveModal(){
     </div>
   </div>`;
 }
+document.addEventListener('input', e=>{
+  if(!e.target.closest || !e.target.closest('#edit-tprep, #edit-tcottura')) return;
+  const el = document.getElementById('edit-time-total'); if(!el) return;
+  el.innerHTML = editTimeTotalHtml(document.getElementById('edit-tprep').value, document.getElementById('edit-tcottura').value, getRecipeMeta(state.recipeEditName) || {});
+});
 function closeMoveModal(){ state.moveModal = null; }
 // Barretta in cima ai fogli ("Aggiungi", "Metti in dispensa"): trascinandola in
 // giù il foglio si chiude (o, se è a tutto schermo, torna a metà); tirandola in
@@ -7685,12 +7742,13 @@ document.addEventListener('click', e=>{
   const t = e.target;
   const row = i => m.rows[parseInt(i, 10)];
   if(t.closest('[data-move-back]') || (t.closest('[data-move-back-bg]') && !t.closest('[data-stop-close]'))){ closeMoveModal(); render(); return; }
-  const open = t.closest('[data-move-open]');
-  if(open){ const i = parseInt(open.dataset.moveOpen, 10); m.open = m.open === i ? -1 : i; render(); return; }
+  const open = t.closest('[data-move-pop]');
+  if(open){ const [i, kind] = open.dataset.movePop.split(':'); m.pop = (m.pop && m.pop.i === parseInt(i, 10) && m.pop.kind === kind) ? null : { i: parseInt(i, 10), kind }; render(); return; }
+  if(m.pop && !t.closest('.move-pop')){ m.pop = null; render(); if(!t.closest('[data-move-confirm]')) return; }
   const lu = t.closest('[data-move-luogo]');
-  if(lu){ const [i, l] = lu.dataset.moveLuogo.split(':'); const r = row(i); if(r){ r.luogo = l; if(!r.userScad) r.scad = moveDefaultScad(r.name, l); } render(); return; }
+  if(lu){ const [i, l] = lu.dataset.moveLuogo.split(':'); const r = row(i); if(r){ if(r.luogo !== l) r.edited = true; r.luogo = l; if(!r.userScad) r.scad = moveDefaultScad(r.name, l); } m.pop = null; render(); return; }
   const sc = t.closest('[data-move-scad]');
-  if(sc){ const idx = sc.dataset.moveScad.indexOf(':'); const r = row(sc.dataset.moveScad.slice(0, idx)); if(r){ r.scad = sc.dataset.moveScad.slice(idx + 1); r.userScad = true; } render(); return; }
+  if(sc){ const idx = sc.dataset.moveScad.indexOf(':'); const r = row(sc.dataset.moveScad.slice(0, idx)); if(r){ r.scad = sc.dataset.moveScad.slice(idx + 1); r.userScad = true; r.edited = true; } m.pop = null; render(); return; }
   if(t.closest('[data-move-confirm]')){
     const snaps = [];
     m.rows.forEach(r=>{ snaps.push(snapshotShopRowForUndo(r)); moveShopRowToPantry(r, { luogo: r.luogo, scad: r.scad }); });
@@ -7705,7 +7763,7 @@ document.addEventListener('change', e=>{
   const inp = e.target.closest && e.target.closest('[data-move-date]');
   if(!inp || !state.moveModal) return;
   const r = state.moveModal.rows[parseInt(inp.dataset.moveDate, 10)];
-  if(r){ r.scad = inp.value || ''; r.userScad = true; render(); }
+  if(r){ r.scad = inp.value || ''; r.userScad = true; r.edited = true; state.moveModal.pop = null; render(); }
 });
 function renderExpiryConfirmModal(){
   const keys = expiryConfirmKeys();
@@ -10164,8 +10222,7 @@ function attachHandlers(){
       const stagioni = Array.from(document.querySelectorAll('#edit-stagioni [data-stagione-chip].active'))
         .map(el=>el.dataset.stagioneChip);
       state.recipeEdits[name] = {
-        tempo: document.getElementById('edit-tempo').value.trim(),
-        tempoBucket: document.getElementById('edit-tempo-bucket').value,
+        ...editTimeFromForm(getRecipeMeta(name) || {}),
         porzioni: document.getElementById('edit-porzioni').value.trim(),
         categoriaNew: document.getElementById('edit-categoria').value,
         tipologia: document.getElementById('edit-tipologia').value,
@@ -10178,6 +10235,7 @@ function attachHandlers(){
         ingredienti,
         procedimento,
         ricordare: document.getElementById('edit-ricordare').value.trim(),
+        consigli: document.getElementById('edit-consigli').value.trim(),
         avanzi: document.getElementById('edit-avanzi-note').value.trim(),
         freezer: document.getElementById('edit-freezer-note').value.trim(),
         link: document.getElementById('edit-link').value.trim()
