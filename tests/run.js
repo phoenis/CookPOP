@@ -857,7 +857,7 @@ test('pasto: piatti in ordine di portata, + piatto per portata, Cambia e ✕ del
     out.portionsUp = state.dayPortions['1_1_cena'] !== before;
     out.fab = !!page().querySelector('.cook-fab');
     page().querySelector('[data-dish-pane-value="steps"]').click();
-    out.stepsShown = !!page().querySelector('.steps-list') && !page().querySelector('.persone-row');
+    out.stepsShown = !!page().querySelector('.steps-list') && !!page().querySelector('.persone-row');
     out.fabInSteps = !!page().querySelector('.cook-fab');
     page().querySelector('[data-meal-menu]').click();
     out.menu = [...page().querySelectorAll('.meal-menu .topbar-menu-item')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
@@ -1736,7 +1736,7 @@ test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, t
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     const gaps = root => { const q = s => root.querySelector(s); const bw = q('.button-wrapper'), pt = q('.pane-tabs'), ps = q('.persone-row'), li = q('.ing-list li');
       const cs = getComputedStyle(bw), top = e => e.getBoundingClientRect().top, bot = e => e.getBoundingClientRect().bottom;
-      return { btnTop: Math.round(top(bw) - bot(pt)), btnToPersone: Math.round(top(ps) - bot(bw)), liPad: getComputedStyle(li).paddingTop }; };
+      return { btnTop: Math.round(top(bw) - bot(pt)), persToTabs: Math.round(top(pt) - bot(ps)), liPad: getComputedStyle(li).paddingTop }; };
     state.extraWeeks = []; generateWeek(1);
     writeMealDishes(1, 1, 'cena', 'Amatriciana', []); state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
     const meal = gaps(document.querySelector('[data-page^="meal-"] .dish-acc-body'));
@@ -1745,7 +1745,7 @@ test('ricetta: stessa spaziatura dal Menù e dal Ricettario attorno a bottone, t
     return { meal, rec };
   });
   eq(r.meal, r.rec);
-  eq(r.rec.btnTop >= 16 && r.rec.btnToPersone >= 16, true);
+  eq(r.rec.btnTop >= 16 && r.rec.persToTabs >= 8, true);
 });
 
 test('cucina: il bottone è al centro in basso, uguale nel pasto e nel Ricettario', async ({ page }) => {
@@ -2839,9 +2839,9 @@ test('ricette: tempo diviso in preparazione e cottura (la somma decide fascia e 
   const r = await page.evaluate(() => {
     const m = getRecipeMeta('Carbonara'), d = getRecipeDetails('Carbonara');
     return { bucket: m.tempoBucket, tempo: m.tempo, prep: m.tPrep, cottura: m.tCottura, consigli: d.consigli, text: recipeTimeText(d),
-      detail: [...document.querySelectorAll('.detail-extra-note')].map(e => e.textContent).join(' | ') };
+      detail: [...document.querySelectorAll('.note-box')].map(e => e.textContent.replace(/\s+/g, ' ')).join(' | ') };
   });
-  eq({ bucket: r.bucket, tempo: r.tempo, prep: r.prep, cottura: r.cottura, consigli: r.consigli, text: r.text, hasConsigli: /Consigli: Puoi aggiungere/.test(r.detail) },
+  eq({ bucket: r.bucket, tempo: r.tempo, prep: r.prep, cottura: r.cottura, consigli: r.consigli, text: r.text, hasConsigli: /Consigli\s*Puoi aggiungere/.test(r.detail) },
     { bucket: 'lunga', tempo: '50 min', prep: 20, cottura: 30, consigli: 'Puoi aggiungere al pangrattato della curcuma.', text: '20 min prep. + 30 min cottura', hasConsigli: true });
   eq(await page.evaluate(() => tempoBucketForMinutes(20) + '|' + tempoBucketForMinutes(30) + '|' + tempoBucketForMinutes(45) + '|' + tempoBucketForMinutes(60) + '|' + tempoBucketForMinutes(61)), 'express|veloce|normale|lunga|progetto');
   eq(page.errors, [], 'errori JS');
