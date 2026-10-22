@@ -6432,7 +6432,7 @@ document.addEventListener('click', e=>{
   if(e.target.closest('[data-done-rest-toggle]')){ state.doneRestOpen = !state.doneRestOpen; render(); return; }
   if(e.target.closest('[data-done-grad-next]')){ state.doneGradIdx = (state.doneGradIdx || 0) + 1; render(); return; }
   if(e.target.closest('.done-sheet [data-set-gradimento]')){ state.doneGradIdx = (state.doneGradIdx || 0) + 1; render(); }
-});
+}, true); // in cattura: il foglio ferma la risalita dei tocchi ([data-stop-close])
 // "Ricetta fatta" da una ricetta (senza pasto): stesse quantità, scalate sulle persone.
 function openRecipeDone(name, ratio){
   const qtyMap = {};

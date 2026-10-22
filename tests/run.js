@@ -594,7 +594,7 @@ test('gradimento: nessuno di partenza, la migrazione toglie quelli salvati, e si
     writeMealPrincipale(weekOverridesRef(1), 1, 'cena', 'Carbonara');
     state.tab = 'menu'; render();
     document.querySelector('[data-toggle-done="1_1_cena"]').click();
-    document.querySelector('.done-grad [data-set-gradimento="Carbonara"][data-grad="ci-piace"]').click();
+    document.querySelector('.done-sheet [data-set-gradimento="Carbonara"][data-grad="ci-piace"]').click();
     return { noneInCatalog, migrated, voted: getRecipeMeta('Carbonara').gradimento, modalOpen: state.doneModalDay === '1_1_cena' };
   });
   eq(r, { noneInCatalog: true, migrated: { grad: '', nota: 'nota' }, voted: 'ci-piace', modalOpen: true });
@@ -2157,9 +2157,9 @@ test('Ricetta fatta!: quantità usate come il pane, c\'è/non c\'è in fondo col
     const out = { fatto: false };
     state.mealDetail = null;
     document.querySelector('[data-toggle-done="1_1_cena"]').click();
-    const rows = [...document.querySelectorAll('.done-ing-list:not(.done-bread) .done-ing-row')];
-    out.lastIsCart = !!rows[rows.length - 1].querySelector('[data-done-cart-toggle]');
     out.noSwipe = document.querySelectorAll('[data-swipe-done]').length === 0;
+    document.querySelector('[data-done-rest-toggle]').click(); // gli ingredienti senza quantità stanno nella lista chiusa
+    out.lastIsCart = !!document.querySelector('.done-rest-row [data-done-cart-toggle="' + CSS.escape(noneName) + '"]');
     document.querySelector('[data-done-cart-toggle="' + CSS.escape(noneName) + '"]').click();
     document.querySelector('[data-confirm-done="1_1_cena"]').click();
     const it = resolvePantryItem(noneName);
@@ -2912,6 +2912,48 @@ test('modalità cucina: "Ho finito" segna il piatto finito e passa al prossimo; 
   eq(r.cards2, ['Primo finito', 'Secondo 1 di 2']);
   assert(/Il primo è già finito.*foglio della cena intera/.test(r.lastNote2), r.lastNote2);
   eq(r.end, [null, '1_1_cena'], 'chiusa la cucina e aperto il foglio della cena');
+  eq(page.errors, [], 'errori JS');
+});
+
+
+test('Cena fatta: foglio dal basso, avanzo No/Sì con luogo, voto un piatto alla volta; da Ricette "Ho finito" apre Ricetta fatta', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    upsertPantryItem('Guanciale', 'frigo', 300, 'g');
+    ['Prova uno', 'Prova due'].forEach(n => { state.customRecipes[n] = { nome: n, categoriaNew: 'pasta', tempoBucket: 'veloce', stagioni: ['tutto'], tipologia: n === 'Prova uno' ? 'primo' : 'secondo', gradimento: '' };
+      state.recipeEdits[n] = { ingredienti: [{ ingrediente: 'Guanciale', qta: '100 g' }], procedimento: ['A', 'B'] }; });
+    state.extraWeeks = []; generateWeek(1);
+    writeMealDishes(1, 1, 'cena', 'Prova uno', ['Prova due']);
+    state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
+    document.querySelector('[data-cook-done-meal]').click();
+    const out = { sheet: !!document.querySelector('.done-sheet'), title: document.querySelector('.done-sheet .move-title').textContent,
+      sub: document.querySelector('.done-sheet .move-sub').textContent, qty: state.doneModalQty['Guanciale'],
+      segs: document.querySelectorAll('.done-seg').length, grad0: document.querySelector('.done-sec h3 small') ? document.querySelector('.done-sheet .done-grads [data-set-gradimento]').dataset.setGradimento : null };
+    document.querySelector('[data-done-left="0:1"]').click();
+    out.where = document.querySelectorAll('.done-where').length;
+    document.querySelector('[data-done-leftover-luogo-set="0:freezer"]').click();
+    out.luogo = state.doneModalLeftovers[0].luogo;
+    document.querySelector('.done-sheet [data-set-gradimento="Prova uno"][data-grad="preferita"]').click();
+    out.grad1 = [getRecipeMeta('Prova uno').gradimento, state.doneGradIdx, document.querySelector('.done-sheet .done-grads [data-set-gradimento]').dataset.setGradimento];
+    document.querySelector('[data-confirm-done]').click();
+    out.after = [state.doneModalDay, state.pantryItems['guanciale'].qty, !!state.pantryItems['prova uno'], state.pantryItems['prova uno'] && state.pantryItems['prova uno'].luogo];
+    // da Ricette: "Ho finito" apre Ricetta fatta, senza pasto
+    state.expandedDay = null; state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = 'Prova uno'; render();
+    document.querySelector('[data-cook-start]').click();
+    state.cookMode.step = 1; render();
+    document.querySelector('[data-cook-finish]').click();
+    out.recipeDone = [state.doneModalDay, !!state.doneModalRecipe, document.querySelector('.done-sheet .move-title').textContent];
+    document.querySelector('[data-confirm-done]').click();
+    out.recipeAfter = [state.doneModalDay, state.pantryItems['guanciale'].qty];
+    return out;
+  });
+  eq([r.sheet, r.title, r.qty, r.segs], [true, 'Cena fatta', 200, 2]);
+  assert(/Prova uno \+ Prova due/.test(r.sub), r.sub);
+  eq([r.grad0, r.where, r.luogo], ['Prova uno', 3, 'freezer']);
+  eq(r.grad1, ['preferita', 1, 'Prova due']);
+  eq(r.after, [null, 100, true, 'freezer']);
+  eq(r.recipeDone, ['recipe', true, 'Ricetta fatta']);
+  eq(r.recipeAfter, [null, 0]);
   eq(page.errors, [], 'errori JS');
 });
 
