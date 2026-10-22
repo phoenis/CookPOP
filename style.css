@@ -1830,7 +1830,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .rd .ing-qty{ min-width:3rem; text-align:right; }
 .rd .ing-list li > span:last-child{ min-width:0; }
 .rd .mancanti-btn, .rd .detail-section > .btn{ margin-top:var(--space-small); }
-.rd .detail-section{ padding-top:0; border-top:0; }
+.rd .detail-section{ padding:0; border-top:0; }
 .rd-sec .note-box{ margin-top:0; margin-bottom:var(--space-small); }
 .rd-back-label{ color:var(--ink-light); font-weight:var(--weight-normal); font-size:var(--text-body); }
 .rd-sec .steps-list li{ padding:0.875rem 0; }

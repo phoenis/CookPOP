@@ -5060,7 +5060,7 @@ function countOpenModals(){
 // inerte tutto ciò che sta sotto (lettori di schermo e Tab non ci arrivano),
 // e alla chiusura riporta il fuoco sul bottone da cui era stata aperta.
 // Esc chiude la finestra in cima, Tab gira solo al suo interno.
-const DIALOG_LAYER_SELECTOR = '.filters-modal-backdrop, .meal-detail-screen, .sheet-page, .card-view, #settings-backdrop.open, #topbar-menu-backdrop.open';
+const DIALOG_LAYER_SELECTOR = '.filters-modal-backdrop, .meal-detail-screen, .sheet-page, .card-view, .move-backdrop, #settings-backdrop.open, #topbar-menu-backdrop.open';
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 let dialogOpenerBeforeRender = null;
 let dialogStack = []; // [{ sig, opener }] dal basso verso l'alto
@@ -5080,6 +5080,7 @@ function dialogOf(layer){
   // lo fosse, la pagina e il suo sfondo diventerebbero inerti e il menù non
   // si potrebbe più chiudere. Solo il menù della topbar ha il suo strato.
   if(layer.id === 'topbar-menu-backdrop') return layer.querySelector('.topbar-menu') || layer;
+  if(layer.classList.contains('move-backdrop')) return layer.querySelector('.move-sheet') || layer;
   return layer.querySelector('.filters-modal, .settings-page') || layer;
 }
 function openDialogLayers(){
