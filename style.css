@@ -1779,3 +1779,19 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Messaggio con "Annulla": sulla stessa riga del + tondo (a sinistra), in ogni schermata */
 .undo-toast{ left:auto; right:calc(1rem + 3rem + 0.5rem); transform:none; bottom:calc(4.5rem + env(safe-area-inset-bottom)); min-height:3rem; box-sizing:border-box; max-width:calc(100% - 1rem - 3rem - 0.5rem - 1rem); }
 .undo-toast-message{ white-space:normal; overflow:visible; text-overflow:clip; line-height:1.25; }
+
+/* Modifica ricetta: i due campi del tempo restano dentro la pagina (niente scroll orizzontale) */
+.edit-time-row{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.edit-time-field{ min-width:0; }
+.edit-time-input input{ width:100%; min-width:0; box-sizing:border-box; }
+/* Dettaglio ricetta (uguale da Menù e da Ricette): persone, note in box separati con più aria, passaggi più distanziati */
+.detail-persone{ margin:0 0 var(--space-medium); }
+.detail-persone .persone-row{ display:flex; align-items:center; gap:0.5rem; width:fit-content; margin:0; padding:var(--space-xxsmall) var(--space-small); border-radius:var(--radius-pill); background:var(--surface-2); font-size:var(--text-small); font-weight:var(--weight-medium); }
+.detail-persone .qty-btn{ width:1.5rem; height:1.5rem; }
+.meal-detail-body > .detail-section.note-box, .dish-acc-body .detail-section.note-box, .detail-section.note-box{ padding:var(--space-medium); margin:var(--space-medium) 0 0; }
+.note-box .detail-section-title{ margin-bottom:var(--space-xsmall); }
+.note-box .detail-extra-note{ line-height:1.5; font-size:var(--text-body); }
+.steps-list, .detail-section .steps-list, .dish-acc-body .steps-list{ list-style:none; counter-reset:step; padding:0; margin:0; font-size:var(--text-body); }
+.steps-list li, .detail-section .steps-list li{ counter-increment:step; display:flex; gap:0.75rem; align-items:flex-start; margin:0; padding:0.75rem 0; line-height:1.5; border-bottom:1px solid var(--line); }
+.steps-list li:last-child{ border-bottom:0; }
+.steps-list li::before{ content:counter(step); flex:none; width:1.5rem; height:1.5rem; margin-top:0.0625rem; border-radius:50%; background:var(--surface-2); color:var(--ink-light); font-size:var(--text-xsmall); font-weight:var(--weight-bold); display:grid; place-items:center; }
