@@ -7674,6 +7674,14 @@ const MOVE_HOUSE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="tru
 // Roba per la casa (detersivi...): l'etichetta del luogo è "Casa".
 function moveIsHome(r){ return r.luogo === 'dispensa' && isNonFoodDept(inventoryDept(r.name)); }
 function moveLuogoChip(r){ return moveIsHome(r) ? `${MOVE_HOUSE_SVG} Casa` : `${LUOGO_ICON[r.luogo] || ''} ${escapeHtml(LUOGO_LABEL[r.luogo])}`; }
+// Il menu sotto luogo/scadenza è un fumetto fisso sopra il foglio, ancorato al
+// valore toccato (sopra se c'è posto, sennò sotto): non sposta niente.
+function movePopStyle(pop){
+  const w = 224, h = 232, vw = window.innerWidth, vh = window.innerHeight;
+  const left = Math.max(8, Math.min(pop.right - w, vw - w - 8));
+  const above = pop.top > h + 8;
+  return above ? `left:${Math.round(left)}px; bottom:${Math.round(vh - pop.top + 6)}px;` : `left:${Math.round(left)}px; top:${Math.round(pop.bottom + 6)}px;`;
+}
 function renderMoveModal(){
   const m = state.moveModal;
   if(!m) return '';
@@ -7683,10 +7691,10 @@ function renderMoveModal(){
     if(r.per) return `<div class="move-row is-per"><div class="move-row-main"><span class="move-row-name">${escapeHtml(r.name)}</span><span class="move-row-qty">${qty}</span></div><div class="move-row-note">Per ${escapeHtml(r.per)} · non entra nella tua Dispensa</div></div>`;
     const scadLabel = r.scad ? moveDateLabel(r.scad) : (r.userScad ? 'nessuna' : (moveIsHome(r) ? 'nessuna' : 'Scrivi'));
     const luogoPop = pop && pop.i === i && pop.kind === 'l' ? `
-        <div class="move-pop" role="listbox">${LUOGO_ORDER.map(l => `<button type="button" class="move-pop-opt${r.luogo === l ? ' active' : ''}" data-move-luogo="${i}:${l}">${LUOGO_ICON[l] || ''} <span>${escapeHtml(LUOGO_LABEL[l])}</span></button>`).join('')}</div>` : '';
+        <div class="move-pop" role="listbox" style="${movePopStyle(pop)}">${LUOGO_ORDER.map(l => `<button type="button" class="move-pop-opt${r.luogo === l ? ' active' : ''}" data-move-luogo="${i}:${l}">${LUOGO_ICON[l] || ''} <span>${escapeHtml(LUOGO_LABEL[l])}</span></button>`).join('')}</div>` : '';
     const est = moveDefaultScad(r.name, r.luogo);
     const scadPop = pop && pop.i === i && pop.kind === 's' ? `
-        <div class="move-pop" role="listbox">
+        <div class="move-pop" role="listbox" style="${movePopStyle(pop)}">
           ${moveScadOptions(r).map(iso => `<button type="button" class="move-pop-opt${r.scad === iso ? ' active' : ''}" data-move-scad="${i}:${iso}"><span>${escapeHtml(moveDateLabel(iso))}</span><small>${iso === est && r.luogo === 'freezer' ? `freezer, ${moveDateHint(iso).replace('tra ', '')}` : escapeHtml(moveDateHint(iso))}</small></button>`).join('')}
           <label class="move-pop-opt is-other">Altra data…<input type="date" data-move-date="${i}" value="${escapeAttr(r.scad || '')}"></label>
           <button type="button" class="move-pop-opt${!r.scad ? ' active' : ''}" data-move-scad="${i}:"><span>Nessuna scadenza</span></button>
@@ -7717,6 +7725,12 @@ document.addEventListener('input', e=>{
   const el = document.getElementById('edit-time-total'); if(!el) return;
   el.innerHTML = editTimeTotalHtml(document.getElementById('edit-tprep').value, document.getElementById('edit-tcottura').value, getRecipeMeta(state.recipeEditName) || {});
 });
+// Ridisegna il foglio tenendo ferma la lista (scorrimento incluso).
+function moveRender(){
+  const top = (document.querySelector('.move-list') || {}).scrollTop || 0;
+  render();
+  const l = document.querySelector('.move-list'); if(l) l.scrollTop = top;
+}
 function closeMoveModal(){ state.moveModal = null; }
 // Barretta in cima ai fogli ("Aggiungi", "Metti in dispensa"): trascinandola in
 // giù il foglio si chiude (o, se è a tutto schermo, torna a metà); tirandola in
@@ -7765,12 +7779,12 @@ document.addEventListener('click', e=>{
   const row = i => m.rows[parseInt(i, 10)];
   if(t.closest('[data-move-back]') || (t.closest('[data-move-back-bg]') && !t.closest('[data-stop-close]'))){ closeMoveModal(); render(); return; }
   const open = t.closest('[data-move-pop]');
-  if(open){ const [i, kind] = open.dataset.movePop.split(':'); m.pop = (m.pop && m.pop.i === parseInt(i, 10) && m.pop.kind === kind) ? null : { i: parseInt(i, 10), kind }; render(); return; }
-  if(m.pop && !t.closest('.move-pop')){ m.pop = null; render(); if(!t.closest('[data-move-confirm]')) return; }
+  if(open){ const [i, kind] = open.dataset.movePop.split(':'); const r = open.getBoundingClientRect(); m.pop = (m.pop && m.pop.i === parseInt(i, 10) && m.pop.kind === kind) ? null : { i: parseInt(i, 10), kind, left: r.left, right: r.right, top: r.top, bottom: r.bottom }; moveRender(); return; }
+  if(m.pop && !t.closest('.move-pop')){ m.pop = null; moveRender(); if(!t.closest('[data-move-confirm]')) return; }
   const lu = t.closest('[data-move-luogo]');
-  if(lu){ const [i, l] = lu.dataset.moveLuogo.split(':'); const r = row(i); if(r){ if(r.luogo !== l) r.edited = true; r.luogo = l; if(!r.userScad) r.scad = moveDefaultScad(r.name, l); } m.pop = null; render(); return; }
+  if(lu){ const [i, l] = lu.dataset.moveLuogo.split(':'); const r = row(i); if(r){ if(r.luogo !== l) r.edited = true; r.luogo = l; if(!r.userScad) r.scad = moveDefaultScad(r.name, l); } m.pop = null; moveRender(); return; }
   const sc = t.closest('[data-move-scad]');
-  if(sc){ const idx = sc.dataset.moveScad.indexOf(':'); const r = row(sc.dataset.moveScad.slice(0, idx)); if(r){ r.scad = sc.dataset.moveScad.slice(idx + 1); r.userScad = true; r.edited = true; } m.pop = null; render(); return; }
+  if(sc){ const idx = sc.dataset.moveScad.indexOf(':'); const r = row(sc.dataset.moveScad.slice(0, idx)); if(r){ r.scad = sc.dataset.moveScad.slice(idx + 1); r.userScad = true; r.edited = true; } m.pop = null; moveRender(); return; }
   if(t.closest('[data-move-confirm]')){
     const snaps = [];
     m.rows.forEach(r=>{ snaps.push(snapshotShopRowForUndo(r)); moveShopRowToPantry(r, { luogo: r.luogo, scad: r.scad }); });
@@ -7785,7 +7799,7 @@ document.addEventListener('change', e=>{
   const inp = e.target.closest && e.target.closest('[data-move-date]');
   if(!inp || !state.moveModal) return;
   const r = state.moveModal.rows[parseInt(inp.dataset.moveDate, 10)];
-  if(r){ r.scad = inp.value || ''; r.userScad = true; r.edited = true; state.moveModal.pop = null; render(); }
+  if(r){ r.scad = inp.value || ''; r.userScad = true; r.edited = true; state.moveModal.pop = null; moveRender(); }
 });
 function renderExpiryConfirmModal(){
   const keys = expiryConfirmKeys();
