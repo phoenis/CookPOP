@@ -1744,3 +1744,34 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .pantry-list .inv-item > .luogo-picker-opt svg{ width:0.875rem !important; height:0.875rem !important; }
 .pantry-list .inv-item .qty-btn{ opacity:0.55; }
 .pantry-list .is-text.inv-name{ padding:0; font-weight:var(--weight-medium); }
+
+/* Metti in dispensa: tabella Articolo | Dove sta | Scadenza, con menu a tendina sotto ogni valore */
+.move-colhead, .move-row{ display:grid; grid-template-columns:minmax(0,1fr) 6.75rem 5.75rem; column-gap:0.5rem; align-items:center; }
+.move-colhead{ padding:0.5rem 0 0.25rem; font-size:var(--text-xsmall); font-weight:var(--weight-bold); letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-light); }
+.move-row, .move-row.is-open{ background:none; margin:0; padding:0.5rem 0; border-bottom:0; border-radius:0; }
+.move-row.is-per{ display:block; }
+.move-row-main{ display:flex; flex-direction:column; min-width:0; }
+.move-row-name{ font-weight:var(--weight-bold); line-height:1.2; }
+.move-row-qty{ font-size:var(--text-xsmall); font-weight:var(--weight-normal); color:var(--ink-light); }
+.move-cell{ position:relative; min-width:0; }
+.move-chip{ display:flex; align-items:center; gap:0.375rem; width:100%; height:2.5rem; padding:0 0.625rem; border:1px solid var(--line); border-radius:0.75rem; background:var(--surface); color:var(--ink); font-family:inherit; font-size:var(--text-small); font-weight:var(--weight-bold); cursor:pointer; white-space:nowrap; }
+.move-chip svg{ width:1rem !important; height:1rem !important; flex:none; }
+.move-chip.is-empty{ border-style:dashed; color:var(--ink-light); font-weight:var(--weight-normal); }
+.move-chip.is-edited{ background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--surface)); border-color:var(--accent, #e03c1f); color:var(--accent, #e03c1f); }
+.move-pop{ position:absolute; z-index:5; right:0; top:calc(100% + 0.25rem); min-width:13.5rem; padding:0.375rem; border-radius:0.875rem; background:var(--surface); border:1px solid var(--line); box-shadow:0 8px 24px rgba(0,0,0,0.25); }
+.move-cell:first-of-type + .move-cell .move-pop{ }
+.move-pop-opt{ position:relative; display:flex; align-items:center; justify-content:space-between; gap:0.75rem; width:100%; padding:0.625rem 0.75rem; border:0; border-radius:0.625rem; background:none; color:var(--ink); font-family:inherit; font-size:var(--text-body); font-weight:var(--weight-medium); text-align:left; cursor:pointer; }
+.move-pop-opt small{ font-size:var(--text-xsmall); font-weight:var(--weight-normal); color:var(--ink-light); }
+.move-pop-opt.active{ background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--surface)); }
+.move-pop-opt.active small{ color:var(--accent, #e03c1f); font-weight:var(--weight-bold); }
+.move-pop-opt.is-other{ color:var(--accent, #e03c1f); font-weight:var(--weight-bold); }
+.move-pop-opt svg{ width:1rem; height:1rem; }
+.move-pop-opt input[type=date]{ position:absolute; inset:0; opacity:0; width:100%; height:100%; }
+.move-list.has-pop{ padding-bottom:12rem; }
+
+/* Modifica ricetta: preparazione e cottura affiancate, consigli su più righe */
+.edit-time-row{ display:grid; grid-template-columns:1fr 1fr; gap:var(--space-small); }
+.edit-time-field{ display:flex; flex-direction:column; gap:0.25rem; font-size:var(--text-small); color:var(--ink-light); }
+.edit-time-input{ display:flex; align-items:center; gap:0.5rem; color:var(--ink-light); }
+.edit-time-input input{ flex:1; min-width:0; }
+#edit-consigli{ box-sizing:border-box; width:100%; font-family:inherit; font-size:var(--text-body); color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:var(--space-small); resize:vertical; }

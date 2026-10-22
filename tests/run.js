@@ -345,12 +345,12 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
   await page.evaluate(() => { state.recipeEditName = 'Carbonara'; render(); });
   await page.waitForSelector('[data-recipe-photo-input]', { state: 'attached' });
   eq(await page.evaluate(() => [!!document.querySelector('.filters-modal-backdrop.is-second'), !!document.querySelector('[data-page="recipe-edit-Carbonara"]')]), [false, true], 'pagina, non modale');
-  await page.fill('#edit-tempo', 'scritto a mano');
+  await page.fill('#edit-porzioni', 'scritto a mano');
   // immagine di prova 3000x2000 generata nel browser
   const png = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 3000; c.height = 2000; const x = c.getContext('2d'); x.fillStyle = '#c33'; x.fillRect(0, 0, 3000, 2000); return c.toDataURL('image/png').split(',')[1]; });
   await page.setInputFiles('[data-recipe-photo-input]', { name: 'piatto.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await page.waitForSelector('.recipe-photo img');
-  eq(await page.inputValue('#edit-tempo'), 'scritto a mano', 'il render della foto non cancella quanto scritto');
+  eq(await page.inputValue('#edit-porzioni'), 'scritto a mano', 'il render della foto non cancella quanto scritto');
   const saved = await page.evaluate(() => { const v = Object.values(window.__photos)[0]; const img = document.querySelector('.recipe-photo img'); return { keys: Object.keys(window.__photos), jpeg: v.data.startsWith('data:image/jpeg'), size: v.data.length, w: img.naturalWidth }; });
   eq(saved.keys, ['recipe-photos/Carbonara'], 'percorso');
   assert(saved.jpeg && saved.size < 300000, `foto troppo grande: ${saved.size}`);
@@ -358,7 +358,7 @@ test('foto del piatto: si carica ridotta, si vede nella scheda e si può rimuove
   await page.click('[data-recipe-photo-remove]');
   await page.waitForSelector('.recipe-photo img', { state: 'detached' });
   eq(await page.evaluate(() => Object.keys(window.__photos)), [], 'foto rimossa');
-  eq(await page.inputValue('#edit-tempo'), 'scritto a mano', 'neanche dopo la rimozione');
+  eq(await page.inputValue('#edit-porzioni'), 'scritto a mano', 'neanche dopo la rimozione');
   await page.click('.undo-toast button');
   await page.waitForSelector('.recipe-photo img');
   // chiusa la pagina di modifica, nel dettaglio la foto si vede ma senza comandi
@@ -572,11 +572,11 @@ test('spesa: "Metti in dispensa" propone luogo e scadenza stimata, si cambia sol
     return { open: !!document.querySelector('.move-sheet'), zu: [row('Zucchine').luogo, daysUntilDate(row('Zucchine').scad)], po: [row('Petto di pollo').luogo, daysUntilDate(row('Petto di pollo').scad)], sp: [row('Spaghetti').luogo, row('Spaghetti').scad], iz: idx('Zucchine'), ip: idx('Petto di pollo'), is: idx('Spaghetti'), plusSeven: addDaysIso(7) };
   });
   eq({ open: r1.open, zu: r1.zu, po: r1.po, sp: r1.sp }, { open: true, zu: ['frigo', 5], po: ['frigo', 2], sp: ['dispensa', ''] }, 'proposte');
-  await page.click(`[data-move-open="${r1.iz}"]`);
+  await page.click(`[data-move-pop="${r1.iz}:s"]`);
   await page.click(`[data-move-scad="${r1.iz}:${r1.plusSeven}"]`);
-  await page.click(`[data-move-open="${r1.ip}"]`);
+  await page.click(`[data-move-pop="${r1.ip}:s"]`);
   await page.click(`[data-move-scad="${r1.ip}:"]`);
-  await page.click(`[data-move-open="${r1.is}"]`);
+  await page.click(`[data-move-pop="${r1.is}:l"]`);
   await page.click(`[data-move-luogo="${r1.is}:freezer"]`);
   await page.click('[data-move-confirm]');
   const r2 = await page.evaluate(() => { const z = state.pantryItems['zucchine'], p = state.pantryItems['petto di pollo'], s = state.pantryItems['spaghetti']; return { open: !!document.querySelector('.move-sheet'), z: [z.luogo, daysUntilDate(z.scadenza)], p: [p.luogo, p.scadenza || null], s: [s.luogo, s.frozenOn === isoLocalDate(new Date()), daysUntilDate(s.scadenza), !!s.freezerExp] }; });
@@ -2823,6 +2823,30 @@ test('fogli: richiudendo con la barretta e premendo + subito, si riapre al primo
     }
   }finally{ await ctx.close(); }
 });
+
+test('ricette: tempo diviso in preparazione e cottura (la somma decide fascia e filtro), e i consigli', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'prep'; state.prepView = 'ricette'; state.recipeEditName = 'Carbonara'; render(); });
+  await page.waitForSelector('#edit-tprep');
+  const none = await page.evaluate(() => [!document.getElementById('edit-tempo'), !document.getElementById('edit-tempo-bucket')]);
+  eq(none, [true, true], 'niente più testo libero né fascia a mano');
+  await page.fill('#edit-tprep', '20');
+  await page.fill('#edit-tcottura', '30');
+  eq(await page.textContent('#edit-time-total'), 'Totale 50 min · 🟠 1 h', 'totale e fascia dal totale');
+  await page.fill('#edit-consigli', 'Puoi aggiungere al pangrattato della curcuma.');
+  await page.click('#edit-recipe-save');
+  await page.evaluate(() => { state.recipeEditName = null; state.expandedRecipe = 'Carbonara'; state.dishPane['r|Carbonara'] = 'steps'; render(); });
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    const m = getRecipeMeta('Carbonara'), d = getRecipeDetails('Carbonara');
+    return { bucket: m.tempoBucket, tempo: m.tempo, prep: m.tPrep, cottura: m.tCottura, consigli: d.consigli, text: recipeTimeText(d),
+      detail: [...document.querySelectorAll('.detail-extra-note')].map(e => e.textContent).join(' | ') };
+  });
+  eq({ bucket: r.bucket, tempo: r.tempo, prep: r.prep, cottura: r.cottura, consigli: r.consigli, text: r.text, hasConsigli: /Consigli: Puoi aggiungere/.test(r.detail) },
+    { bucket: 'lunga', tempo: '50 min', prep: 20, cottura: 30, consigli: 'Puoi aggiungere al pangrattato della curcuma.', text: '20 min prep. + 30 min cottura', hasConsigli: true });
+  eq(await page.evaluate(() => tempoBucketForMinutes(20) + '|' + tempoBucketForMinutes(30) + '|' + tempoBucketForMinutes(45) + '|' + tempoBucketForMinutes(60) + '|' + tempoBucketForMinutes(61)), 'express|veloce|normale|lunga|progetto');
+  eq(page.errors, [], 'errori JS');
+});
+
 
 (async () => {
   const filter = process.argv[2] || '';
