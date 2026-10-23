@@ -2979,6 +2979,29 @@ test('Cena fatta: foglio dal basso, avanzo No/Sì con luogo, voto un piatto alla
 });
 
 
+test('Spesa: tocco sulla quantità apre il fumetto con numero, unità e "Fatto"; l\'unità scelta resta e va in Dispensa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.shopExtras = { q1: { ingrediente: 'Provaqty', qta: '2' } }; state.shopUnit = {}; state.shopQty = {};
+    state.tab = 'spesa'; render();
+    const out = {};
+    const row = () => document.querySelector('.shop-item-row:has([data-shop-name="Provaqty"])');
+    row().querySelector('[data-shop-qty-show]').click();
+    out.pop = !!document.querySelector('.qty-pop');
+    document.querySelector('[data-shop-qty-unit="kg"]').click();
+    out.still = !!document.querySelector('.qty-pop');
+    const inp = document.querySelector('.qty-pop [data-shop-qty-edit]');
+    inp.value = '3'; document.querySelector('[data-shop-qty-pop-done]').click();
+    out.pop2 = !!document.querySelector('.qty-pop');
+    out.label = row().querySelector('.qty-num').textContent.trim();
+    out.unit = row().querySelector('[data-shop-name]').dataset.shopUnit;
+    out.saved = [state.shopQty.q1, state.shopUnit.q1];
+    return out;
+  });
+  eq([r.pop, r.still, r.pop2], [true, true, false]);
+  eq([r.label, r.unit, r.saved], ['3 kg', 'kg', [3, 'kg']]);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
