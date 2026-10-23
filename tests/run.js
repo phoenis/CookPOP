@@ -2987,7 +2987,7 @@ test('Spesa: tocco sulla quantità apre il fumetto con numero, unità e "Fatto";
     const row = () => document.querySelector('.shop-item-row:has([data-shop-name="Provaqty"])');
     row().querySelector('[data-shop-qty-show]').click();
     out.pop = !!document.querySelector('.qty-pop');
-    document.querySelector('[data-shop-qty-unit="kg"]').click();
+    { const sel = document.querySelector('select[data-shop-qty-unit]'); sel.value = 'kg'; sel.dispatchEvent(new Event('change')); }
     out.still = !!document.querySelector('.qty-pop');
     const inp = document.querySelector('.qty-pop [data-shop-qty-edit]');
     inp.value = '3'; document.querySelector('[data-shop-qty-pop-done]').click();
@@ -3009,7 +3009,7 @@ test('Dispensa: tocco sulla quantità apre il fumetto con numero, unità e "Fatt
     const out = {};
     document.querySelector('[data-qty-show="provafarina"]').click();
     out.pop = !!document.querySelector('.qty-pop');
-    document.querySelector('[data-qty-unit="kg"]').click();
+    { const sel = document.querySelector('select[data-qty-unit]'); sel.value = 'kg'; sel.dispatchEvent(new Event('change')); }
     out.still = !!document.querySelector('.qty-pop');
     const inp = document.querySelector('.qty-pop [data-qty-edit]');
     inp.value = '2'; document.querySelector('.qty-pop [data-qty-pop-close].qty-pop-done').click();
