@@ -6023,30 +6023,30 @@ function renderDishPickerScreen(){
     <div class="swap-result" data-dish-pick="${escapeAttr(r.nome)}" data-dish-key="${mk}">
       <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
       <span class="swap-result-name">${escapeHtml(r.nome)}</span>
-      <span class="swap-result-time">${dp.tipo === 'freezer' ? `❄️ ${freezerPortionsOf(r.nome)} porz.` : escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
+      <span class="swap-result-time">${dp.tipo === 'freezer' ? `❄️ ${freezerPortionsOf(r.nome)} porz.` : escapeHtml(String(TEMPO_LABEL[r.tempoBucket] || '').replace(/^\S+\s/, ''))}</span>
     </div>`).join('');
-  const chips = (frozen.length ? `<button type="button" class="btn is-chip ${dp.tipo==='freezer'?'active':''}" data-dish-course="freezer">❄️ Dal freezer</button>` : '') + COURSE_ORDER.map(t => `<button type="button" class="btn is-chip ${dp.tipo===t?'active':''}" data-dish-course="${t}">${tipoIcon(t)} ${escapeHtml(courseLabel(t))}</button>`).join('')
-    + `<button type="button" class="btn is-chip ${dp.tipo==='all'?'active':''}" data-dish-course="all">Tutte</button>`;
+  const chips = `<button type="button" class="btn is-chip ${dp.tipo==='all'?'active':''}" data-dish-course="all">Tutte</button>`
+    + (frozen.length ? `<button type="button" class="btn is-chip ${dp.tipo==='freezer'?'active':''}" data-dish-course="freezer">❄️ Dal freezer</button>` : '')
+    + COURSE_ORDER.map(t => `<button type="button" class="btn is-chip ${dp.tipo===t?'active':''}" data-dish-course="${t}">${tipoIcon(t)} ${escapeHtml(courseLabel(t))}</button>`).join('');
+  const replaced = dp.replace ? dishes.find(x => x.name === dp.replace) : null;
+  const curHtml = dp.replace ? `<div class="dsh-cur"><span class="dsh-cur-ic" aria-hidden="true">${tipoIcon(replaced ? replaced.tipo : dishCourse(dp.replace))}</span><span>Al posto di <b>${escapeHtml(dp.replace)}</b></span></div>` : '';
   return `
-  <div class="meal-detail-screen">
-    <div class="filters-modal">
-      <div class="meal-detail-header">
-        <div class="meal-detail-header-text">
-          <div class="meal-detail-kicker">${escapeHtml(MEAL_LABEL[meal])} · ${escapeHtml(d.giorno)} ${escapeHtml(dateLabel)}</div>
-          <div class="meal-detail-title">${dp.replace ? `Cambia «${escapeHtml(dp.replace)}»` : 'Aggiungi piatto'}</div>
+  <div class="move-backdrop" data-dish-picker-backdrop>
+    <div class="move-sheet dish-sheet" role="dialog" aria-label="${dp.replace ? 'Cambia piatto' : 'Aggiungi piatto'}">
+      <div class="move-handle" aria-hidden="true"></div>
+      <div class="dsh-head">
+        <div class="dsh-head-text">
+          <span class="dsh-kicker">${escapeHtml(MEAL_LABEL[meal])} · ${escapeHtml(d.giorno.slice(0,3).toLowerCase())} ${escapeHtml(dateLabel.toLowerCase())}</span>
+          <h2 class="move-title">${dp.replace ? 'Cambia piatto' : 'Aggiungi piatto'}</h2>
         </div>
-        <button type="button" class="btn is-icon meal-detail-close" data-close-dish-picker aria-label="Chiudi">✕</button>
+        <button type="button" class="btn is-icon dsh-close" data-close-dish-picker aria-label="Chiudi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
-      <div class="meal-detail-body">
-        <div class="swap-panel">
-          <div class="filter-group-label">Portata</div>
-          <div class="swap-cat-chips dish-course-chips">${chips}</div>
-          <input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-dish-search="${mk}" value="${escapeAttr(search)}">
-          <div class="swap-results">
-            ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
-            ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
-          </div>
-        </div>
+      ${curHtml}
+      <label class="dsh-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></svg><input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-dish-search="${mk}" value="${escapeAttr(search)}" autocomplete="off"></label>
+      <div class="dsh-chips dish-course-chips" role="group" aria-label="Portata">${chips}</div>
+      <div class="swap-results dsh-results">
+        ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+        ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
       </div>
     </div>
   </div>`;
@@ -11948,7 +11948,7 @@ document.addEventListener('click', e=>{
     render();
     return;
   }
-  if(e.target.closest('[data-close-dish-picker]')){ state.dishPicker = null; render(); return; }
+  if(e.target.closest('[data-close-dish-picker]') || (e.target.matches && e.target.matches('[data-dish-picker-backdrop]'))){ state.dishPicker = null; render(); return; }
   const courseEl = e.target.closest('[data-dish-course]');
   if(courseEl && state.dishPicker){ state.dishPicker.tipo = courseEl.dataset.dishCourse; render(); return; }
   const pickEl = e.target.closest('[data-dish-pick]');
