@@ -9,6 +9,7 @@
     --accent:#D6391C;        /* bottone pieno, attivo (4,7:1 col bianco) */
     --accent-text:#B5301A;   /* testo rosso, scheda attiva, PRIMO/SECONDO */
     --accent-soft:#FBE3DE;   /* fondo di ciò che è scelto */
+    --accent-dark:#691818;
     --text:#1B1B1B;
     --muted:#5F5F5F;         /* testo secondario, etichette, icone */
     --line:#ECECEC;          /* separatori, bordo card */
@@ -26,9 +27,9 @@
     --fs-title:1.5rem;     --lh-title:1.875rem;   /* 24/30 nome ricetta, titolo foglio */
     --fs-bar:1.25rem;      --lh-bar:1.625rem;     /* 20/26 barra in alto */
     --fs-section:1.125rem; --lh-section:1.5rem;   /* 18/24 reparto, giorno, sezione, nome piatto nel Menù */
-    --fs-body:1rem;        --lh-body:1.375rem;    /* 16/22 righe, testi, bottoni */
+    --fs-body:0.9rem;        --lh-body:1.375rem;    /* 16/22 righe, testi, bottoni */
     --fs-small:0.875rem;   --lh-small:1.25rem;    /* 14/20 sotto-righe, aiuti, chip */
-    --fs-label:0.75rem;    --lh-label:1rem;       /* 12/16 etichette MAIUSCOLE, badge */
+    --fs-label:0.65rem;    --lh-label:1rem;       /* 12/16 etichette MAIUSCOLE, badge */
     --fs-cook:1.5rem;      --lh-cook:2.125rem;    /* 24/34 solo passaggio in modalità Cucina */
 
     /* spazi */
@@ -47,7 +48,7 @@
 
     /* ombre: solo due */
     --shadow-1:0 1px 2px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.07); /* card pasti nel Menù */
-    --shadow-2:0 4px 24px rgba(0,0,0,.16);                           /* fogli, +, selettore flottante */
+    --shadow-2:2px 2px 14px rgba(0,0,0,0.075);                           /* fogli, +, selettore flottante */
   }
   /* tema scuro: stessi nomi, altri valori (--ok/--no/--warn non sono nel file: li ho scelti io) */
   @media (prefers-color-scheme: dark){
@@ -2279,7 +2280,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .pantry-list .exp-badge, .pantry-list .frozen-on{ display:inline-flex; align-items:center; height:22px; padding:0 var(--s2); border-radius:var(--r-full); font-size:var(--fs-label); font-weight:700; line-height:1; }
 .pantry-list .exp-badge.is-soon{ background:var(--warn); color:var(--warn-text); }
 .pantry-list .exp-badge.is-later{ background:var(--surface-2); color:#3d3d3d; }
-.pantry-list .exp-badge.is-expired{ background:var(--no); color:#fff; }
+.pantry-list .exp-badge.is-expired{ background:var(--accent-soft); color:var(--accent-text); }
 .pantry-list .frozen-on{ background:var(--freeze); color:var(--freeze-text); }
 .pantry-list .qty-stepper{ gap:0; }
 .pantry-list .inv-item .qty-btn{ width:32px; height:44px; border:0; border-radius:0; background:transparent; color:#8A8A8A; font-size:1.25rem; opacity:1; }
@@ -2355,8 +2356,8 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .shop-list .qty-num, .pantry-list .qty-num{ min-width:0; display:inline-flex; align-items:center; justify-content:center; height:var(--h-m); padding:0 6px; text-align:center; }
 .shop-list .qty-stepper:has(.qty-placeholder) .qty-btn{ display:none; }
 .shop-list .qty-num.qty-placeholder{ min-width:44px; }
-.pantry-list .inv-main{ flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:2px var(--s2); }
-.pantry-list .inv-main .inv-name{ flex:0 1 auto; min-width:0; }
+.pantry-list .inv-main{ flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:2px 4px; }
+.pantry-list .inv-main .inv-name{ flex:0 1 auto; min-width:0; margin-right: var(--s2);}
 .pantry-list .inv-main .inv-badges{ display:inline-flex; align-items:center; gap:var(--s2); padding:0; height:auto; min-height:0; flex:none; }
 .pantry-list .inv-main .inv-badges .exp-badge, .pantry-list .inv-main .inv-badges .frozen-on{ margin:0; }
 .pantry-list .inv-main > .luogo-picker-opt{ display:inline-flex; align-items:center; justify-content:center; width:auto; min-width:22px; height:22px; margin:0; padding:0 var(--s2); border:0; border-radius:var(--r-full); background:var(--surface-2); color:#3d3d3d; flex:none; }
