@@ -7052,11 +7052,11 @@ function renderSpesa(){
     classified.forEach(it=>{
       const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.per ? '\u0001' + it.per : '');
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? (it.contextShort ? [it.contextShort] : []) : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
       } else {
         merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
-        if(it.isRecipe && it.contextShort && !merged[mergeKey].contexts.includes(it.contextShort)) merged[mergeKey].contexts.push(it.contextShort);
+        // Giorno e pasto non si scrivono sotto l'ingrediente: chi li vuole usa "Ordina per Pasto".
       }
     });
     const mergedList = Object.values(merged).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
