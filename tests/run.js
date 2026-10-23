@@ -3023,6 +3023,23 @@ test('Dispensa: tocco sulla quantità apre il fumetto con numero, unità e "Fatt
   eq(page.errors, [], 'errori JS');
 });
 
+test('Spesa: gli ingredienti di un pasto passato restano in lista ma senza "giorno · pasto"', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(0);
+    const dates = weekDatesFor(0);
+    const pos = dates.findIndex(d => new Date(d).setHours(0,0,0,0) < new Date().setHours(0,0,0,0));
+    if(pos < 0) return { skip: true };
+    const i = WEEK_DISPLAY_ORDER[pos];
+    writeMealPrincipale(weekOverridesRef(0), i, 'cena', 'Carbonara');
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    const row = [...document.querySelectorAll('.shop-item-row')].find(r => /guanciale/i.test(r.textContent));
+    return { found: !!row, detail: row ? !!row.querySelector('.item-detail') : null };
+  });
+  if(r.skip) return;
+  eq([r.found, r.detail], [true, false]);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

@@ -3641,6 +3641,7 @@ function allPlannedShoppingMeals(){
           key: mealKey(weekIdx, i, meal),
           giorno: DATA.week1[i].giorno,
           dateLabel: formatShortDate(dates[pos]),
+          isPast: new Date(dates[pos]).setHours(0,0,0,0) < new Date().setHours(0,0,0,0),
           principale: mealData.principale,
           contorni: mealData.contorni,
           dishLabel: mealData.principale + (mealData.contorni.length ? ' + ' + mealData.contorni.join(', ') : '')
@@ -6837,7 +6838,7 @@ function isMealDoneAt(weekIdx, i, meal){
 }
 function buildShopFlat(){
   const flat = [];
-  allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,principale,contorni,dishLabel})=>{
+  allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,isPast,principale,contorni,dishLabel})=>{
     if(isMealDoneAt(weekIdx, i, meal)) return;
     // Le porzioni sono per pasto (non per singola ricetta): il rapporto si
     // calcola una volta sola dal principale e si applica uniformemente anche
@@ -6851,7 +6852,8 @@ function buildShopFlat(){
     const context = `${giorno} ${dateLabel} · ${MEAL_LABEL[meal]} · ${dishLabel}`;
     // Nota delle righe in Per reparto: solo giorno e pasto, il nome della
     // ricetta la rendeva troppo lunga (resta nell'intestazione di Per giorno).
-    const contextShort = `${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${MEAL_LABEL[meal]}`;
+    // Pasto già passato: l'ingrediente resta in lista ma senza dire di quale pasto era.
+    const contextShort = isPast ? '' : `${giorno.slice(0,3)} ${dateLabel.split(' ')[0]} · ${MEAL_LABEL[meal]}`;
     const dishes = [{ role:'p', name: principale }].concat(contorni.map((c,ci)=>({ role:`c${ci}`, name:c })));
     dishes.forEach(({role, name})=>{
       // Dal freezer: niente da comprare. Doppia dose: il doppio.
@@ -7049,11 +7051,11 @@ function renderSpesa(){
     classified.forEach(it=>{
       const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.per ? '\u0001' + it.per : '');
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [it.contextShort] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? (it.contextShort ? [it.contextShort] : []) : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
       } else {
         merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
-        if(it.isRecipe && !merged[mergeKey].contexts.includes(it.contextShort)) merged[mergeKey].contexts.push(it.contextShort);
+        if(it.isRecipe && it.contextShort && !merged[mergeKey].contexts.includes(it.contextShort)) merged[mergeKey].contexts.push(it.contextShort);
       }
     });
     const mergedList = Object.values(merged).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
