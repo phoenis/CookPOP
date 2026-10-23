@@ -2618,7 +2618,7 @@ test('Ricetta fatta!: un avanzo possibile per ogni piatto; spuntati vanno in Dis
   eq(r.rows.map(x => x[1]), r.dishes.map(() => false), 'di norma non spuntati');
   eq(r.kept, [r.second], 'solo quello spuntato va in Dispensa');
   const link = await page.evaluate(() => {
-    state.extraWeeks = []; generateWeek(0); state.pantryItems = {}; state.mealsDone = {}; state.dayLinks = {};
+    state.extraWeeks = []; generateWeek(0); generateWeek(1); state.pantryItems = {}; state.mealsDone = {}; state.dayLinks = {};
     const metas = allPlannedShoppingMeals();
     const src = metas[0], dst = metas[1];
     state.dayLinks[dst.key] = src.key; // il secondo mangia l'avanzo del primo
