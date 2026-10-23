@@ -1,16 +1,84 @@
+  /* ===== Design system CookPOP v1 (cookpop-ds.css) — token ===========================
+     Fonte di verità per colori, testi, spazi, altezze, angoli e ombre. Le variabili
+     storiche dell'app (--gold, --ink, --text-small…) più sotto puntano a questi token:
+     si cambia un valore e cambia ovunque. Testi in rem (16px = 1rem) così seguono la
+     grandezza del carattere scelta nel telefono. */
+  :root{
+    --font:"Open Sans",system-ui,sans-serif;
+    /* colori */
+    --accent:#D6391C;        /* bottone pieno, attivo (4,7:1 col bianco) */
+    --accent-text:#B5301A;   /* testo rosso, scheda attiva, PRIMO/SECONDO */
+    --accent-soft:#FBE3DE;   /* fondo di ciò che è scelto */
+    --text:#1B1B1B;
+    --muted:#5F5F5F;         /* testo secondario, etichette, icone */
+    --line:#ECECEC;          /* separatori, bordo card */
+    --line-strong:#D9D9D9;   /* bordo chip, campi, stepper */
+    --bg:#FFFFFF;
+    --surface-2:#F2F2F2;     /* fondo segmentato, cerchi icona */
+    --cream:#F9F2E2;         /* note, "Ti serve", avvisi */
+    --ok:#2E7D32;            /* pallino "in casa", spunta */
+    --no:#F0533F;            /* pallino "da comprare" */
+    --warn:#FBC02D;  --warn-text:#3A2A00;
+    --freeze:#DCEBFA; --freeze-text:#0D4A8A;
+    --danger:#8A2412;
+
+    /* testi: 6 grandezze (+ Cucina) */
+    --fs-title:1.5rem;     --lh-title:1.875rem;   /* 24/30 nome ricetta, titolo foglio */
+    --fs-bar:1.25rem;      --lh-bar:1.625rem;     /* 20/26 barra in alto */
+    --fs-section:1.125rem; --lh-section:1.5rem;   /* 18/24 reparto, giorno, sezione, nome piatto nel Menù */
+    --fs-body:1rem;        --lh-body:1.375rem;    /* 16/22 righe, testi, bottoni */
+    --fs-small:0.875rem;   --lh-small:1.25rem;    /* 14/20 sotto-righe, aiuti, chip */
+    --fs-label:0.75rem;    --lh-label:1rem;       /* 12/16 etichette MAIUSCOLE, badge */
+    --fs-cook:1.5rem;      --lh-cook:2.125rem;    /* 24/34 solo passaggio in modalità Cucina */
+
+    /* spazi */
+    --s1:0.25rem; --s2:0.5rem; --s3:0.75rem; --s4:1rem; --s5:1.5rem; --s6:2rem;
+    --gutter:1rem;
+
+    /* altezze */
+    --h-l:3.25rem;   /* 52 barra in basso, campi */
+    --h-m:2.75rem;   /* 44 bottoni nel contenuto, icone, schede */
+    --h-s:2.25rem;   /* 36 chip, bottoni piccoli */
+    --row:3.5rem;    /* 56 riga minima */
+    --row-ro:3rem;   /* 48 riga di sola lettura */
+
+    /* angoli */
+    --r-m:0.75rem; --r-l:1rem; --r-xl:1.5rem; --r-full:999px;
+
+    /* ombre: solo due */
+    --shadow-1:0 1px 2px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.07); /* card pasti nel Menù */
+    --shadow-2:0 4px 24px rgba(0,0,0,.16);                           /* fogli, +, selettore flottante */
+  }
+  /* tema scuro: stessi nomi, altri valori (--ok/--no/--warn non sono nel file: li ho scelti io) */
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --accent:#FF6A4D; --accent-text:#FF8A70; --accent-soft:#3A1E18;
+      --text:#ECECEC; --muted:#A8A8A8; --line:#2A2A2A; --line-strong:#3A3A3A;
+      --bg:#121212; --surface-2:#1E1E1E; --cream:#2B2519;
+      --freeze:#14304D; --freeze-text:#B9D8F7; --danger:#FF8A70;
+      --ok:#66BB6A; --no:#F0645A;
+      --shadow-1:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.35); --shadow-2:0 4px 24px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --accent:#FF6A4D; --accent-text:#FF8A70; --accent-soft:#3A1E18;
+    --text:#ECECEC; --muted:#A8A8A8; --line:#2A2A2A; --line-strong:#3A3A3A;
+    --bg:#121212; --surface-2:#1E1E1E; --cream:#2B2519;
+    --freeze:#14304D; --freeze-text:#B9D8F7; --danger:#FF8A70;
+    --ok:#66BB6A; --no:#F0645A;
+    --shadow-1:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.35); --shadow-2:0 4px 24px rgba(0,0,0,.6);
+  }
   :root{
     /* palette caldo/agrume: il colore comunica stato di disponibilità, non decorazione —
        verde = ce l'hai/fatto, giallo+arancio = attenzione, rosso = manca/azione richiesta,
        bordeaux = testo rosso a dimensione di corpo (il rosso pieno non ha contrasto sufficiente sotto i 18px) */
-    --bg:#ffffff; --bg-strip:#f2f2f2; --surface:#ffffff; --surface-2:#f5f5f5;
-    --green-deep:#8cb42a; --green-mid:#5a7517;
-    --gold:#e03c1e; --gold-dark:#c53116; --tomato:#87282b; --steel:#fb8323; 
+    --bg-strip:#f2f2f2; --surface:#ffffff;
+    --green-deep:var(--ok); --green-mid:var(--ok);
+    --gold:var(--accent); --gold-dark:var(--accent-text); --tomato:var(--danger); --steel:#fb8323; 
     --gold-soft: color-mix(in srgb, var(--gold) 17%, transparent 100%);
     --green-soft: color-mix(in srgb, var(--green-deep) 17%, transparent 100%);
-    --amber:#fbc02d; --on-amber:#201e1d; /* testo su sfondo --amber: scuro anche in dark mode, il giallo resta chiaro */ --plum:#7a5a8a; --ink:#1b1b1b; --ink-light:#5f5f5f;
+    --amber:var(--warn); --on-amber:#201e1d; /* testo su sfondo --amber: scuro anche in dark mode, il giallo resta chiaro */ --plum:#7a5a8a; --ink:var(--text); --ink-light:var(--muted);
     --line-light:#e4e4e4; 
-    --line: rgba(0,0,0,0.11);
-    --line-strong: rgba(0,0,0,0.32);
     --border: 1px;
     --border-strong: 2px;
     --delete: var(--tomato); /* rosso per testo/icone "elimina": in scuro diventa più chiaro, il bordeaux non si leggerebbe */
@@ -30,12 +98,12 @@
     --line-height-small: 1.1;
     --line-height: 1.6;
 
-    --text-body: 1rem;
+    --text-body: var(--fs-body);
     --text-xxsmall: 0.55rem;
-    --text-xsmall: 0.75rem;
-    --text-small: 0.85rem;
-    --text-medium:1.125rem;
-    --text-large:1.3rem;
+    --text-xsmall: var(--fs-label);
+    --text-small: var(--fs-small);
+    --text-medium: var(--fs-section);
+    --text-large: var(--fs-bar);
 
     --user-color-mara:#ff7a66; --user-color-ste:#ff6f9c; /* default = --gold/--tomato, sovrascritti inline per-utente da applyUserColors() */
 
@@ -49,26 +117,26 @@
        usati per costruire varianti con alpha (rgba(var(--x-rgb), a)) senza duplicare i valori */
     --white:#fff;
     --shadow-rgb: 0,0,0;
-    --gold-rgb: 224,60,30;
+    --gold-rgb: 214,57,28;
     --honey: #d4a73a; --honey-rgb: 212,167,58; /* accento miele: note, tag stagione */
     --freezer-tag-rgb: 59,111,143; /* solo per lo sfondo del tag "freezer" nelle ricette */
     --danger-soft-rgb: 179,58,58; /* hover rosso tenue sui pulsanti di rimozione riga */
     --overlay: rgba(var(--shadow-rgb), 0.5); /* scrim dietro le modali */
 
     /* raggio degli angoli usato dalle modali (filters-modal, settings sheet, recipe-edit-modal) */
-    --radius-modal: 1rem;
+    --radius-modal: var(--r-l);
     --radius-full: 100%;
-    --radius-pill: 62.4375rem;
-    --form-border-radius: 0.75rem;
+    --radius-pill: var(--r-full);
+    --form-border-radius: var(--r-m);
 
     --form-background: var(--surface);
 
-    --space-xxsmall: 0.25rem;
-    --space-xsmall: 0.5rem;
-    --space-small: 0.75rem;
-    --space-medium: 1rem;
-    --space-large: 1.5rem;
-    --space-xlarge: 2rem;
+    --space-xxsmall: var(--s1);
+    --space-xsmall: var(--s2);
+    --space-small: var(--s3);
+    --space-medium: var(--s4);
+    --space-large: var(--s5);
+    --space-xlarge: var(--s6);
     
     --padding-xxsmall: 0.25rem;
     --padding-xsmall: 0.5rem;
@@ -89,15 +157,15 @@
     --blur-modal: 3px;
 
     /* box-shadow: un valore per ogni effetto, offset/blur in rem + colore in rgba */
-    --shadow-card: 0 0.125rem 0.75rem rgba(var(--shadow-rgb), 0.1); /* carte bianche su sfondo bianco: un'ombra leggera e un filo di bordo */
-    --shadow-fab: 0 0.125rem 0.75rem rgba(var(--shadow-rgb), 0.07); /* morbida e leggera, come la reference */
+    --shadow-card: var(--shadow-1); /* carte bianche su sfondo bianco: un'ombra leggera e un filo di bordo */
+    --shadow-fab: var(--shadow-2); /* morbida e leggera, come la reference */
     --shadow-today: inset 0.1875rem 0 0 var(--gold);
     --shadow-drag-over: 0 0 0 0.125rem var(--gold) inset;
     --shadow-drag-ghost: 0 0.625rem 1.875rem rgba(var(--shadow-rgb), 0.35);
-    --shadow-modal: 0.4375rem 0.4375rem 0.875rem rgba(var(--shadow-rgb), 0.35);
+    --shadow-modal: var(--shadow-2);
     --shadow-generate-btn: 0 0.375rem 1rem rgba(var(--gold-rgb), 0.3);
     --shadow-login: 0 1.25rem 3.125rem rgba(var(--shadow-rgb), 0.2);
-    --shadow-dropdown: 0 0.375rem 1.125rem rgba(var(--shadow-rgb), 0.22);
+    --shadow-dropdown: var(--shadow-2);
   }
   /* Scuro: automatico se il sistema lo preferisce (a meno che l'utente non
      abbia forzato "Chiaro" nelle Impostazioni), oppure sempre se ha forzato
@@ -108,20 +176,18 @@
      scuro lo stesso contrasto che hanno in chiaro. */
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#18191b; --bg-strip:#111213; --surface:#242423; --surface-2:rgba(255,255,255,0.05);
+      --bg-strip:#0d0d0d; --surface:#1b1b1b;
       --green-deep:#a3cc3f;
-      --ink:#ece7e0; --ink-light:#b5afa4; --line-light:#9a9488; --line: rgba(255,255,255,0.12);
-      --line-strong: rgba(255,255,255,0.35);
-      --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06); --accordion-border:rgba(255,255,255,0.35);
+      --line-light:#9a9488;
+      --surface-past:#181818; --control-face:rgba(255,255,255,0.06); --accordion-border:rgba(255,255,255,0.35);
       --delete:#f0645a; --green-mid:#a3cc3f;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#18191b; --bg-strip:#111213; --surface:#242423; --surface-2:rgba(255,255,255,0.05);
+    --bg-strip:#0d0d0d; --surface:#1b1b1b;
     --green-deep:#a3cc3f;
-    --ink:#ece7e0; --ink-light:#b5afa4; --line-light:#9a9488; --line: rgba(255,255,255,0.12);
-    --line-strong: rgba(255,255,255,0.35);
-    --surface-past:#1f2021; --control-face:rgba(255,255,255,0.06); --accordion-border:rgba(255,255,255,0.35);
+    --line-light:#9a9488;
+    --surface-past:#181818; --control-face:rgba(255,255,255,0.06); --accordion-border:rgba(255,255,255,0.35);
     --delete:#f0645a; --green-mid:#a3cc3f;
   }
   *{box-sizing:border-box;}
@@ -1646,7 +1712,7 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 /* Ricette: chip rapidi (Con quello che ho, Preferite, ≤30 min) */
 .prep-quick{ display:flex; flex-wrap:wrap; gap:0.5rem; padding:0 var(--padding-page); margin:0.5rem 0 0.75rem; }
 .prep-quick .btn.is-chip{ height:auto; padding:0.5rem 0.875rem; font-size:var(--text-small); border:1px solid var(--line); background:var(--surface); color:var(--ink); font-weight:var(--weight-bold); border-radius:var(--radius-pill); }
-.prep-quick .btn.is-chip.active{ background:color-mix(in srgb, var(--accent, #e03c1f) 14%, var(--surface)); border-color:var(--accent, #e03c1f); color:var(--accent, #e03c1f); }
+.prep-quick .btn.is-chip.active{ background:color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color:var(--accent); color:var(--accent); }
 
 /* Spesa a una mano: avanzamento, "Chiudi tutti" in testa, barra fissa in basso */
 .shop-progress{ padding:var(--space-small) var(--padding-page) 0; }
@@ -1654,11 +1720,11 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .shop-progress-row b{ color:var(--ink); }
 .shop-sync{ font-size:var(--text-xsmall); }
 .shop-progress-bar{ height:0.25rem; margin-top:0.375rem; border-radius:var(--radius-pill); background:var(--line); overflow:hidden; }
-.shop-progress-bar span{ display:block; height:100%; background:var(--accent, #e03c1f); border-radius:inherit; transition:width .2s; }
+.shop-progress-bar span{ display:block; height:100%; background:var(--accent); border-radius:inherit; transition:width .2s; }
 .shop-head .shop-toggle-all{ padding:0.25rem 0; color:var(--ink); }
 .shop-list{ padding-bottom:calc(8rem + env(safe-area-inset-bottom)); }
 .shop-item input[type=checkbox]{ width:1.375rem; height:1.375rem; border-radius:50%; border-width:2px; margin-top:0.0625rem; }
-.shop-item.checked input[type=checkbox]{ background:var(--accent, #e03c1f); border-color:var(--accent, #e03c1f); }
+.shop-item.checked input[type=checkbox]{ background:var(--accent); border-color:var(--accent); }
 .shop-item.checked input[type=checkbox]::after{ width:0.3125rem; height:0.5625rem; }
 
 /* Metti in dispensa: foglio dal basso */
@@ -1676,8 +1742,8 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .move-row-note{ font-size:var(--text-small); color:var(--ink-light); }
 .move-chips{ display:flex; flex-wrap:wrap; gap:0.5rem; }
 .move-chip{ height:auto; padding:0.375rem 0.75rem; font-size:var(--text-small); font-weight:var(--weight-bold); border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--radius-pill); }
-.move-chip.is-dashed{ border-style:dashed; color:var(--accent, #e03c1f); }
-.move-chip.active{ background:color-mix(in srgb, var(--accent, #e03c1f) 14%, var(--surface)); border-color:var(--accent, #e03c1f); color:var(--accent, #e03c1f); }
+.move-chip.is-dashed{ border-style:dashed; color:var(--accent); }
+.move-chip.active{ background:color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color:var(--accent); color:var(--accent); }
 .move-chip input[type=date]{ position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
 .move-chip{ position:relative; }
 .move-label{ margin:0.625rem 0 0.25rem; font-size:var(--text-xsmall); font-weight:var(--weight-bold); letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-light); }
@@ -1695,14 +1761,14 @@ button.dish-ic.is-locked, .dish-ic.is-locked{ color:var(--delete); }
 .add-seg button{ border:0; background:transparent; color:var(--ink); font:inherit; font-size:var(--text-small); font-weight:var(--weight-bold); padding:0.375rem 0.875rem; border-radius:var(--radius-pill); }
 .add-seg button.active{ background:var(--surface); box-shadow:0 1px 3px rgba(0,0,0,0.15); }
 .add-body{ overflow-y:auto; flex:1; min-height:0; padding-bottom:0.5rem; }
-.add-field{ position:relative; display:flex; align-items:center; border:2px solid var(--accent, #e03c1f); border-radius:0.75rem; background:var(--surface); }
+.add-field{ position:relative; display:flex; align-items:center; border:2px solid var(--accent); border-radius:0.75rem; background:var(--surface); }
 .add-field input{ flex:1; min-width:0; border:0; background:transparent; font-size:1.125rem; padding:0.75rem 0.875rem; color:var(--ink); outline:none; }
 .add-scan{ margin:0.25rem; width:2.5rem; height:2.5rem; border:0; border-radius:0.5rem; background:var(--surface-2, rgba(0,0,0,0.07)); color:var(--ink); display:inline-flex; align-items:center; justify-content:center; }
 .add-scan .ui-ico{ width:1.375rem; height:1.375rem; }
 .add-suggest{ display:flex; flex-direction:column; margin-top:0.25rem; }
 .add-suggest-row{ display:flex; justify-content:space-between; align-items:center; gap:var(--space-small); text-align:left; border:0; border-bottom:1px solid var(--line); background:transparent; color:var(--ink); font:inherit; padding:0.75rem 0.25rem; }
 .add-suggest-meta{ font-size:var(--text-xsmall); color:var(--ink-light); text-align:right; }
-.add-suggest-new{ color:var(--accent, #e03c1f); font-weight:var(--weight-bold); justify-content:flex-start; }
+.add-suggest-new{ color:var(--accent); font-weight:var(--weight-bold); justify-content:flex-start; }
 .add-qty-row{ display:flex; align-items:center; gap:var(--space-small); margin-top:0.875rem; }
 .add-qty-row .add-field-label{ flex:1; font-weight:var(--weight-bold); margin:0; }
 .add-unit{ width:auto; field-sizing:content; border:1px solid var(--line); border-radius:var(--radius-pill); padding:0.375rem 0.75rem; background:var(--surface); color:var(--ink); font:inherit; font-size:var(--text-small); font-weight:var(--weight-bold); }
@@ -1757,14 +1823,14 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .move-chip{ display:flex; align-items:center; gap:0.375rem; width:100%; height:2.5rem; padding:0 0.625rem; border:1px solid var(--line); border-radius:0.75rem; background:var(--surface); color:var(--ink); font-family:inherit; font-size:var(--text-small); font-weight:var(--weight-bold); cursor:pointer; white-space:nowrap; }
 .move-chip svg{ width:1rem !important; height:1rem !important; flex:none; }
 .move-chip.is-empty{ border-style:dashed; color:var(--ink-light); font-weight:var(--weight-normal); }
-.move-chip.is-edited{ background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--surface)); border-color:var(--accent, #e03c1f); color:var(--accent, #e03c1f); }
+.move-chip.is-edited{ background:color-mix(in srgb, var(--accent) 12%, var(--surface)); border-color:var(--accent); color:var(--accent); }
 .move-pop{ position:absolute; z-index:5; right:0; top:calc(100% + 0.25rem); min-width:13.5rem; padding:0.375rem; border-radius:0.875rem; background:var(--surface); border:1px solid var(--line); box-shadow:0 8px 24px rgba(0,0,0,0.25); }
 .move-cell:first-of-type + .move-cell .move-pop{ }
 .move-pop-opt{ position:relative; display:flex; align-items:center; justify-content:space-between; gap:0.75rem; width:100%; padding:0.625rem 0.75rem; border:0; border-radius:0.625rem; background:none; color:var(--ink); font-family:inherit; font-size:var(--text-body); font-weight:var(--weight-medium); text-align:left; cursor:pointer; }
 .move-pop-opt small{ font-size:var(--text-xsmall); font-weight:var(--weight-normal); color:var(--ink-light); }
-.move-pop-opt.active{ background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--surface)); }
-.move-pop-opt.active small{ color:var(--accent, #e03c1f); font-weight:var(--weight-bold); }
-.move-pop-opt.is-other{ color:var(--accent, #e03c1f); font-weight:var(--weight-bold); }
+.move-pop-opt.active{ background:color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.move-pop-opt.active small{ color:var(--accent); font-weight:var(--weight-bold); }
+.move-pop-opt.is-other{ color:var(--accent); font-weight:var(--weight-bold); }
 .move-pop-opt svg{ width:1rem; height:1rem; }
 .move-pop-opt input[type=date]{ position:absolute; inset:0; opacity:0; width:100%; height:100%; }
 .move-list.has-pop{ padding-bottom:12rem; }
@@ -1812,7 +1878,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .rd-grad-wrap .grad-pop{ right:0; left:auto; }
 .rd-tabs{ position:sticky; top:var(--rd-top, 3.75rem); z-index:3; display:flex; background:var(--bg); border-bottom:2px solid var(--line); margin:0 calc(-1 * var(--padding-page)); padding:0 var(--padding-page); }
 .rd-tab{ flex:1; padding:0.875rem var(--space-xsmall); border:0; border-bottom:3px solid transparent; margin-bottom:-2px; background:none; font-family:inherit; font-size:var(--text-body); font-weight:var(--weight-bold); color:var(--ink-light); cursor:pointer; }
-.rd-tab.active{ color:var(--accent, #e03c1f); border-bottom-color:var(--accent, #e03c1f); }
+.rd-tab.active{ color:var(--accent); border-bottom-color:var(--accent); }
 .rd-sec{ padding-top:var(--space-medium); }
 .rd-sec-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); margin-bottom:var(--space-small); }
 .rd-sec-head h2{ margin:0; font-size:1.5rem; font-weight:var(--weight-bold); }
@@ -1823,7 +1889,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .rd-legend span{ display:inline-flex; align-items:center; gap:0.375rem; }
 .rd .ing-status, .rd-legend .ing-status{ display:inline-block; flex:none; width:0.75rem; height:0.75rem; border:0; opacity:1; }
 .rd .ing-status.in-casa, .rd-legend .ing-status.in-casa{ background:var(--green-deep); }
-.rd .ing-status.manca, .rd-legend .ing-status.manca{ background:var(--accent, #e03c1f); opacity:0.85; }
+.rd .ing-status.manca, .rd-legend .ing-status.manca{ background:var(--accent); opacity:0.85; }
 .rd .ing-list li{ gap:0.75rem; }
 .rd .ing-list li > .ing-list-name{ flex:1; min-width:0; }
 .rd .ing-qual{ color:var(--ink-light); font-weight:var(--weight-normal); font-size:var(--text-small); }
@@ -1845,7 +1911,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .menu-pick-day{ font-weight:var(--weight-bold); }
 .menu-pick-chip{ display:flex; flex-direction:column; align-items:flex-start; gap:0.125rem; min-width:0; padding:0.5rem 0.75rem; border:1px solid var(--line); border-radius:0.75rem; background:var(--surface); color:var(--ink); font-family:inherit; text-align:left; cursor:pointer; }
 .menu-pick-chip small{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-light); font-size:var(--text-xsmall); }
-.menu-pick-chip.active{ border-color:var(--accent, #e03c1f); background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--surface)); }
+.menu-pick-chip.active{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 
 .rd .button-wrapper{ margin:var(--space-small) 0 0; }
 .rd .button-wrapper .btn.is-small{ width:100%; height:3.25rem; justify-content:center; gap:0.5rem; border:1.5px solid var(--ink); border-radius:var(--radius-pill); background:var(--bg); color:var(--ink); font-size:var(--text-body); font-weight:var(--weight-bold); }
@@ -1855,7 +1921,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .cook-head{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:var(--space-small); }
 .cook-end{ order:0; display:inline-flex; align-items:center; gap:0.5rem; justify-self:start; font-size:var(--text-medium, 1.125rem); font-weight:var(--weight-bold); color:var(--ink); padding:var(--space-xsmall) 0; }
 .cook-title{ order:0; text-align:center; font-size:var(--text-medium, 1.125rem); font-weight:var(--weight-bold); }
-.cook-count{ justify-self:end; font-size:var(--text-medium, 1.125rem); font-weight:var(--weight-bold); color:var(--accent, #e03c1f); }
+.cook-count{ justify-self:end; font-size:var(--text-medium, 1.125rem); font-weight:var(--weight-bold); color:var(--accent); }
 .cook-cards{ display:flex; gap:0.75rem; padding:0.25rem var(--padding-page) 0.75rem; }
 .cook-card{ flex:1; min-width:0; display:flex; align-items:center; gap:0.625rem; padding:0.75rem; border:1.5px solid var(--line); border-radius:1.125rem; background:var(--bg); color:var(--ink); font-family:inherit; text-align:left; cursor:pointer; }
 .cook-card-ic{ flex:none; width:2.5rem; height:2.5rem; border-radius:50%; background:var(--surface-2); display:grid; place-items:center; }
@@ -1867,14 +1933,14 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .cook-cards.n3 .cook-card-text{ align-items:center; }
 .cook-cards.n4{ overflow-x:auto; scrollbar-width:none; }
 .cook-cards.n4 .cook-card{ flex:none; min-width:8.5rem; }
-.cook-card.active{ background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--bg)); border-color:var(--accent, #e03c1f); color:var(--accent-dark, #a8260f); }
+.cook-card.active{ background:color-mix(in srgb, var(--accent) 12%, var(--bg)); border-color:var(--accent); color:var(--accent-text); }
 .cook-card.active .cook-card-ic{ background:var(--bg); }
-.cook-card.active small{ color:var(--accent-dark, #a8260f); font-weight:var(--weight-bold); }
+.cook-card.active small{ color:var(--accent-text); font-weight:var(--weight-bold); }
 .cook-card.is-done .cook-card-ic{ background:color-mix(in srgb, var(--green-deep) 16%, var(--bg)); color:var(--green-deep); }
 .cook-card.is-done small{ color:var(--green-deep); font-weight:var(--weight-bold); }
 .cook-segs{ display:flex; gap:0.375rem; padding:0 var(--padding-page) var(--space-small); }
 .cook-segs span{ flex:1; height:0.3125rem; border-radius:var(--radius-pill); background:var(--line); }
-.cook-segs span.on{ background:var(--accent, #e03c1f); }
+.cook-segs span.on{ background:var(--accent); }
 .cook-body{ padding:var(--space-small) var(--padding-page) var(--space-medium); gap:var(--space-medium); }
 .cook-step{ flex:none; padding:0; display:block; }
 .cook-step-count{ margin-bottom:var(--space-xsmall); font-size:var(--text-body); font-weight:var(--weight-bold); color:var(--ink-light); }
@@ -1887,7 +1953,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .cook-need-list b{ flex:none; }
 .cook-need-list li b:empty{ display:none; }
 .cook-tip{ display:flex; gap:0.75rem; margin:0; padding:0 0.25rem; color:var(--ink-light); font-size:var(--text-medium, 1.125rem); line-height:1.4; }
-.cook-tip svg{ flex:none; margin-top:0.125rem; color:var(--accent, #e03c1f); }
+.cook-tip svg{ flex:none; margin-top:0.125rem; color:var(--accent); }
 .cook-tip b{ color:var(--ink); }
 .cook-footer{ padding:var(--space-small) var(--padding-page) calc(var(--space-small) + env(safe-area-inset-bottom)); }
 .cook-awake{ display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:var(--space-small); color:var(--ink-light); font-size:var(--text-body); text-align:center; }
@@ -1895,7 +1961,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .cook-last-ic{ flex:none; width:3rem; height:3rem; border-radius:50%; background:color-mix(in srgb, var(--green-deep) 16%, var(--bg)); color:var(--green-deep); display:grid; place-items:center; font-size:1.5rem; }
 .cook-nav{ gap:0.75rem; }
 .cook-nav-back{ flex:0 0 auto; width:auto; height:3.25rem; padding:0 2rem; border:1.5px solid var(--ink); border-radius:var(--radius-pill); background:var(--bg); color:var(--ink); font-family:inherit; font-size:var(--text-medium, 1.125rem); font-weight:var(--weight-bold); }
-.cook-nav-next{ height:3.25rem; font-size:var(--text-medium, 1.125rem); font-weight:var(--weight-bold); background:var(--accent, #e03c1f); }
+.cook-nav-next{ height:3.25rem; font-size:var(--text-medium, 1.125rem); font-weight:var(--weight-bold); background:var(--accent); }
 
 /* Foglio "Cena fatta": sezioni, − e + grandi, Sì/No, voto un piatto alla volta */
 .done-sheet .done-sec{ padding:var(--space-small) 0; }
@@ -1908,7 +1974,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .done-stepper{ display:inline-flex; align-items:center; gap:0.5rem; flex:none; }
 .done-qty{ min-width:4rem; text-align:center; font-size:1.125rem; font-weight:var(--weight-bold); }
 .done-qty .qty-input{ width:4rem; text-align:center; }
-.done-chip{ flex:none; padding:0.375rem 0.75rem; border-radius:var(--radius-pill); background:rgba(var(--honey-rgb),0.25); color:var(--gold-dark, #8a5a00); font-weight:var(--weight-bold); font-size:var(--text-body); }
+.done-chip{ flex:none; padding:0.375rem 0.75rem; border-radius:var(--radius-pill); background:rgba(var(--honey-rgb),0.25); color:var(--gold-dark); font-weight:var(--weight-bold); font-size:var(--text-body); }
 .done-rest-toggle{ display:flex; align-items:center; justify-content:space-between; width:100%; padding:0.75rem 0; border:0; background:none; color:var(--ink-light); font-family:inherit; font-size:1.0625rem; text-align:left; cursor:pointer; }
 .done-rest-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); padding:0.5rem 0; color:var(--ink-light); }
 .done-rest-row small{ font-style:italic; }
@@ -1922,7 +1988,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .done-where{ width:auto; flex:none; }
 .done-grads{ display:flex; flex-wrap:wrap; gap:0.625rem; }
 .done-grad-chip{ height:3rem; padding:0 1.125rem; border:1.5px solid var(--line-strong, var(--line)); border-radius:var(--radius-pill); background:var(--bg); color:var(--ink); font-family:inherit; font-size:1.0625rem; font-weight:var(--weight-bold); cursor:pointer; }
-.done-grad-chip.active{ border-color:var(--accent, #e03c1f); background:color-mix(in srgb, var(--accent, #e03c1f) 12%, var(--bg)); color:var(--accent, #e03c1f); }
+.done-grad-chip.active{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, var(--bg)); color:var(--accent); }
 .done-next{ border:0; background:none; padding:0; color:var(--ink-light); font:inherit; cursor:pointer; }
 .done-row-main .done-chip{ align-self:flex-start; margin-top:0.375rem; }
 
@@ -1944,7 +2010,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Cucina: "Cucinando la cena" + Termina, schede piatti come nel dettaglio, testi regolari, frecce + CTA */
 .cook-head{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-small); }
 .cook-title{ order:0; flex:1; min-width:0; text-align:left; font-size:var(--text-medium); font-weight:var(--weight-bold); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cook-end{ order:0; justify-self:auto; flex:none; color:var(--accent, #e03c1f); font-size:var(--text-body); font-weight:var(--weight-bold); padding:var(--space-xsmall) 0; }
+.cook-end{ order:0; justify-self:auto; flex:none; color:var(--accent); font-size:var(--text-body); font-weight:var(--weight-bold); padding:var(--space-xsmall) 0; }
 .cook-tabs{ margin:0 var(--padding-page) var(--space-small); }
 .cook-tab-check{ margin-left:0.125rem; color:var(--green-deep); font-weight:var(--weight-bold); }
 .dish-tab.is-done .dish-tab-label{ color:var(--ink-light); }
@@ -1957,9 +2023,206 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .cook-nav{ display:flex; align-items:center; gap:var(--space-small); }
 .cook-arrow{ flex:none; width:var(--btn-footer-h); height:var(--btn-footer-h); display:grid; place-items:center; border:1.5px solid var(--ink); border-radius:50%; background:var(--bg); color:var(--ink); cursor:pointer; padding:0; }
 .cook-arrow:disabled{ opacity:0.3; cursor:default; }
-.cook-nav-main{ flex:1; height:var(--btn-footer-h); border:0; border-radius:var(--radius-pill); background:var(--accent, #e03c1f); color:#fff; font-family:inherit; font-size:var(--text-body); font-weight:var(--weight-bold); cursor:pointer; }
+.cook-nav-main{ flex:1; height:var(--btn-footer-h); border:0; border-radius:var(--radius-pill); background:var(--accent); color:#fff; font-family:inherit; font-size:var(--text-body); font-weight:var(--weight-bold); cursor:pointer; }
 .cook-nav-main.is-quiet{ background:var(--bg); color:var(--ink); border:1.5px solid var(--line-strong, var(--line)); }
 
 /* Ti serve: ingredienti grandi come nella lista fuori */
 .cook-need-list li{ font-size:var(--text-body); line-height:1.4; padding:0.625rem 0; }
 .cook-need-list li b{ font-weight:var(--weight-normal); }
+
+/* =============================================================================
+   Design system CookPOP · componenti (da cookpop-ds.css, sezioni 2–12)
+   Classi nuove, a scelta: una schermata alla volta il markup le adotta al posto
+   delle vecchie. Per i bottoni valgono solo se c'è un modificatore .btn--* (le
+   vecchie .btn.is-* restano com'erano finché la loro schermata non passa al
+   sistema); le schede si chiamano .tabs-ds perché .tabs è già la barra in basso.
+   ============================================================================= */
+/* ---------- 2. Base ---------- */
+/* (base globale del file: già coperta dall'app) */
+
+.t-title  {font-size:var(--fs-title);line-height:var(--lh-title);font-weight:700;margin:0}
+.t-section{font-size:var(--fs-section);line-height:var(--lh-section);font-weight:700;margin:0}
+.t-small  {font-size:var(--fs-small);line-height:var(--lh-small);color:var(--muted)}
+.label{font-size:var(--fs-label);line-height:var(--lh-label);font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0}
+.label--course{color:var(--accent-text)} /* PRIMO, SECONDO… solo nel Menù */
+
+/* ---------- 3. Barra in alto ---------- */
+.app-bar{height:56px;display:flex;align-items:center;gap:var(--s1);
+  padding:0 var(--s1) 0 var(--gutter);border-bottom:1px solid var(--line);background:var(--bg)}
+.app-bar__title{flex:1;margin:0;font-size:var(--fs-bar);line-height:var(--lh-bar);font-weight:700}
+.app-bar__context{flex:1;font-size:var(--fs-body);color:var(--muted)} /* "‹ Ricette": il titolo vero sta nel contenuto */
+.app-bar--back{padding-left:var(--s1)}
+
+/* ---------- 4. Bottoni ---------- */
+.btn[class*="btn--"]{display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);
+  border:0;border-radius:var(--r-full);font-weight:600;white-space:nowrap;cursor:pointer;
+  padding:0 20px;height:var(--h-m);font-size:var(--fs-body)}
+.btn--l{height:var(--h-l)}
+.btn--m{height:var(--h-m);padding:0 18px}
+.btn--s{height:var(--h-s);padding:0 14px;font-size:var(--fs-small)}
+.btn--block{width:100%}
+.btn--primary  {background:var(--accent);color:#fff}
+.btn--secondary{background:var(--bg);color:var(--text);box-shadow:inset 0 0 0 1.5px var(--text)} /* bordo scuro = bottone */
+.btn--ghost    {background:transparent;color:var(--accent-text);padding:0 var(--s2)}
+.btn--danger   {background:transparent;color:var(--danger);padding:0 var(--s2)}
+.btn[class*="btn--"]:disabled{opacity:.4;cursor:default}
+.btn[class*="btn--"] svg{width:20px;height:20px;flex:none}
+
+.icon-btn{width:var(--h-m);height:var(--h-m);border:0;border-radius:var(--r-full);
+  background:transparent;color:var(--text);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.icon-btn--muted{color:var(--muted)}
+.icon-btn--outline{width:var(--h-l);height:var(--h-l);background:var(--bg);box-shadow:inset 0 0 0 1.5px var(--text)}
+.icon-btn svg{width:24px;height:24px}
+
+.fab{position:fixed;right:var(--gutter);bottom:calc(64px + var(--gutter));
+  width:56px;height:56px;border:0;border-radius:var(--r-full);background:var(--accent);color:#fff;
+  box-shadow:var(--shadow-2);display:flex;align-items:center;justify-content:center}
+
+/* barra azioni in basso */
+.bottom-bar{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);
+  padding:var(--s3) var(--gutter);background:var(--bg);border-top:1px solid var(--line)}
+.bottom-bar--1-2{grid-template-columns:1fr 2fr}
+.bottom-bar--nav{grid-template-columns:var(--h-l) 1fr var(--h-l)} /* modalità Cucina */
+.bottom-bar .btn{height:var(--h-l)}
+/* la lista sopra non resta mai coperta */
+.has-bottom-bar{padding-bottom:calc(var(--h-l) + var(--s3)*2 + var(--s4))}
+.has-fab{padding-bottom:96px}
+
+/* ---------- 5. Scelte ---------- */
+.chip{height:var(--h-s);display:inline-flex;align-items:center;gap:6px;padding:0 14px;
+  border:0;border-radius:var(--r-full);background:var(--bg);color:var(--text);
+  box-shadow:inset 0 0 0 1px var(--line-strong);font-size:var(--fs-small);font-weight:600;cursor:pointer}
+.chip[aria-pressed="true"],.chip.is-on{background:var(--accent-soft);color:var(--accent-text);
+  box-shadow:inset 0 0 0 1.5px var(--accent)}
+.chip-row{display:flex;flex-wrap:wrap;gap:var(--s2)}
+
+.tile{width:72px;height:72px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--s1);
+  border:0;border-radius:var(--r-m);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line-strong);
+  font-size:13px;color:var(--text);cursor:pointer}
+.tile[aria-pressed="true"],.tile.is-on{background:var(--accent-soft);color:var(--accent-text);box-shadow:inset 0 0 0 1.5px var(--accent)}
+
+/* segmentato: 2–3 viste */
+.seg{display:inline-grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--surface-2);
+  border-radius:var(--r-full);padding:3px}
+.seg > button{height:var(--h-s);border:0;border-radius:var(--r-full);background:transparent;
+  padding:0 16px;font-size:var(--fs-small);font-weight:600;color:var(--muted);cursor:pointer}
+.seg > button[aria-pressed="true"],.seg > button.is-on{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+/* selettore flottante a icone (Dispensa Cibo/Casa, Ricette): come oggi */
+.seg--floating{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(64px + var(--gutter));
+  display:inline-flex;align-items:center;gap:4px;background:var(--bg);padding:4px;box-shadow:var(--shadow-2)}
+.seg--floating > button{width:52px;height:40px;padding:0;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.seg--floating > button.is-on,.seg--floating > button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+
+/* schede (nell'app .tabs è la barra in basso: qui si chiamano .tabs-ds) */
+.tabs-ds{display:flex;border-bottom:1px solid var(--line)}
+.tabs-ds > button{flex:1;height:var(--h-m);border:0;background:transparent;font-size:var(--fs-body);font-weight:600;
+  color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);cursor:pointer}
+.tabs-ds > button[aria-selected="true"],.tabs-ds > button.is-on{color:var(--accent-text);border-bottom-color:var(--accent)}
+.tabs-ds--scroll{overflow-x:auto}.tabs-ds--scroll > button{flex:none;padding:0 var(--s4)}
+
+/* piatti del pasto (Secondo / Contorno): pillole, nel dettaglio pasto e in Cucina */
+.dish-switch{display:flex;gap:var(--s2);overflow-x:auto}
+.dish-switch > button{height:var(--h-m);flex:none;border:0;border-radius:var(--r-full);background:var(--bg);
+  box-shadow:inset 0 0 0 1px var(--line-strong);padding:0 16px;font-size:var(--fs-body);font-weight:600;color:var(--text);
+  display:inline-flex;align-items:center;gap:var(--s2);cursor:pointer}
+.dish-switch > button[aria-pressed="true"],.dish-switch > button.is-on{background:var(--accent-soft);color:var(--accent-text);box-shadow:inset 0 0 0 1.5px var(--accent)}
+
+/* ---------- 6. Stepper ---------- */
+.stepper{display:inline-flex;align-items:center;gap:var(--s2)}
+.stepper > button{width:40px;height:40px;border:0;border-radius:var(--r-full);background:var(--bg);
+  box-shadow:inset 0 0 0 1px var(--line-strong);font-size:20px;line-height:1;color:var(--text);padding:0;cursor:pointer}
+.stepper__value{min-width:56px;text-align:center;font-weight:700}
+.stepper__value--qb{font-weight:400;color:var(--muted)}
+/* S: nelle righe. Niente cerchio, − e + grigi: conta la quantità, non il controllo */
+.stepper--s{gap:0}
+.stepper--s > button{width:28px;height:40px;background:transparent;box-shadow:none;color:#8A8A8A;font-size:20px}
+.stepper--s .stepper__value{min-width:52px;text-decoration:underline dotted #B0B0B0;text-underline-offset:5px;text-decoration-thickness:1.5px;cursor:pointer}
+.stepper--s .stepper__value[aria-expanded="true"]{color:var(--accent-text);text-decoration-color:var(--accent)}
+/* Spesa: − e +. Dispensa: solo − (si toglie; per aggiungere si tocca il numero) */
+.stepper--minus-only > .stepper__plus{display:none}
+
+/* fumetto quantità: si apre toccando il numero dello stepper S */
+.stepper{position:relative}
+.qty-pop{position:absolute;top:calc(100% + 4px);right:0;z-index:20;width:236px;padding:var(--s3);
+  display:flex;flex-direction:column;gap:10px;background:var(--bg);border-radius:var(--r-m);box-shadow:var(--shadow-2)}
+.qty-pop::before{content:"";position:absolute;top:-6px;right:48px;width:12px;height:12px;background:var(--bg);transform:rotate(45deg)}
+.qty-pop__row{display:flex;gap:var(--s2)}
+.qty-pop input{flex:1;min-width:0;height:var(--h-m);border:0;border-radius:var(--r-m);padding:0 12px;
+  font-size:var(--fs-body);font-weight:700;box-shadow:inset 0 0 0 2px var(--accent);outline:0}
+.qty-pop select{height:var(--h-m);border:0;border-radius:var(--r-m);padding:0 12px;font-size:var(--fs-body);
+  background:var(--bg);box-shadow:inset 0 0 0 1px var(--line-strong)}
+.qty-pop .btn--s{align-self:flex-end}
+
+/* ---------- 7. Campi ---------- */
+.field{height:var(--h-l);display:flex;align-items:center;gap:10px;padding:0 14px;
+  border-radius:var(--r-m);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line-strong)}
+.field:focus-within{box-shadow:inset 0 0 0 2px var(--accent)}
+.field input,.field select{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:var(--fs-body)}
+.field--search{height:48px;border-radius:var(--r-full);padding:0 16px;color:var(--muted)}
+.form-group{display:flex;flex-direction:column;gap:6px} /* .label + .field */
+
+/* ---------- 8. Titolo di sezione, badge, pallini ---------- */
+.section-title{display:flex;align-items:center;justify-content:space-between;min-height:var(--h-m);margin-top:var(--s2)}
+.section-title__text{font-size:var(--fs-section);line-height:var(--lh-section);font-weight:700}
+.section-title__count{font-size:var(--fs-small);font-weight:400;color:var(--muted)}
+
+.badge{height:22px;display:inline-flex;align-items:center;gap:4px;padding:0 var(--s2);
+  border-radius:var(--r-full);font-size:var(--fs-label);font-weight:700;white-space:nowrap}
+.badge--warn   {background:var(--warn);color:var(--warn-text)}    /* "tra 2 gg" (≤3 gg) */
+.badge--neutral{background:var(--surface-2);color:var(--muted)}   /* "tra 5 gg", "21 gen" */
+.badge--freeze {background:var(--freeze);color:var(--freeze-text)}/* "❄ dal 23 ott" */
+
+.dot{width:10px;height:10px;border-radius:var(--r-full);display:inline-block;flex:none}
+.dot--ok{background:var(--ok)} .dot--no{background:var(--no)}
+
+/* ---------- 9. Riga ---------- */
+.row{display:flex;align-items:center;gap:var(--s3);min-height:var(--row);padding:var(--s2) 0;border-bottom:1px solid var(--line)}
+.row--readonly{min-height:var(--row-ro)}
+/* compatta (Dispensa): tutto su una riga, 48 px */
+.row--compact{min-height:var(--row-ro);padding:0;gap:10px}
+.row--compact .row__main{flex-direction:row;align-items:center;gap:var(--s2);white-space:nowrap}
+.row--compact .row__title{overflow:hidden;text-overflow:ellipsis}
+.row--compact .badge{flex:none}
+.row__icon{width:20px;height:20px;flex:none;color:var(--muted)}      /* luogo, senza cerchio */
+.row__icon--freeze{color:#1565C0}
+.row:last-child{border-bottom:0}
+.row__lead{width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:var(--r-full)}
+.row__lead--place {background:var(--surface-2);color:var(--muted)}
+.row__lead--freeze{background:var(--freeze);color:var(--freeze-text)}
+/* spunta: quadrata stondata, verde quando presa */
+.row__check{width:24px;height:24px;border-radius:6px;box-shadow:inset 0 0 0 2px #8A8A8A;display:flex;align-items:center;justify-content:center}
+.row__check[aria-checked="true"]{background:var(--ok);box-shadow:none;color:#fff}
+.row--done .row__title{color:#8A8A8A;font-weight:400;text-decoration:line-through}
+/* le righe spuntate si spostano nella sezione "Completati" in fondo */
+.row__check[aria-checked="true"]::after{content:"";width:6px;height:11px;border:solid currentColor;border-width:0 2.5px 2.5px 0;transform:translateY(-1px) rotate(45deg)}
+.row__main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.row__title{font-size:var(--fs-body);font-weight:600}          /* da spuntare o contare */
+.row__title--nav{font-weight:400}                              /* voce da aprire */
+.row__sub{font-size:var(--fs-small);color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.row__trail{flex:none;display:flex;align-items:center;gap:var(--s2)}
+.row__qty{font-weight:700;min-width:44px;text-align:right}
+
+/* ---------- 10. Contenitori ---------- */
+.card{background:var(--bg);border-radius:var(--r-l);box-shadow:inset 0 0 0 1px var(--line);padding:var(--s4)}
+.card--raised{box-shadow:var(--shadow-1)}           /* solo pasti del Menù */
+.card--list{padding:var(--s1) var(--s4)}            /* gruppi di righe (Impostazioni) */
+.note{background:var(--cream);border-radius:var(--r-l);padding:var(--s4);display:flex;flex-direction:column;gap:6px}
+.note__text{font-size:var(--fs-body);line-height:1.45}
+
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:calc(100% - 48px);display:flex;flex-direction:column;
+  background:var(--bg);border-radius:var(--r-xl) var(--r-xl) 0 0;box-shadow:var(--shadow-2)}
+.sheet__handle{width:40px;height:4px;border-radius:4px;background:var(--line-strong);align-self:center;margin:10px 0 4px}
+.sheet__body{flex:1;min-height:0;overflow:auto;padding:var(--s2) var(--gutter) 0;display:flex;flex-direction:column;gap:var(--s5)}
+.sheet__title{font-size:var(--fs-title);line-height:var(--lh-title);font-weight:700;margin:0}
+.scrim{position:fixed;inset:0;background:rgba(20,20,20,.45)}
+
+/* ---------- 11. Modalità Cucina ---------- */
+.cook-step{font-size:var(--fs-cook);line-height:var(--lh-cook);font-weight:400;margin:0}
+
+/* ---------- 12. Pagina ---------- */
+.page{padding:var(--s3) var(--gutter) 0}
+.stack-8{display:flex;flex-direction:column;gap:var(--s2)}
+.stack-16{display:flex;flex-direction:column;gap:var(--s4)}
+.stack-24{display:flex;flex-direction:column;gap:var(--s5)}

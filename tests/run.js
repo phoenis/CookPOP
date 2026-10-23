@@ -2122,9 +2122,9 @@ test('colori: l\'accento ha la sua tavolozza, diversa da quella dei turni di cuc
   const r = await page.evaluate(() => {
     state.appearanceOpen = true; render();
     const acc = [...document.querySelectorAll('[data-accent-color]')].map(b => b.dataset.accentColor);
-    return { acc, same: acc.join() === ACCENT_PRESETS.join(), differs: ACCENT_PRESETS.join() !== USER_COLOR_PRESETS.join(), def: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() };
+    return { acc, same: acc.join() === ACCENT_PRESETS.join(), differs: ACCENT_PRESETS.join() !== USER_COLOR_PRESETS.join(), def: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() };
   });
-  eq(r, { acc: ['#e03c1e', '#87282b', '#c9702e', '#b08d2b', '#5a7517', '#2e7d6b', '#546e7a', '#7a5a8a'], same: true, differs: true, def: '#e03c1e' });
+  eq(r, { acc: ['#d6391c', '#87282b', '#c9702e', '#b08d2b', '#5a7517', '#2e7d6b', '#546e7a', '#7a5a8a'], same: true, differs: true, def: '#D6391C' });
 });
 
 test('modalità cucina: si passa da una ricetta all\'altra restando al passo a cui si è arrivati', async ({ page }) => {

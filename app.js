@@ -2466,7 +2466,7 @@ const COOK_LABEL = { mara:'Mara', ste:'Ste' };
 // col testo chiaro sopra (--bg) del cook-pill.
 const USER_COLOR_PRESETS = ['#ff7a66','#ff6f9c','#ffae42','#ffd23f','#6fe07a','#3fe0c8','#6bb6ff','#c293ff'];
 const USER_COLOR_PRESETS_BRIGHT = ['#ff3b1d','#ff2d6f','#ff8a00','#ffb800','#2fd24f','#00c2a8','#2d8cff','#a75cff'];
-const USER_COLOR_PRESETS_OLD = ['#e03c1e','#87282b','#c9702e','#b08d2b','#5a7517','#2e7d6b','#546e7a','#7a5a8a'];
+const USER_COLOR_PRESETS_OLD = ['#d6391c','#87282b','#c9702e','#b08d2b','#5a7517','#2e7d6b','#546e7a','#7a5a8a'];
 // Colore d'accento dell'app: tavolozza a sé (non cambia con quella dei turni di cucina).
 const ACCENT_PRESETS = USER_COLOR_PRESETS_OLD;
 function applyUserColors(){
@@ -2495,7 +2495,7 @@ function applyTheme(theme){
   else delete document.documentElement.dataset.theme;
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const meta = document.getElementById('meta-theme-color');
-  if(meta) meta.setAttribute('content', isDark ? '#18191b' : '#f3f2f2');
+  if(meta) meta.setAttribute('content', isDark ? '#121212' : '#f3f2f2');
 }
 function hexToRgbTriplet(hex){
   const m = hex.replace('#','');
@@ -2509,12 +2509,15 @@ function darkenHex(hex, amount){
 function applyAccent(hex){
   if(hex) localStorage.setItem(ACCENT_KEY, hex); else localStorage.removeItem(ACCENT_KEY);
   const root = document.documentElement.style;
+  // Il colore scelto in Tema cambia solo i tre token d'accento del design system
+  // (--gold e --gold-dark ne sono alias); --gold-rgb serve a ombre e sfumature.
   if(!hex){
-    root.removeProperty('--gold'); root.removeProperty('--gold-dark'); root.removeProperty('--gold-rgb');
+    ['--accent', '--accent-text', '--accent-soft', '--gold-rgb'].forEach(p => root.removeProperty(p));
     return;
   }
-  root.setProperty('--gold', hex);
-  root.setProperty('--gold-dark', darkenHex(hex, 0.18));
+  root.setProperty('--accent', hex);
+  root.setProperty('--accent-text', `color-mix(in srgb, ${hex} 78%, var(--text))`);
+  root.setProperty('--accent-soft', `color-mix(in srgb, ${hex} 15%, transparent)`);
   root.setProperty('--gold-rgb', hexToRgbTriplet(hex).join(','));
 }
 
@@ -2522,6 +2525,8 @@ function applyAccent(hex){
 // cucina, torna al colore corrispondente della sua tavolozza.
 (function(){
   try{
+    // Il rosso d'accento di prima (#e03c1e) è diventato quello del design system (#d6391c).
+    if((localStorage.getItem(ACCENT_KEY) || '').toLowerCase() === '#e03c1e') localStorage.setItem(ACCENT_KEY, '#d6391c');
     const a = localStorage.getItem(ACCENT_KEY);
     const i = a ? USER_COLOR_PRESETS.indexOf(a) : -1;
     if(i >= 0 && !ACCENT_PRESETS.includes(a)) applyAccent(ACCENT_PRESETS[i]);
