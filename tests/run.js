@@ -3040,6 +3040,29 @@ test('Spesa: gli ingredienti di un pasto passato restano in lista ma senza "gior
   eq(page.errors, [], 'errori JS');
 });
 
+test('Aggiungi piatto: da un pasto vuoto è lo stesso foglio, con "Con quello che ho" e il tetto di tempo', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.extraWeeks = []; generateWeek(1); state.tab = 'menu'; render();
+    const mk = '1_2_pranzo';
+    clearMealToEmpty(1, 2, 'pranzo'); render();
+    const out = {};
+    document.querySelector('[data-open-swap="' + mk + '"]').click();
+    out.sheet = !!document.querySelector('.dish-sheet');
+    out.noOldScreen = !document.querySelector('.meal-detail-screen');
+    out.kicker = document.querySelector('.dsh-kicker').textContent;
+    out.pantryChip = !!document.querySelector('[data-dish-pantry]');
+    out.before = document.querySelectorAll('[data-dish-pick]').length;
+    document.querySelector('[data-dish-pantry]').click();
+    out.pantryOn = !!state.dishPicker.pantry;
+    out.after = document.querySelectorAll('[data-dish-pick]').length;
+    return out;
+  });
+  eq([r.sheet, r.noOldScreen, r.pantryChip, r.pantryOn], [true, true, true, true], JSON.stringify(r));
+  assert(/MAX|max/i.test(r.kicker), r.kicker);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
