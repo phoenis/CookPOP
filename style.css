@@ -2423,3 +2423,9 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .leftover-sep{ color:var(--muted); font-weight:400; }
 .leftover-names .day-menu{ text-decoration:none; border:0; }
 .leftover-line .leftover-ic.dish-ic{ width:28px; height:28px; min-width:0; background:transparent; font-size:1.25rem; }
+
+/* Etichetta "Avanzo" in alto a destra: giallo chiaro con testo scuro, come le etichette della Dispensa */
+.meal-avanzo-badge{ margin-left:auto; flex:none; height:22px; padding:0 var(--s2); gap:4px; border-radius:var(--r-full); background:color-mix(in srgb, var(--warn) 35%, var(--bg)); color:var(--warn-text); font-size:.6875rem; font-weight:700; line-height:1; }
+.meal-avanzo-badge .status-badge-reset{ font-size:.6875rem; opacity:.7; }
+.meal-block .status-badge.status-avanzo.meal-avanzo-badge{ display:inline-flex; height:22px; padding:0 var(--s2); gap:4px; border-radius:var(--r-full); background:color-mix(in srgb, var(--warn) 35%, var(--bg)); color:var(--warn-text); font-size:.6875rem; font-weight:700; line-height:1; }
+.meal-block .meal-avanzo-badge .status-badge-reset{ font-size:.6875rem; opacity:.7; }
