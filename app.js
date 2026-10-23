@@ -9100,7 +9100,6 @@ function renderDispensa(){
     <div class="swipe-wrap" data-swipe-id="pantry:${escapeAttr(it.key)}" data-swipe-pantry="${escapeAttr(it.key)}">
     <button type="button" class="swipe-trash" tabindex="-1" aria-label="${escapeAttr(it.nome)}: finito">${TRASH_ICON_SVG}</button>
     <div class="inv-item swipe-content" data-pantry-row="${escapeAttr(it.key)}">
-      <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${luogoIconContent}</button>
       ${state.pantryLuogoPicker === it.key ? `
       <div class="luogo-picker-backdrop" data-luogo-picker-close></div>
       <div class="luogo-picker">
@@ -9112,7 +9111,11 @@ function renderDispensa(){
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M17 17H6V3H4"/><path d="m6 5l14 1l-1 7H6"/></g></svg></button>
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-trash="${escapeAttr(it.key)}" title="Metti tra i Finiti" aria-label="Metti tra i Finiti">${TRASH_ICON_SVG}</button>
       </div>` : ''}
-      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>
+      <div class="inv-main">
+      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
+      <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])} — tocca per scegliere">${luogoIconContent}</button>
+      ${(it.scadenza || it.frozenOn) ? `<button class="btn is-text inv-badges" data-pantry-edit="${escapeAttr(it.key)}" type="button" tabindex="-1" aria-hidden="true">${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>` : ''}
+      </div>
       ${it.unit === 'none'
         ? `<label class="presence-toggle"><input type="checkbox" ${it.qty > 0 ? 'checked' : ''} data-presence-toggle="${escapeAttr(it.key)}"></label>`
         : `<span class="qty-stepper">
