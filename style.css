@@ -2364,3 +2364,6 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .pantry-list .inv-main > .luogo-picker-opt[data-luogo-value="Freezer"]{ background:var(--freeze); color:var(--freeze-text); }
 .pantry-list .inv-main > .luogo-picker-opt.picking{ background:var(--accent); color:#fff; }
 .pantry-list .swipe-content > .luogo-picker{ left:var(--s6); }
+.pantry-list .inv-main > .luogo-picker-opt{ gap:var(--s1); }
+.pantry-list .luogo-since{ font-size:.6875rem; font-weight:700; line-height:1; }
+.pantry-list .exp-badge, .pantry-list .frozen-on{ font-size:.6875rem; }
