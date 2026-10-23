@@ -13545,6 +13545,31 @@ refreshProfileLink();
 (function(){
   const btn = document.getElementById('refresh-btn');
   if(!btn) return;
+  // Versione = il numero di app.js?v=N di questa pagina. Se la pagina sul
+  // server ne ha uno più alto, ne è uscita una nuova: sottotitolo + badge.
+  const verMatch = ((document.querySelector('script[src*="app.js"]') || {}).src || '').match(/app\.js\?v=(\d+)/);
+  const curVer = verMatch ? parseInt(verMatch[1], 10) : null;
+  const sub = btn.querySelector('small');
+  const paintVersion = isNew => {
+    if(sub && curVer) sub.textContent = `Versione ${curVer}${isNew ? ' · nuova disponibile' : ''}`;
+    let badge = btn.querySelector('.settings-badge-new');
+    if(isNew && !badge){ badge = document.createElement('span'); badge.className = 'settings-badge-new'; badge.textContent = 'Nuova'; btn.appendChild(badge); }
+    if(!isNew && badge) badge.remove();
+  };
+  let lastCheck = 0;
+  const checkNewVersion = async ()=>{
+    if(!curVer || Date.now() - lastCheck < 60000 || navigator.onLine === false) return;
+    lastCheck = Date.now();
+    try{
+      const res = await fetch(window.location.pathname, { cache: 'no-store' });
+      const m = (await res.text()).match(/app\.js\?v=(\d+)/);
+      paintVersion(!!m && parseInt(m[1], 10) > curVer);
+    }catch(e){ /* offline: resta il testo di base */ }
+  };
+  paintVersion(false);
+  setTimeout(checkNewVersion, 3000);
+  const settingsEl = document.getElementById('settings-backdrop');
+  if(settingsEl) new MutationObserver(()=>{ if(settingsEl.classList.contains('open')) checkNewVersion(); }).observe(settingsEl, { attributes: true, attributeFilter: ['class'] });
   btn.addEventListener('click', async ()=>{
     btn.disabled = true;
     btn.innerHTML = uiIcon('refresh') + ' Aggiornamento…';
