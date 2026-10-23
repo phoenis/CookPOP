@@ -9116,8 +9116,10 @@ function renderDispensa(){
       </div>` : ''}
       <div class="inv-main">
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
+      <span class="inv-tags">
       <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])}${it.frozenOn ? escapeAttr(` · congelato il ${it.frozenOn}`) : ''} — tocca per scegliere">${luogoIconContent}${it.frozenOn && it.luogo === 'freezer' && !isSelected ? `<span class="luogo-since">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>
       ${(it.scadenza || (it.frozenOn && it.luogo !== 'freezer')) ? `<button class="btn is-text inv-badges" data-pantry-edit="${escapeAttr(it.key)}" type="button" tabindex="-1" aria-hidden="true">${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn && it.luogo !== 'freezer' ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>` : ''}
+      </span>
       </div>
       ${it.unit === 'none'
         ? `<label class="presence-toggle"><input type="checkbox" ${it.qty > 0 ? 'checked' : ''} data-presence-toggle="${escapeAttr(it.key)}"></label>`
