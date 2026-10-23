@@ -5053,6 +5053,12 @@ function closeTopbarMenu(){
   const el = document.getElementById('topbar-menu-backdrop');
   if(el) el.classList.remove('open');
 }
+// Il fumetto della quantità resta tutto in vista anche quando la tastiera si
+// apre: centrato subito e di nuovo quando la tastiera ha finito di salire.
+function keepQtyPopVisible(){
+  const go = ()=>{ const el = document.querySelector('.qty-pop'); if(el) el.scrollIntoView({ block: 'center', behavior: 'auto' }); };
+  go(); setTimeout(go, 350);
+}
 const MODAL_CHECKS = [
   [()=> !!state.shopQtyEditingKey, ()=>{ state.shopQtyEditingKey = null; }],
   [()=> !!state.pantryEditingKey, ()=>{ state.pantryEditingKey = null; }],
@@ -6999,8 +7005,10 @@ function renderSpesa(){
           : `<span class="qty-num qty-placeholder" data-shop-qty-show="${escapeAttr(rowKey)}" title="Quantità non indicata">–</span>`}
         ${editingQty ? `<div class="qty-pop-backdrop" data-shop-qty-pop-close></div>
         <div class="qty-pop" role="dialog" aria-label="Quantità">
-          <input type="number" inputmode="decimal" min="0" step="${step}" class="qty-input" value="${qty > 0 ? qty : ''}" placeholder="–" data-shop-qty-edit="${escapeAttr(rowKey)}" aria-label="Quantità">
-          <div class="qty-pop-units">${['', 'g', 'kg', 'ml', 'l'].map(u=>`<button type="button" class="qty-pop-unit${unit === u ? ' active' : ''}" data-shop-qty-unit="${u}" aria-pressed="${unit === u}">${escapeHtml(UNIT_SHORT[u] || u)}</button>`).join('')}</div>
+          <div class="qty-pop-row">
+            <input type="number" inputmode="decimal" min="0" step="${step}" class="qty-input" value="${qty > 0 ? qty : ''}" placeholder="–" data-shop-qty-edit="${escapeAttr(rowKey)}" aria-label="Quantità">
+            <select class="qty-pop-unit-sel" data-shop-qty-unit aria-label="Unità">${['', 'g', 'kg', 'ml', 'l'].map(u=>`<option value="${u}"${unit === u ? ' selected' : ''}>${escapeHtml(UNIT_SHORT[u] || u)}</option>`).join('')}</select>
+          </div>
           <button type="button" class="btn btn--primary qty-pop-done" data-shop-qty-pop-close data-shop-qty-pop-done>Fatto</button>
         </div>` : ''}
         <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Aumenta quantità">+</button>
@@ -9112,8 +9120,10 @@ function renderDispensa(){
         <span class="qty-num${pantryQtyIsLow(it) ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>
         ${editing ? `<div class="qty-pop-backdrop" data-qty-pop-close></div>
         <div class="qty-pop" role="dialog" aria-label="Quantità">
-          <input type="number" inputmode="decimal" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}" aria-label="Quantità">
-          ${state.pantryView === 'casa' ? '' : `<div class="qty-pop-units">${['', 'g', 'kg', 'ml', 'l'].map(u=>`<button type="button" class="qty-pop-unit${(it.unit || '') === u ? ' active' : ''}" data-qty-unit="${u}" aria-pressed="${(it.unit || '') === u}">${escapeHtml(UNIT_SHORT[u] || u)}</button>`).join('')}</div>`}
+          <div class="qty-pop-row">
+            <input type="number" inputmode="decimal" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}" aria-label="Quantità">
+            ${state.pantryView === 'casa' ? '' : `<select class="qty-pop-unit-sel" data-qty-unit aria-label="Unità">${['', 'g', 'kg', 'ml', 'l'].map(u=>`<option value="${u}"${(it.unit || '') === u ? ' selected' : ''}>${escapeHtml(UNIT_SHORT[u] || u)}</option>`).join('')}</select>`}
+          </div>
           <button type="button" class="btn btn--primary qty-pop-done" data-qty-pop-close>Fatto</button>
         </div>` : ''}
       </span>`}
@@ -9342,6 +9352,7 @@ function attachHandlers(){
       if(r.bottom > window.innerHeight - 90) popEl.classList.add('is-up');
     }
     shopQtyEditInput.focus({ preventScroll: true });
+    keepQtyPopVisible();
     shopQtyEditInput.select();
     const popKey = shopQtyEditInput.dataset.shopQtyEdit;
     // Il numero si legge alla chiusura (Fatto o tocco fuori) e quando cambia
@@ -9350,11 +9361,11 @@ function attachHandlers(){
       const n = parseFloat(shopQtyEditInput.value);
       state.shopQty[popKey] = Number.isNaN(n) ? 0 : Math.max(0, n);
     };
-    document.querySelectorAll('[data-shop-qty-unit]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    document.querySelectorAll('select[data-shop-qty-unit]').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
         readQty();
         if(!state.shopUnit) state.shopUnit = {};
-        state.shopUnit[popKey] = btn.dataset.shopQtyUnit;
+        state.shopUnit[popKey] = sel.value;
         persist(); render();
       });
     });
@@ -10937,6 +10948,7 @@ function attachHandlers(){
     const popEl = document.querySelector('.qty-pop');
     if(popEl && popEl.getBoundingClientRect().bottom > window.innerHeight - 90) popEl.classList.add('is-up');
     qtyEditInput.focus({ preventScroll: true });
+    keepQtyPopVisible();
     qtyEditInput.select();
     const popKey = qtyEditInput.dataset.qtyEdit;
     // Il numero si legge alla chiusura (Fatto, tocco fuori, Invio) e quando
@@ -10950,13 +10962,13 @@ function attachHandlers(){
       else it.qty = next;
       if(it.qty > 0) delete state.pantryConfirmedShop[popKey];
     };
-    document.querySelectorAll('[data-qty-unit]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    document.querySelectorAll('select[data-qty-unit]').forEach(sel=>{
+      sel.addEventListener('change', ()=>{
         const it = state.pantryItems[popKey];
         if(!it) return;
         const n = parseFloat(qtyEditInput.value);
         if(!Number.isNaN(n) && n > 0) it.qty = n;
-        if(btn.dataset.qtyUnit) it.unit = btn.dataset.qtyUnit; else delete it.unit;
+        if(sel.value) it.unit = sel.value; else delete it.unit;
         persist(); render();
       });
     });
