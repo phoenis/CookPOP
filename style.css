@@ -2302,3 +2302,20 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .meal-notes .meal-note{ background:var(--cream); border-radius:var(--r-m); padding:10px var(--s3); font-size:var(--fs-small); line-height:1.43; color:#3d3d3d; align-items:flex-start; gap:var(--s2); }
 .meal-notes .meal-note.is-hot{ font-weight:400; color:#3d3d3d; }
 .meal-notes{ gap:var(--s2); margin:var(--s2) 0; }
+
+/* ---------- Design system · Ricetta e Cucina ---------- */
+.dish-tabs-row{ border-bottom:0; padding:var(--s3) 0 0; gap:var(--s2); }
+.dish-tabs-row .dish-tabs, .dish-tabs{ gap:var(--s2); border-bottom:0; }
+.dish-tab, .dish-tabs-row .dish-tab{ height:var(--h-m); margin:0; padding:0 var(--s4) 0 var(--s2); gap:var(--s2); border:0; border-radius:var(--r-full); background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); color:var(--text); font-size:var(--fs-body); font-weight:600; }
+.dish-tab.active{ background:var(--accent-soft); box-shadow:inset 0 0 0 1.5px var(--accent); color:var(--danger); }
+.dish-tab.is-done .dish-tab-label{ color:var(--muted); }
+.dish-tab .dish-ic{ width:28px; height:28px; background:transparent; font-size:1.125rem; }
+.dish-tabs-add .dish-add-ic{ width:var(--h-m); height:var(--h-m); }
+.rd-sec-head h2{ display:none; }
+.rd-sec-head{ justify-content:flex-end; }
+.chip-row.prep-quick .btn.is-chip{ height:var(--h-s); min-height:0; padding:0 14px; font-size:var(--fs-small); font-weight:600; }
+.recipe-card{ min-height:var(--row); padding-top:6px; padding-bottom:6px; }
+.recipe-title{ font-size:var(--fs-body); line-height:1.375; font-weight:600; }
+.recipe-card .day-time{ font-size:var(--fs-small); line-height:1.43; color:var(--muted); }
+.recipe-card .cat-icon{ font-size:1.5rem; }
+.cook-step-count{ font-size:var(--fs-label); line-height:1.33; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
