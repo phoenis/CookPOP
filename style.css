@@ -2386,3 +2386,13 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .settings-field .chip-row label.sheet-date-chip.btn.is-chip, .settings-field .chip-row label.sheet-date-chip.btn.is-chip svg{ font-size:var(--fs-small); }
 .settings-field .chip-row label.sheet-date-chip.btn.is-chip .ui-ico, .settings-field .chip-row label.sheet-date-chip.btn.is-chip svg{ width:16px; height:16px; }
 .settings-field .chip-row.scadenza-quick .btn.is-chip, .settings-field .chip-row .sheet-date-chip.btn.is-chip{ font-size:.875rem; font-weight:600; }
+
+/* Spesa come Dispensa: righe da 48px con riga divisoria */
+.shop-list .shop-item-row{ min-height:var(--row-ro); padding:0; gap:var(--s3); border-bottom:1px solid var(--line); border-radius:0; }
+.shop-list .shop-item-row:last-of-type{ border-bottom:1px solid var(--line); }
+.shop-list .swipe-wrap:last-child .shop-item-row{ border-bottom:0; }
+.shop-list .shop-item{ padding:4px 0; }
+.shop-list .shop-completed .shop-item-row{ min-height:var(--row-ro); }
+/* Scheda ingrediente: bordo scelto da 1px */
+.sheet-luogo.active{ box-shadow:inset 0 0 0 1px var(--accent); }
+.chip-row.scadenza-quick .btn.is-chip.active{ box-shadow:inset 0 0 0 1px var(--accent); }
