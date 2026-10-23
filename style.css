@@ -2319,3 +2319,10 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .recipe-card .day-time{ font-size:var(--fs-small); line-height:1.43; color:var(--muted); }
 .recipe-card .cat-icon{ font-size:1.5rem; }
 .cook-step-count{ font-size:var(--fs-label); line-height:1.33; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+
+/* ---------- Design system · Aggiungi, Metti in dispensa, scheda ingrediente ---------- */
+.add-sheet .sheet-title, .add-sheet h2, .add-sheet h3{ font-size:var(--fs-title); line-height:1.25; font-weight:700; }
+.scadenza-quick .btn.is-chip{ height:var(--h-s); min-height:0; padding:0 14px; font-size:var(--fs-small); font-weight:600; }
+.scadenza-quick .btn.is-chip.active{ background:var(--accent-soft); box-shadow:inset 0 0 0 1.5px var(--accent); color:var(--danger); border-color:transparent; }
+.chip-row.scadenza-quick .btn.is-chip{ background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); border:0; color:var(--text); }
+.chip-row.scadenza-quick .btn.is-chip.active{ background:var(--accent-soft); box-shadow:inset 0 0 0 1.5px var(--accent); color:var(--danger); }
