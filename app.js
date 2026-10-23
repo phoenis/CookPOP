@@ -6019,13 +6019,24 @@ function renderDishPickerScreen(){
   if(dp.tipo === 'freezer') results = results.filter(r => frozenNames.has(r.nome));
   else if(dp.tipo !== 'all') results = results.filter(r => r.tipologia === dp.tipo);
   if(search) results = results.filter(r => r.nome.toLowerCase().includes(search.toLowerCase()));
+  // "Con quello che ho": prima chi ha tutto in casa, poi a cui manca poco
+  // (almeno metà degli ingredienti), dal meno al più mancante.
+  const pantryMatches = {};
+  if(dp.pantry){
+    const expiring = pantryExpiringMap();
+    results.forEach(r=>{ pantryMatches[r.nome] = recipePantryMatch(r.nome, expiring); });
+    results = results.filter(r => pantryMatches[r.nome].total && (!pantryMatches[r.nome].missing.length || pantryMatches[r.nome].cov >= 0.5));
+    results.sort((a, b) => (pantryMatches[a.nome].missing.length - pantryMatches[b.nome].missing.length) || (pantryMatches[b.nome].exp.length - pantryMatches[a.nome].exp.length) || IT_COLLATOR_BASE.compare(a.nome, b.nome));
+  }
+  const pantryNote = m => !m ? '' : (m.missing.length ? ` · manca ${m.missing.slice(0, 2).map(escapeHtml).join(', ')}${m.missing.length > 2 ? ` e altri ${m.missing.length - 2}` : ''}` : ' · hai tutto');
   const resultsHtml = results.slice(0, 60).map(r=>`
     <div class="swap-result" data-dish-pick="${escapeAttr(r.nome)}" data-dish-key="${mk}">
       <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
       <span class="swap-result-name">${escapeHtml(r.nome)}</span>
-      <span class="swap-result-time">${dp.tipo === 'freezer' ? `❄️ ${freezerPortionsOf(r.nome)} porz.` : escapeHtml(String(TEMPO_LABEL[r.tempoBucket] || '').replace(/^\S+\s/, ''))}</span>
+      <span class="swap-result-time">${dp.tipo === 'freezer' ? `❄️ ${freezerPortionsOf(r.nome)} porz.` : escapeHtml(String(TEMPO_LABEL[r.tempoBucket] || '').replace(/^\S+\s/, ''))}${pantryNote(pantryMatches[r.nome])}</span>
     </div>`).join('');
-  const chips = `<button type="button" class="btn is-chip ${dp.tipo==='all'?'active':''}" data-dish-course="all">Tutte</button>`
+  const chips = `<button type="button" class="btn is-chip ${dp.pantry?'active':''}" data-dish-pantry aria-pressed="${!!dp.pantry}">🧺 Con quello che ho</button><span class="dsh-chip-sep" aria-hidden="true"></span>`
+    + `<button type="button" class="btn is-chip ${dp.tipo==='all'?'active':''}" data-dish-course="all">Tutte</button>`
     + (frozen.length ? `<button type="button" class="btn is-chip ${dp.tipo==='freezer'?'active':''}" data-dish-course="freezer">❄️ Dal freezer</button>` : '')
     + COURSE_ORDER.map(t => `<button type="button" class="btn is-chip ${dp.tipo===t?'active':''}" data-dish-course="${t}">${tipoIcon(t)} ${escapeHtml(courseLabel(t))}</button>`).join('');
   const replaced = dp.replace ? dishes.find(x => x.name === dp.replace) : null;
@@ -6036,7 +6047,7 @@ function renderDishPickerScreen(){
       <div class="move-handle" aria-hidden="true"></div>
       <div class="dsh-head">
         <div class="dsh-head-text">
-          <span class="dsh-kicker">${escapeHtml(MEAL_LABEL[meal])} · ${escapeHtml(d.giorno.slice(0,3).toLowerCase())} ${escapeHtml(dateLabel.toLowerCase())}</span>
+          <span class="dsh-kicker">${escapeHtml(MEAL_LABEL[meal])} · ${escapeHtml(d.giorno.slice(0,3).toLowerCase())} ${escapeHtml(dateLabel.toLowerCase())} · max ${escapeHtml(tempoShortLabel(getTempoCap(i, meal)).replace(/^circa\s+/, ''))}</span>
           <h2 class="move-title">${dp.replace ? 'Cambia piatto' : 'Aggiungi piatto'}</h2>
         </div>
         <button type="button" class="btn is-icon dsh-close" data-close-dish-picker aria-label="Chiudi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -9661,7 +9672,15 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-open-swap]').forEach(btn=>{
     btn.addEventListener('click', e=>{
-      const key = e.target.dataset.openSwap;
+      const key = e.currentTarget.dataset.openSwap;
+      // Pasto vuoto: stessa schermata di "+ piatto" (foglio Aggiungi piatto).
+      const pm = parseMealKey(key);
+      if(state.swapOpenDay !== key && (pm.meal === 'pranzo' || pm.meal === 'cena') && !effectiveMeal(pm.weekIdx, pm.i, pm.meal).principale){
+        state.dishPicker = { key, replace: null, tipo: 'all', search: '' };
+        state.swapOpenDay = null; state.linkPickerOpenDay = null; state.avanzoDiPickerOpenDay = null;
+        render();
+        return;
+      }
       state.swapOpenDay = state.swapOpenDay === key ? null : key;
       state.linkPickerOpenDay = null;
       state.avanzoDiPickerOpenDay = null;
@@ -11949,6 +11968,7 @@ document.addEventListener('click', e=>{
     return;
   }
   if(e.target.closest('[data-close-dish-picker]') || (e.target.matches && e.target.matches('[data-dish-picker-backdrop]'))){ state.dishPicker = null; render(); return; }
+  if(e.target.closest('[data-dish-pantry]') && state.dishPicker){ state.dishPicker.pantry = !state.dishPicker.pantry; render(); return; }
   const courseEl = e.target.closest('[data-dish-course]');
   if(courseEl && state.dishPicker){ state.dishPicker.tipo = courseEl.dataset.dishCourse; render(); return; }
   const pickEl = e.target.closest('[data-dish-pick]');
