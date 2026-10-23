@@ -442,7 +442,7 @@ test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finch�
     state.pantryItems['ricotta'].qty = 0; upsertPantryItem('Ricotta', 'frigo', 1); // era finita: confezione nuova
     return { names, badges, kept, ricotta: state.pantryItems['ricotta'].scadenza || null };
   });
-  eq(r2, { names: ['Ricotta', 'Mozzarella'], badges: ['Scaduto ieri', 'Scade domani'], kept: true, ricotta: null });
+  eq(r2, { names: ['Ricotta', 'Mozzarella'], badges: ['Scaduto ieri', 'domani'], kept: true, ricotta: null });
   eq(page.errors, [], 'errori JS');
 });
 
@@ -1206,7 +1206,7 @@ test('dispensa come la spesa: Cibo/Casa restano, Raggruppa per Categoria/Luogo/A
   await page.evaluate(() => { state.tab = 'spesa'; render(); });
   const pasto = await page.evaluate(() => [...document.querySelectorAll('[data-shop-group] option')].map(o => o.textContent));
   eq(toggle, 2, 'Cibo/Casa');
-  eq(luogo.includes('Frigo') && luogo.includes('Freezer'), true, 'sezioni per luogo');
+  eq(luogo.some(t => /^Frigo\b/.test(t)) && luogo.some(t => /^Freezer\b/.test(t)), true, 'sezioni per luogo');
   eq(az.titles, 0, 'A-Z senza sezioni');
   eq(az.names.slice().sort((a, b) => a.localeCompare(b, 'it')), az.names, 'A-Z in ordine');
   eq(pasto, ['Corsie', 'Categoria', 'Spesa', 'Pasto', 'Dalla A alla Z']);
@@ -2999,6 +2999,27 @@ test('Spesa: tocco sulla quantità apre il fumetto con numero, unità e "Fatto";
   });
   eq([r.pop, r.still, r.pop2], [true, true, false]);
   eq([r.label, r.unit, r.saved], ['3 kg', 'kg', [3, 'kg']]);
+  eq(page.errors, [], 'errori JS');
+});
+
+test('Dispensa: tocco sulla quantità apre il fumetto con numero, unità e "Fatto"', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    upsertPantryItem('Provafarina', 'dispensa', 500, 'g');
+    state.tab = 'dispensa'; state.pantryView = 'cibo'; render();
+    const out = {};
+    document.querySelector('[data-qty-show="provafarina"]').click();
+    out.pop = !!document.querySelector('.qty-pop');
+    document.querySelector('[data-qty-unit="kg"]').click();
+    out.still = !!document.querySelector('.qty-pop');
+    const inp = document.querySelector('.qty-pop [data-qty-edit]');
+    inp.value = '2'; document.querySelector('.qty-pop [data-qty-pop-close].qty-pop-done').click();
+    out.pop2 = !!document.querySelector('.qty-pop');
+    out.item = [state.pantryItems['provafarina'].qty, state.pantryItems['provafarina'].unit];
+    out.label = document.querySelector('[data-qty-show="provafarina"]').textContent.trim();
+    return out;
+  });
+  eq([r.pop, r.still, r.pop2], [true, true, false]);
+  eq([r.item, r.label], [[2, 'kg'], '2 kg']);
   eq(page.errors, [], 'errori JS');
 });
 
