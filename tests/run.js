@@ -1539,11 +1539,21 @@ test('modalità cucina: un passo per schermata, avanti e indietro, Fatto in fond
   eq([await text(), await count()], [r.steps[0], `Passaggio 1/${r.steps.length}`], 'primo passo');
   eq(await page.locator('[data-cook-prev]').isDisabled(), true, 'indietro spento al primo');
   eq(await page.locator('.cook-nav-main').textContent(), r.steps.length > 1 ? 'Fatto!' : 'Ho finito', 'Fatto! ai passi intermedi');
+  // guardando avanti senza aver fatto il passaggio: il bottone riporta a quello che si sta facendo
   await page.click('[data-cook-next]');
-  eq([await text(), await count()], [r.steps[1], `Passaggio 2/${r.steps.length}`], 'secondo passo');
+  eq([await text(), await count()], [r.steps[1], `Passaggio 2/${r.steps.length}`], 'secondo passo (guardato)');
+  eq(await page.locator('.cook-nav-main').textContent(), 'Passaggio 1', 'guardando avanti: Passaggio x del passaggio che si sta facendo');
   await page.click('[data-cook-prev]');
   eq(await text(), r.steps[0], 'si torna indietro');
-  for(let i = 1; i < r.steps.length; i++) await page.click('[data-cook-next]');
+  // Fatto! segna il passaggio e passa al successivo
+  await page.click('[data-cook-step-done]');
+  eq(await text(), r.steps[1], 'Fatto! porta al secondo passo');
+  // guardando un passaggio precedente: Esegui di nuovo
+  await page.click('[data-cook-prev]');
+  eq(await page.locator('.cook-nav-main').textContent(), 'Esegui di nuovo', 'passaggio precedente: Esegui di nuovo');
+  await page.click('[data-cook-redo]');
+  eq(await page.locator('.cook-nav-main').textContent(), 'Fatto!', 'rifatto: di nuovo Fatto!');
+  for(let i = 0; i < r.steps.length - 1; i++) await page.click('[data-cook-step-done]');
   eq(await text(), r.steps[r.steps.length - 1], 'ultimo passo');
   eq(await page.locator('.cook-nav-main').textContent(), 'Ho finito', 'Ho finito all\'ultimo passo');
   await page.click('.cook-nav-main');
@@ -2905,12 +2915,12 @@ test('modalità cucina: "Ho finito" segna il piatto finito e passa al prossimo; 
     state.tab = 'menu'; state.expandedDay = '1_1_cena'; render();
     document.querySelector('[data-cook-start]').click();
     const out = { cards: [...document.querySelectorAll('.cook-tabs .dish-tab')].map(c => c.querySelector('.dish-tab-label').textContent), head: document.querySelector('.cook-title').textContent, endLabel: document.querySelector('.cook-end').textContent, noAwake: !document.querySelector('.cook-awake') };
-    document.querySelector('[data-cook-next]').click();
+    document.querySelector('[data-cook-step-done]').click();
     out.lastNote = document.querySelector('.cook-last-note').textContent.replace(/\s+/g, ' ').trim();
     document.querySelector('[data-cook-finish]').click();
     out.afterFirst = [state.cookMode.name, state.cookSession.map(x => x.done)];
     out.cards2 = [...document.querySelectorAll('.cook-tabs .dish-tab')].map(c => c.querySelector('.dish-tab-label').textContent + (c.classList.contains('is-done') ? ' finito' : ''));
-    document.querySelector('[data-cook-next]').click();
+    document.querySelector('[data-cook-step-done]').click();
     out.lastNote2 = document.querySelector('.cook-last-note').textContent.replace(/\s+/g, ' ').trim();
     document.querySelector('[data-cook-finish]').click();
     out.end = [state.cookMode, state.doneModalDay];
@@ -2951,7 +2961,7 @@ test('Cena fatta: foglio dal basso, avanzo No/Sì con luogo, voto un piatto alla
     // da Ricette: "Ho finito" apre Ricetta fatta, senza pasto
     state.expandedDay = null; state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = 'Prova uno'; render();
     document.querySelector('[data-cook-start]').click();
-    state.cookMode.step = 1; render();
+    state.cookSession[0].cursor = 1; state.cookMode.step = 1; render();
     document.querySelector('[data-cook-finish]').click();
     out.recipeDone = [state.doneModalDay, !!state.doneModalRecipe, document.querySelector('.done-sheet .move-title').textContent];
     document.querySelector('[data-confirm-done]').click();

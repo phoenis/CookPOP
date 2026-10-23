@@ -627,7 +627,7 @@ function mancantiButtonHtml(mancanti){
 // procedimento, ognuno con la sua scala di porzioni. Si passa dall'una
 // all'altra restando al passo a cui si è arrivati in ciascuna.
 function cookSessionFor(name, ratio, mk){
-  const list = [{ name, step: 0, ratio: ratio || 1, done: false, doneSteps: [] }];
+  const list = [{ name, step: 0, ratio: ratio || 1, done: false, cursor: 0 }];
   if(!mk) return list;
   const { weekIdx, i, meal } = parseMealKey(mk);
   const dishes = mealDishes(weekIdx, i, meal);
@@ -640,7 +640,7 @@ function cookSessionFor(name, ratio, mk){
     const det = getRecipeDetails(d.name);
     if(!det || !det.procedimento || !det.procedimento.length) return;
     const b = baseOf(d.name);
-    list.push({ name: d.name, step: 0, ratio: (b && current) ? current / b : 1, done: false, doneSteps: [] });
+    list.push({ name: d.name, step: 0, ratio: (b && current) ? current / b : 1, done: false, cursor: 0 });
   });
   return list;
 }
@@ -865,11 +865,12 @@ function renderCookModePage(){
   const BULB = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M176 232a8 8 0 0 1-8 8H88a8 8 0 0 1 0-16h80a8 8 0 0 1 8 8m40-128a87.55 87.55 0 0 1-33.64 69.21A16.24 16.24 0 0 0 176 186v6a16 16 0 0 1-16 16H96a16 16 0 0 1-16-16v-6a16 16 0 0 0-6.23-12.66A87.59 87.59 0 0 1 40 104.49C39.74 56.83 78.26 17.14 125.88 16A88 88 0 0 1 216 104m-16 0a72 72 0 0 0-73.74-72c-39 .92-70.47 33.39-70.26 72.39a71.65 71.65 0 0 0 27.64 56.3A32 32 0 0 1 96 186v6h64v-6a32.15 32.15 0 0 1 12.47-25.35A71.65 71.65 0 0 0 200 104m-16.11-9.34a57.6 57.6 0 0 0-46.56-46.55a8 8 0 0 0-2.66 15.78c16.57 2.79 30.63 16.85 33.44 33.45A8 8 0 0 0 176 104a9 9 0 0 0 1.35-.11a8 8 0 0 0 6.54-9.23"/></svg>';
   const tipHtml = tip ? `<p class="cook-tip">${BULB}<span><b>Consiglio:</b> ${escapeHtml(tip)}</span></p>` : '';
   const timerUi = cookTimerHtml(steps[step]);
+  // "cursor" è il passaggio che si sta facendo; "step" quello che si sta guardando.
   const cur = (state.cookSession || []).find(x => x.name === cm.name);
-  const stepDone = !!(cur && (cur.doneSteps || []).includes(step));
+  const cursor = Math.min(Math.max(0, cur ? (cur.cursor || 0) : step), total - 1);
   const where = isLast ? 'Ultimo passaggio' : `Passaggio ${step + 1} di ${total}`;
   const lastNote = isLast ? cookLastNote(cm) : '';
-  const segs = Array.from({ length: total }, (_, i) => `<span class="${i <= step ? 'on' : ''}"></span>`).join('');
+  const segs = Array.from({ length: total }, (_, i) => `<span class="${i <= cursor ? 'on' : ''}"></span>`).join('');
   const cooking = cm.mk ? (parseMealKey(cm.mk).meal === 'cena' ? 'Cucinando la cena' : 'Cucinando il pranzo') : `Cucinando ${cm.name}`;
   return `
   <div class="sheet-page cook-page${pageEntering('cook') ? ' is-entering' : ''}" data-page="cook">
@@ -893,11 +894,11 @@ function renderCookModePage(){
       ${lastNote ? `<div class="cook-last-note"><span class="cook-last-ic" aria-hidden="true">✓</span><span>${escapeHtml(lastNote)}</span></div>` : ''}
       <div class="cook-nav">
         <button type="button" class="cook-arrow" data-cook-prev aria-label="Passaggio precedente" ${isFirst ? 'disabled' : ''}><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M224 128a8 8 0 0 1-8 8H59.31l58.35 58.34a8 8 0 0 1-11.32 11.32l-72-72a8 8 0 0 1 0-11.32l72-72a8 8 0 0 1 11.32 11.32L59.31 120H216a8 8 0 0 1 8 8"/></svg></button>
-        ${isLast
-          ? '<button type="button" class="cook-nav-main" data-cook-finish>Ho finito</button>'
-          : stepDone
-            ? `<button type="button" class="cook-nav-main is-quiet" data-cook-next>Passaggio ${step + 1}</button>`
-            : '<button type="button" class="cook-nav-main" data-cook-step-done>Fatto!</button>'}
+        ${step === cursor
+          ? (isLast ? '<button type="button" class="cook-nav-main" data-cook-finish>Ho finito</button>' : '<button type="button" class="cook-nav-main" data-cook-step-done>Fatto!</button>')
+          : step > cursor
+            ? `<button type="button" class="cook-nav-main is-quiet" data-cook-goto="${cursor}">Passaggio ${cursor + 1}</button>`
+            : `<button type="button" class="cook-nav-main is-quiet" data-cook-redo>Esegui di nuovo</button>`}
         <button type="button" class="cook-arrow" data-cook-next aria-label="Passaggio successivo" ${isLast ? 'disabled' : ''}><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M221.66 133.66l-72 72a8 8 0 0 1-11.32-11.32L196.69 136H40a8 8 0 0 1 0-16h156.69l-58.35-58.34a8 8 0 0 1 11.32-11.32l72 72a8 8 0 0 1 0 11.32"/></svg></button>
       </div>
     </div>
@@ -10390,11 +10391,19 @@ function attachHandlers(){
     render();
   };
   document.querySelectorAll('[data-cook-prev]').forEach(el=> el.addEventListener('click', ()=> cookGo(-1)));
+  const cookSetCursor = n => { const cm = state.cookMode; if(!cm) return; const cur = (state.cookSession || []).find(x => x.name === cm.name); if(cur) cur.cursor = n; };
   document.querySelectorAll('[data-cook-step-done]').forEach(el=> el.addEventListener('click', ()=>{
     const cm = state.cookMode; if(!cm) return;
-    const cur = (state.cookSession || []).find(x => x.name === cm.name);
-    if(cur){ cur.doneSteps = cur.doneSteps || []; if(!cur.doneSteps.includes(cm.step || 0)) cur.doneSteps.push(cm.step || 0); }
-    cookGo(1);
+    const next = (cm.step || 0) + 1;
+    cookSetCursor(next); cm.step = next; render();
+  }));
+  document.querySelectorAll('[data-cook-goto]').forEach(el=> el.addEventListener('click', ()=>{
+    const cm = state.cookMode; if(!cm) return;
+    cm.step = parseInt(el.dataset.cookGoto, 10) || 0; render();
+  }));
+  document.querySelectorAll('[data-cook-redo]').forEach(el=> el.addEventListener('click', ()=>{
+    const cm = state.cookMode; if(!cm) return;
+    cookSetCursor(cm.step || 0); render();
   }));
   document.querySelectorAll('[data-cook-next]').forEach(el=> el.addEventListener('click', ()=> cookGo(1)));
   // Scorrere con il dito: a sinistra passo avanti, a destra indietro.
