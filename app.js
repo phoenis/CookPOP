@@ -8259,13 +8259,19 @@ function renderAddSheet(){
       ${!casa ? `<div class="add-field-label">Per chi</div>
       <select data-add-per aria-label="Per chi"><option value="">Noi</option>${shopPeople().map(p=>`<option value="${escapeAttr(p)}" ${a.per===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}<option value="__new" ${a.per==='__new'?'selected':''}>Un'altra persona…</option></select>
       ${a.per === '__new' ? `<input type="text" class="add-per-new" data-add-per-new placeholder="Nome (es. Nonna)" value="${escapeAttr(a.perNew || '')}" autocomplete="off">` : ''}` : ''}
-      <div class="add-field-label">Categoria (reparto in "Per reparto")</div>
-      <select data-add-cat aria-label="Categoria"><option value="">Automatica (${escapeHtml(DEPT_LABEL[classifyDept(name || '')] || '')})</option>${deptOptionsHtml(d.cat || '')}</select>
       <div class="add-field-label">${casa ? 'Dove sta' : 'Dove va quando lo compri'}</div>
-      <div class="move-chips">${LUOGO_ORDER.map(l => `<button type="button" class="btn is-chip move-chip${(d.luogo || 'dispensa') === l ? ' active' : ''}" data-add-luogo="${l}">${LUOGO_ICON[l] || ''} ${escapeHtml(LUOGO_LABEL[l])}</button>`).join('')}</div>
-      ${casa ? `<div class="add-field-label">Scadenza</div><input type="date" data-add-scad value="${escapeAttr(d.scadenza || '')}" aria-label="Scadenza">` : ''}
-      ${(!existingPantryFor(name) && name) ? `<div class="add-field-label">Gruppo (es. un formato di pasta)</div>
-      <select data-add-group aria-label="Gruppo"><option value="">Nessuno</option>${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${d.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}</select>` : ''}
+      <div class="add-luoghi">${LUOGO_ORDER.map(l => `<button type="button" class="sheet-luogo${(d.luogo || 'dispensa') === l ? ' active' : ''}" data-add-luogo="${l}" aria-pressed="${(d.luogo || 'dispensa') === l}"><span class="sheet-luogo-icon">${LUOGO_ICON[l] || ''}</span><span>${escapeHtml(LUOGO_LABEL[l])}</span></button>`).join('')}</div>
+      ${casa ? `<div class="add-field-label">Scadenza</div>
+      <div class="chip-row scadenza-quick">
+        <button type="button" class="btn is-chip${d.scadenza ? '' : ' active'}" data-add-scad-clear>Nessuna</button>
+        ${[3, 7, 30].map(n => { const iso = addDaysIso(n); return `<button type="button" class="btn is-chip${d.scadenza === iso ? ' active' : ''}" data-add-scad-quick="${n}">${escapeHtml(frozenOnShort(iso))}</button>`; }).join('')}
+        ${d.scadenza && ![3, 7, 30].some(n => addDaysIso(n) === d.scadenza) ? `<button type="button" class="btn is-chip active" aria-pressed="true">${escapeHtml(frozenOnShort(d.scadenza))}</button>` : ''}
+        <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} Altra data<input type="date" data-add-scad value="${escapeAttr(d.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
+      </div>` : ''}
+      <div class="add-field-label">Reparto</div>
+      <select data-add-cat aria-label="Reparto"><option value="">Automatico (${escapeHtml(DEPT_LABEL[classifyDept(name || '')] || '')})</option>${deptOptionsHtml(d.cat || '')}</select>
+      ${(!existingPantryFor(name) && name) ? `<div class="add-field-label">Equivalenti</div>
+      <select data-add-group aria-label="Equivalenti"><option value="">Nessuno</option>${Object.entries(state.pantryGroups).map(([id,g])=>`<option value="${id}" ${d.group===id?'selected':''}>${escapeHtml(g.label)}</option>`).join('')}</select>` : ''}
     </div>` : '';
   return `
   <div class="move-backdrop" data-add-bg>
@@ -8359,6 +8365,9 @@ document.addEventListener('click', e=>{
   const qtyBtn = t.closest('[data-add-qty]');
   if(qtyBtn){ const step = qtyStepFor(d.unit || '') * parseInt(qtyBtn.dataset.addQty, 10); d.qty = Math.max(0, Math.round(((typeof d.qty === 'number' ? d.qty : 0) + step) * 100) / 100); render(); return; }
   if(t.closest('[data-add-details]')){ a.detailsOpen = !a.detailsOpen; render(); return; }
+  if(t.closest('[data-add-scad-clear]')){ d.scadenza = ''; render(); return; }
+  const sq = t.closest('[data-add-scad-quick]');
+  if(sq){ d.scadenza = addDaysIso(parseInt(sq.dataset.addScadQuick, 10)); render(); return; }
   const lu = t.closest('[data-add-luogo]');
   if(lu){ d.luogo = lu.dataset.addLuogo; a.luogoUser = true; render(); return; }
   if(t.closest('[data-add-confirm]')){ addSheetCommit(); return; }
@@ -8403,7 +8412,7 @@ document.addEventListener('change', e=>{
   else if(t.matches('[data-add-cat]')){ a.d.cat = t.value; render(); }
   else if(t.matches('[data-add-group]')){ a.d.group = t.value; }
   else if(t.matches('[data-add-per]')){ a.per = t.value; render(); }
-  else if(t.matches('[data-add-scad]')){ a.d.scadenza = t.value; }
+  else if(t.matches('[data-add-scad]')){ a.d.scadenza = t.value; render(); }
   else if(t.matches('[data-add-name]')){
     // scritto a mano il nome di una voce che c'è già: stessi dati che se l'avessi scelta dall'elenco
     if(existingPantryFor(a.d.nome)){ fillDraftFromPantry(a.d, a.d.nome.trim()); render(); }
