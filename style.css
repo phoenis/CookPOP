@@ -2375,3 +2375,14 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 
 /* Bottoni dentro le barre in basso: niente ombra (solo i bottoni flottanti la tengono) */
 .cook-fab-bar .cook-fab, .cook-nav button, .cook-nav .cook-nav-main, .sheet-footer .btn, .move-footer .btn, .edit-footer .btn, .filters-modal-footer .btn{ box-shadow:none; }
+
+/* Scheda ingrediente: stessi bordi (1px, 1.5px quando scelto) per luogo, date e quantità */
+.sheet-luogo{ border:0; box-shadow:inset 0 0 0 1px var(--line-strong); border-radius:var(--r-m); background:var(--bg); color:var(--text); }
+.sheet-luogo.active{ border:0; box-shadow:inset 0 0 0 1.5px var(--accent); background:var(--accent-soft); color:var(--danger); }
+.sheet-date-chip, .chip-row .sheet-date-chip.btn.is-chip{ height:var(--h-s); min-height:0; padding:0 14px; border:0; border-radius:var(--r-full); background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); color:var(--text); font-size:var(--fs-small); font-weight:600; }
+.sheet-stepper .qty-btn{ width:var(--h-m); height:var(--h-m); border:0; border-radius:50%; background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); color:var(--text); }
+.sheet-stepper .qty-input{ border:0; box-shadow:none; background:transparent; font-weight:700; }
+.sheet-unit-btn{ height:var(--h-s); border:0; border-radius:var(--r-full); background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); color:var(--text); font-size:var(--fs-small); font-weight:600; }
+.settings-field .chip-row label.sheet-date-chip.btn.is-chip, .settings-field .chip-row label.sheet-date-chip.btn.is-chip svg{ font-size:var(--fs-small); }
+.settings-field .chip-row label.sheet-date-chip.btn.is-chip .ui-ico, .settings-field .chip-row label.sheet-date-chip.btn.is-chip svg{ width:16px; height:16px; }
+.settings-field .chip-row.scadenza-quick .btn.is-chip, .settings-field .chip-row .sheet-date-chip.btn.is-chip{ font-size:.875rem; font-weight:600; }
