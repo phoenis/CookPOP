@@ -2367,3 +2367,11 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .pantry-list .inv-main > .luogo-picker-opt{ gap:var(--s1); }
 .pantry-list .luogo-since{ font-size:.6875rem; font-weight:700; line-height:1; }
 .pantry-list .exp-badge, .pantry-list .frozen-on{ font-size:.6875rem; }
+
+/* Ricetta: legenda su due righe a sinistra, persone a destra sulla stessa riga */
+.rd .rd-sec{ position:relative; }
+.rd .rd-sec-head{ min-height:var(--row); }
+.rd .rd-legend{ position:absolute; left:0; top:0; height:var(--row); margin:0; flex-direction:column; justify-content:center; gap:4px; font-size:var(--fs-label); line-height:1.33; }
+
+/* Bottoni dentro le barre in basso: niente ombra (solo i bottoni flottanti la tengono) */
+.cook-fab-bar .cook-fab, .cook-nav button, .cook-nav .cook-nav-main, .sheet-footer .btn, .move-footer .btn, .edit-footer .btn, .filters-modal-footer .btn{ box-shadow:none; }
