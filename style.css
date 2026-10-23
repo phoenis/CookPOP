@@ -2251,8 +2251,9 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .shop-completed .qty-num{ text-decoration:line-through; }
 .shop-completed-actions .is-text{ color:var(--accent-text); }
 .shop-head .shop-toggle-all{ font-size:var(--fs-small); font-weight:600; min-height:var(--h-m); }
-.buttons-fixed.is-checked{ padding:0; left:var(--gutter); right:calc(var(--gutter) + 56px + var(--s3)); background:none; border:0; box-shadow:none; height:56px; }
-.buttons-fixed.is-checked .shop-move-btn{ width:100%; flex:none; height:56px; border-radius:var(--r-full); box-shadow:var(--shadow-2); }
+/* "Metti in dispensa": bottone centrato (non a tutta larghezza), alto e in linea con il + */
+.buttons-fixed.is-checked{ bottom:calc(4.5rem + env(safe-area-inset-bottom)); padding:0; left:50%; right:auto; transform:translateX(-50%); width:auto; background:none; border:0; box-shadow:none; height:56px; }
+.buttons-fixed.is-checked .shop-move-btn{ width:auto; flex:none; height:56px; padding:0 var(--s5); border-radius:var(--r-full); box-shadow:var(--shadow-2); }
 #spesa-fab{ width:56px; height:56px; box-shadow:var(--shadow-2); }
 
 /* ---------- Design system · Spesa (fumetto quantità) ---------- */
@@ -2407,3 +2408,8 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .shop-list .qty-stepper .qty-btn[data-shop-qty-inc]{ justify-content:flex-start; padding:0 0 0 2px; margin-right:-2px; }
 .shop-list .qty-num{ padding:0 4px; }
 .shop-list .qty-num.qty-placeholder{ justify-content:flex-end; padding-right:0; }
+
+/* Messaggio "annulla": stessa altezza e stessa linea del + (56px), a sinistra del + */
+.undo-toast{ right:calc(var(--gutter) + 56px + var(--s2)); bottom:calc(4.5rem + env(safe-area-inset-bottom)); min-height:56px; max-width:calc(100% - 2 * var(--gutter) - 56px - var(--s2)); align-items:center; }
+/* Selettore Cibo/Casa e Ricette/Libro: centrato in verticale sulla stessa linea del + (56px) */
+.pantry-kind-switch{ bottom:calc(4.5rem + 4px + env(safe-area-inset-bottom)); }
