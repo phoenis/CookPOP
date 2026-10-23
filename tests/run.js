@@ -2867,7 +2867,7 @@ test('dettaglio ricetta: tempi, "Uova · tuorli", titolo del pasto, "Metti nel m
   });
   assert(/^\S+ \d+ \S+ · 1 piatto$/.test(r.sub), `titolo: ${r.sub}`);
   eq([r.time, r.both, r.metaClean], ['Preparazione 10 min · Cottura 15 min', true, true]);
-  eq(r.uova, ['Uova · tuorli', 'Uova · intero']);
+  eq(r.uova, ['Uova · tuorli', 'Uova']);
   eq([r.bar, r.recBar, r.back], [['Cena fatta', 'Cucina'], ['Metti nel menù', 'Cucina'], 'Ricette']);
   // "Metti nel menù": scelgo un pasto e la ricetta ci va (come "Cambia piatto")
   await page.click('[data-recipe-to-menu]');
