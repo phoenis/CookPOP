@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=201">
+<link rel="stylesheet" href="style.css?v=203">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -36,7 +36,7 @@
       document.documentElement.style.setProperty('--gold-rgb', r+','+g+','+b);
     }
     var dark = theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.getElementById('meta-theme-color').setAttribute('content', dark ? '#18191b' : '#f3f2f2');
+    document.getElementById('meta-theme-color').setAttribute('content', dark ? '#121212' : '#f3f2f2');
   }catch(e){}
 })();
 </script>
@@ -124,6 +124,6 @@
 });
 </script>
 <script src="catalog.js?v=16"></script>
-<script src="app.js?v=287"></script>
+<script src="app.js?v=289"></script>
 </body>
 </html>
