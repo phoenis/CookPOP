@@ -627,7 +627,7 @@ function mancantiButtonHtml(mancanti){
 // procedimento, ognuno con la sua scala di porzioni. Si passa dall'una
 // all'altra restando al passo a cui si è arrivati in ciascuna.
 function cookSessionFor(name, ratio, mk){
-  const list = [{ name, step: 0, ratio: ratio || 1, done: false }];
+  const list = [{ name, step: 0, ratio: ratio || 1, done: false, doneSteps: [] }];
   if(!mk) return list;
   const { weekIdx, i, meal } = parseMealKey(mk);
   const dishes = mealDishes(weekIdx, i, meal);
@@ -640,7 +640,7 @@ function cookSessionFor(name, ratio, mk){
     const det = getRecipeDetails(d.name);
     if(!det || !det.procedimento || !det.procedimento.length) return;
     const b = baseOf(d.name);
-    list.push({ name: d.name, step: 0, ratio: (b && current) ? current / b : 1, done: false });
+    list.push({ name: d.name, step: 0, ratio: (b && current) ? current / b : 1, done: false, doneSteps: [] });
   });
   return list;
 }
@@ -656,21 +656,17 @@ function cookSwitchTo(name){
 function cookSwitcherHtml(cm){
   const list = state.cookSession;
   if(!list || list.length < 2) return '';
-  const total = n => ((getRecipeDetails(n) || {}).procedimento || []).length;
-  // Una scheda per piatto: portata (Primo, Secondo…) con la sua icona e, sotto,
-  // "2 di 8" oppure "finito" con la spunta. Fino a 3 piatti stanno in una riga
-  // (con 3 le schede sono in colonna), da 4 in poi scorrono in orizzontale.
-  const CHECK = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1em" height="1em"><path fill="currentColor" d="M229.66 77.66l-128 128a8 8 0 0 1-11.32 0l-56-56a8 8 0 0 1 11.32-11.32L96 188.69L218.34 66.34a8 8 0 0 1 11.32 11.32"/></svg>';
+  // Le stesse schede dei piatti del dettaglio del pasto (icona + portata, la
+  // attiva sottolineata); un piatto finito ha la spunta.
   const seen = {};
-  return `<div class="cook-cards n${Math.min(list.length, 4)}" role="tablist" aria-label="Piatti in cucina">${list.map(x=>{
+  return `<div class="dish-tabs-row cook-tabs"><div class="dish-tabs" role="tablist" aria-label="Piatti in cucina">${list.map(x=>{
     const active = x.name === cm.name;
-    const step = active ? (cm.step || 0) : (x.step || 0);
-    const label = courseLabel(dishCourse(x.name));
+    const tipo = dishCourse(x.name);
+    const label = courseLabel(tipo);
     seen[label] = (seen[label] || 0) + 1;
     const text = seen[label] > 1 ? `${label} ${seen[label]}` : label;
-    const status = x.done ? 'finito' : `${step + 1} di ${total(x.name)}`;
-    return `<button type="button" class="cook-card${active ? ' active' : ''}${x.done ? ' is-done' : ''}" role="tab" aria-selected="${active}" aria-label="${escapeAttr(x.name)}" title="${escapeAttr(x.name)}" data-cook-switch="${escapeAttr(x.name)}"><span class="cook-card-ic" aria-hidden="true">${x.done ? CHECK : tipoIcon(dishCourse(x.name))}</span><span class="cook-card-text"><b>${escapeHtml(text)}</b><small>${status}</small></span></button>`;
-  }).join('')}</div>`;
+    return `<button type="button" class="dish-tab${active ? ' active' : ''}${x.done ? ' is-done' : ''}" role="tab" aria-selected="${active}" aria-label="${escapeAttr(x.name)}" title="${escapeAttr(x.name)}" data-cook-switch="${escapeAttr(x.name)}"><span class="dish-ic" aria-hidden="true">${tipoIcon(tipo)}</span><span class="dish-tab-label">${escapeHtml(text)}</span>${x.done ? '<span class="cook-tab-check" aria-hidden="true">✓</span>' : ''}</button>`;
+  }).join('')}</div></div>`;
 }
 function cookFabHtml(name, ratio, mk){
   const det = getRecipeDetails(name);
@@ -869,25 +865,24 @@ function renderCookModePage(){
   const BULB = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M176 232a8 8 0 0 1-8 8H88a8 8 0 0 1 0-16h80a8 8 0 0 1 8 8m40-128a87.55 87.55 0 0 1-33.64 69.21A16.24 16.24 0 0 0 176 186v6a16 16 0 0 1-16 16H96a16 16 0 0 1-16-16v-6a16 16 0 0 0-6.23-12.66A87.59 87.59 0 0 1 40 104.49C39.74 56.83 78.26 17.14 125.88 16A88 88 0 0 1 216 104m-16 0a72 72 0 0 0-73.74-72c-39 .92-70.47 33.39-70.26 72.39a71.65 71.65 0 0 0 27.64 56.3A32 32 0 0 1 96 186v6h64v-6a32.15 32.15 0 0 1 12.47-25.35A71.65 71.65 0 0 0 200 104m-16.11-9.34a57.6 57.6 0 0 0-46.56-46.55a8 8 0 0 0-2.66 15.78c16.57 2.79 30.63 16.85 33.44 33.45A8 8 0 0 0 176 104a9 9 0 0 0 1.35-.11a8 8 0 0 0 6.54-9.23"/></svg>';
   const tipHtml = tip ? `<p class="cook-tip">${BULB}<span><b>Consiglio:</b> ${escapeHtml(tip)}</span></p>` : '';
   const timerUi = cookTimerHtml(steps[step]);
-  const where = multi ? `${cm.name} · ${isLast ? 'ultimo passaggio' : `passaggio ${step + 1}`}` : '';
+  const cur = (state.cookSession || []).find(x => x.name === cm.name);
+  const stepDone = !!(cur && (cur.doneSteps || []).includes(step));
+  const where = isLast ? 'Ultimo passaggio' : `Passaggio ${step + 1} di ${total}`;
   const lastNote = isLast ? cookLastNote(cm) : '';
-  const X = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M205.66 194.34a8 8 0 0 1-11.32 11.32L128 139.31l-66.34 66.35a8 8 0 0 1-11.32-11.32L116.69 128L50.34 61.66a8 8 0 0 1 11.32-11.32L128 116.69l66.34-66.35a8 8 0 0 1 11.32 11.32L139.31 128Z"/></svg>';
-  const sun = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.125em" height="1.125em"><path fill="currentColor" d="M120 40V16a8 8 0 0 1 16 0v24a8 8 0 0 1-16 0m72 88a64 64 0 1 1-64-64a64.07 64.07 0 0 1 64 64m-16 0a48 48 0 1 0-48 48a48.05 48.05 0 0 0 48-48M58.34 69.66a8 8 0 0 0 11.32-11.32l-16-16a8 8 0 0 0-11.32 11.32Zm0 116.68l-16 16a8 8 0 0 0 11.32 11.32l16-16a8 8 0 0 0-11.32-11.32M192 72a8 8 0 0 0 5.66-2.34l16-16a8 8 0 0 0-11.32-11.32l-16 16A8 8 0 0 0 192 72m5.66 114.34a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32-11.32ZM48 128a8 8 0 0 0-8-8H16a8 8 0 0 0 0 16h24a8 8 0 0 0 8-8m80 80a8 8 0 0 0-8 8v24a8 8 0 0 0 16 0v-24a8 8 0 0 0-8-8m112-88h-24a8 8 0 0 0 0 16h24a8 8 0 0 0 0-16"/></svg>';
   const segs = Array.from({ length: total }, (_, i) => `<span class="${i <= step ? 'on' : ''}"></span>`).join('');
-  const mealTitle = cm.mk ? MEAL_LABEL[parseMealKey(cm.mk).meal] : cm.name;
+  const cooking = cm.mk ? (parseMealKey(cm.mk).meal === 'cena' ? 'Cucinando la cena' : 'Cucinando il pranzo') : `Cucinando ${cm.name}`;
   return `
   <div class="sheet-page cook-page${pageEntering('cook') ? ' is-entering' : ''}" data-page="cook">
     <header class="cook-head">
-      <button type="button" class="cook-end" data-close-cook>${X} Esci</button>
-      <h2 class="cook-title">${escapeHtml(multi ? mealTitle : cm.name)}</h2>
-      ${multi ? '' : `<span class="cook-count">${step + 1} di ${total}</span>`}
+      <h2 class="cook-title">${escapeHtml(cooking)}</h2>
+      <button type="button" class="cook-end" data-close-cook>Termina</button>
     </header>
     ${cookSwitcherHtml(cm)}
     ${timerUi.bar}
     <div class="cook-segs" role="progressbar" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${step + 1}">${segs}</div>
     <div class="cook-body" data-cook-swipe>
       <section class="cook-step">
-        ${where ? `<div class="cook-step-count">${escapeHtml(where)}</div>` : ''}
+        <div class="cook-step-count">${escapeHtml(where)}</div>
         <p class="cook-step-text">${escapeHtml(steps[step])}</p>
         ${timerUi.btns}
       </section>
@@ -895,10 +890,15 @@ function renderCookModePage(){
       ${tipHtml}
     </div>
     <div class="cook-footer">
-      ${lastNote ? `<div class="cook-last-note"><span class="cook-last-ic" aria-hidden="true">✓</span><span>${escapeHtml(lastNote)}</span></div>` : `<div class="cook-awake">${sun}<span>Lo schermo resta acceso${multi || cm.mk ? '' : ' · all\'ultimo passaggio: “Ho finito” → Ricetta fatta'}</span></div>`}
+      ${lastNote ? `<div class="cook-last-note"><span class="cook-last-ic" aria-hidden="true">✓</span><span>${escapeHtml(lastNote)}</span></div>` : ''}
       <div class="cook-nav">
-        <button type="button" class="cook-nav-back" data-cook-prev ${isFirst ? 'disabled' : ''}>Indietro</button>
-        <button type="button" class="cook-nav-next" ${isLast ? 'data-cook-finish' : 'data-cook-next'}>${isLast ? 'Ho finito' : 'Avanti'}</button>
+        <button type="button" class="cook-arrow" data-cook-prev aria-label="Passaggio precedente" ${isFirst ? 'disabled' : ''}><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M224 128a8 8 0 0 1-8 8H59.31l58.35 58.34a8 8 0 0 1-11.32 11.32l-72-72a8 8 0 0 1 0-11.32l72-72a8 8 0 0 1 11.32 11.32L59.31 120H216a8 8 0 0 1 8 8"/></svg></button>
+        ${isLast
+          ? '<button type="button" class="cook-nav-main" data-cook-finish>Ho finito</button>'
+          : stepDone
+            ? `<button type="button" class="cook-nav-main is-quiet" data-cook-next>Passaggio ${step + 1}</button>`
+            : '<button type="button" class="cook-nav-main" data-cook-step-done>Fatto!</button>'}
+        <button type="button" class="cook-arrow" data-cook-next aria-label="Passaggio successivo" ${isLast ? 'disabled' : ''}><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1.25em" height="1.25em"><path fill="currentColor" d="M221.66 133.66l-72 72a8 8 0 0 1-11.32-11.32L196.69 136H40a8 8 0 0 1 0-16h156.69l-58.35-58.34a8 8 0 0 1 11.32-11.32l72 72a8 8 0 0 1 0 11.32"/></svg></button>
       </div>
     </div>
   </div>`;
@@ -10390,6 +10390,12 @@ function attachHandlers(){
     render();
   };
   document.querySelectorAll('[data-cook-prev]').forEach(el=> el.addEventListener('click', ()=> cookGo(-1)));
+  document.querySelectorAll('[data-cook-step-done]').forEach(el=> el.addEventListener('click', ()=>{
+    const cm = state.cookMode; if(!cm) return;
+    const cur = (state.cookSession || []).find(x => x.name === cm.name);
+    if(cur){ cur.doneSteps = cur.doneSteps || []; if(!cur.doneSteps.includes(cm.step || 0)) cur.doneSteps.push(cm.step || 0); }
+    cookGo(1);
+  }));
   document.querySelectorAll('[data-cook-next]').forEach(el=> el.addEventListener('click', ()=> cookGo(1)));
   // Scorrere con il dito: a sinistra passo avanti, a destra indietro.
   document.querySelectorAll('[data-cook-swipe]').forEach(el=>{
