@@ -1959,3 +1959,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .cook-arrow:disabled{ opacity:0.3; cursor:default; }
 .cook-nav-main{ flex:1; height:var(--btn-footer-h); border:0; border-radius:var(--radius-pill); background:var(--accent, #e03c1f); color:#fff; font-family:inherit; font-size:var(--text-body); font-weight:var(--weight-bold); cursor:pointer; }
 .cook-nav-main.is-quiet{ background:var(--bg); color:var(--ink); border:1.5px solid var(--line-strong, var(--line)); }
+
+/* Ti serve: ingredienti grandi come nella lista fuori */
+.cook-need-list li{ font-size:var(--text-body); line-height:1.4; padding:0.625rem 0; }
+.cook-need-list li b{ font-weight:var(--weight-normal); }
