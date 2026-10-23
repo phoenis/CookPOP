@@ -5551,7 +5551,14 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
     if(plan.double) bits.push('×2');
     return bits.length ? ' · ' + bits.join(' ') : '';
   };
-  const dishesHtml = name ? `
+  // Pasto-avanzo: niente portate né azioni per piatto, ma una riga sola più
+  // discreta — icona dell'avanzo e i piatti uno dopo l'altro, col "+".
+  const leftoverHtml = (name && linkSource) ? `
+    <div class="dish-line is-leftover">
+      <div class="leftover-line"><button type="button" class="dish-ic leftover-ic${dishLockedHas(mk, dishes[0].name) ? ' is-locked' : ''}" data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(dishes[0].name)}" aria-pressed="${dishLockedHas(mk, dishes[0].name)}" aria-label="Avanzo: blocca o sblocca il pasto">🥡</button><span class="leftover-names">${dishes.map(dsh => `<span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>`).join('<span class="leftover-sep"> + </span>')}</span></div>
+      <button type="button" class="btn dish-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>
+    </div>` : '';
+  const dishesHtml = leftoverHtml || (name ? `
     <div class="dish-line">
       ${dishes.map(dsh=>{
         const fixed = !!linkSource && dsh.role === 'p';
@@ -5569,7 +5576,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       </div>`;
       }).join('')}
       <button type="button" class="btn dish-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>
-    </div>` : '';
+    </div>` : '');
 
   // Un pasto vuoto non è mai "cucinato", anche se è rimasta la spunta di una
   // ricetta che prima c'era (prima la nascondeva per caso il CSS della riga

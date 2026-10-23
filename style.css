@@ -2413,3 +2413,13 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .undo-toast{ right:calc(var(--gutter) + 56px + var(--s2)); bottom:calc(4.5rem + env(safe-area-inset-bottom)); min-height:56px; max-width:calc(100% - 2 * var(--gutter) - 56px - var(--s2)); align-items:center; }
 /* Selettore Cibo/Casa e Ricette/Libro: centrato in verticale sulla stessa linea del + (56px) */
 .pantry-kind-switch{ bottom:calc(4.5rem + 4px + env(safe-area-inset-bottom)); }
+
+/* Pasto-avanzo: una riga discreta con l'icona dell'avanzo e i piatti col "+" */
+.dish-line.is-leftover{ display:flex; flex-direction:column; align-items:flex-start; gap:var(--s1); }
+.leftover-line{ display:flex; align-items:flex-start; gap:var(--s2); padding:var(--s2) 0; }
+.leftover-ic{ flex:none; font-size:1.25rem; line-height:1.375; }
+.leftover-names{ font-size:var(--fs-body); line-height:var(--lh-body); font-weight:600; color:var(--text); }
+.leftover-names .day-menu{ font-size:inherit; line-height:inherit; font-weight:inherit; }
+.leftover-sep{ color:var(--muted); font-weight:400; }
+.leftover-names .day-menu{ text-decoration:none; border:0; }
+.leftover-line .leftover-ic.dish-ic{ width:28px; height:28px; min-width:0; background:transparent; font-size:1.25rem; }
