@@ -2073,6 +2073,7 @@ const state = {
   shopDismissed: {},
   shopExtras: {},
   shopQty: {},
+  shopUnit: {}, // rowKey di Spesa -> unità scelta a mano nel fumetto della quantità ('' = pezzi)
   shopQtyEditingKey: null,
   shopView: 'reparto', // non persistito (vedi persist()): riparte sempre da qui, non "ricorda" l'ultima vista scelta tra un caricamento e l'altro
   addIngModalOpen: false,
@@ -3160,7 +3161,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','shopExpiry','expiryEstimates','expiryRules','userColors','prepDay','dishPlan','freezerDishes'];
+const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','shopUnit','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','shopExpiry','expiryEstimates','expiryRules','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -3301,6 +3302,7 @@ function buildPersonalPayload(){
     shopDismissed: state.shopDismissed,
     shopExtras: state.shopExtras,
     shopQty: state.shopQty,
+    shopUnit: state.shopUnit,
     pantryChecked: state.pantryChecked,
     // shopView/pantryView non persistiti: ogni apertura dell'app riparte da
     // Per reparto/Per categoria (vedi state init), non "ricorda" l'ultima
@@ -6954,7 +6956,8 @@ function renderSpesa(){
     const parsedQta = parseQtyValue(qta);
     const hasAmount = !!parsedQta && parsedQta.unit !== 'none';
     const pantryUnit = (state.pantryItems[(ingrediente||'').trim().toLowerCase()] || {}).unit;
-    const unit = hasAmount ? (parsedQta.unit || '') : (['g','kg','ml','l'].includes(pantryUnit) ? pantryUnit : '');
+    const baseUnit = hasAmount ? (parsedQta.unit || '') : (['g','kg','ml','l'].includes(pantryUnit) ? pantryUnit : '');
+    const unit = typeof (state.shopUnit || {})[rowKey] === 'string' ? state.shopUnit[rowKey] : baseUnit;
     const step = qtyStepFor(unit);
     const qty = (typeof state.shopQty[rowKey] === 'number') ? state.shopQty[rowKey] : (hasAmount ? parsedQta.value : 0);
     const qtyDefault = hasAmount ? parsedQta.value : '';
@@ -6988,11 +6991,15 @@ function renderSpesa(){
       </label>
       <span class="qty-stepper" title="Quantità da prendere">
         <button class="qty-btn" type="button" data-shop-qty-dec="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Diminuisci quantità">−</button>
-        ${editingQty
-          ? `<input type="number" min="0" step="${step}" class="qty-input" value="${qty > 0 ? qty : ''}" placeholder="–" data-shop-qty-edit="${escapeAttr(rowKey)}">${unit ? `<span class="qty-unit">${escapeHtml(unit)}</span>` : ''}`
-          : qty > 0
-            ? `<span class="qty-num" data-shop-qty-show="${escapeAttr(rowKey)}">${qty}${unit ? ' ' + escapeHtml(unit) : ''}</span>`
-            : `<span class="qty-num qty-placeholder" data-shop-qty-show="${escapeAttr(rowKey)}" title="Quantità non indicata">–</span>`}
+        ${qty > 0
+          ? `<span class="qty-num" data-shop-qty-show="${escapeAttr(rowKey)}">${qty}${unit ? ' ' + escapeHtml(unit) : ''}</span>`
+          : `<span class="qty-num qty-placeholder" data-shop-qty-show="${escapeAttr(rowKey)}" title="Quantità non indicata">–</span>`}
+        ${editingQty ? `<div class="qty-pop-backdrop" data-shop-qty-pop-close></div>
+        <div class="qty-pop" role="dialog" aria-label="Quantità">
+          <input type="number" inputmode="decimal" min="0" step="${step}" class="qty-input" value="${qty > 0 ? qty : ''}" placeholder="–" data-shop-qty-edit="${escapeAttr(rowKey)}" aria-label="Quantità">
+          <div class="qty-pop-units">${['', 'g', 'kg', 'ml', 'l'].map(u=>`<button type="button" class="qty-pop-unit${unit === u ? ' active' : ''}" data-shop-qty-unit="${u}" aria-pressed="${unit === u}">${escapeHtml(UNIT_SHORT[u] || u)}</button>`).join('')}</div>
+          <button type="button" class="btn btn--primary qty-pop-done" data-shop-qty-pop-close data-shop-qty-pop-done>Fatto</button>
+        </div>` : ''}
         <button class="qty-btn" type="button" data-shop-qty-inc="${escapeAttr(rowKey)}" data-shop-qty-default="${qtyDefault}" data-shop-qty-step="${step}" aria-label="Aumenta quantità">+</button>
       </span>
     </div>
@@ -9324,17 +9331,36 @@ function attachHandlers(){
   });
   const shopQtyEditInput = document.querySelector('[data-shop-qty-edit]');
   if(shopQtyEditInput){
-    shopQtyEditInput.focus();
+    const popEl = document.querySelector('.qty-pop');
+    if(popEl){
+      const r = popEl.getBoundingClientRect();
+      if(r.bottom > window.innerHeight - 90) popEl.classList.add('is-up');
+    }
+    shopQtyEditInput.focus({ preventScroll: true });
     shopQtyEditInput.select();
-    const commitShopQtyEdit = ()=>{
-      const key = shopQtyEditInput.dataset.shopQtyEdit;
+    const popKey = shopQtyEditInput.dataset.shopQtyEdit;
+    // Il numero si legge alla chiusura (Fatto o tocco fuori) e quando cambia
+    // l'unità: un solo posto, così il fumetto non perde mai quello che hai scritto.
+    const readQty = ()=>{
       const n = parseFloat(shopQtyEditInput.value);
-      state.shopQty[key] = Number.isNaN(n) ? 0 : Math.max(0, n);
-      state.shopQtyEditingKey = null;
-      persist(); render();
+      state.shopQty[popKey] = Number.isNaN(n) ? 0 : Math.max(0, n);
     };
-    shopQtyEditInput.addEventListener('blur', commitShopQtyEdit);
-    shopQtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') shopQtyEditInput.blur(); });
+    document.querySelectorAll('[data-shop-qty-unit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        readQty();
+        if(!state.shopUnit) state.shopUnit = {};
+        state.shopUnit[popKey] = btn.dataset.shopQtyUnit;
+        persist(); render();
+      });
+    });
+    document.querySelectorAll('[data-shop-qty-pop-close]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        readQty();
+        state.shopQtyEditingKey = null;
+        persist(); render();
+      });
+    });
+    shopQtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ readQty(); state.shopQtyEditingKey = null; persist(); render(); } });
   }
   // Nota persistente per ingrediente (vedi ingredientNotes): il tasto/testo
   // vive dentro il <label> della riga, quindi senza preventDefault il click
