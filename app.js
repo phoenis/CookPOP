@@ -8118,14 +8118,13 @@ function frozenOnShort(iso){
 }
 function expiryBadgeHtml(days, iso){
   if(days === null) return '';
-  const [y, m, d] = iso.split('-');
   let text, level;
   if(days < 0){ text = days === -1 ? 'Scaduto ieri' : 'Scaduto'; level = 'is-expired'; }
-  else if(days === 0){ text = 'Scade oggi'; level = 'is-expired'; }
-  else if(days === 1){ text = 'Scade domani'; level = 'is-soon'; }
-  else if(days <= EXPIRY_SOON_DAYS){ text = `Scade tra ${days} giorni`; level = 'is-soon'; }
-  else if(days <= 7){ text = `Scade tra ${days} giorni`; level = 'is-later'; }
-  else { text = `Scad. ${d}/${m}`; level = 'is-later'; }
+  else if(days === 0){ text = 'oggi'; level = 'is-expired'; }
+  else if(days === 1){ text = 'domani'; level = 'is-soon'; }
+  else if(days <= EXPIRY_SOON_DAYS){ text = `tra ${days} gg`; level = 'is-soon'; }
+  else if(days <= 7){ text = `tra ${days} gg`; level = 'is-later'; }
+  else { text = frozenOnShort(iso); level = 'is-later'; }
   return `<span class="exp-badge ${level}">${text}</span>`;
 }
 
@@ -9103,14 +9102,18 @@ function renderDispensa(){
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-tolist="${escapeAttr(it.key)}" title="Aggiungi alla lista spesa" aria-label="Aggiungi alla lista spesa"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M17 17H6V3H4"/><path d="m6 5l14 1l-1 7H6"/></g></svg></button>
         <button type="button" class="btn is-icon luogo-picker-opt" data-finish-trash="${escapeAttr(it.key)}" title="Metti tra i Finiti" aria-label="Metti tra i Finiti">${TRASH_ICON_SVG}</button>
       </div>` : ''}
-      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">❄️ ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>
+      <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>
       ${it.unit === 'none'
         ? `<label class="presence-toggle"><input type="checkbox" ${it.qty > 0 ? 'checked' : ''} data-presence-toggle="${escapeAttr(it.key)}"></label>`
         : `<span class="qty-stepper">
         <button class="qty-btn" type="button" data-qty-dec="${escapeAttr(it.key)}" aria-label="Diminuisci">−</button>
-        ${editing
-          ? `<input type="number" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}">${it.unit ? `<span class="qty-unit">${escapeHtml(it.unit)}</span>` : ''}`
-          : `<span class="qty-num${pantryQtyIsLow(it) ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>`}
+        <span class="qty-num${pantryQtyIsLow(it) ? ' low' : ''}" data-qty-show="${escapeAttr(it.key)}">${it.qty}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>
+        ${editing ? `<div class="qty-pop-backdrop" data-qty-pop-close></div>
+        <div class="qty-pop" role="dialog" aria-label="Quantità">
+          <input type="number" inputmode="decimal" min="0" step="${step}" class="qty-input" value="${it.qty}" data-qty-edit="${escapeAttr(it.key)}" aria-label="Quantità">
+          ${state.pantryView === 'casa' ? '' : `<div class="qty-pop-units">${['', 'g', 'kg', 'ml', 'l'].map(u=>`<button type="button" class="qty-pop-unit${(it.unit || '') === u ? ' active' : ''}" data-qty-unit="${u}" aria-pressed="${(it.unit || '') === u}">${escapeHtml(UNIT_SHORT[u] || u)}</button>`).join('')}</div>`}
+          <button type="button" class="btn btn--primary qty-pop-done" data-qty-pop-close>Fatto</button>
+        </div>` : ''}
       </span>`}
     </div>
     </div>
@@ -9141,7 +9144,7 @@ function renderDispensa(){
       .sort((a, b) => a.days - b.days || IT_COLLATOR.compare(a.it.nome, b.it.nome));
     const expiringHtml = expiring.length ? `
       <div class="shop-day-group expiring-group">
-        <div class="dept-title"><span class="dept-icon">⏰</span>In scadenza</div>
+        <div class="dept-title"><span class="dept-icon">⏰</span>In scadenza <small class="dept-num">· ${expiring.length}</small></div>
         <div class="accordion-body">${expiring.map(x => itemRow(x.it)).join('')}</div>
       </div>` : '';
     body = expiringHtml + (!depts.length
@@ -9153,7 +9156,7 @@ function renderDispensa(){
       return `
       <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-pantry-section="${sectionId}">
-          <span class="dept-icon">${iconHtml}</span>${escapeHtml(label)}
+          <span class="dept-icon">${iconHtml}</span>${escapeHtml(label)} <small class="dept-num">· ${list.length}</small>
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"/></svg>
         </div>
         <div class="accordion-body${isOpen ? '' : ' is-collapsed'}">
@@ -10929,23 +10932,35 @@ function attachHandlers(){
   });
   const qtyEditInput = document.querySelector('[data-qty-edit]');
   if(qtyEditInput){
-    qtyEditInput.focus();
+    const popEl = document.querySelector('.qty-pop');
+    if(popEl && popEl.getBoundingClientRect().bottom > window.innerHeight - 90) popEl.classList.add('is-up');
+    qtyEditInput.focus({ preventScroll: true });
     qtyEditInput.select();
-    const commitQtyEdit = ()=>{
-      const key = qtyEditInput.dataset.qtyEdit;
-      const it = state.pantryItems[key];
-      if(it){
-        const n = parseFloat(qtyEditInput.value);
-        const next = Number.isNaN(n) ? 0 : Math.max(0, n);
-        if(next <= 0 && !isLeftoverPantryItem(it)) state.pantryFinishPicker = key;
-        else it.qty = next;
-        if(it.qty > 0) delete state.pantryConfirmedShop[key];
-      }
-      state.pantryEditingKey = null;
-      persist(); render();
+    const popKey = qtyEditInput.dataset.qtyEdit;
+    // Il numero si legge alla chiusura (Fatto, tocco fuori, Invio) e quando
+    // cambia l'unità. Da 0 in giù resta la domanda "è finito?" di sempre.
+    const readQty = ()=>{
+      const it = state.pantryItems[popKey];
+      if(!it) return;
+      const n = parseFloat(qtyEditInput.value);
+      const next = Number.isNaN(n) ? 0 : Math.max(0, n);
+      if(next <= 0 && !isLeftoverPantryItem(it)) state.pantryFinishPicker = popKey;
+      else it.qty = next;
+      if(it.qty > 0) delete state.pantryConfirmedShop[popKey];
     };
-    qtyEditInput.addEventListener('blur', commitQtyEdit);
-    qtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') qtyEditInput.blur(); });
+    document.querySelectorAll('[data-qty-unit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const it = state.pantryItems[popKey];
+        if(!it) return;
+        const n = parseFloat(qtyEditInput.value);
+        if(!Number.isNaN(n) && n > 0) it.qty = n;
+        if(btn.dataset.qtyUnit) it.unit = btn.dataset.qtyUnit; else delete it.unit;
+        persist(); render();
+      });
+    });
+    const closePop = ()=>{ readQty(); state.pantryEditingKey = null; persist(); render(); };
+    document.querySelectorAll('[data-qty-pop-close]').forEach(el=> el.addEventListener('click', closePop));
+    qtyEditInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') closePop(); });
   }
   document.querySelectorAll('[data-inv-remove]').forEach(btn=>{
     btn.addEventListener('click', e=>{
