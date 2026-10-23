@@ -2455,3 +2455,12 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .dsh-search .swap-search{ box-sizing:border-box; height:auto; line-height:1.3; align-self:center; padding:0; margin:0; }
 .dsh-results .swap-result{ row-gap:2px; align-content:center; }
 .dsh-chip-sep{ flex:none; width:1px; height:24px; background:var(--line-strong); align-self:center; }
+
+/* Aggiungi: dettagli nello stesso ordine e layout della scheda ingrediente */
+.add-luoghi{ display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:6px; }
+.add-luoghi .sheet-luogo{ height:64px; padding:0 2px; justify-content:center; gap:4px; font-size:.75rem; }
+.add-qty-row .qty-btn{ width:var(--h-m); height:var(--h-m); border:0; border-radius:50%; background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); color:var(--text); }
+.add-qty-row .qty-input{ border:0; box-shadow:none; background:transparent; font-weight:700; text-align:center; width:3.25rem; }
+.add-unit{ height:var(--h-s); padding:0 var(--s3); border:0; border-radius:var(--r-full); background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); color:var(--text); font-size:var(--fs-small); font-weight:600; }
+.add-details .scadenza-quick{ margin-bottom:var(--s2); }
+.add-details select{ width:100%; height:var(--h-l); padding:0 var(--s3); border:0; border-radius:var(--r-m); background:var(--bg); box-shadow:inset 0 0 0 1px var(--line-strong); color:var(--text); font-size:var(--fs-body); }
