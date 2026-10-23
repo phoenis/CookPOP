@@ -5690,7 +5690,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // e "Bloccato" è sola lettura (l'annullo sta nel lucchetto/nel foglio "⋯").
   const doneTag = ''; // lo stato "Cucinata" si legge e si cambia già nel bottone in basso a destra
   const statusBadges = `
-    ${linkSource ? `<button type="button" class="status-badge status-avanzo" data-unlink-day="${mk}">Avanzo <span class="status-badge-reset">✕</span></button>${!state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : ''}` : ''}
+    ${linkSource ? `${!state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : ''}` : ''}
   `;
 
   const isOpen = state.expandedDay === mk;
@@ -5701,6 +5701,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   <div class="meal-block${isDone ? ' done' : ''}${isOpen ? ' open' : ''}${name ? '' : ' is-empty'}" data-week-idx="${weekIdx}" data-day-index="${i}" data-meal="${meal}">
     <div class="day-meal">
       <div class="meal-block-label">${escapeHtml(MEAL_LABEL[meal])}${timeDisplay ? `<span class="meal-block-time"> · ${escapeHtml(timeDisplay)}</span>` : ''}</div>
+      ${name && linkSource ? `<button type="button" class="status-badge status-avanzo meal-avanzo-badge" data-unlink-day="${mk}" aria-label="Avanzo: scollega">Avanzo <span class="status-badge-reset">✕</span></button>` : ''}
       ${name && !linkSource ? `<button type="button" class="btn is-icon meal-overflow-btn" data-open-meal-overflow="${mk}" aria-label="Altre azioni"><svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button>` : ''}
       <div class="day-row-side display-none">
         ${currentCat ? `<span class="cat-icon" title="${escapeAttr(CAT_LABEL[currentCat])}">${catIcon(currentCat)}</span>` : ''}
