@@ -6640,11 +6640,12 @@ function renderMenu(){
       .filter(x => x.d !== null && x.d <= EXPIRY_SOON_DAYS && !isNonFoodDept(knownDept(x.it.cat) || classifyDept(x.it.nome)))
       .sort((a, b) => a.d - b.d);
     if(soon.length){
-      const when = d => d < 0 ? 'scaduto' : d === 0 ? 'oggi' : d === 1 ? 'domani' : `tra ${d} giorni`;
+      const when = d => d < 0 ? 'scaduto' : d === 0 ? 'oggi' : d === 1 ? 'domani' : `tra ${d} gg`;
       const list = soon.slice(0, 3).map(x => `<b>${escapeHtml(x.it.nome)}</b> (${when(x.d)})`).join(', ') + (soon.length > 3 ? ` e altri ${soon.length - 3}` : '');
       expiryBanner = `
         <div class="eaten-reminder-banner expiry-banner">
-          <span>⏰ Scade presto: ${list}</span>
+          <span class="expiry-lbl">⏰ Scade presto</span>
+          <span class="expiry-txt">${list}</span>
           <div class="eaten-reminder-actions">
             <button type="button" class="btn is-solid mini-add-btn" data-expiry-cook>Cosa cucino</button>
             <button type="button" class="btn is-ghost" data-dismiss-expiry-banner aria-label="Chiudi fino a domani">✕</button>
