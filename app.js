@@ -5054,6 +5054,8 @@ function closeTopbarMenu(){
   if(el) el.classList.remove('open');
 }
 const MODAL_CHECKS = [
+  [()=> !!state.shopQtyEditingKey, ()=>{ state.shopQtyEditingKey = null; }],
+  [()=> !!state.pantryEditingKey, ()=>{ state.pantryEditingKey = null; }],
   [()=> !!state.menuPick, ()=>{ state.menuPick = null; }],
   [()=> !!state.cookMode, ()=>{ state.cookMode = null; }],
   [()=> !!state.cookbookNameDraft, ()=>{ state.cookbookNameDraft = null; }],
@@ -7940,7 +7942,7 @@ function moveDateHint(iso){
   const d = Math.round((new Date(iso + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000);
   if(d <= 0) return 'oggi';
   if(d === 1) return 'domani';
-  if(d < 14) return `tra ${d} giorni`;
+  if(d < 14) return `tra ${d} gg`;
   if(d < 45) return `tra ${Math.round(d / 7)} sett.`;
   return `tra ${Math.round(d / 30)} mesi`;
 }
@@ -8650,10 +8652,9 @@ function renderIngredientSheet(it, isNew){
           <div class="settings-field-label">${addsLot ? 'Scadenza della nuova confezione' : 'Scadenza'} ${it.scadenza ? expiryBadgeHtml(days, it.scadenza) : '<span class="sheet-hint-inline">nessuna</span>'}</div>
           <div class="chip-row scadenza-quick">
             <button type="button" class="btn is-chip${it.scadenza ? '' : ' active'}" data-scadenza-clear>Nessuna</button>
-            <button type="button" class="btn is-chip" data-scadenza-quick="3">+3 giorni</button>
-            <button type="button" class="btn is-chip" data-scadenza-quick="7">+1 settimana</button>
-            <button type="button" class="btn is-chip" data-scadenza-quick="30">+1 mese</button>
-            <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} Data…<input type="date" id="pantry-edit-scadenza" value="${escapeAttr(it.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
+            ${[3, 7, 30].map(n => { const iso = addDaysIso(n); return `<button type="button" class="btn is-chip${it.scadenza === iso ? ' active' : ''}" data-scadenza-quick="${n}">${escapeHtml(frozenOnShort(iso))}</button>`; }).join('')}
+            ${it.scadenza && ![3, 7, 30].some(n => addDaysIso(n) === it.scadenza) ? `<button type="button" class="btn is-chip active" aria-pressed="true">${escapeHtml(frozenOnShort(it.scadenza))}</button>` : ''}
+            <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} Altra data<input type="date" id="pantry-edit-scadenza" value="${escapeAttr(it.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
           </div>
           ${canLots ? '<button type="button" class="btn is-text lot-add-link" data-lot-add>+ Altra scadenza (un\'altra confezione)</button>' : ''}
         </div>`);
@@ -8706,12 +8707,12 @@ function renderIngredientSheet(it, isNew){
       </section>
       <section class="settings-section">
         <div class="settings-card sheet-rows">
-          ${pickRow('cat', 'Categoria', sheetDeptLabelHtml(it, home))}
+          ${pickRow('cat', 'Reparto', sheetDeptLabelHtml(it, home))}
           ${catPicker}
-          ${home ? '' : pickRow('group', 'Gruppo', it.group && state.pantryGroups[it.group] ? escapeHtml(state.pantryGroups[it.group].label) : '<span class="sheet-hint-inline">nessuno</span>')}
+          ${home ? '' : pickRow('group', 'Equivalenti', it.group && state.pantryGroups[it.group] ? escapeHtml(state.pantryGroups[it.group].label) : '<span class="sheet-hint-inline">nessuno</span>')}
           ${groupPicker}
         </div>
-        ${home ? '' : '<p class="settings-note">Il gruppo unisce più formati (es. Fusilli e Penne in "Pasta corta"): una ricetta che chiede pasta corta li trova tutti.</p>'}
+        ${home ? '' : '<p class="settings-note">Gli equivalenti uniscono più formati (es. Fusilli e Penne in "Pasta corta"): una ricetta che chiede pasta corta li trova tutti.</p>'}
       </section>
       ${isNew ? '' : `<section class="settings-section">
         <button type="button" class="sheet-more-toggle" data-sheet-more aria-expanded="${more}">Altro ${more ? '▴' : '▾'}</button>
