@@ -1850,10 +1850,11 @@ function getIngredientsFor(name){
   return sortRecipeIngredients(list.map(it=>{
     const displayName = resolveIngredientName(it.ingrediente, renames);
     if(displayName === it.ingrediente) return it;
-    // Il nome scritto nella ricetta ("Tuorli", "Uovo") resta come dettaglio
-    // accanto al nome unificato ("Uova · tuorli"); stessa radice = "intero".
+    // Il nome scritto nella ricetta ("Tuorli") resta come dettaglio accanto al
+    // nome unificato ("Uova · tuorli"); se è solo una variante dello stesso
+    // nome (singolare/plurale, "Sale" / "Sale fino") non si ripete.
     const orig = (it.ingrediente || '').trim().toLowerCase(), shown = displayName.toLowerCase();
-    const qual = orig.slice(0, 3) === shown.slice(0, 3) ? 'intero' : orig;
+    const qual = orig.slice(0, 3) === shown.slice(0, 3) ? '' : orig;
     return Object.assign({}, it, { ingrediente: displayName, qual });
   }));
 }
