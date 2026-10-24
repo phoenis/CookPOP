@@ -3792,7 +3792,14 @@ function suggestSwaps(weekIdx, i, exclude){
 // Tetto di durata effettivo per un giorno+pasto: l'eccezione se c'è,
 // altrimenti la base (cena per ogni giorno, pranzo solo ven/sab/dom).
 function getTempoCap(day, meal){
-  return state.weekTempoExceptions[`${day}_${meal}`] || state.weekTempoBase || 'progetto';
+  const exc = state.weekTempoExceptions[`${day}_${meal}`];
+  if(exc) return exc;
+  const base = state.weekTempoBase || 'progetto';
+  // Sabato e domenica c'è più tempo: se non hai messo una regola per quel
+  // pasto, ammettono anche le ricette lunghe (altrimenti il generatore pesca
+  // sempre tra le poche ricette veloci e le settimane si somigliano tutte).
+  if((day === 5 || day === 6) && TEMPO_ORDER.indexOf(base) < TEMPO_ORDER.indexOf('lunga')) return 'lunga';
+  return base;
 }
 // Un piatto "da pasto" (principale): primo, secondo o piatto unico. Contorni
 // e antipasti non sono mai il piatto di un pasto (prima potevano esserlo:
