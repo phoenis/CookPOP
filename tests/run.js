@@ -3083,6 +3083,22 @@ test('avanzo: niente promemoria di preparazione (ammollo) né nel pasto né la s
   eq(r.after, { note: false, soak: false }, 'come avanzo non ci sono');
 });
 
+test('Gestisci ingredienti: eliminare un ingrediente lo toglie dall\'elenco anche se è in una ricetta, e riaggiungerlo lo riporta', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const nome = allIngredientNamesForManager().find(n => /^pasta$/i.test(n)) || allIngredientNamesForManager()[0];
+    const key = nome.trim().toLowerCase();
+    if(!state.pantryItems[key]) upsertPantryItem(nome, 'dispensa', 0);
+    state.tab = 'dispensa'; state.ingredientManagerOpen = true; state.pantryEditKey = key; state.pantrySheetMore = true; render();
+    document.getElementById('pantry-edit-delete').click();
+    const dopo = allIngredientNamesForManager().some(n => n.trim().toLowerCase() === key);
+    const nellaPagina = !!document.querySelector(`[data-manage-ingredient="${CSS.escape(nome)}"]`);
+    upsertPantryItem(nome, 'dispensa', 1);
+    const riaggiunto = allIngredientNamesForManager().some(n => n.trim().toLowerCase() === key);
+    return { nome, dopo, nellaPagina, riaggiunto };
+  });
+  eq([r.dopo, r.nellaPagina, r.riaggiunto], [false, false, true], 'elenco ingredienti ' + r.nome);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
