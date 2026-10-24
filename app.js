@@ -2187,6 +2187,7 @@ const state = {
   pantryDraft: null, // non persistito: bozza della scheda "Aggiungi ingrediente"
   pantrySheetPicker: null, // non persistito: 'cat' | 'group', elenco aperto nella scheda ingrediente
   pantrySheetMore: false, // non persistito: sezione "Altro" della scheda aperta
+  pantrySheetUsed: false, // non persistito: elenco "Usato in…" della scheda aperto
   mergeIngredientFrom: null, // non persistito: "Unisci con…" aperto per questo nome (vedi mergeIngredientInto)
   mergeIngredientTarget: null, // non persistito: nome scelto con cui unire, in attesa di conferma
   mergeIngredientSearch: '', // non persistito: ricerca nella scelta
@@ -6339,6 +6340,7 @@ function closeIngredientSheet(){
   state.pantryDraft = null;
   state.pantrySheetPicker = null;
   state.pantrySheetMore = false;
+  state.pantrySheetUsed = false;
 }
 function isCloseTap(e, el){
   return el.tagName === 'BUTTON' || e.target === el;
@@ -8663,6 +8665,14 @@ function pantryAddSuggestions(q){
   const sort = arr => arr.sort((a, b) => rank(a) - rank(b) || IT_COLLATOR.compare(a, b));
   return sort(inPantry).concat(sort(others)).slice(0, 8);
 }
+// Ricette che usano un ingrediente (stesso nome a meno di maiuscole/accenti,
+// anche come voce di un'alternativa o di una parentesi: vedi
+// manageableIngredientNames). Serve a sapere dove è usato prima di eliminarlo.
+function recipeNamesUsingIngredient(name){
+  const k = ingMatchKey(name);
+  if(!k) return [];
+  return allRecipeMetas().filter(r => getIngredientsFor(r.nome).some(it => it.ingrediente && (ingMatchKey(it.ingrediente) === k || manageableIngredientNames(it.ingrediente).some(n => ingMatchKey(n) === k)))).map(r => r.nome).sort((x, y) => IT_COLLATOR.compare(x, y));
+}
 function renderIngredientSheet(it, isNew){
   const sheetKey = 'sheet-' + (isNew ? 'new' : state.pantryEditKey);
   const entering = pageEntering(sheetKey);
@@ -8792,6 +8802,10 @@ function renderIngredientSheet(it, isNew){
           ${groupPicker}
         </div>
       </section>
+      ${isNew || home ? '' : (() => { const used = recipeNamesUsingIngredient(it.nome); const open = !!state.pantrySheetUsed && used.length > 0; return `<section class="settings-section">
+        ${used.length ? `<button type="button" class="sheet-more-toggle" data-sheet-used aria-expanded="${open}">Usato in ${used.length} ${used.length === 1 ? 'ricetta' : 'ricette'} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="${open ? 'transform:rotate(180deg)' : ''}"><path d="m6 9 6 6 6-6"/></svg></button>
+        ${open ? `<div class="settings-card"><ul class="ing-used-list">${used.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>` : ''}` : `<p class="settings-note">Non è in nessuna ricetta.</p>`}
+      </section>`; })()}
       ${isNew ? '' : `<section class="settings-section">
         <button type="button" class="sheet-more-toggle" data-sheet-more aria-expanded="${more}">Altro <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="${more ? 'transform:rotate(180deg)' : ''}"><path d="m6 9 6 6 6-6"/></svg></button>
         ${more ? `
@@ -11585,6 +11599,10 @@ function attachHandlers(){
     sheetChanged();
   }));
   document.querySelectorAll('[data-sheet-picker-close]').forEach(el=> el.addEventListener('click', ()=>{ state.pantrySheetPicker = null; render(); }));
+  document.querySelectorAll('[data-sheet-used]').forEach(btn=> btn.addEventListener('click', ()=>{
+    state.pantrySheetUsed = !state.pantrySheetUsed;
+    render();
+  }));
   document.querySelectorAll('[data-sheet-more]').forEach(btn=> btn.addEventListener('click', ()=>{
     state.pantrySheetMore = !state.pantrySheetMore;
     render();
