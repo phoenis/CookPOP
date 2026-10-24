@@ -4942,7 +4942,16 @@ function restoreRecipeEditForm(snap){
   const area = form.querySelector('#edit-photo-area');
   if(area && fresh !== undefined) area.innerHTML = fresh;
 }
+// La data del giorno resta appiccicata sotto topbar + titolo settimana: la loro
+// altezza cambia (testo grande, a capo), quindi la misuriamo invece di fissarla.
+function syncMenuStickyTop(){
+  const bar = document.querySelector('.topbar'), title = document.querySelector('.week-title.is-menu');
+  if(!bar || !title) return;
+  document.documentElement.style.setProperty('--menu-sticky-top', (bar.offsetHeight + title.offsetHeight) + 'px');
+}
+window.addEventListener('resize', syncMenuStickyTop);
 function render(){
+  requestAnimationFrame(syncMenuStickyTop);
   applyCustomDepts();
   if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
   if(personalSynced || !window.cookpopSync) applyRecurringConsumption();

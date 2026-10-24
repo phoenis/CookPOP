@@ -353,7 +353,7 @@
 /*   .day-card:last-child{ border-bottom:none; }
  */  .day-card.done{ background:color-mix(in srgb, var(--green-deep) 8%, transparent); }
   .day-card.done .day-menu{ text-decoration:line-through; opacity:0.6; }
-  .day-row{ display:flex; flex-direction: column; align-items:center; position: sticky; top: 7rem; width: 1.5rem;}
+  .day-row{ display:flex; flex-direction: column; align-items:center; position: sticky; top: calc(var(--menu-sticky-top, 7rem) + var(--padding-block)); width: 1.5rem;}
   .day-row-side{ display:flex; align-items:center; flex-shrink:0; height: 1rem; gap: var(--gap-icon); position: absolute; top: var(--padding-page); right: var(--padding-page);}
   .day-name{ font-family:var(--font-family); font-weight:var(--weight-medium); font-size:var(--text-small); display: flex; flex-direction: column; text-align: center;}
   /* .day-date{ font-family:var(--font-family); font-weight:var(--weight-normal); font-size:var(--text-xsmall); color:var(--ink-light); } */
