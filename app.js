@@ -1201,6 +1201,7 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
   const key = trimmedName.toLowerCase();
+  if(state.hiddenIngredients) delete state.hiddenIngredients[key]; // lo riaggiungi: torna nell'elenco
   const existing = state.pantryItems[key];
   const currentQty = (existing && typeof existing.qty === 'number') ? existing.qty : 0;
   const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
@@ -2003,7 +2004,7 @@ function allIngredientNamesForManager(){
   });
   Object.values(state.shopExtras).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
   DATA.generalShopping.forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
-  return Array.from(names.values()).sort((a,b)=>IT_COLLATOR.compare(a, b));
+  return Array.from(names.values()).filter(n => !(state.hiddenIngredients || {})[n.trim().toLowerCase()]).sort((a,b)=>IT_COLLATOR.compare(a, b));
 }
 
 // Combobox "leggera" per un campo nome-ingrediente creato fuori dal normale
@@ -2243,6 +2244,7 @@ const state = {
   recipeEdits: {},
   recipeEditName: null,
   customRecipes: {}, // nome -> {nome}: ricette create a mano, non presenti nel catalogo DATA.recipes
+  hiddenIngredients: {}, // nome in minuscolo -> true: ingredienti "eliminati" da Gestisci ingredienti (il nome può restare in qualche ricetta, quindi si nasconde dall'elenco)
   hiddenRecipes: {}, // nome -> true: ricette del catalogo "eliminate" (DATA.recipes è statico, quindi si nascondono invece di rimuoverle)
   newRecipeModalOpen: false,
   newRecipeError: '',
@@ -2443,13 +2445,14 @@ function getSpaceRoute(){
 // personale — un flag condiviso farebbe girare quella migrazione una sola
 // volta in assoluto (dal primo spazio ad aprire l'app) invece che una volta
 // per spazio, lasciando gli altri spazi senza gruppi assegnati alla loro Dispensa.
-const CATALOG_FIELDS = ['recipeIngredients','ingredientRenames','recipeEdits','customRecipes','hiddenRecipes','pantryGroups','customDepts'];
+const CATALOG_FIELDS = ['recipeIngredients','ingredientRenames','recipeEdits','customRecipes','hiddenRecipes','hiddenIngredients','pantryGroups','customDepts'];
 function decodeCatalogSaved(saved){
   if(saved.recipeIngredients) saved.recipeIngredients = decodeKeysFromFirebase(saved.recipeIngredients);
   if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
   if(saved.recipeEdits) saved.recipeEdits = decodeKeysFromFirebase(saved.recipeEdits);
   if(saved.customRecipes) saved.customRecipes = decodeKeysFromFirebase(saved.customRecipes);
   if(saved.hiddenRecipes) saved.hiddenRecipes = decodeKeysFromFirebase(saved.hiddenRecipes);
+  if(saved.hiddenIngredients) saved.hiddenIngredients = decodeKeysFromFirebase(saved.hiddenIngredients);
   return saved;
 }
 function encodeCatalogForFirebase(payload){
@@ -2459,7 +2462,8 @@ function encodeCatalogForFirebase(payload){
     ingredientRenames: encodeKeysForFirebase(payload.ingredientRenames),
     recipeEdits: encodeKeysForFirebase(payload.recipeEdits),
     customRecipes: encodeKeysForFirebase(payload.customRecipes),
-    hiddenRecipes: encodeKeysForFirebase(payload.hiddenRecipes)
+    hiddenRecipes: encodeKeysForFirebase(payload.hiddenRecipes),
+    hiddenIngredients: encodeKeysForFirebase(payload.hiddenIngredients)
   }));
 }
 const COOK_LABEL = { mara:'Mara', ste:'Ste' };
@@ -11603,10 +11607,15 @@ function attachHandlers(){
     editDeleteBtn.addEventListener('click', ()=>{
       const key = state.pantryEditKey;
       const prev = state.pantryItems[key];
+      const wasHidden = !!(state.hiddenIngredients || {})[key];
       delete state.pantryItems[key];
+      // Il nome può stare ancora in una ricetta o in Spesa: oltre alla scorta
+      // lo nascondiamo da "Gestisci ingredienti", altrimenti sembra non eliminato.
+      state.hiddenIngredients = state.hiddenIngredients || {};
+      state.hiddenIngredients[key] = true;
       closeIngredientSheet();
       persist(); render();
-      if(prev) showUndoToast(`${prev.nome} eliminato`, ()=>{ state.pantryItems[key] = prev; persist(); render(); });
+      if(prev) showUndoToast(`${prev.nome} eliminato`, ()=>{ if(!wasHidden) delete state.hiddenIngredients[key]; state.pantryItems[key] = prev; persist(); render(); });
     });
   }
 }
