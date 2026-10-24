@@ -8254,7 +8254,8 @@ function renderAddSheet(){
       ${!exact ? `<button type="button" class="add-suggest-row add-suggest-new" data-add-create>+ Crea “${escapeHtml(name)}”</button>` : ''}
     </div>` : '';
   const step = qtyStepFor(unit);
-  const units = UNIT_ORDER.filter(u => casa || u !== 'none');
+  const units = UNIT_ORDER.filter(u => u !== 'none');
+  const presence = casa && unit === 'none';
   const detail = a.detailsOpen ? `<div class="add-details">
       ${!casa ? `<div class="add-field-label">Per chi</div>
       <select data-add-per aria-label="Per chi"><option value="">Noi</option>${shopPeople().map(p=>`<option value="${escapeAttr(p)}" ${a.per===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}<option value="__new" ${a.per==='__new'?'selected':''}>Un'altra persona…</option></select>
@@ -8268,6 +8269,8 @@ function renderAddSheet(){
         ${d.scadenza && ![3, 7, 30].some(n => addDaysIso(n) === d.scadenza) ? `<button type="button" class="btn is-chip active" aria-pressed="true">${escapeHtml(frozenOnShort(d.scadenza))}</button>` : ''}
         <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} Altra data<input type="date" data-add-scad value="${escapeAttr(d.scadenza || '')}" aria-label="Scegli la data di scadenza"></label>
       </div>` : ''}
+      ${casa ? `<div class="add-field-label">Come lo conti</div>
+      <select data-add-count aria-label="Come lo conti"><option value="qty" ${unit === 'none' ? '' : 'selected'}>A quantità</option><option value="none" ${unit === 'none' ? 'selected' : ''}>Solo se c'è</option></select>` : ''}
       <div class="add-field-label">Reparto</div>
       <select data-add-cat aria-label="Reparto"><option value="">Automatico (${escapeHtml(DEPT_LABEL[classifyDept(name || '')] || '')})</option>${deptOptionsHtml(d.cat || '')}</select>
       ${(!existingPantryFor(name) && name) ? `<div class="add-field-label">Equivalenti</div>
@@ -8292,13 +8295,13 @@ function renderAddSheet(){
         ${d.scanMsg ? `<div class="scan-result ${d.scanOk ? 'is-ok' : 'is-miss'}" role="status"><span class="scan-result-ic" aria-hidden="true">${d.scanOk ? '✓' : '!'}</span><span>${escapeHtml(d.scanMsg)}</span></div>` : ''}
         ${suggHtml}
         <div class="add-qty-row">
-          <span class="add-field-label">Quantità</span>
-          <span class="qty-stepper">
+          <span class="add-field-label">${presence ? 'Ce l\'hai?' : 'Quantità'}</span>
+          ${presence ? `<span class="seg sheet-seg" role="group" aria-label="Ce l'hai?"><button type="button" class="${d.qty > 0 ? 'active' : ''}" data-add-presence="1" aria-pressed="${d.qty > 0}"><i class="seg-dot is-ok"></i>In casa</button><button type="button" class="${d.qty > 0 ? '' : 'active'}" data-add-presence="0" aria-pressed="${!(d.qty > 0)}"><i class="seg-dot is-no"></i>Finito</button></span>` : `<span class="qty-stepper">
             <button class="qty-btn" type="button" data-add-qty="-1" aria-label="Diminuisci">−</button>
             <input type="number" min="0" step="${step}" class="qty-input" id="add-qty" data-add-qty-input value="${d.qty > 0 ? d.qty : ''}" placeholder="–" aria-label="Quantità">
             <button class="qty-btn" type="button" data-add-qty="1" aria-label="Aumenta">+</button>
           </span>
-          <select class="add-unit" data-add-unit aria-label="Unità">${units.map(u=>`<option value="${u}" ${unit===u?'selected':''}>${escapeHtml(UNIT_SHORT[u] || u)}</option>`).join('')}</select>
+          <select class="add-unit" data-add-unit aria-label="Unità">${units.map(u=>`<option value="${u}" ${unit===u?'selected':''}>${escapeHtml(UNIT_SHORT[u] || u)}</option>`).join('')}</select>`}
         </div>
         <button type="button" class="add-details-toggle" data-add-details aria-expanded="${a.detailsOpen}">Altri dettagli: <b>${escapeHtml(addSheetSummary(a))}</b> <span class="add-chev" aria-hidden="true">${a.detailsOpen ? '⌃' : '⌄'}</span></button>
         ${detail}
@@ -8365,6 +8368,8 @@ document.addEventListener('click', e=>{
   const qtyBtn = t.closest('[data-add-qty]');
   if(qtyBtn){ const step = qtyStepFor(d.unit || '') * parseInt(qtyBtn.dataset.addQty, 10); d.qty = Math.max(0, Math.round(((typeof d.qty === 'number' ? d.qty : 0) + step) * 100) / 100); render(); return; }
   if(t.closest('[data-add-details]')){ a.detailsOpen = !a.detailsOpen; render(); return; }
+  const pr = t.closest('[data-add-presence]');
+  if(pr){ d.qty = pr.dataset.addPresence === '1' ? 1 : 0; render(); return; }
   if(t.closest('[data-add-scad-clear]')){ d.scadenza = ''; render(); return; }
   const sq = t.closest('[data-add-scad-quick]');
   if(sq){ d.scadenza = addDaysIso(parseInt(sq.dataset.addScadQuick, 10)); render(); return; }
@@ -8408,7 +8413,12 @@ document.addEventListener('input', e=>{
 document.addEventListener('change', e=>{
   const a = state.addSheet; if(!a) return;
   const t = e.target; if(!t.matches) return;
-  if(t.matches('[data-add-unit]')){ a.d.unit = t.value; if(t.value === 'none') a.d.qty = 1; render(); }
+  if(t.matches('[data-add-unit]')){ a.d.unit = t.value; render(); }
+  else if(t.matches('[data-add-count]')){
+    if(t.value === 'none'){ a.d.unit = 'none'; a.d.qty = a.d.qty > 0 ? 1 : 0; if(!(a.d.qty > 0)) a.d.qty = 1; }
+    else { if(a.d.unit === 'none') a.d.unit = ''; if(!(a.d.qty > 0)) a.d.qty = 1; }
+    render();
+  }
   else if(t.matches('[data-add-cat]')){ a.d.cat = t.value; render(); }
   else if(t.matches('[data-add-group]')){ a.d.group = t.value; }
   else if(t.matches('[data-add-per]')){ a.per = t.value; render(); }
