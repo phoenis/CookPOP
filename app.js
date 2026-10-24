@@ -8640,7 +8640,7 @@ function renderIngredientSheet(it, isNew){
   const closeAttr = isNew ? 'data-close-pantry-add-modal' : 'data-close-pantry-edit';
   // Unità accanto alla quantità: un tocco apre un piccolo elenco (come il luogo
   // nelle righe di Dispensa) per cambiarla senza uscire dalla scheda.
-  const unitChoices = home ? HOME_UNITS.concat(unit && !HOME_UNITS.includes(unit) ? [unit] : []) : UNIT_ORDER;
+  const unitChoices = (home ? HOME_UNITS.concat(unit && !HOME_UNITS.includes(unit) ? [unit] : []) : UNIT_ORDER).filter(u => u !== 'none');
   const unitPickerHtml = `
       <span class="unit-anchor">
         <button type="button" class="sheet-unit-btn" data-sheet-picker="unit" aria-haspopup="listbox" aria-expanded="${picker === 'unit'}" aria-label="Unità di misura: ${escapeAttr(UNIT_SHORT[unit] || unit)}">${escapeHtml(unit === 'none' ? 'solo c\'è' : (UNIT_SHORT[unit] || unit))} <span aria-hidden="true">▾</span></button>
@@ -8651,7 +8651,7 @@ function renderIngredientSheet(it, isNew){
         </div>` : ''}
       </span>`;
   const qtyHtml = unit === 'none'
-    ? `<label class="sheet-presence"><input type="checkbox" data-sheet-presence ${it.qty > 0 ? 'checked' : ''}> In casa</label>${unitPickerHtml}`
+    ? `<span class="seg sheet-seg" role="group" aria-label="Ce l'hai?"><button type="button" class="${it.qty > 0 ? 'active' : ''}" data-sheet-presence-set="1" aria-pressed="${it.qty > 0}"><i class="seg-dot is-ok"></i>In casa</button><button type="button" class="${it.qty > 0 ? '' : 'active'}" data-sheet-presence-set="0" aria-pressed="${!(it.qty > 0)}"><i class="seg-dot is-no"></i>Finito</button></span>`
     : `<span class="qty-stepper sheet-stepper">
         <button class="qty-btn" type="button" data-sheet-qty="-1" aria-label="Diminuisci">−</button>
         <input type="number" inputmode="decimal" min="0" step="${qtyStepFor(unit)}" class="qty-input" id="pantry-edit-qty" value="${it.qty}" aria-label="Quantità">
@@ -8680,7 +8680,7 @@ function renderIngredientSheet(it, isNew){
         </div>` : '';
   const frozenHtml = (!isNew && !home && it.luogo === 'freezer' && it.frozenOn !== undefined) ? `
         <div class="settings-field">
-          <div class="settings-field-label">❄️ Congelato il ${it.frozenOn ? '' : '<span class="sheet-hint-inline">data non nota</span>'}</div>
+          <div class="settings-field-label">Congelato il ${it.frozenOn ? '' : '<span class="sheet-hint-inline">data non nota</span>'}</div>
           <div class="chip-row">
             <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} ${it.frozenOn ? escapeHtml(frozenOnShort(it.frozenOn)) : 'Data…'}<input type="date" id="pantry-edit-frozen" value="${escapeAttr(it.frozenOn || '')}" aria-label="Data di congelamento"></label>
           </div>
@@ -8698,11 +8698,11 @@ function renderIngredientSheet(it, isNew){
           ${canLots ? '<button type="button" class="btn is-text lot-add-link" data-lot-add>+ Altra scadenza (un\'altra confezione)</button>' : ''}
         </div>`);
   // Righe che si aprono in un elenco (categoria, gruppo), una alla volta.
-  const pickRow = (key, label, valueHtml) => `
-        <button type="button" class="sheet-row" data-sheet-picker="${key}" aria-expanded="${picker === key}">
-          <span class="sheet-row-label">${label}</span>
+  const pickRow = (key, label, valueHtml, sub) => `
+        <button type="button" class="sheet-row${sub ? ' has-sub' : ''}" data-sheet-picker="${key}" aria-expanded="${picker === key}">
+          <span class="sheet-row-label">${label}${sub ? `<small>${sub}</small>` : ''}</span>
           <span class="sheet-row-value" ${key === 'cat' ? 'id="sheet-cat-value"' : ''}>${valueHtml}</span>
-          <span class="sheet-row-chevron" aria-hidden="true">${picker === key ? '▴' : '▾'}</span>
+          <span class="sheet-row-chevron${picker === key ? ' is-open' : ''}" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></span>
         </button>`;
   const deptList = DEPT_ORDER.filter(d => d !== 'finiti' && d !== 'avanzi' && (home ? isNonFoodDept(d) : !isNonFoodDept(d)))
     .sort((a, b) => IT_COLLATOR.compare(DEPT_LABEL[a], DEPT_LABEL[b]));
@@ -8713,6 +8713,11 @@ function renderIngredientSheet(it, isNew){
           ${deptList.map(d => `<button type="button" class="sheet-option${it.cat === d ? ' active' : ''}" data-sheet-cat="${d}">${DEPT_ICON[d]} ${escapeHtml(DEPT_LABEL[d])}</button>`).join('')}
           <button type="button" class="sheet-option is-muted" data-sheet-cat="${home ? 'altro' : 'altro-casa'}">${uiIcon('swap')} ${home ? 'È un alimento (sposta in Cibo)' : 'È un prodotto per la casa (sposta in Casa)'}</button>
           <button type="button" class="sheet-option is-link" data-open-depts>${uiIcon('tag')} Gestisci categorie…</button>
+        </div>`;
+  const modePicker = picker !== 'mode' ? '' : `
+        <div class="sheet-options" role="listbox" aria-label="Come lo conti">
+          <button type="button" class="sheet-option${unit === 'none' ? '' : ' active'}" data-sheet-mode="qty">A quantità <span class="sheet-hint-inline">(pezzi, g, ml…)</span></button>
+          <button type="button" class="sheet-option${unit === 'none' ? ' active' : ''}" data-sheet-mode="none">Solo se c'è <span class="sheet-hint-inline">(ce l'hai o l'hai finito)</span></button>
         </div>`;
   const groups = Object.entries(state.pantryGroups);
   const groupPicker = picker !== 'group' ? '' : `
@@ -8746,15 +8751,16 @@ function renderIngredientSheet(it, isNew){
       </section>
       <section class="settings-section">
         <div class="settings-card sheet-rows">
+          ${pickRow('mode', 'Come lo conti', unit === 'none' ? 'Solo se c\'è' : 'A quantità')}
+          ${modePicker}
           ${pickRow('cat', 'Reparto', sheetDeptLabelHtml(it, home))}
           ${catPicker}
-          ${home ? '' : pickRow('group', 'Equivalenti', it.group && state.pantryGroups[it.group] ? escapeHtml(state.pantryGroups[it.group].label) : '<span class="sheet-hint-inline">nessuno</span>')}
+          ${home ? '' : pickRow('group', 'Equivalenti', it.group && state.pantryGroups[it.group] ? escapeHtml(state.pantryGroups[it.group].label) : 'nessuno', 'Es. Fusilli e Penne = Pasta corta')}
           ${groupPicker}
         </div>
-        ${home ? '' : '<p class="settings-note">Gli equivalenti uniscono più formati (es. Fusilli e Penne in "Pasta corta"): una ricetta che chiede pasta corta li trova tutti.</p>'}
       </section>
       ${isNew ? '' : `<section class="settings-section">
-        <button type="button" class="sheet-more-toggle" data-sheet-more aria-expanded="${more}">Altro ${more ? '▴' : '▾'}</button>
+        <button type="button" class="sheet-more-toggle" data-sheet-more aria-expanded="${more}">Altro <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="${more ? 'transform:rotate(180deg)' : ''}"><path d="m6 9 6 6 6-6"/></svg></button>
         ${more ? `
         <div class="settings-card">
           <div class="settings-field">
@@ -11442,6 +11448,18 @@ function attachHandlers(){
   document.querySelectorAll('[data-sheet-presence]').forEach(cb=> cb.addEventListener('change', ()=>{
     const it = sheetTarget(); if(!it) return;
     it.qty = cb.checked ? 1 : 0;
+    sheetChanged();
+  }));
+  document.querySelectorAll('[data-sheet-presence-set]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    it.qty = btn.dataset.sheetPresenceSet === '1' ? 1 : 0;
+    sheetChanged();
+  }));
+  document.querySelectorAll('[data-sheet-mode]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    if(btn.dataset.sheetMode === 'none'){ it.unit = 'none'; it.qty = it.qty > 0 ? 1 : 0; }
+    else { if(it.unit === 'none') delete it.unit; if(!(it.qty > 0)) it.qty = 1; }
+    state.pantrySheetPicker = null;
     sheetChanged();
   }));
   document.querySelectorAll('[data-sheet-luogo]').forEach(btn=> btn.addEventListener('click', ()=>{
