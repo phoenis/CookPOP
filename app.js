@@ -5530,7 +5530,9 @@ function reuseNotesFor(weekIdx, i, meal){
 }
 function mealNotesHtml(weekIdx, i, meal, dishes){
   const notes = reuseNotesFor(weekIdx, i, meal).map(t => ({ t, hot: true }));
-  dishes.forEach(dsh=>{
+  // Un avanzo è già cucinato: i promemoria di preparazione (ammollo, marinatura…) non servono.
+  const isLeftover = !!linkedSourceMealKey(weekIdx, i, meal);
+  if(!isLeftover) dishes.forEach(dsh=>{
     const det = getRecipeDetails(dsh.name);
     const r = det && det.ricordare && det.ricordare !== 'Niente' ? String(det.ricordare).trim() : '';
     if(r) notes.push({ t: (dishes.length > 1 ? dsh.name + ': ' : '') + r, hot: false });
@@ -6274,6 +6276,7 @@ function soakReminderHtml(weekIdx, pos){
     { ic: '🥩', label: 'Marinatura', items: [] }
   ];
   ['pranzo', 'cena'].forEach(meal => {
+    if(linkedSourceMealKey(nx.weekIdx, nx.i, meal)) return; // avanzo: già cucinato
     const mk = mealKey(nx.weekIdx, nx.i, meal);
     mealDishes(nx.weekIdx, nx.i, meal).forEach(dsh => {
       const what = `<b>${escapeHtml(dsh.name)}</b> (${escapeHtml(MEAL_LABEL[meal].toLowerCase())})`;
