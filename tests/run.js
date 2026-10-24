@@ -3099,6 +3099,22 @@ test('Gestisci ingredienti: eliminare un ingrediente lo toglie dall\'elenco anch
   eq([r.dopo, r.nellaPagina, r.riaggiunto], [false, false, true], 'elenco ingredienti ' + r.nome);
 });
 
+test('scheda ingrediente: "Usato in N ricette" si apre con l\'elenco, e dice quando non è in nessuna ricetta', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    upsertPantryItem('Uova', 'frigo', 6); upsertPantryItem('Zzz inventato', 'dispensa', 1);
+    state.tab = 'dispensa'; state.pantryEditKey = 'uova'; state.pantrySheetUsed = false; render();
+    const btn = document.querySelector('[data-sheet-used]');
+    const chiuso = { label: btn ? btn.textContent.trim() : '', righe: document.querySelectorAll('.ing-used-list li').length };
+    btn.click();
+    const aperto = document.querySelectorAll('.ing-used-list li').length;
+    state.pantryEditKey = 'zzz inventato'; state.pantrySheetUsed = false; render();
+    return { chiuso, aperto, vuoto: !document.querySelector('[data-sheet-used]') && /nessuna ricetta/.test(document.querySelector('.sheet-body').textContent), n: recipeNamesUsingIngredient('Uova').length };
+  });
+  assert(/^Usato in \d+ ricette/.test(r.chiuso.label) && r.chiuso.righe === 0, 'chiuso: ' + JSON.stringify(r.chiuso));
+  assert(r.aperto === r.n && r.n > 5, 'aperto: ' + r.aperto + ' / ' + r.n);
+  assert(r.vuoto, 'ingrediente senza ricette');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
