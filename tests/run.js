@@ -3115,11 +3115,19 @@ test('scheda ingrediente: "Usato in N ricette" si apre con l\'elenco, e dice qua
   assert(r.vuoto, 'ingrediente senza ricette');
 });
 
-test('variazioni: uova, prosciutto, panna, pollo restano un ingrediente solo con la specifica; latte e altri si scelgono nella scheda', async ({ page }) => {
+test('variazioni: tuorli e albumi sono righe separate in Spesa; latte e altri si scelgono nella scheda', async ({ page }) => {
   const r = await page.evaluate(() => {
     const find = (re) => { for(const m of allRecipeMetas()){ const hit = getIngredientsFor(m.nome).find(i => i.qual && re.test(i.qual + '|' + i.ingrediente)); if(hit) return { ricetta: m.nome, ing: hit.ingrediente, qual: hit.qual }; } return null; };
     const tuorli = find(/^tuorli\|Uova/), cotto = find(/^cotto\|Prosciutto/), petto = find(/^petto\|Pollo/), panna = find(/^da cucina\|Panna/);
-    const nota = variantNoteText([{ qual: 'tuorli', qta: '2' }, { qual: '', qta: '6' }, { qual: 'tuorli', qta: '2' }, { qual: 'sode', qta: '3' }]);
+    // due ricette in menù: una con tuorli, una con uova intere → due righe in Spesa
+    state.pantryItems = {}; generateWeek(0);
+    const sl = allPlannedShoppingMeals().slice(-4);
+    writeMealDishes(sl[0].weekIdx, sl[0].i, sl[0].meal, tuorli.ricetta, []);
+    const intere = allRecipeMetas().find(m => getIngredientsFor(m.nome).some(i => i.ingrediente === 'Uova' && !i.qual));
+    writeMealDishes(sl[1].weekIdx, sl[1].i, sl[1].meal, intere.nome, []);
+    const righe = buildShopFlat().filter(x => x.ingrediente === 'Uova').map(x => x.qual || '');
+    state.tab = 'spesa'; render();
+    const testo = [...document.querySelectorAll('.item-name')].map(e => e.textContent.trim()).filter(t => /^Uova/.test(t));
     upsertPantryItem('Latte', 'frigo', 2);
     state.tab = 'dispensa'; state.pantryEditKey = 'latte'; render();
     const chips = [...document.querySelectorAll('[data-sheet-variant]')].map(b => b.dataset.sheetVariant);
@@ -3127,13 +3135,48 @@ test('variazioni: uova, prosciutto, panna, pollo restano un ingrediente solo con
     const salvata = state.pantryItems.latte.variante;
     state.pantryEditKey = null; render();
     const riga = !!([...document.querySelectorAll('.inv-variant')].find(e => e.textContent === 'parzialmente scremato'));
-    upsertPantryItem('Latte', 'frigo', 1);
-    return { tuorli, cotto, petto, panna, nota, chips, salvata, riga, dopoUpsert: state.pantryItems.latte.variante };
+    return { tuorli, cotto, petto, panna, righe, testo, chips, salvata, riga };
   });
   assert(r.tuorli && r.cotto && r.petto && r.panna, 'ingredienti con variazione: ' + JSON.stringify(r));
-  eq(r.nota, 'tuorli 4 g'.replace(' g', '') + ' · sode 3', 'nota Spesa');
+  assert(r.righe.includes('tuorli') && r.righe.includes(''), 'righe Uova in Spesa: ' + JSON.stringify(r.righe));
+  assert(r.testo.some(t => /Uova · tuorli/.test(t)) && r.testo.some(t => t === 'Uova'), 'testo righe: ' + JSON.stringify(r.testo));
   eq(r.chips, ['intero', 'parzialmente scremato'], 'variazioni del latte');
-  eq([r.salvata, r.riga, r.dopoUpsert], ['parzialmente scremato', true, 'parzialmente scremato'], 'variazione salvata e visibile in Dispensa');
+  eq([r.salvata, r.riga], ['parzialmente scremato', true], 'variazione salvata e visibile in Dispensa');
+});
+
+test('Modifica ricetta: quantità con numero e unità, specifica scelta dall\'elenco; un testo non riconosciuto resta com\'è', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {
+      p: ['200 g', '1/2', '2 cucchiai', 'q.b.', 'mezzo bicchiere', '1 1/2 kg'].map(parseQtyForEdit),
+      b: [buildQtyFromEdit('1', 'cucchiaio'), buildQtyFromEdit('2', 'cucchiaio'), buildQtyFromEdit('1.5', 'kg'), buildQtyFromEdit('', 'q.b.'), buildQtyFromEdit('3', '')]
+    };
+    const nome = 'Carbonara';
+    state.tab = 'prep'; state.recipeEditName = nome; render();
+    const rows = [...document.querySelectorAll('#edit-ing-list .edit-ing-row')];
+    out.righe = rows.length; out.conNumero = rows.filter(r => r.querySelector('.edit-ing-num')).length;
+    const uova = rows.find(r => /^uova$/i.test(r.querySelector('.edit-ing-name').value)) || rows.find(r => /tuorl|uov/i.test(r.querySelector('.edit-ing-name').value));
+    out.haUova = !!uova;
+    if(uova){ uova.querySelector('.edit-ing-name').value = 'Uova'; uova.querySelector('.edit-ing-name').dispatchEvent(new Event('input', { bubbles: true })); out.qualVisibile = !uova.querySelector('.edit-ing-qual').hidden; uova.querySelector('.edit-ing-qual').value = 'tuorli'; out.letta = readEditIngRow(uova); }
+    return out;
+  });
+  eq(r.p.map(x => x.ok ? x.num + '|' + x.unit : 'raw'), ['200|g', '0.5|', '2|cucchiaio', '|q.b.', 'raw', '1.5|kg'], 'parse');
+  eq(r.b, ['1 cucchiaio', '2 cucchiai', '1,5 kg', 'q.b.', '3'], 'build');
+  assert(r.righe > 0 && r.conNumero > 0, 'righe con numero e unità');
+  assert(r.haUova && r.qualVisibile && r.letta.qual === 'tuorli', 'specifica: ' + JSON.stringify(r.letta));
+});
+
+test('modalità cucina: i rettangolini si colorano avanzando, anche con le frecce', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const nome = allRecipeMetas().find(m => ((getRecipeDetails(m.nome) || {}).procedimento || []).length >= 4).nome;
+    state.cookSession = cookSessionFor(nome, 1, ''); state.cookMode = { name: nome, step: 0, ratio: 1, mk: '' }; render();
+    const on = () => document.querySelectorAll('.cook-segs span.on').length;
+    const out = { inizio: on() };
+    document.querySelector('[data-cook-next]').click(); out.dopoFreccia = on();
+    document.querySelector('[data-cook-next]').click(); out.dopoDue = on();
+    document.querySelector('[data-cook-prev]').click(); out.indietro = on();
+    return out;
+  });
+  eq([r.inizio, r.dopoFreccia, r.dopoDue, r.indietro], [1, 2, 3, 2], 'rettangolini colorati');
 });
 
 (async () => {

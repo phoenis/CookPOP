@@ -871,7 +871,7 @@ function renderCookModePage(){
   const cursor = Math.min(Math.max(0, cur ? (cur.cursor || 0) : step), total - 1);
   const where = isLast ? 'Ultimo passaggio' : `Passaggio ${step + 1} di ${total}`;
   const lastNote = isLast ? cookLastNote(cm) : '';
-  const segs = Array.from({ length: total }, (_, i) => `<span class="${i <= cursor ? 'on' : ''}"></span>`).join('');
+  const segs = Array.from({ length: total }, (_, i) => `<span class="${i <= Math.max(cursor, step) ? 'on' : ''}"></span>`).join('');
   const cooking = cm.mk ? (parseMealKey(cm.mk).meal === 'cena' ? 'Cucinando la cena' : 'Cucinando il pranzo') : `Cucinando ${cm.name}`;
   return `
   <div class="sheet-page cook-page${pageEntering('cook') ? ' is-entering' : ''}" data-page="cook">
@@ -1871,7 +1871,7 @@ function getIngredientsFor(name){
   });
   const renames = Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
   return sortRecipeIngredients(list.map(it=>{
-    const variant = CURATED_INGREDIENT_VARIANTS[(it.ingrediente || '').trim().toLowerCase()];
+    const variant = !it.qual && CURATED_INGREDIENT_VARIANTS[(it.ingrediente || '').trim().toLowerCase()];
     if(variant) return Object.assign({}, it, { ingrediente: resolveIngredientName(variant[0], renames), qual: variant[1] });
     const displayName = resolveIngredientName(it.ingrediente, renames);
     if(displayName === it.ingrediente) return it;
@@ -1880,7 +1880,7 @@ function getIngredientsFor(name){
     // nome (singolare/plurale, "Sale" / "Sale fino") non si ripete.
     const orig = (it.ingrediente || '').trim().toLowerCase(), shown = displayName.toLowerCase();
     const qual = orig.slice(0, 3) === shown.slice(0, 3) ? '' : orig;
-    return Object.assign({}, it, { ingrediente: displayName, qual });
+    return Object.assign({}, it, { ingrediente: displayName, qual: it.qual || qual });
   }));
 }
 // Ordine fisso degli ingredienti in ogni ricetta: prima gli ingredienti
@@ -5362,13 +5362,77 @@ function renderUndoToast(){
   </div>`;
 }
 
-function editIngRowHtml(ingrediente, qta){
+// Quantità degli ingredienti di una ricetta: numero + unità scelta da un
+// elenco, invece del testo scritto a mano. Un testo che non si riconosce
+// ("mezzo bicchiere", "3-4") resta com'è, in un campo di testo.
+const QTY_UNIT_OPTIONS = [
+  ['', 'pezzi', 'pezzi'], ['g', 'g', 'g'], ['kg', 'kg', 'kg'], ['ml', 'ml', 'ml'], ['l', 'l', 'l'],
+  ['cucchiaio', 'cucchiaio', 'cucchiai'], ['cucchiaino', 'cucchiaino', 'cucchiaini'], ['spicchio', 'spicchio', 'spicchi'],
+  ['pizzico', 'pizzico', 'pizzichi'], ['bicchiere', 'bicchiere', 'bicchieri'], ['fetta', 'fetta', 'fette'],
+  ['foglia', 'foglia', 'foglie'], ['rametto', 'rametto', 'rametti'], ['mazzetto', 'mazzetto', 'mazzetti'], ['ciuffo', 'ciuffo', 'ciuffi'],
+  ['costa', 'costa', 'coste'], ['confezione', 'confezione', 'confezioni'], ['lattina', 'lattina', 'lattine'], ['noce', 'noce', 'noci'], ['q.b.', 'q.b.', 'q.b.']
+];
+function parseQtyForEdit(text){
+  const t = String(text || '').trim();
+  if(!t) return { ok: true, num: '', unit: '' };
+  if(/^q\.?\s?b\.?$/i.test(t)) return { ok: true, num: '', unit: 'q.b.' };
+  const m = t.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)\s*(.*)$/);
+  if(!m) return { ok: false };
+  let n = m[1];
+  if(/\//.test(n)){ const mixed = n.match(/^(\d+)\s+(\d+)\/(\d+)$/); n = mixed ? +mixed[1] + (+mixed[2] / +mixed[3]) : (+n.split('/')[0] / +n.split('/')[1]); }
+  else n = parseFloat(n.replace(',', '.'));
+  if(!isFinite(n)) return { ok: false };
+  const rest = m[2].trim().toLowerCase();
+  if(!rest) return { ok: true, num: String(n), unit: '' };
+  const hit = QTY_UNIT_OPTIONS.find(u => u[0] && (u[1] === rest || u[2] === rest));
+  return hit ? { ok: true, num: String(n), unit: hit[0] } : { ok: false };
+}
+function buildQtyFromEdit(num, unit){
+  const n = String(num || '').trim();
+  if(unit === 'q.b.') return 'q.b.';
+  if(!n) return '';
+  const v = parseFloat(n.replace(',', '.'));
+  const shown = isFinite(v) ? String(v).replace('.', ',') : n;
+  const u = QTY_UNIT_OPTIONS.find(o => o[0] === unit);
+  if(!unit || !u) return shown;
+  return `${shown} ${isFinite(v) && v === 1 ? u[1] : u[2]}`;
+}
+function editIngRowHtml(ingrediente, qta, qual){
+  const p = parseQtyForEdit(qta);
+  const opts = INGREDIENT_VARIANT_OPTIONS[ingMatchKey(ingrediente || '')] || [];
+  const qualOpts = opts.slice();
+  if(qual && !qualOpts.includes(qual)) qualOpts.push(qual);
+  const qtyHtml = p.ok
+    ? `<input type="number" inputmode="decimal" min="0" step="any" class="edit-ing-num" placeholder="Qtà" aria-label="Quantità" value="${escapeAttr(p.num)}">
+       <select class="edit-ing-unit" aria-label="Unità">${QTY_UNIT_OPTIONS.map(u => `<option value="${escapeAttr(u[0])}"${p.unit === u[0] ? ' selected' : ''}>${escapeHtml(u[2])}</option>`).join('')}</select>`
+    : `<input type="text" class="edit-ing-qta" placeholder="Quantità" aria-label="Quantità" value="${escapeAttr(qta || '')}">`;
   return `
     <div class="edit-ing-row">
-      <input type="text" class="edit-ing-name" placeholder="Ingrediente" value="${escapeAttr(ingrediente||'')}">
-      <input type="text" class="edit-ing-qta" placeholder="Quantità" value="${escapeAttr(qta||'')}">
-      <button type="button" class="btn is-outline is-icon is-danger edit-row-remove" data-remove-row aria-label="Rimuovi riga">✕</button>
+      <div class="edit-ing-main">
+        <input type="text" class="edit-ing-name" placeholder="Ingrediente" value="${escapeAttr(ingrediente||'')}">
+        <button type="button" class="btn is-outline is-icon is-danger edit-row-remove" data-remove-row aria-label="Rimuovi riga">✕</button>
+      </div>
+      <div class="edit-ing-fields">
+        ${qtyHtml}
+        <select class="edit-ing-qual" aria-label="Specifica"${qualOpts.length ? '' : ' hidden'}>${['', ...qualOpts].map(v => `<option value="${escapeAttr(v)}"${(qual || '') === v ? ' selected' : ''}>${v ? escapeHtml(v) : 'Specifica…'}</option>`).join('')}</select>
+      </div>
     </div>`;
+}
+// La specifica (tuorli, albumi, petto…) dipende dall'ingrediente scelto: si
+// aggiorna le scelte quando cambia il nome.
+function refreshEditIngQual(row){
+  const sel = row.querySelector('.edit-ing-qual'); if(!sel) return;
+  const opts = INGREDIENT_VARIANT_OPTIONS[ingMatchKey(row.querySelector('.edit-ing-name').value)] || [];
+  const cur = sel.value;
+  sel.innerHTML = ['', ...opts].map(v => `<option value="${escapeAttr(v)}"${cur === v ? ' selected' : ''}>${v ? escapeHtml(v) : 'Specifica…'}</option>`).join('');
+  sel.hidden = !opts.length;
+}
+function readEditIngRow(row){
+  const raw = row.querySelector('.edit-ing-qta');
+  const qta = raw ? raw.value.trim() : buildQtyFromEdit(row.querySelector('.edit-ing-num').value, row.querySelector('.edit-ing-unit').value);
+  const q = row.querySelector('.edit-ing-qual');
+  const qual = q && !q.hidden ? q.value : '';
+  return { ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()), qta, ...(qual ? { qual } : {}) };
 }
 function editStepRowHtml(text){
   return `
@@ -5392,7 +5456,7 @@ function renderRecipeEditModal(){
   const stagioniSet = new Set(rec.stagioni || []);
 
   const ingRowsHtml = (ingredienti.length ? ingredienti : [{ingrediente:'',qta:''}])
-    .map(it => editIngRowHtml(it.ingrediente, it.qta)).join('');
+    .map(it => editIngRowHtml(it.ingrediente, it.qta, it.qual)).join('');
 
   const stepRowsHtml = (procedimento.length ? procedimento : [''])
     .map(s => editStepRowHtml(s)).join('');
@@ -6903,12 +6967,6 @@ function isMealDoneAt(weekIdx, i, meal){
   const done = weekMealsDoneRef(weekIdx);
   return !!(done && done[i] && done[i][meal]);
 }
-// "tuorli 4 · sode 2": quanto serve di ogni variazione, sotto il nome unificato.
-function variantNoteText(parts){
-  const by = {};
-  parts.forEach(p => { if(p.qual) (by[p.qual] = by[p.qual] || []).push(p.qta); });
-  return Object.entries(by).map(([q, qs]) => { const t = combineQtyTexts(qs).replace(/ \+ q\.b\.$/, ''); return t && t !== 'q.b.' ? `${q} ${t}` : q; }).join(' · ');
-}
 function buildShopFlat(){
   const flat = [];
   allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,isPast,principale,contorni,dishLabel})=>{
@@ -7021,7 +7079,7 @@ function renderSpesa(){
   let displayDone = done;
   let displayDoneShoppable = doneShoppable;
 
-  function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked, per){
+  function itemRow(keys, ingrediente, qta, note, subtitle, forcedChecked, per, qual){
     const checked = forcedChecked !== undefined ? forcedChecked : isItemChecked(keys, ingrediente);
     const rowKey = keys.join(',');
     // La quantità/unità di partenza viene dal testo della ricetta ("300 g",
@@ -7068,7 +7126,7 @@ function renderSpesa(){
       <label class="shop-item ${checked?'checked':''}">
         <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" ${per ? `data-shop-per="${escapeAttr(per)}" ` : ''}data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
         <span>
-          <span class="item-name">${escapeHtml(ingrediente)}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}${!ingNote && !editingIngNote ? `<button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Aggiungi una nota">${PENCIL_ICON_SVG}</button>` : ''}</span>
+          <span class="item-name">${escapeHtml(ingrediente)}${qual ? `<small class="ing-qual"> · ${escapeHtml(qual)}</small>` : ''}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}${!ingNote && !editingIngNote ? `<button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Aggiungi una nota">${PENCIL_ICON_SVG}</button>` : ''}</span>
           ${(subtitle || note) ? `<span class="item-detail">${escapeHtml(subtitle||'')}${subtitle && note ? ' · ' : ''}${escapeHtml(note||'')}</span>` : ''}
           ${ingNoteHtml}
         </span>
@@ -7100,8 +7158,8 @@ function renderSpesa(){
   // posto della vecchia "Modalità spesa", che spostava subito in Dispensa).
   const completedMap = {};
   const addCompleted = it => {
-    const k = (it.ingrediente || '').trim().toLowerCase() + (it.per ? '\u0001' + it.per : '');
-    if(!completedMap[k]) completedMap[k] = { ingrediente: it.ingrediente, qtas: [], keys: [], per: it.per || '' };
+    const k = (it.ingrediente || '').trim().toLowerCase() + (it.qual ? '\u0002' + it.qual : '') + (it.per ? '\u0001' + it.per : '');
+    if(!completedMap[k]) completedMap[k] = { ingrediente: it.ingrediente, qtas: [], keys: [], per: it.per || '', qual: it.qual || '' };
     completedMap[k].qtas.push(...(it.qtas || [it.qta]));
     completedMap[k].keys.push(...(it.keys || [it.key]));
   };
@@ -7122,13 +7180,12 @@ function renderSpesa(){
     // sommando le quantità invece di tenerne una sola (vedi combineQtyTexts)
     const merged = {};
     classified.forEach(it=>{
-      const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.per ? '\u0001' + it.per : '');
+      const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.qual ? '\u0002' + it.qual : '') + (it.per ? '\u0001' + it.per : '');
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], quals: [{ qual: it.qual || '', qta: it.qta }], contexts: it.isRecipe ? [] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], qual: it.qual || '', contexts: it.isRecipe ? [] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
       } else {
         merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
-        merged[mergeKey].quals.push({ qual: it.qual || '', qta: it.qta });
         // Giorno e pasto non si scrivono sotto l'ingrediente: chi li vuole usa "Ordina per Pasto".
       }
     });
@@ -7165,7 +7222,7 @@ function renderSpesa(){
       const isFinitiDept = dept === 'finiti';
       const items = byDept[dept];
       const finitiCheckedCount = isFinitiDept ? items.filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
-      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, [variantNoteText(it.quals || []), it.contexts.join(' + ')].filter(Boolean).join(' · '), undefined, it.per)).join('');
+      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per, it.qual)).join('');
       const finishedActions = finitiCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${finitiCheckedCount})</button>
@@ -7217,9 +7274,9 @@ function renderSpesa(){
       const dayItems = mainFlat.filter(it => it.context === context);
       const mergedDay = {};
       dayItems.forEach(it=>{
-        const mergeKey = (it.ingrediente||'').trim().toLowerCase();
-        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key], quals: [{ qual: it.qual || '', qta: it.qta }] };
-        else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); mergedDay[mergeKey].quals.push({ qual: it.qual || '', qta: it.qta }); }
+        const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.qual ? '\u0002' + it.qual : '');
+        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key], qual: it.qual || '' };
+        else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); }
       });
       const allDayItems = Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
       giornoMergedAll.push(...allDayItems);
@@ -7233,7 +7290,7 @@ function renderSpesa(){
       const totalIngCount = getIngredientsFor(principale).length
         + contorni.reduce((n,c)=> n + getIngredientsFor(c).length, 0);
       const rows = mergedDayItems.length
-        ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, [variantNoteText(it.quals || []), it.dove].filter(Boolean).join(' · '))).join('')
+        ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.dove, undefined, undefined, it.qual)).join('')
         : (totalIngCount > 0
           ? `<div class="ing-empty">✅ Hai tutti gli ingredienti, puoi cucinare!</div>`
           : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`);
@@ -7322,7 +7379,7 @@ function renderSpesa(){
     body += `
       <div class="shop-day-group shop-completed">
         <div class="dept-title">Completati</div>
-        <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', it.per ? `Per ${it.per}` : '', true, it.per)).join('')}</div>
+        <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', it.per ? `Per ${it.per}` : '', true, it.per, it.qual)).join('')}</div>
         <div class="shop-completed-actions">
           <button type="button" class="btn is-text" id="reset-shop">Togli le spunte</button>
           <button type="button" class="btn is-outline color-delete" id="delete-checked-shop">Elimina</button>
@@ -10671,6 +10728,10 @@ function attachHandlers(){
     // completo: si manipola solo il DOM del form, per non perdere il testo che
     // si sta scrivendo negli altri campi (a differenza del resto dell'app, che
     // ri-renderizza tutto a ogni modifica).
+    ['input', 'change', 'focusout', 'click'].forEach(ev => recipeEditModal.addEventListener(ev, e=>{
+      const row = e.target.closest && e.target.closest('.edit-ing-row');
+      if(row && !e.target.matches('.edit-ing-qual')) refreshEditIngQual(row);
+    }));
     recipeEditModal.addEventListener('click', e=>{
       if(e.target.closest('[data-remove-row]')){
         e.target.closest('.edit-ing-row, .edit-step-row').remove();
@@ -10683,7 +10744,7 @@ function attachHandlers(){
       }
       if(e.target.closest('#edit-add-ing-row')){
         const list = document.getElementById('edit-ing-list');
-        list.insertAdjacentHTML('beforeend', editIngRowHtml('', ''));
+        list.insertAdjacentHTML('beforeend', editIngRowHtml('', '', ''));
         attachIngredientCombobox(list.lastElementChild.querySelector('.edit-ing-name'));
         return;
       }
@@ -10703,10 +10764,7 @@ function attachHandlers(){
         renameRecipe(name, newName);
         name = newName;
       }
-      const ingredienti = Array.from(document.querySelectorAll('#edit-ing-list .edit-ing-row')).map(row=>({
-        ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()),
-        qta: row.querySelector('.edit-ing-qta').value.trim()
-      })).filter(it=>it.ingrediente);
+      const ingredienti = Array.from(document.querySelectorAll('#edit-ing-list .edit-ing-row')).map(readEditIngRow).filter(it=>it.ingrediente);
       const procedimento = Array.from(document.querySelectorAll('#edit-step-list .edit-step-text'))
         .map(el=>el.value.trim()).filter(Boolean);
       const stagioni = Array.from(document.querySelectorAll('#edit-stagioni [data-stagione-chip].active'))
