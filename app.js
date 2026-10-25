@@ -1216,6 +1216,7 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
     ...(finalCat ? { cat: finalCat } : {}),
     ...(finalUnit ? { unit: finalUnit } : {}),
     ...(finalGroup ? { group: finalGroup } : {}),
+    ...(existing && existing.variante ? { variante: existing.variante } : {}),
     // La scadenza resta finché c'è ancora scorta (vale quella della confezione
     // già in casa, la più vicina); se era finita, quella nuova non si conosce.
     ...(currentQty > 0 && existing && existing.scadenza ? { scadenza: existing.scadenza } : {}),
@@ -1795,6 +1796,25 @@ const CURATED_INGREDIENT_RENAMES = {
   'olive (verdi e nere)':'Olive', 'olive nere e verdi':'Olive',
   'aceto (balsamico o di vino)':'Aceto'
 };
+// Variazioni: un ingrediente solo (uova, prosciutto, latte, panna, pollo) e la
+// specifica ("tuorli", "cotto", "petto"…) come dettaglio. In Dispensa e in
+// Spesa resta una voce sola; la ricetta dice quale variazione serve, e in
+// Spesa la si legge sotto il nome. La chiave è il nome scritto nella ricetta
+// (minuscolo), il valore [ingrediente, variazione].
+const CURATED_INGREDIENT_VARIANTS = {
+  'tuorli':['Uova','tuorli'], 'albumi':['Uova','albumi'], 'albume':['Uova','albumi'], 'uova sode':['Uova','sode'],
+  'uova (grandi)':['Uova','grandi'], 'uova medie (a temperatura ambiente)':['Uova','medie'],
+  'prosciutto cotto':['Prosciutto','cotto'], 'prosciutto crudo':['Prosciutto','crudo'], 'prosciutto crudo (quantità a piacere)':['Prosciutto','crudo'],
+  'panna da cucina':['Panna','da cucina'], 'panna fresca':['Panna','da montare'],
+  'petto di pollo':['Pollo','petto'], 'petto di pollo (sottili)':['Pollo','petto'], 'petto di pollo o lonza di maiale a cubetti':['Pollo','petto'],
+  'cosce o sovracosce di pollo':['Pollo','coscia'], 'pollo (sovracosce e cosce)':['Pollo','coscia'], 'pollo a pezzi (cosce o sovracosce)':['Pollo','coscia'],
+  'sovracosce di pollo (o petto)':['Pollo','coscia'], 'pollo a pezzi (cosce o petto)':['Pollo','petto o coscia'], 'petto di pollo o cosce disossate':['Pollo','petto o coscia']
+};
+// Le variazioni tra cui scegliere nella scheda dell'ingrediente (chiave = nome).
+const INGREDIENT_VARIANT_OPTIONS = {
+  'uova':['tuorli','albumi','sode','grandi','medie'], 'prosciutto':['cotto','crudo'],
+  'latte':['intero','parzialmente scremato'], 'panna':['da montare','da cucina'], 'pollo':['petto','coscia']
+};
 // Gruppi di Dispensa concordati con l'utente: il nome generico usato nelle
 // ricette (matchName) e i nomi delle voci di Dispensa che ne fanno parte
 // (assegnati una tantum alle voci già presenti, vedi pantryGroupMigrated3).
@@ -1851,6 +1871,8 @@ function getIngredientsFor(name){
   });
   const renames = Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
   return sortRecipeIngredients(list.map(it=>{
+    const variant = CURATED_INGREDIENT_VARIANTS[(it.ingrediente || '').trim().toLowerCase()];
+    if(variant) return Object.assign({}, it, { ingrediente: resolveIngredientName(variant[0], renames), qual: variant[1] });
     const displayName = resolveIngredientName(it.ingrediente, renames);
     if(displayName === it.ingrediente) return it;
     // Il nome scritto nella ricetta ("Tuorli") resta come dettaglio accanto al
@@ -6881,6 +6903,12 @@ function isMealDoneAt(weekIdx, i, meal){
   const done = weekMealsDoneRef(weekIdx);
   return !!(done && done[i] && done[i][meal]);
 }
+// "tuorli 4 · sode 2": quanto serve di ogni variazione, sotto il nome unificato.
+function variantNoteText(parts){
+  const by = {};
+  parts.forEach(p => { if(p.qual) (by[p.qual] = by[p.qual] || []).push(p.qta); });
+  return Object.entries(by).map(([q, qs]) => { const t = combineQtyTexts(qs).replace(/ \+ q\.b\.$/, ''); return t && t !== 'q.b.' ? `${q} ${t}` : q; }).join(' · ');
+}
 function buildShopFlat(){
   const flat = [];
   allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,isPast,principale,contorni,dishLabel})=>{
@@ -6915,7 +6943,7 @@ function buildShopFlat(){
         // (niente riga da vedere/spuntare) — a meno che non l'avessi già
         // esplicitamente de-spuntato in passato per dire "mi serve comunque".
         if(pantryStatusFor(it.ingrediente, qta) === 'in-casa' && state.shopChecked[key] !== false) return;
-        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, context, contextShort, isRecipe: true });
+        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, qual:it.qual || '', context, contextShort, isRecipe: true });
       });
     });
   });
@@ -7096,10 +7124,11 @@ function renderSpesa(){
     classified.forEach(it=>{
       const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.per ? '\u0001' + it.per : '');
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], contexts: it.isRecipe ? [] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], quals: [{ qual: it.qual || '', qta: it.qta }], contexts: it.isRecipe ? [] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
       } else {
         merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
+        merged[mergeKey].quals.push({ qual: it.qual || '', qta: it.qta });
         // Giorno e pasto non si scrivono sotto l'ingrediente: chi li vuole usa "Ordina per Pasto".
       }
     });
@@ -7136,7 +7165,7 @@ function renderSpesa(){
       const isFinitiDept = dept === 'finiti';
       const items = byDept[dept];
       const finitiCheckedCount = isFinitiDept ? items.filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
-      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per)).join('');
+      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, [variantNoteText(it.quals || []), it.contexts.join(' + ')].filter(Boolean).join(' · '), undefined, it.per)).join('');
       const finishedActions = finitiCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${finitiCheckedCount})</button>
@@ -7189,8 +7218,8 @@ function renderSpesa(){
       const mergedDay = {};
       dayItems.forEach(it=>{
         const mergeKey = (it.ingrediente||'').trim().toLowerCase();
-        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key] };
-        else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); }
+        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key], quals: [{ qual: it.qual || '', qta: it.qta }] };
+        else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); mergedDay[mergeKey].quals.push({ qual: it.qual || '', qta: it.qta }); }
       });
       const allDayItems = Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
       giornoMergedAll.push(...allDayItems);
@@ -7204,7 +7233,7 @@ function renderSpesa(){
       const totalIngCount = getIngredientsFor(principale).length
         + contorni.reduce((n,c)=> n + getIngredientsFor(c).length, 0);
       const rows = mergedDayItems.length
-        ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.dove)).join('')
+        ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, [variantNoteText(it.quals || []), it.dove].filter(Boolean).join(' · '))).join('')
         : (totalIngCount > 0
           ? `<div class="ing-empty">✅ Hai tutti gli ingredienti, puoi cucinare!</div>`
           : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`);
@@ -8800,6 +8829,7 @@ function renderIngredientSheet(it, isNew){
           ${catPicker}
           ${home ? '' : pickRow('group', 'Equivalenti', it.group && state.pantryGroups[it.group] ? escapeHtml(state.pantryGroups[it.group].label) : 'nessuno', 'Es. Fusilli e Penne = Pasta corta')}
           ${groupPicker}
+          ${isNew || home || !INGREDIENT_VARIANT_OPTIONS[ingMatchKey(it.nome)] ? '' : `<div class="sheet-row sheet-variants"><div class="settings-field-label">Variazione</div><div class="chip-row">${INGREDIENT_VARIANT_OPTIONS[ingMatchKey(it.nome)].map(v => `<button type="button" class="btn is-chip${it.variante === v ? ' active' : ''}" data-sheet-variant="${escapeAttr(v)}" aria-pressed="${it.variante === v}">${escapeHtml(v)}</button>`).join('')}</div></div>`}
         </div>
       </section>
       ${isNew || home ? '' : (() => { const used = recipeNamesUsingIngredient(it.nome); const open = !!state.pantrySheetUsed && used.length > 0; return `<section class="settings-section">
@@ -9165,7 +9195,7 @@ function renderDispensa(){
   // vede solo una volta impostato.
   const searchTerm = state.pantrySearch.trim().toLowerCase();
   const items = Object.entries(state.pantryItems)
-    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat, scadenza: it.scadenza || '', frozenOn: it.frozenOn || '' }))
+    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat, scadenza: it.scadenza || '', frozenOn: it.frozenOn || '', variante: it.variante || '' }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0)
     .filter(it => !searchTerm || it.nome.toLowerCase().includes(searchTerm));
 
@@ -9198,6 +9228,7 @@ function renderDispensa(){
       <div class="inv-main">
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
       <span class="inv-tags">
+      ${it.variante ? `<span class="inv-variant">${escapeHtml(it.variante)}</span>` : ''}
       <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])}${it.frozenOn ? escapeAttr(` · congelato il ${it.frozenOn}`) : ''} — tocca per scegliere">${luogoIconContent}${it.frozenOn && it.luogo === 'freezer' && !isSelected ? `<span class="luogo-since">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>
       ${(it.scadenza || (it.frozenOn && it.luogo !== 'freezer')) ? `<button class="btn is-text inv-badges" data-pantry-edit="${escapeAttr(it.key)}" type="button" tabindex="-1" aria-hidden="true">${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn && it.luogo !== 'freezer' ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>` : ''}
       </span>
@@ -11589,6 +11620,12 @@ function attachHandlers(){
     const group = state.pantryGroups[v];
     if(!it.cat && group && group.cat) it.cat = group.cat;
     state.pantrySheetPicker = null;
+    sheetChanged();
+  }));
+  document.querySelectorAll('[data-sheet-variant]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const it = sheetTarget(); if(!it) return;
+    const v = btn.dataset.sheetVariant;
+    if(it.variante === v) delete it.variante; else it.variante = v;
     sheetChanged();
   }));
   document.querySelectorAll('[data-sheet-unit]').forEach(btn=> btn.addEventListener('click', ()=>{
