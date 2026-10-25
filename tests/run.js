@@ -737,7 +737,7 @@ test('scheda ingrediente: aprire un elenco o "Altro" non la riporta in cima né 
   await page.setViewportSize({ width: 390, height: 600 });
   await page.evaluate(() => { upsertPantryItem('Carciofi', 'frigo', 3); state.tab = 'dispensa'; state.pantryView = 'cibo'; state.pantryEditKey = 'carciofi'; render(); });
   eq(await page.evaluate(() => document.querySelector('.sheet-page').classList.contains('is-entering')), true, 'animazione alla prima apertura');
-  await page.evaluate(() => { document.querySelector('.sheet-page').scrollTop = 250; });
+  await page.evaluate(() => { document.querySelector('.sheet-page').scrollTop = 250; document.querySelector('[data-sheet-more]').scrollIntoView({ block: 'center' }); });
   const before = await page.evaluate(() => document.querySelector('.sheet-page').scrollTop);
   assert(before > 100, `la scheda scorre (${before})`);
   await page.click('[data-sheet-more]');
@@ -3118,33 +3118,65 @@ test('scheda ingrediente: "Usato in N ricette" si apre con l\'elenco, e dice qua
   assert(r.vuoto, 'ingrediente senza ricette');
 });
 
-test('variazioni: tuorli e albumi sono righe separate in Spesa; latte e altri si scelgono nella scheda', async ({ page }) => {
+test('variazioni: solo per le parti di uno stesso prodotto (uova, limone, arance); prosciutto, pollo, panna tornano ingredienti singoli', async ({ page }) => {
   const r = await page.evaluate(() => {
-    const find = (re) => { for(const m of allRecipeMetas()){ const hit = getIngredientsFor(m.nome).find(i => i.qual && re.test(i.qual + '|' + i.ingrediente)); if(hit) return { ricetta: m.nome, ing: hit.ingrediente, qual: hit.qual }; } return null; };
-    const tuorli = find(/^tuorli\|Uova/), cotto = find(/^cotto\|Prosciutto/), petto = find(/^petto\|Pollo/), panna = find(/^da cucina\|Panna/);
+    const find = (re) => { for(const m of allRecipeMetas()){ const hit = getIngredientsFor(m.nome).find(i => re.test(i.ingrediente + '|' + (i.spec || ''))); if(hit) return { ricetta: m.nome, ing: hit.ingrediente, qual: hit.qual || '' }; } return null; };
+    const out = {
+      tuorli: find(/^Uova\|tuorli$/), succo: find(/^Limone\|succo$/), scorza: find(/^Limone\|scorza$/), arance: find(/^Arance\|scorza$/),
+      prosciutto: find(/^Prosciutto cotto\|$/), pollo: find(/^Petto di pollo\|$/), panna: find(/^Panna da cucina\|$/),
+      sbagliati: [].concat(...allRecipeMetas().map(m => getIngredientsFor(m.nome).filter(i => i.spec && !/^(tuorli|albumi|sode|grandi|medie|scorza|succo)$/.test(i.spec)).map(i => m.nome + ':' + i.ingrediente + ':' + i.spec)))
+    };
+    // una ricetta salvata con la vecchia specifica rimette il nome intero
+    state.recipeEdits['Prova vecchia'] = { ingredienti: [{ ingrediente: 'Prosciutto', qta: '100 g', qual: 'cotto' }] };
+    out.legacy = (getIngredientsFor('Prova vecchia')[0] || {}).ingrediente;
     // due ricette in menù: una con tuorli, una con uova intere → due righe in Spesa
     state.pantryItems = {}; generateWeek(0);
     const sl = allPlannedShoppingMeals().slice(-4);
-    writeMealDishes(sl[0].weekIdx, sl[0].i, sl[0].meal, tuorli.ricetta, []);
-    const intere = allRecipeMetas().find(m => getIngredientsFor(m.nome).some(i => i.ingrediente === 'Uova' && !i.qual));
+    writeMealDishes(sl[0].weekIdx, sl[0].i, sl[0].meal, out.tuorli.ricetta, []);
+    const intere = allRecipeMetas().find(m => getIngredientsFor(m.nome).some(i => i.ingrediente === 'Uova' && !i.spec));
     writeMealDishes(sl[1].weekIdx, sl[1].i, sl[1].meal, intere.nome, []);
-    const righe = buildShopFlat().filter(x => x.ingrediente === 'Uova').map(x => x.qual || '');
+    out.righe = buildShopFlat().filter(x => x.ingrediente === 'Uova').map(x => x.spec || '');
     state.tab = 'spesa'; render();
-    const testo = [...document.querySelectorAll('.item-name')].map(e => e.textContent.trim()).filter(t => /^Uova/.test(t));
-    upsertPantryItem('Latte', 'frigo', 2);
-    state.tab = 'dispensa'; state.pantryEditKey = 'latte'; render();
-    const chips = [...document.querySelectorAll('[data-sheet-variant]')].map(b => b.dataset.sheetVariant);
-    document.querySelector('[data-sheet-variant="parzialmente scremato"]').click();
-    const salvata = state.pantryItems.latte.variante;
-    state.pantryEditKey = null; render();
-    const riga = !!([...document.querySelectorAll('.inv-variant')].find(e => e.textContent === 'parzialmente scremato'));
-    return { tuorli, cotto, petto, panna, righe, testo, chips, salvata, riga };
+    out.testo = [...document.querySelectorAll('.item-name')].map(e => e.textContent.trim()).filter(t => /^Uova/.test(t));
+    return out;
   });
-  assert(r.tuorli && r.cotto && r.petto && r.panna, 'ingredienti con variazione: ' + JSON.stringify(r));
+  assert(r.tuorli && r.succo && r.scorza && r.arance, 'uova/limone/arance con specifica: ' + JSON.stringify([r.tuorli, r.succo, r.scorza, r.arance]));
+  assert(r.prosciutto && r.pollo && r.panna, 'ingredienti singoli: ' + JSON.stringify([r.prosciutto, r.pollo, r.panna]));
+  eq(r.sbagliati, [], 'solo specifiche ammesse');
+  eq(r.legacy, 'Prosciutto cotto', 'vecchia specifica');
   assert(r.righe.includes('tuorli') && r.righe.includes(''), 'righe Uova in Spesa: ' + JSON.stringify(r.righe));
   assert(r.testo.some(t => /Uova · tuorli/.test(t)) && r.testo.some(t => t === 'Uova'), 'testo righe: ' + JSON.stringify(r.testo));
-  eq(r.chips, ['intero', 'parzialmente scremato'], 'variazioni del latte');
-  eq([r.salvata, r.riga], ['parzialmente scremato', true], 'variazione salvata e visibile in Dispensa');
+});
+
+test('specifiche tue: la aggiungi all\'ingrediente (pompelmo · succo), la scegli nella ricetta e resta disponibile', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    upsertPantryItem('Pompelmo', 'frigo', 2);
+    state.tab = 'dispensa'; state.pantryEditKey = 'pompelmo'; render();
+    const prima = variantOptionsFor('Pompelmo');
+    document.getElementById('variant-new-input').value = 'succo';
+    document.querySelector('[data-variant-add]').click();
+    const dopo = variantOptionsFor('Pompelmo');
+    const chip = [...document.querySelectorAll('.variant-chips .btn')].map(e => e.textContent.replace('✕', '').trim());
+    state.pantryEditKey = null;
+    state.tab = 'prep'; state.recipeEditName = 'Carbonara'; render();
+    document.getElementById('edit-add-ing-row').click();
+    const row = [...document.querySelectorAll('#edit-ing-list .edit-ing-row')].pop();
+    row.querySelector('.edit-ing-name').value = 'Pompelmo';
+    row.querySelector('.edit-ing-name').dispatchEvent(new Event('input', { bubbles: true }));
+    const opzioni = [...row.querySelectorAll('.edit-ing-qual option')].map(o => o.value);
+    row.querySelector('.edit-ing-qual').value = '__new';
+    row.querySelector('.edit-ing-qual').dispatchEvent(new Event('change', { bubbles: true }));
+    const nuovo = row.querySelector('.edit-ing-qual-new'); nuovo.value = 'scorza';
+    row.querySelector('.edit-ing-num').value = '1';
+    document.querySelector('[data-save-recipe-edit]').click();
+    const salvata = getIngredientsFor('Carbonara').find(i => i.ingrediente === 'Pompelmo');
+    return { prima, dopo, chip, opzioni, salvata, poi: variantOptionsFor('Pompelmo') };
+  });
+  eq([r.prima, r.dopo], [[], ['succo']], 'aggiunta dalla scheda');
+  eq(r.chip, ['succo'], 'chip');
+  eq(r.opzioni, ['', 'succo', '__new'], 'scelta nella ricetta');
+  assert(r.salvata && r.salvata.qual === 'scorza', 'salvata: ' + JSON.stringify(r.salvata));
+  eq(r.poi, ['succo', 'scorza'], 'la nuova specifica resta disponibile');
 });
 
 test('Modifica ricetta: quantità con numero e unità, specifica scelta dall\'elenco; un testo non riconosciuto resta com\'è', async ({ page }) => {
@@ -3159,7 +3191,7 @@ test('Modifica ricetta: quantità con numero e unità, specifica scelta dall\'el
     out.righe = rows.length; out.conNumero = rows.filter(r => r.querySelector('.edit-ing-num')).length;
     const uova = rows.find(r => /^uova$/i.test(r.querySelector('.edit-ing-name').value)) || rows.find(r => /tuorl|uov/i.test(r.querySelector('.edit-ing-name').value));
     out.haUova = !!uova;
-    if(uova){ uova.querySelector('.edit-ing-name').value = 'Uova'; uova.querySelector('.edit-ing-name').dispatchEvent(new Event('input', { bubbles: true })); out.qualVisibile = !uova.querySelector('.edit-ing-qual').hidden; uova.querySelector('.edit-ing-qual').value = 'tuorli'; out.letta = readEditIngRow(uova); }
+    if(uova){ uova.querySelector('.edit-ing-name').value = 'Uova'; uova.querySelector('.edit-ing-name').dispatchEvent(new Event('input', { bubbles: true })); out.qualVisibile = !!uova.querySelector('.edit-ing-qual'); uova.querySelector('.edit-ing-qual').value = 'tuorli'; out.letta = readEditIngRow(uova); }
     return out;
   });
   eq(r.p.map(x => x.ok ? x.num + '|' + x.unit : 'raw'), ['200|g', '0.5|', '2|cucchiaio', '|q.b.', 'raw', '1.5|kg'], 'parse');

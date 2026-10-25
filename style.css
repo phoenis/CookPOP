@@ -2504,8 +2504,6 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .ing-used-list li + li{ border-top:1px solid var(--line); }
 
 /* Variazione dell'ingrediente (scheda e riga di Dispensa) */
-.sheet-variants{ padding:var(--s3) 0; display:flex; flex-direction:column; gap:var(--s2); }
-.inv-variant{ font-size:var(--text-xsmall); color:var(--ink-light); }
 
 /* Modifica ricetta: ogni ingrediente su due righe (nome + ✕, poi quantità, unità, specifica) */
 .edit-ing-row{ flex-direction:column; gap:var(--s2); align-items:stretch; margin-bottom:var(--s3); }
@@ -2535,3 +2533,10 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .leftover-names .avanzo-note-pencil{ margin-left:var(--s1); vertical-align:middle; }
 /* "+" dei piatti: stesso spessore del cerchio col punto di domanda */
 .dish-add-ic, .dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border-width:var(--border); }
+
+/* Specifiche dell'ingrediente (scheda ingrediente) */
+.variant-chips{ margin-bottom:var(--s3); }
+.variant-chips .chip-x{ border:0; background:none; padding:0 0 0 var(--s1); font:inherit; color:inherit; cursor:pointer; }
+.sheet-variant-add{ display:flex; gap:var(--s2); align-items:center; }
+.sheet-variant-add input{ flex:1; min-width:0; box-sizing:border-box; height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-small); background:var(--surface); color:var(--ink); }
+.edit-ing-fields .edit-ing-qual-new{ flex:1; min-width:0; box-sizing:border-box; height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-small); background:var(--surface); color:var(--ink); }
