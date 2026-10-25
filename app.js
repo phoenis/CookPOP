@@ -936,10 +936,9 @@ const CLOCK_TAG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http
 const CAL_TAG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M208 32h-24v-8a8 8 0 0 0-16 0v8H88v-8a8 8 0 0 0-16 0v8H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h160a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16M72 48v8a8 8 0 0 0 16 0v-8h80v8a8 8 0 0 0 16 0v-8h24v32H48V48Zm136 160H48V96h160zm-96-88v64a8 8 0 0 1-16 0v-51.06l-4.42 2.22a8 8 0 0 1-7.16-14.32l16-8A8 8 0 0 1 112 120m59.16 30.45L152 176h16a8 8 0 0 1 0 16h-32a8 8 0 0 1-6.4-12.8l28.78-38.37a8 8 0 1 0-13.31-8.83a8 8 0 1 1-13.85-8A24 24 0 0 1 176 136a23.76 23.76 0 0 1-4.84 14.45"></path></svg>';
 const NOTE_TITLE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg>';
 function recipeTimeTagsHtml(rec, det){
-  const { prep, cottura } = recipeTimeParts(rec);
-  if(prep != null || cottura != null){
-    return [prep != null ? `Preparazione ${formatMinutes(prep)}` : '', cottura != null ? `Cottura ${formatMinutes(cottura)}` : ''].filter(Boolean)
-      .map((t, i) => `<span class="tag tempo">${i === 0 ? CLOCK_TAG_SVG + ' ' : ''}${t}</span>`).join('');
+  const entries = recipeTimeEntriesWithText(rec, det);
+  if(entries.length){
+    return entries.map((t, i) => `<span class="tag tempo">${i === 0 ? CLOCK_TAG_SVG + ' ' : ''}${escapeHtml(t.label || 'Tempo')} ${formatMinutes(t.min)}</span>`).join('');
   }
   return `<span class="tag tempo">${det && det.tempo ? CLOCK_TAG_SVG + ' ' + escapeHtml(det.tempo) : escapeHtml(TEMPO_LABEL[rec.tempoBucket])}</span>`;
 }
@@ -1048,14 +1047,11 @@ document.addEventListener('scroll', e=>{
   }, { passive: true });
 })();
 function rdTimeHtml(rec, det){
-  const { prep, cottura } = recipeTimeParts(rec);
   const clock = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256" width="1em" height="1em"><path fill="currentColor" d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24m0 192a88 88 0 1 1 88-88a88.1 88.1 0 0 1-88 88m64-88a8 8 0 0 1-8 8h-56a8 8 0 0 1-8-8V72a8 8 0 0 1 16 0v48h48a8 8 0 0 1 8 8"/></svg>';
-  let text;
-  if(prep != null || cottura != null){
-    text = [prep != null ? `Preparazione <b>${formatMinutes(prep)}</b>` : '', cottura != null ? `Cottura <b>${formatMinutes(cottura)}</b>` : ''].filter(Boolean).join(' · ');
-  } else {
-    text = `<b>${escapeHtml((det && det.tempo) || TEMPO_LABEL[rec.tempoBucket] || '')}</b>`;
-  }
+  const entries = recipeTimeEntriesWithText(rec, det);
+  const text = entries.length
+    ? entries.map(t => `${escapeHtml(t.label || 'Tempo')} <b>${formatMinutes(t.min)}</b>`).join(' · ')
+    : `<b>${escapeHtml((det && det.tempo) || TEMPO_LABEL[rec.tempoBucket] || '')}</b>`;
   return `<div class="rd-time">${clock}<span>${text}</span></div>`;
 }
 function rdMetaText(rec){
@@ -1485,30 +1481,82 @@ function formatMinutes(min){
   const h = Math.floor(min / 60), m = min % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
 }
-function recipeTimeParts(x){
+// I tempi di una ricetta sono un elenco, come gli ingredienti: ognuno ha un
+// nome (Preparazione, Cottura, Riposo…) e dei minuti. Il totale è la somma e
+// decide la fascia. Vecchio formato: solo tPrep / tCottura.
+const TIME_LABELS = ['Preparazione', 'Cottura', 'Riposo', 'Lievitazione', 'Marinatura', 'Raffreddamento'];
+function recipeTimeEntries(x){
+  if(x && Array.isArray(x.tempi)){
+    return x.tempi.map(t => ({ label: String((t && t.label) || '').trim(), min: Math.max(0, Math.round(Number(t && t.min) || 0)) })).filter(t => t.min > 0 || t.label);
+  }
+  const out = [];
   const p = x && x.tPrep != null && x.tPrep !== '' ? Number(x.tPrep) : null;
   const c = x && x.tCottura != null && x.tCottura !== '' ? Number(x.tCottura) : null;
-  return { prep: Number.isFinite(p) ? p : null, cottura: Number.isFinite(c) ? c : null };
+  if(Number.isFinite(p)) out.push({ label: 'Preparazione', min: p });
+  if(Number.isFinite(c)) out.push({ label: 'Cottura', min: c });
+  return out;
+}
+// "1 ora + 1 ora di cottura + 1 ora di riposo nel forno" -> tre voci. Solo se
+// ogni parte si capisce; altrimenti null e il testo resta com'è.
+function parseTempoText(text){
+  const t = String(text || '').trim();
+  if(!/\+/.test(t)) return null;
+  const parts = t.split('+').map(x => x.trim()).filter(Boolean);
+  const out = [];
+  for(let k = 0; k < parts.length; k++){
+    const p = parts[k].toLowerCase();
+    let m = p.match(/(\d+(?:[.,]\d+)?)\s*(ore|ora|h)\b/), min = null;
+    if(m) min = Math.round(parseFloat(m[1].replace(',', '.')) * 60);
+    else if((m = p.match(/(\d+)\s*(minuti|min|m)\b/))) min = parseInt(m[1], 10);
+    else if(/mezz'?\s*ora/.test(p)) min = 30;
+    if(min == null) return null;
+    const label = /cottur|forno/.test(p) && !/riposo/.test(p) ? 'Cottura' : /riposo/.test(p) ? 'Riposo' : /lievit/.test(p) ? 'Lievitazione' : /marin/.test(p) ? 'Marinatura' : /prep/.test(p) || k === 0 ? 'Preparazione' : 'Tempo';
+    out.push({ label, min });
+  }
+  return out.length > 1 ? out : null;
+}
+function recipeTimeEntriesWithText(rec, det){
+  const e = recipeTimeEntries(rec).filter(t => t.min > 0);
+  if(e.length) return e;
+  return parseTempoText((det && det.tempo) || (rec && rec.tempo)) || [];
+}
+function recipeTimeTotal(entries){ return entries.reduce((n, t) => n + (t.min || 0), 0); }
+// Nell'elenco Ricette: con più tempi, il totale e la fascia ("3 h · oltre 1 h").
+function recipeListTime(r){
+  const e = recipeTimeEntriesWithText(r, getRecipeDetails(r.nome));
+  if(e.length < 2) return r.tempo;
+  const tot = recipeTimeTotal(e);
+  return `${formatMinutes(tot)} · ${tempoShortLabel(tempoBucketForMinutes(tot))}`;
 }
 function recipeTimeText(x){
-  const { prep, cottura } = recipeTimeParts(x);
-  if(prep == null && cottura == null) return '';
-  return [prep != null ? `${formatMinutes(prep)} prep.` : '', cottura != null ? `${formatMinutes(cottura)} cottura` : ''].filter(Boolean).join(' + ');
+  return recipeTimeEntries(x).filter(t => t.min > 0).map(t => `${formatMinutes(t.min)} ${t.label.toLowerCase()}`).join(' + ');
 }
-function editTimeTotalHtml(prep, cottura, rec){
-  const { prep: p, cottura: c } = recipeTimeParts({ tPrep: prep, tCottura: cottura });
-  if(p == null && c == null) return rec && rec.tempo ? `Ora: ${escapeHtml(rec.tempo)} (${escapeHtml(TEMPO_LABEL[rec.tempoBucket] || '')}). Scrivi i minuti per cambiarlo.` : 'Scrivi i minuti di preparazione e di cottura: il totale decide la fascia dei filtri.';
-  const tot = (p || 0) + (c || 0);
+function editTimeEntryHtml(label, min){
+  return `
+    <div class="edit-time-entry">
+      <input type="text" class="edit-time-label" list="edit-time-labels" placeholder="Es. Cottura" aria-label="Che tempo è" value="${escapeAttr(label || '')}">
+      <span class="edit-time-input"><input type="number" inputmode="numeric" min="0" step="5" class="edit-time-min" aria-label="Minuti" value="${min != null && min !== '' ? escapeAttr(String(min)) : ''}" placeholder="–"> min</span>
+      <button type="button" class="btn is-outline is-icon is-danger edit-row-remove" data-remove-row aria-label="Rimuovi tempo">✕</button>
+    </div>`;
+}
+function editTimeTotalHtml(entries, rec){
+  const tot = recipeTimeTotal(entries);
+  if(!entries.some(t => t.min > 0)) return rec && rec.tempo ? `Ora: ${escapeHtml(rec.tempo)} (${escapeHtml(TEMPO_LABEL[rec.tempoBucket] || '')}). Aggiungi i tempi: il totale decide la fascia.` : 'Aggiungi i tempi (preparazione, cottura, riposo…): il totale decide la fascia.';
   return `Totale ${formatMinutes(tot)} · ${escapeHtml(TEMPO_LABEL[tempoBucketForMinutes(tot)])}`;
 }
-// Salvataggio dal form: con almeno un campo compilato il totale rifà testo e
-// fascia; vuoti, restano quelli che la ricetta aveva già.
+function readEditTimeEntries(){
+  return Array.from(document.querySelectorAll('#edit-time-list .edit-time-entry')).map(row => ({
+    label: row.querySelector('.edit-time-label').value.trim(),
+    min: Math.max(0, parseInt(row.querySelector('.edit-time-min').value, 10) || 0)
+  })).filter(t => t.min > 0);
+}
+// Salvataggio dal form: con almeno un tempo il totale rifà testo e fascia;
+// senza, restano quelli che la ricetta aveva già.
 function editTimeFromForm(rec){
-  const raw = id => { const v = document.getElementById(id).value.trim(); return v === '' ? null : Math.max(0, parseInt(v, 10) || 0); };
-  const prep = raw('edit-tprep'), cottura = raw('edit-tcottura');
-  if(prep == null && cottura == null) return { tPrep: null, tCottura: null, tempo: rec.tempo || '', tempoBucket: rec.tempoBucket || 'normale' };
-  const tot = (prep || 0) + (cottura || 0);
-  return { tPrep: prep, tCottura: cottura, tempo: formatMinutes(tot), tempoBucket: tempoBucketForMinutes(tot) };
+  const tempi = readEditTimeEntries().map(t => ({ label: t.label || 'Tempo', min: t.min }));
+  if(!tempi.length) return { tempi: null, tPrep: null, tCottura: null, tempo: rec.tempo || '', tempoBucket: rec.tempoBucket || 'normale' };
+  const tot = recipeTimeTotal(tempi);
+  return { tempi, tPrep: null, tCottura: null, tempo: formatMinutes(tot), tempoBucket: tempoBucketForMinutes(tot) };
 }
 function getRecipeMeta(name){
   if(state.hiddenRecipes[name]) return null;
@@ -5467,6 +5515,8 @@ function renderRecipeEditModal(){
   const ingRowsHtml = (ingredienti.length ? ingredienti : [{ingrediente:'',qta:''}])
     .map(it => editIngRowHtml(it.ingrediente, it.qta, it.qual)).join('');
 
+  const editTimeEntries = recipeTimeEntriesWithText(rec, getRecipeDetails(name));
+  const editTimeEntriesHtml = (editTimeEntries.length ? editTimeEntries : [{ label: '', min: '' }]).map(t => editTimeEntryHtml(t.label, t.min || '')).join('');
   const stepRowsHtml = (procedimento.length ? procedimento : [''])
     .map(s => editStepRowHtml(s)).join('');
 
@@ -5482,11 +5532,10 @@ function renderRecipeEditModal(){
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M128 20a108 108 0 1 0 108 108A108.12 108.12 0 0 0 128 20m0 192a84 84 0 1 1 84-84a84.09 84.09 0 0 1-84 84m68-84a12 12 0 0 1-12 12h-56a12 12 0 0 1-12-12V72a12 12 0 0 1 24 0v44h44a12 12 0 0 1 12 12"></path></svg> Tempo</div>
-            <div class="edit-time-row">
-              <label class="edit-time-field"><span>Preparazione</span><span class="edit-time-input"><input type="number" inputmode="numeric" min="0" step="5" id="edit-tprep" value="${rec.tPrep != null ? escapeAttr(String(rec.tPrep)) : ''}" placeholder="–"> min</span></label>
-              <label class="edit-time-field"><span>Cottura</span><span class="edit-time-input"><input type="number" inputmode="numeric" min="0" step="5" id="edit-tcottura" value="${rec.tCottura != null ? escapeAttr(String(rec.tCottura)) : ''}" placeholder="–"> min</span></label>
-            </div>
-            <p class="settings-note" id="edit-time-total">${editTimeTotalHtml(rec.tPrep, rec.tCottura, rec)}</p>
+            <div id="edit-time-list">${editTimeEntriesHtml}</div>
+            <datalist id="edit-time-labels">${TIME_LABELS.map(l => `<option value="${escapeAttr(l)}"></option>`).join('')}</datalist>
+            <button type="button" class="btn is-text edit-add-row" id="edit-add-time-row">+ aggiungi tempo</button>
+            <p class="settings-note" id="edit-time-total">${editTimeTotalHtml(editTimeEntries, rec)}</p>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Porzioni</div>
@@ -7615,7 +7664,7 @@ function renderPrep(){
       <div class="recipe-row">
         <div>
           <div class="recipe-title">${escapeHtml(r.nome)}${det ? ' <span class="full-badge" title="Ricetta completa con procedimento"></span>' : ''}</div>
-          <span class="day-time">${escapeHtml(r.tempo)}</span>
+          <span class="day-time">${escapeHtml(recipeListTime(r))}</span>
           ${pantryMatchHtml(matches[r.nome])}
         </div>
         <div class="day-row-side">
@@ -8146,10 +8195,13 @@ function renderMoveModal(){
     </div>
   </div>`;
 }
-document.addEventListener('input', e=>{
-  if(!e.target.closest || !e.target.closest('#edit-tprep, #edit-tcottura')) return;
+function refreshEditTimeTotal(){
   const el = document.getElementById('edit-time-total'); if(!el) return;
-  el.innerHTML = editTimeTotalHtml(document.getElementById('edit-tprep').value, document.getElementById('edit-tcottura').value, getRecipeMeta(state.recipeEditName) || {});
+  el.innerHTML = editTimeTotalHtml(readEditTimeEntries(), getRecipeMeta(state.recipeEditName) || {});
+}
+document.addEventListener('input', e=>{
+  if(!e.target.closest || !e.target.closest('.edit-time-min')) return;
+  refreshEditTimeTotal();
 });
 // Ridisegna il foglio tenendo ferma la lista (scorrimento incluso).
 function moveRender(){
@@ -10743,7 +10795,8 @@ function attachHandlers(){
     }));
     recipeEditModal.addEventListener('click', e=>{
       if(e.target.closest('[data-remove-row]')){
-        e.target.closest('.edit-ing-row, .edit-step-row').remove();
+        e.target.closest('.edit-ing-row, .edit-step-row, .edit-time-entry').remove();
+        refreshEditTimeTotal();
         return;
       }
       const stagioneChip = e.target.closest('[data-stagione-chip]');
@@ -10755,6 +10808,12 @@ function attachHandlers(){
         const list = document.getElementById('edit-ing-list');
         list.insertAdjacentHTML('beforeend', editIngRowHtml('', '', ''));
         attachIngredientCombobox(list.lastElementChild.querySelector('.edit-ing-name'));
+        return;
+      }
+      if(e.target.closest('#edit-add-time-row')){
+        const tl = document.getElementById('edit-time-list');
+        tl.insertAdjacentHTML('beforeend', editTimeEntryHtml('', ''));
+        tl.lastElementChild.querySelector('.edit-time-label').focus();
         return;
       }
       if(e.target.closest('#edit-add-step-row')){

@@ -2517,3 +2517,11 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .edit-ing-fields select[hidden]{ display:none; }
 .edit-ing-fields .edit-ing-num, .edit-ing-fields .edit-ing-qta{ box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:var(--space-xsmall) var(--space-small); background:var(--surface); color:var(--ink); }
 .edit-ing-fields .edit-ing-num, .edit-ing-fields .edit-ing-qta{ height:2.75rem; padding-top:0; padding-bottom:0; line-height:normal; }
+
+/* Modifica ricetta: elenco dei tempi (nome + minuti), come gli ingredienti */
+.edit-time-entry{ display:flex; gap:var(--s2); align-items:center; margin-bottom:var(--s2); }
+.edit-time-entry .edit-time-label{ flex:1; min-width:0; box-sizing:border-box; height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-small); background:var(--surface); color:var(--ink); }
+.edit-time-entry .edit-time-input{ display:flex; align-items:center; gap:var(--s2); flex:0 0 auto; color:var(--ink-light); font-size:var(--text-small); }
+.edit-time-entry .edit-time-min{ width:4.5rem; box-sizing:border-box; height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-small); background:var(--surface); color:var(--ink); }
+.edit-add-row{ align-self:flex-start; }
+.edit-time-entry .edit-time-label, .edit-time-entry .edit-time-min{ padding-top:0; padding-bottom:0; line-height:normal; }
