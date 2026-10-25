@@ -5720,9 +5720,12 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   };
   // Pasto-avanzo: niente portate né azioni per piatto, ma una riga sola più
   // discreta — icona dell'avanzo e i piatti uno dopo l'altro, col "+".
+  // La matita per la variante sta subito dopo il nome dell'avanzo.
+  const leftoverPencil = (name && linkSource && !state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk)
+    ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : '';
   const leftoverHtml = (name && linkSource) ? `
     <div class="dish-line is-leftover">
-      <div class="leftover-line"><button type="button" class="dish-ic leftover-ic${dishLockedHas(mk, dishes[0].name) ? ' is-locked' : ''}" data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(dishes[0].name)}" aria-pressed="${dishLockedHas(mk, dishes[0].name)}" aria-label="Avanzo: blocca o sblocca il pasto">🥡</button><span class="leftover-names">${dishes.map(dsh => `<span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>`).join('<span class="leftover-sep"> + </span>')}</span></div>
+      <div class="leftover-line"><button type="button" class="dish-ic leftover-ic${dishLockedHas(mk, dishes[0].name) ? ' is-locked' : ''}" data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(dishes[0].name)}" aria-pressed="${dishLockedHas(mk, dishes[0].name)}" aria-label="Avanzo: blocca o sblocca il pasto">🥡</button><span class="leftover-names">${dishes.map(dsh => `<span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>`).join('<span class="leftover-sep"> + </span>')}${leftoverPencil}</span></div>
       <button type="button" class="btn dish-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>
     </div>` : '';
   const dishesHtml = leftoverHtml || (name ? `
@@ -5856,9 +5859,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // spostato nel foglio "⋯". "Avanzo di GG" resta badge-con-✕ (scollega),
   // e "Bloccato" è sola lettura (l'annullo sta nel lucchetto/nel foglio "⋯").
   const doneTag = ''; // lo stato "Cucinata" si legge e si cambia già nel bottone in basso a destra
-  const statusBadges = `
-    ${linkSource ? `${!state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : ''}` : ''}
-  `;
+  const statusBadges = '';
 
   const isOpen = state.expandedDay === mk;
   // Un'unica fonte per "chi cucina": iniziale sola a blocco chiuso, nome per

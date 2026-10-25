@@ -2525,3 +2525,11 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .edit-time-entry .edit-time-min{ width:4.5rem; box-sizing:border-box; height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-small); background:var(--surface); color:var(--ink); }
 .edit-add-row{ align-self:flex-start; }
 .edit-time-entry .edit-time-label, .edit-time-entry .edit-time-min{ padding-top:0; padding-bottom:0; line-height:normal; }
+
+/* "+" e linea tratteggiata dei piatti: stesso colore (e stessa trasparenza) della matita */
+:root{ --dish-hint: color-mix(in srgb, var(--ink-light) 60%, transparent); }
+.dish-item::before{ border-left-color:var(--dish-hint); }
+.dish-add-ic, .dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border-color:var(--dish-hint); color:var(--dish-hint); }
+/* Matita dell'avanzo: in riga, vicino al nome */
+.leftover-names{ display:inline; }
+.leftover-names .avanzo-note-pencil{ margin-left:var(--s1); vertical-align:middle; }
