@@ -3254,6 +3254,19 @@ test('ricette: i tempi sono un elenco (anche 3: preparazione, cottura, riposo); 
   eq(dopo, { n: 4, bucket: 'progetto', tempo: '3 h 30 min', lista: '3 h 30 min · oltre 1 h' });
 });
 
+test('modalità cucina: "Ti serve" trova anche l\'uovo (singolare) e le specifiche', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.recipeEdits['Prova uova'] = { ingredienti: [{ ingrediente: 'Uova', qta: '1' }, { ingrediente: 'Limone', qta: '1', qual: 'succo' }, { ingrediente: 'Sale', qta: 'q.b.' }] };
+    return {
+      uovo: cookStepIngredients('Prova uova', "Aggiungi il tonno, l'uovo e il parmigiano.", 1).map(i => i.nome),
+      uova: cookStepIngredients('Prova uova', 'Sbatti le uova.', 1).map(i => i.nome),
+      succo: cookStepIngredients('Prova uova', 'Spremi il succo.', 1).map(i => i.nome),
+      nulla: cookStepIngredients('Prova uova', 'Mescola bene.', 1).map(i => i.nome)
+    };
+  });
+  eq([r.uovo, r.uova, r.succo, r.nulla], [['Uova'], ['Uova'], ['Limone'], []]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

@@ -706,8 +706,9 @@ const COOK_SKIP_WORDS = new Set(['fresco','fresca','freschi','fresche','tritato'
 function cookStepIngredients(name, stepText, ratio){
   const text = (stepText || '').toLowerCase();
   return getIngredientsFor(name).filter(it=>{
-    const words = (it.ingrediente || '').toLowerCase().split(/[^a-zàèéìòù]+/).filter(w => w.length >= 4 && !COOK_SKIP_WORDS.has(w));
-    return words.some(w => text.includes(w.length > 4 ? w.slice(0, -1) : w));
+    // Anche la specifica (tuorli, succo…) conta; "uova" → "uov" regge "l'uovo".
+    const words = `${it.ingrediente || ''} ${it.spec || ''}`.toLowerCase().split(/[^a-zàèéìòù]+/).filter(w => w.length >= 4 && !COOK_SKIP_WORDS.has(w));
+    return words.some(w => text.includes(w === 'uova' ? 'uov' : (w.length > 4 ? w.slice(0, -1) : w)));
   }).map(it => ({ nome: it.ingrediente, qta: scaleQtyText(it.qta, ratio) || '' }));
 }
 // --- Timer in modalità cucina --------------------------------------------
