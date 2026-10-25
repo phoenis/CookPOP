@@ -3179,6 +3179,21 @@ test('modalità cucina: i rettangolini si colorano avanzando, anche con le frecc
   eq([r.inizio, r.dopoFreccia, r.dopoDue, r.indietro], [1, 2, 3, 2], 'rettangolini colorati');
 });
 
+test('uova e tuorli (stesso ingrediente, specifiche diverse) stanno vicini nella lista della ricetta e in Spesa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.recipeEdits['Pastiera'] = { ingredienti: [
+      { ingrediente: 'Grano cotto', qta: '500 g' }, { ingrediente: 'Uova', qta: '8' }, { ingrediente: 'Ricotta', qta: '500 g' },
+      { ingrediente: 'Zucchero', qta: '500 g' }, { ingrediente: 'Uova', qta: '3', qual: 'tuorli' }
+    ] };
+    const ricetta = getIngredientsFor('Pastiera').map(i => i.ingrediente + (i.qual ? '·' + i.qual : ''));
+    const rows = groupRowsByName([{ ingrediente: 'Uova' }, { ingrediente: 'Burro' }, { ingrediente: 'uova', qual: 'tuorli' }, { ingrediente: 'Latte' }]).map(x => (x.qual ? 'T' : x.ingrediente));
+    return { ricetta, rows };
+  });
+  const iu = r.ricetta.indexOf('Uova'), it = r.ricetta.indexOf('Uova·tuorli');
+  assert(iu >= 0 && it === iu + 1, 'ricetta: ' + JSON.stringify(r.ricetta));
+  eq(r.rows, ['Uova', 'T', 'Burro', 'Latte'], 'Spesa');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

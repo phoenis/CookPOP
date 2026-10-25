@@ -1899,8 +1899,17 @@ function recipeIngredientRank(name){
   return i < 0 ? RECIPE_ING_ORDER.length : i;
 }
 function sortRecipeIngredients(list){
-  return list.map((it, idx) => ({ it, idx, r: recipeIngredientRank(it.ingrediente) }))
-    .sort((x, y) => x.r - y.r || x.idx - y.idx).map(x => x.it);
+  // A parità di posto, le righe con lo stesso nome (Uova e Uova · tuorli) stanno vicine.
+  const first = {};
+  list.forEach((it, idx) => { const k = (it.ingrediente || '').trim().toLowerCase(); if(!(k in first)) first[k] = idx; });
+  return list.map((it, idx) => ({ it, idx, r: recipeIngredientRank(it.ingrediente), f: first[(it.ingrediente || '').trim().toLowerCase()] }))
+    .sort((x, y) => x.r - y.r || x.f - y.f || x.idx - y.idx).map(x => x.it);
+}
+// Righe con lo stesso ingrediente (specifiche diverse) una dopo l'altra, nell'ordine in cui compare il nome la prima volta.
+function groupRowsByName(rows){
+  const order = [], by = {};
+  rows.forEach(r => { const k = (r.ingrediente || '').trim().toLowerCase(); if(!by[k]){ by[k] = []; order.push(k); } by[k].push(r); });
+  return order.flatMap(k => by[k]);
 }
 // Nome finale di un ingrediente seguendo i sinonimi (quelli curati e quelli
 // creati dall'app, che hanno la precedenza), con protezione dai giri chiusi.
@@ -7189,7 +7198,7 @@ function renderSpesa(){
         // Giorno e pasto non si scrivono sotto l'ingrediente: chi li vuole usa "Ordina per Pasto".
       }
     });
-    const mergedList = Object.values(merged).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
+    const mergedList = groupRowsByName(Object.values(merged).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) })));
     displayTotal = mergedList.length;
     displayDone = mergedList.filter(it=>isItemChecked(it.keys, it.ingrediente)).length;
     displayDoneShoppable = mergedList.filter(it=> it.dept !== 'finiti' && isItemChecked(it.keys, it.ingrediente)).length;
@@ -7278,7 +7287,7 @@ function renderSpesa(){
         if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key], qual: it.qual || '' };
         else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); }
       });
-      const allDayItems = Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) }));
+      const allDayItems = groupRowsByName(Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) })));
       giornoMergedAll.push(...allDayItems);
       const mergedDayItems = allDayItems.filter(it => { if(isItemChecked(it.keys, it.ingrediente)){ addCompleted(it); return false; } return true; });
       if(allDayItems.length && !mergedDayItems.length) return '';
