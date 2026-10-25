@@ -2837,11 +2837,14 @@ test('fogli: richiudendo con la barretta e premendo + subito, si riapre al primo
 
 test('ricette: tempo diviso in preparazione e cottura (la somma decide fascia e filtro), e i consigli', async ({ page }) => {
   await page.evaluate(() => { state.tab = 'prep'; state.prepView = 'ricette'; state.recipeEditName = 'Carbonara'; render(); });
-  await page.waitForSelector('#edit-tprep');
+  await page.waitForSelector('#edit-time-list');
   const none = await page.evaluate(() => [!document.getElementById('edit-tempo'), !document.getElementById('edit-tempo-bucket')]);
   eq(none, [true, true], 'niente più testo libero né fascia a mano');
-  await page.fill('#edit-tprep', '20');
-  await page.fill('#edit-tcottura', '30');
+  await page.fill('#edit-time-list .edit-time-entry:last-child .edit-time-label', 'Preparazione');
+  await page.fill('#edit-time-list .edit-time-entry:last-child .edit-time-min', '20');
+  await page.click('#edit-add-time-row');
+  await page.fill('#edit-time-list .edit-time-entry:last-child .edit-time-label', 'Cottura');
+  await page.fill('#edit-time-list .edit-time-entry:last-child .edit-time-min', '30');
   eq(await page.textContent('#edit-time-total'), 'Totale 50 min · 🟠 1 h', 'totale e fascia dal totale');
   await page.fill('#edit-consigli', 'Puoi aggiungere al pangrattato della curcuma.');
   await page.click('#edit-recipe-save');
@@ -2849,11 +2852,11 @@ test('ricette: tempo diviso in preparazione e cottura (la somma decide fascia e 
   await page.waitForTimeout(300);
   const r = await page.evaluate(() => {
     const m = getRecipeMeta('Carbonara'), d = getRecipeDetails('Carbonara');
-    return { bucket: m.tempoBucket, tempo: m.tempo, prep: m.tPrep, cottura: m.tCottura, consigli: d.consigli, text: recipeTimeText(d),
+    return { bucket: m.tempoBucket, tempo: m.tempo, prep: (m.tempi || [])[0] && m.tempi[0].min, cottura: (m.tempi || [])[1] && m.tempi[1].min, consigli: d.consigli, text: recipeTimeText(d),
       detail: [...document.querySelectorAll('.note-box')].map(e => e.textContent.replace(/\s+/g, ' ')).join(' | ') };
   });
   eq({ bucket: r.bucket, tempo: r.tempo, prep: r.prep, cottura: r.cottura, consigli: r.consigli, text: r.text, hasConsigli: /Consigli\s*Puoi aggiungere/.test(r.detail) },
-    { bucket: 'lunga', tempo: '50 min', prep: 20, cottura: 30, consigli: 'Puoi aggiungere al pangrattato della curcuma.', text: '20 min prep. + 30 min cottura', hasConsigli: true });
+    { bucket: 'lunga', tempo: '50 min', prep: 20, cottura: 30, consigli: 'Puoi aggiungere al pangrattato della curcuma.', text: '20 min preparazione + 30 min cottura', hasConsigli: true });
   eq(await page.evaluate(() => tempoBucketForMinutes(20) + '|' + tempoBucketForMinutes(30) + '|' + tempoBucketForMinutes(45) + '|' + tempoBucketForMinutes(60) + '|' + tempoBucketForMinutes(61)), 'express|veloce|normale|lunga|progetto');
   eq(page.errors, [], 'errori JS');
 });
@@ -3192,6 +3195,31 @@ test('uova e tuorli (stesso ingrediente, specifiche diverse) stanno vicini nella
   const iu = r.ricetta.indexOf('Uova'), it = r.ricetta.indexOf('Uova·tuorli');
   assert(iu >= 0 && it === iu + 1, 'ricetta: ' + JSON.stringify(r.ricetta));
   eq(r.rows, ['Uova', 'T', 'Burro', 'Latte'], 'Spesa');
+});
+
+test('ricette: i tempi sono un elenco (anche 3: preparazione, cottura, riposo); in lista il totale con la fascia', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const rec = getRecipeMeta('Pastiera'), det = getRecipeDetails('Pastiera');
+    const parsed = recipeTimeEntriesWithText(rec, det);
+    const lista = recipeListTime(rec);
+    state.tab = 'prep'; state.prepView = 'ricette'; state.recipeEditName = 'Pastiera'; render();
+    const righe = [...document.querySelectorAll('#edit-time-list .edit-time-entry')].map(e => e.querySelector('.edit-time-label').value + ':' + e.querySelector('.edit-time-min').value);
+    const totale = document.getElementById('edit-time-total').textContent;
+    return { parsed, lista, righe, totale, parseNo: parseTempoText('circa 30 min'), tag: recipeTimeTagsHtml(rec, det).replace(/<svg.*?<\/svg>/g, '').replace(/<[^>]+>/g, '|').replace(/\|+/g, '|') };
+  });
+  eq(r.parsed.map(t => t.label + ':' + t.min), ['Preparazione:60', 'Cottura:60', 'Riposo:60'], 'tre tempi riconosciuti');
+  eq(r.lista, '3 h · oltre 1 h', 'in lista totale e fascia');
+  eq(r.righe, ['Preparazione:60', 'Cottura:60', 'Riposo:60'], 'righe nella modifica');
+  assert(/Totale 3 h/.test(r.totale), r.totale);
+  assert(r.parseNo === null, 'testo semplice non toccato');
+  // modifica: aggiungo un quarto tempo e salvo
+  await page.click('#edit-add-time-row');
+  await page.fill('#edit-time-list .edit-time-entry:last-child .edit-time-label', 'Lievitazione');
+  await page.fill('#edit-time-list .edit-time-entry:last-child .edit-time-min', '30');
+  assert(/Totale 3 h 30 min/.test(await page.textContent('#edit-time-total')), 'totale aggiornato');
+  await page.click('#edit-recipe-save');
+  const dopo = await page.evaluate(() => { const m = getRecipeMeta('Pastiera'); return { n: (m.tempi || []).length, bucket: m.tempoBucket, tempo: m.tempo, lista: recipeListTime(m) }; });
+  eq(dopo, { n: 4, bucket: 'progetto', tempo: '3 h 30 min', lista: '3 h 30 min · oltre 1 h' });
 });
 
 (async () => {
