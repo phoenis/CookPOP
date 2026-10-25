@@ -3115,6 +3115,27 @@ test('scheda ingrediente: "Usato in N ricette" si apre con l\'elenco, e dice qua
   assert(r.vuoto, 'ingrediente senza ricette');
 });
 
+test('variazioni: uova, prosciutto, panna, pollo restano un ingrediente solo con la specifica; latte e altri si scelgono nella scheda', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const find = (re) => { for(const m of allRecipeMetas()){ const hit = getIngredientsFor(m.nome).find(i => i.qual && re.test(i.qual + '|' + i.ingrediente)); if(hit) return { ricetta: m.nome, ing: hit.ingrediente, qual: hit.qual }; } return null; };
+    const tuorli = find(/^tuorli\|Uova/), cotto = find(/^cotto\|Prosciutto/), petto = find(/^petto\|Pollo/), panna = find(/^da cucina\|Panna/);
+    const nota = variantNoteText([{ qual: 'tuorli', qta: '2' }, { qual: '', qta: '6' }, { qual: 'tuorli', qta: '2' }, { qual: 'sode', qta: '3' }]);
+    upsertPantryItem('Latte', 'frigo', 2);
+    state.tab = 'dispensa'; state.pantryEditKey = 'latte'; render();
+    const chips = [...document.querySelectorAll('[data-sheet-variant]')].map(b => b.dataset.sheetVariant);
+    document.querySelector('[data-sheet-variant="parzialmente scremato"]').click();
+    const salvata = state.pantryItems.latte.variante;
+    state.pantryEditKey = null; render();
+    const riga = !!([...document.querySelectorAll('.inv-variant')].find(e => e.textContent === 'parzialmente scremato'));
+    upsertPantryItem('Latte', 'frigo', 1);
+    return { tuorli, cotto, petto, panna, nota, chips, salvata, riga, dopoUpsert: state.pantryItems.latte.variante };
+  });
+  assert(r.tuorli && r.cotto && r.petto && r.panna, 'ingredienti con variazione: ' + JSON.stringify(r));
+  eq(r.nota, 'tuorli 4 g'.replace(' g', '') + ' · sode 3', 'nota Spesa');
+  eq(r.chips, ['intero', 'parzialmente scremato'], 'variazioni del latte');
+  eq([r.salvata, r.riga, r.dopoUpsert], ['parzialmente scremato', true, 'parzialmente scremato'], 'variazione salvata e visibile in Dispensa');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
