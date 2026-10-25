@@ -2506,3 +2506,14 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Variazione dell'ingrediente (scheda e riga di Dispensa) */
 .sheet-variants{ padding:var(--s3) 0; display:flex; flex-direction:column; gap:var(--s2); }
 .inv-variant{ font-size:var(--text-xsmall); color:var(--ink-light); }
+
+/* Modifica ricetta: ogni ingrediente su due righe (nome + ✕, poi quantità, unità, specifica) */
+.edit-ing-row{ flex-direction:column; gap:var(--s2); align-items:stretch; margin-bottom:var(--s3); }
+.edit-ing-main, .edit-ing-fields{ display:flex; gap:var(--s2); align-items:center; }
+.edit-ing-main .add-ing-combo{ flex:1; min-width:0; }
+.edit-ing-fields .edit-ing-num{ flex:0 0 6rem; width:6rem; min-width:0; }
+.edit-ing-fields .edit-ing-qta{ flex:1; }
+.edit-ing-fields select{ flex:1; min-width:0; box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:var(--space-xsmall) var(--space-small); background:var(--surface); color:var(--ink); }
+.edit-ing-fields select[hidden]{ display:none; }
+.edit-ing-fields .edit-ing-num, .edit-ing-fields .edit-ing-qta{ box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:var(--space-xsmall) var(--space-small); background:var(--surface); color:var(--ink); }
+.edit-ing-fields .edit-ing-num, .edit-ing-fields .edit-ing-qta{ height:2.75rem; padding-top:0; padding-bottom:0; line-height:normal; }
