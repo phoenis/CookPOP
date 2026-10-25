@@ -2533,3 +2533,5 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Matita dell'avanzo: in riga, vicino al nome */
 .leftover-names{ display:inline; }
 .leftover-names .avanzo-note-pencil{ margin-left:var(--s1); vertical-align:middle; }
+/* "+" dei piatti: stesso spessore del cerchio col punto di domanda */
+.dish-add-ic, .dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border-width:var(--border); }
