@@ -1212,7 +1212,6 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
     ...(finalCat ? { cat: finalCat } : {}),
     ...(finalUnit ? { unit: finalUnit } : {}),
     ...(finalGroup ? { group: finalGroup } : {}),
-    ...(existing && existing.variante ? { variante: existing.variante } : {}),
     // La scadenza resta finché c'è ancora scorta (vale quella della confezione
     // già in casa, la più vicina); se era finita, quella nuova non si conosce.
     ...(currentQty > 0 && existing && existing.scadenza ? { scadenza: existing.scadenza } : {}),
@@ -1852,16 +1851,39 @@ const CURATED_INGREDIENT_RENAMES = {
 const CURATED_INGREDIENT_VARIANTS = {
   'tuorli':['Uova','tuorli'], 'albumi':['Uova','albumi'], 'albume':['Uova','albumi'], 'uova sode':['Uova','sode'],
   'uova (grandi)':['Uova','grandi'], 'uova medie (a temperatura ambiente)':['Uova','medie'],
-  'prosciutto cotto':['Prosciutto','cotto'], 'prosciutto crudo':['Prosciutto','crudo'], 'prosciutto crudo (quantità a piacere)':['Prosciutto','crudo'],
-  'panna da cucina':['Panna','da cucina'], 'panna fresca':['Panna','da montare'],
-  'petto di pollo':['Pollo','petto'], 'petto di pollo (sottili)':['Pollo','petto'], 'petto di pollo o lonza di maiale a cubetti':['Pollo','petto'],
-  'cosce o sovracosce di pollo':['Pollo','coscia'], 'pollo (sovracosce e cosce)':['Pollo','coscia'], 'pollo a pezzi (cosce o sovracosce)':['Pollo','coscia'],
-  'sovracosce di pollo (o petto)':['Pollo','coscia'], 'pollo a pezzi (cosce o petto)':['Pollo','petto o coscia'], 'petto di pollo o cosce disossate':['Pollo','petto o coscia']
+  'limone (scorza)':['Limone','scorza'], 'limone (succo)':['Limone','succo'], 'scorza di limone':['Limone','scorza'],
+  'scorza di limone (grattugiata)':['Limone','scorza'], 'succo di limone':['Limone','succo'],
+  "scorza d'arancia":['Arance','scorza'], "bucce d'arancia":['Arance','scorza']
 };
-// Le variazioni tra cui scegliere nella scheda dell'ingrediente (chiave = nome).
+// Le specifiche proposte per un ingrediente: solo per quelli di cui si usa una
+// parte (si compra comunque l'uovo, il limone, l'arancia). Altre specifiche
+// le aggiungi tu (state.ingredientVariants, vedi variantOptionsFor).
 const INGREDIENT_VARIANT_OPTIONS = {
-  'uova':['tuorli','albumi','sode','grandi','medie'], 'prosciutto':['cotto','crudo'],
-  'latte':['intero','parzialmente scremato'], 'panna':['da montare','da cucina'], 'pollo':['petto','coscia']
+  'uova':['tuorli','albumi','sode'], 'limone':['scorza','succo'], 'limoni':['scorza','succo'],
+  'arance':['scorza','succo'], 'arancia':['scorza','succo']
+};
+function variantOptionsFor(name){
+  const k = ingMatchKey(name || '');
+  const custom = (state.ingredientVariants && state.ingredientVariants[k]) || [];
+  return [...new Set([...(INGREDIENT_VARIANT_OPTIONS[k] || []), ...custom])];
+}
+function addIngredientVariant(name, variant){
+  const k = ingMatchKey(name || ''), v = String(variant || '').trim();
+  if(!k || !v || variantOptionsFor(name).includes(v)) return;
+  state.ingredientVariants = state.ingredientVariants || {};
+  (state.ingredientVariants[k] = state.ingredientVariants[k] || []).push(v);
+}
+function removeIngredientVariant(name, variant){
+  const k = ingMatchKey(name || ''), list = (state.ingredientVariants || {})[k];
+  if(!list) return;
+  state.ingredientVariants[k] = list.filter(x => x !== variant);
+  if(!state.ingredientVariants[k].length) delete state.ingredientVariants[k];
+}
+// Specifiche salvate prima che prosciutto, pollo e panna tornassero ingredienti
+// singoli: rimettono il nome intero che avevano.
+const LEGACY_VARIANT_NAMES = {
+  'prosciutto|cotto':'Prosciutto cotto', 'prosciutto|crudo':'Prosciutto crudo', 'pollo|petto':'Petto di pollo', 'pollo|coscia':'Cosce di pollo',
+  'pollo|petto o coscia':'Pollo a pezzi (cosce o petto)', 'panna|da cucina':'Panna da cucina', 'panna|da montare':'Panna fresca'
 };
 // Gruppi di Dispensa concordati con l'utente: il nome generico usato nelle
 // ricette (matchName) e i nomi delle voci di Dispensa che ne fanno parte
@@ -1919,8 +1941,11 @@ function getIngredientsFor(name){
   });
   const renames = Object.assign({}, CURATED_INGREDIENT_RENAMES, state.ingredientRenames);
   return sortRecipeIngredients(list.map(it=>{
+    const legacy = it.qual && LEGACY_VARIANT_NAMES[ingMatchKey(it.ingrediente) + '|' + it.qual];
+    if(legacy) it = Object.assign({}, it, { ingrediente: legacy, qual: '' });
+    if(it.qual && !it.spec) it = Object.assign({}, it, { spec: it.qual }); // specifica scelta da te (salvata come qual)
     const variant = !it.qual && CURATED_INGREDIENT_VARIANTS[(it.ingrediente || '').trim().toLowerCase()];
-    if(variant) return Object.assign({}, it, { ingrediente: resolveIngredientName(variant[0], renames), qual: variant[1] });
+    if(variant) return Object.assign({}, it, { ingrediente: resolveIngredientName(variant[0], renames), qual: variant[1], spec: variant[1] });
     const displayName = resolveIngredientName(it.ingrediente, renames);
     if(displayName === it.ingrediente) return it;
     // Il nome scritto nella ricetta ("Tuorli") resta come dettaglio accanto al
@@ -2324,6 +2349,7 @@ const state = {
   recipeEdits: {},
   recipeEditName: null,
   customRecipes: {}, // nome -> {nome}: ricette create a mano, non presenti nel catalogo DATA.recipes
+  ingredientVariants: {}, // nome in minuscolo -> [specifiche] aggiunte da te (es. pompelmo: succo); si compra comunque l'ingrediente
   hiddenIngredients: {}, // nome in minuscolo -> true: ingredienti "eliminati" da Gestisci ingredienti (il nome può restare in qualche ricetta, quindi si nasconde dall'elenco)
   hiddenRecipes: {}, // nome -> true: ricette del catalogo "eliminate" (DATA.recipes è statico, quindi si nascondono invece di rimuoverle)
   newRecipeModalOpen: false,
@@ -2525,7 +2551,7 @@ function getSpaceRoute(){
 // personale — un flag condiviso farebbe girare quella migrazione una sola
 // volta in assoluto (dal primo spazio ad aprire l'app) invece che una volta
 // per spazio, lasciando gli altri spazi senza gruppi assegnati alla loro Dispensa.
-const CATALOG_FIELDS = ['recipeIngredients','ingredientRenames','recipeEdits','customRecipes','hiddenRecipes','hiddenIngredients','pantryGroups','customDepts'];
+const CATALOG_FIELDS = ['recipeIngredients','ingredientRenames','recipeEdits','customRecipes','hiddenRecipes','hiddenIngredients','ingredientVariants','pantryGroups','customDepts'];
 function decodeCatalogSaved(saved){
   if(saved.recipeIngredients) saved.recipeIngredients = decodeKeysFromFirebase(saved.recipeIngredients);
   if(saved.ingredientRenames) saved.ingredientRenames = decodeKeysFromFirebase(saved.ingredientRenames);
@@ -2533,6 +2559,7 @@ function decodeCatalogSaved(saved){
   if(saved.customRecipes) saved.customRecipes = decodeKeysFromFirebase(saved.customRecipes);
   if(saved.hiddenRecipes) saved.hiddenRecipes = decodeKeysFromFirebase(saved.hiddenRecipes);
   if(saved.hiddenIngredients) saved.hiddenIngredients = decodeKeysFromFirebase(saved.hiddenIngredients);
+  if(saved.ingredientVariants) saved.ingredientVariants = decodeKeysFromFirebase(saved.ingredientVariants);
   return saved;
 }
 function encodeCatalogForFirebase(payload){
@@ -2543,7 +2570,8 @@ function encodeCatalogForFirebase(payload){
     recipeEdits: encodeKeysForFirebase(payload.recipeEdits),
     customRecipes: encodeKeysForFirebase(payload.customRecipes),
     hiddenRecipes: encodeKeysForFirebase(payload.hiddenRecipes),
-    hiddenIngredients: encodeKeysForFirebase(payload.hiddenIngredients)
+    hiddenIngredients: encodeKeysForFirebase(payload.hiddenIngredients),
+    ingredientVariants: encodeKeysForFirebase(payload.ingredientVariants)
   }));
 }
 const COOK_LABEL = { mara:'Mara', ste:'Ste' };
@@ -5456,9 +5484,6 @@ function buildQtyFromEdit(num, unit){
 }
 function editIngRowHtml(ingrediente, qta, qual){
   const p = parseQtyForEdit(qta);
-  const opts = INGREDIENT_VARIANT_OPTIONS[ingMatchKey(ingrediente || '')] || [];
-  const qualOpts = opts.slice();
-  if(qual && !qualOpts.includes(qual)) qualOpts.push(qual);
   const qtyHtml = p.ok
     ? `<input type="number" inputmode="decimal" min="0" step="any" class="edit-ing-num" placeholder="Qtà" aria-label="Quantità" value="${escapeAttr(p.num)}">
        <select class="edit-ing-unit" aria-label="Unità">${QTY_UNIT_OPTIONS.map(u => `<option value="${escapeAttr(u[0])}"${p.unit === u[0] ? ' selected' : ''}>${escapeHtml(u[2])}</option>`).join('')}</select>`
@@ -5471,24 +5496,35 @@ function editIngRowHtml(ingrediente, qta, qual){
       </div>
       <div class="edit-ing-fields">
         ${qtyHtml}
-        <select class="edit-ing-qual" aria-label="Specifica"${qualOpts.length ? '' : ' hidden'}>${['', ...qualOpts].map(v => `<option value="${escapeAttr(v)}"${(qual || '') === v ? ' selected' : ''}>${v ? escapeHtml(v) : 'Specifica…'}</option>`).join('')}</select>
+        ${editIngQualHtml(ingrediente, qual)}
       </div>
     </div>`;
 }
-// La specifica (tuorli, albumi, petto…) dipende dall'ingrediente scelto: si
-// aggiorna le scelte quando cambia il nome.
+// La specifica (tuorli, succo…): scelta tra quelle dell'ingrediente, oppure
+// una nuova che scrivi tu (resta poi disponibile per quell'ingrediente).
+function editIngQualOptionsHtml(name, cur){
+  const opts = variantOptionsFor(name);
+  if(cur && !opts.includes(cur)) opts.push(cur);
+  return ['', ...opts].map(v => `<option value="${escapeAttr(v)}"${(cur || '') === v ? ' selected' : ''}>${v ? escapeHtml(v) : 'Specifica…'}</option>`).join('') + '<option value="__new">+ Nuova specifica…</option>';
+}
+function editIngQualHtml(name, qual){
+  return `<select class="edit-ing-qual" aria-label="Specifica">${editIngQualOptionsHtml(name, qual)}</select>`;
+}
+// Le scelte dipendono dall'ingrediente: si aggiornano quando cambia il nome.
 function refreshEditIngQual(row){
   const sel = row.querySelector('.edit-ing-qual'); if(!sel) return;
-  const opts = INGREDIENT_VARIANT_OPTIONS[ingMatchKey(row.querySelector('.edit-ing-name').value)] || [];
-  const cur = sel.value;
-  sel.innerHTML = ['', ...opts].map(v => `<option value="${escapeAttr(v)}"${cur === v ? ' selected' : ''}>${v ? escapeHtml(v) : 'Specifica…'}</option>`).join('');
-  sel.hidden = !opts.length;
+  sel.innerHTML = editIngQualOptionsHtml(row.querySelector('.edit-ing-name').value, sel.value === '__new' ? '' : sel.value);
+}
+function switchEditIngQualToNew(sel){
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'edit-ing-qual-new'; inp.placeholder = 'Nuova specifica'; inp.setAttribute('aria-label', 'Nuova specifica');
+  sel.replaceWith(inp); inp.focus();
 }
 function readEditIngRow(row){
   const raw = row.querySelector('.edit-ing-qta');
   const qta = raw ? raw.value.trim() : buildQtyFromEdit(row.querySelector('.edit-ing-num').value, row.querySelector('.edit-ing-unit').value);
-  const q = row.querySelector('.edit-ing-qual');
-  const qual = q && !q.hidden ? q.value : '';
+  const q = row.querySelector('.edit-ing-qual-new') || row.querySelector('.edit-ing-qual');
+  const qual = q && q.value !== '__new' ? q.value.trim() : '';
   return { ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()), qta, ...(qual ? { qual } : {}) };
 }
 function editStepRowHtml(text){
@@ -5513,7 +5549,7 @@ function renderRecipeEditModal(){
   const stagioniSet = new Set(rec.stagioni || []);
 
   const ingRowsHtml = (ingredienti.length ? ingredienti : [{ingrediente:'',qta:''}])
-    .map(it => editIngRowHtml(it.ingrediente, it.qta, it.qual)).join('');
+    .map(it => editIngRowHtml(it.ingrediente, it.qta, it.spec)).join('');
 
   const editTimeEntries = recipeTimeEntriesWithText(rec, getRecipeDetails(name));
   const editTimeEntriesHtml = (editTimeEntries.length ? editTimeEntries : [{ label: '', min: '' }]).map(t => editTimeEntryHtml(t.label, t.min || '')).join('');
@@ -7060,7 +7096,7 @@ function buildShopFlat(){
         // (niente riga da vedere/spuntare) — a meno che non l'avessi già
         // esplicitamente de-spuntato in passato per dire "mi serve comunque".
         if(pantryStatusFor(it.ingrediente, qta) === 'in-casa' && state.shopChecked[key] !== false) return;
-        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, qual:it.qual || '', context, contextShort, isRecipe: true });
+        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, spec:it.spec || '', context, contextShort, isRecipe: true });
       });
     });
   });
@@ -7217,8 +7253,8 @@ function renderSpesa(){
   // posto della vecchia "Modalità spesa", che spostava subito in Dispensa).
   const completedMap = {};
   const addCompleted = it => {
-    const k = (it.ingrediente || '').trim().toLowerCase() + (it.qual ? '\u0002' + it.qual : '') + (it.per ? '\u0001' + it.per : '');
-    if(!completedMap[k]) completedMap[k] = { ingrediente: it.ingrediente, qtas: [], keys: [], per: it.per || '', qual: it.qual || '' };
+    const k = (it.ingrediente || '').trim().toLowerCase() + (it.spec ? '\u0002' + it.spec : '') + (it.per ? '\u0001' + it.per : '');
+    if(!completedMap[k]) completedMap[k] = { ingrediente: it.ingrediente, qtas: [], keys: [], per: it.per || '', spec: it.spec || '' };
     completedMap[k].qtas.push(...(it.qtas || [it.qta]));
     completedMap[k].keys.push(...(it.keys || [it.key]));
   };
@@ -7239,9 +7275,9 @@ function renderSpesa(){
     // sommando le quantità invece di tenerne una sola (vedi combineQtyTexts)
     const merged = {};
     classified.forEach(it=>{
-      const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.qual ? '\u0002' + it.qual : '') + (it.per ? '\u0001' + it.per : '');
+      const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.spec ? '\u0002' + it.spec : '') + (it.per ? '\u0001' + it.per : '');
       if(!merged[mergeKey]){
-        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], qual: it.qual || '', contexts: it.isRecipe ? [] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
+        merged[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.isRecipe ? it.note : '', dept: it.dept, keys: [it.key], spec: it.spec || '', contexts: it.isRecipe ? [] : (it.per ? [`Per ${it.per}`] : []), per: it.per || '' };
       } else {
         merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
@@ -7281,7 +7317,7 @@ function renderSpesa(){
       const isFinitiDept = dept === 'finiti';
       const items = byDept[dept];
       const finitiCheckedCount = isFinitiDept ? items.filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
-      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per, it.qual)).join('');
+      const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per, it.spec)).join('');
       const finishedActions = finitiCheckedCount ? `
         <div class="finished-shop-actions">
           <button type="button" class="btn is-outline color-delete" data-finished-shop-delete>Elimina (${finitiCheckedCount})</button>
@@ -7333,8 +7369,8 @@ function renderSpesa(){
       const dayItems = mainFlat.filter(it => it.context === context);
       const mergedDay = {};
       dayItems.forEach(it=>{
-        const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.qual ? '\u0002' + it.qual : '');
-        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key], qual: it.qual || '' };
+        const mergeKey = (it.ingrediente||'').trim().toLowerCase() + (it.spec ? '\u0002' + it.spec : '');
+        if(!mergedDay[mergeKey]) mergedDay[mergeKey] = { ingrediente: it.ingrediente, qtas: [it.qta], note: it.note, dove: it.dove, keys: [it.key], spec: it.spec || '' };
         else { mergedDay[mergeKey].qtas.push(it.qta); mergedDay[mergeKey].keys.push(it.key); }
       });
       const allDayItems = groupRowsByName(Object.values(mergedDay).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) })));
@@ -7349,7 +7385,7 @@ function renderSpesa(){
       const totalIngCount = getIngredientsFor(principale).length
         + contorni.reduce((n,c)=> n + getIngredientsFor(c).length, 0);
       const rows = mergedDayItems.length
-        ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.dove, undefined, undefined, it.qual)).join('')
+        ? mergedDayItems.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.dove, undefined, undefined, it.spec)).join('')
         : (totalIngCount > 0
           ? `<div class="ing-empty">✅ Hai tutti gli ingredienti, puoi cucinare!</div>`
           : `<div class="ing-empty">Nessun ingrediente salvato — aprilo dal Menù e aggiungili dalla scheda ricetta.</div>`);
@@ -7438,7 +7474,7 @@ function renderSpesa(){
     body += `
       <div class="shop-day-group shop-completed">
         <div class="dept-title">Completati</div>
-        <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', it.per ? `Per ${it.per}` : '', true, it.per, it.qual)).join('')}</div>
+        <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', it.per ? `Per ${it.per}` : '', true, it.per, it.spec)).join('')}</div>
         <div class="shop-completed-actions">
           <button type="button" class="btn is-text" id="reset-shop">Togli le spunte</button>
           <button type="button" class="btn is-outline color-delete" id="delete-checked-shop">Elimina</button>
@@ -8948,12 +8984,21 @@ function renderIngredientSheet(it, isNew){
           ${catPicker}
           ${home ? '' : pickRow('group', 'Equivalenti', it.group && state.pantryGroups[it.group] ? escapeHtml(state.pantryGroups[it.group].label) : 'nessuno', 'Es. Fusilli e Penne = Pasta corta')}
           ${groupPicker}
-          ${isNew || home || !INGREDIENT_VARIANT_OPTIONS[ingMatchKey(it.nome)] ? '' : `<div class="sheet-row sheet-variants"><div class="settings-field-label">Variazione</div><div class="chip-row">${INGREDIENT_VARIANT_OPTIONS[ingMatchKey(it.nome)].map(v => `<button type="button" class="btn is-chip${it.variante === v ? ' active' : ''}" data-sheet-variant="${escapeAttr(v)}" aria-pressed="${it.variante === v}">${escapeHtml(v)}</button>`).join('')}</div></div>`}
         </div>
       </section>
       ${isNew || home ? '' : (() => { const used = recipeNamesUsingIngredient(it.nome); const open = !!state.pantrySheetUsed && used.length > 0; return `<section class="settings-section">
         ${used.length ? `<button type="button" class="sheet-more-toggle" data-sheet-used aria-expanded="${open}">Usato in ${used.length} ${used.length === 1 ? 'ricetta' : 'ricette'} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="${open ? 'transform:rotate(180deg)' : ''}"><path d="m6 9 6 6 6-6"/></svg></button>
         ${open ? `<div class="settings-card"><ul class="ing-used-list">${used.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>` : ''}` : `<p class="settings-note">Non è in nessuna ricetta.</p>`}
+      </section>`; })()}
+      ${isNew || home ? '' : (() => {
+        const k = ingMatchKey(it.nome), fixed = INGREDIENT_VARIANT_OPTIONS[k] || [], custom = ((state.ingredientVariants || {})[k] || []).filter(v => !fixed.includes(v));
+        return `<section class="settings-section">
+        <h3 class="settings-section-title">Specifiche</h3>
+        <div class="settings-card">
+          <p class="settings-note">Se di questo ingrediente usi solo una parte (es. il succo del pompelmo), aggiungi la specifica: la scegli nelle ricette e in Spesa compri comunque ${escapeHtml(it.nome)}.</p>
+          ${fixed.length || custom.length ? `<div class="chip-row variant-chips">${fixed.map(v => `<span class="btn is-chip">${escapeHtml(v)}</span>`).join('')}${custom.map(v => `<span class="btn is-chip">${escapeHtml(v)} <button type="button" class="chip-x" data-variant-del="${escapeAttr(v)}" aria-label="Togli ${escapeAttr(v)}">✕</button></span>`).join('')}</div>` : ''}
+          <div class="sheet-variant-add"><input type="text" id="variant-new-input" placeholder="Nuova specifica (es. succo)" autocomplete="off"><button type="button" class="btn is-outline" data-variant-add>Aggiungi</button></div>
+        </div>
       </section>`; })()}
       ${isNew ? '' : `<section class="settings-section">
         <button type="button" class="sheet-more-toggle" data-sheet-more aria-expanded="${more}">Altro <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="${more ? 'transform:rotate(180deg)' : ''}"><path d="m6 9 6 6 6-6"/></svg></button>
@@ -9314,7 +9359,7 @@ function renderDispensa(){
   // vede solo una volta impostato.
   const searchTerm = state.pantrySearch.trim().toLowerCase();
   const items = Object.entries(state.pantryItems)
-    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat, scadenza: it.scadenza || '', frozenOn: it.frozenOn || '', variante: it.variante || '' }))
+    .map(([key, it])=>({ key, nome: it.nome, qty: it.qty, unit: it.unit || '', luogo: it.luogo || 'dispensa', cat: it.cat, scadenza: it.scadenza || '', frozenOn: it.frozenOn || '' }))
     .filter(it => typeof it.qty === 'number' && it.qty > 0)
     .filter(it => !searchTerm || it.nome.toLowerCase().includes(searchTerm));
 
@@ -9347,7 +9392,6 @@ function renderDispensa(){
       <div class="inv-main">
       <button class="btn is-text inv-name" data-pantry-edit="${escapeAttr(it.key)}" type="button">${escapeHtml(it.nome)}</button>
       <span class="inv-tags">
-      ${it.variante ? `<span class="inv-variant">${escapeHtml(it.variante)}</span>` : ''}
       <button class="btn is-icon luogo-picker-opt is-selected${isSelected ? ' picking' : ''}" data-luogo-value="${escapeAttr(LUOGO_LABEL[it.luogo])}" data-luogo-toggle="${escapeAttr(it.key)}" type="button" title="Luogo: ${escapeAttr(LUOGO_LABEL[it.luogo])}${it.frozenOn ? escapeAttr(` · congelato il ${it.frozenOn}`) : ''} — tocca per scegliere">${luogoIconContent}${it.frozenOn && it.luogo === 'freezer' && !isSelected ? `<span class="luogo-since">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>
       ${(it.scadenza || (it.frozenOn && it.luogo !== 'freezer')) ? `<button class="btn is-text inv-badges" data-pantry-edit="${escapeAttr(it.key)}" type="button" tabindex="-1" aria-hidden="true">${it.scadenza ? expiryBadgeHtml(daysUntilDate(it.scadenza), it.scadenza) : ''}${it.frozenOn && it.luogo !== 'freezer' ? `<span class="frozen-on" title="Congelato il ${escapeAttr(it.frozenOn)}">dal ${escapeHtml(frozenOnShort(it.frozenOn))}</span>` : ''}</button>` : ''}
       </span>
@@ -10790,9 +10834,12 @@ function attachHandlers(){
     // completo: si manipola solo il DOM del form, per non perdere il testo che
     // si sta scrivendo negli altri campi (a differenza del resto dell'app, che
     // ri-renderizza tutto a ogni modifica).
+    recipeEditModal.addEventListener('change', e=>{
+      if(e.target.matches && e.target.matches('.edit-ing-qual') && e.target.value === '__new') switchEditIngQualToNew(e.target);
+    });
     ['input', 'change', 'focusout', 'click'].forEach(ev => recipeEditModal.addEventListener(ev, e=>{
       const row = e.target.closest && e.target.closest('.edit-ing-row');
-      if(row && !e.target.matches('.edit-ing-qual')) refreshEditIngQual(row);
+      if(row && !e.target.matches('.edit-ing-qual, .edit-ing-qual-new')) refreshEditIngQual(row);
     }));
     recipeEditModal.addEventListener('click', e=>{
       if(e.target.closest('[data-remove-row]')){
@@ -10834,6 +10881,8 @@ function attachHandlers(){
         name = newName;
       }
       const ingredienti = Array.from(document.querySelectorAll('#edit-ing-list .edit-ing-row')).map(readEditIngRow).filter(it=>it.ingrediente);
+      // Una specifica nuova resta disponibile per quell'ingrediente.
+      ingredienti.forEach(it => { if(it.qual && !variantOptionsFor(it.ingrediente).includes(it.qual)) addIngredientVariant(it.ingrediente, it.qual); });
       const procedimento = Array.from(document.querySelectorAll('#edit-step-list .edit-step-text'))
         .map(el=>el.value.trim()).filter(Boolean);
       const stagioni = Array.from(document.querySelectorAll('#edit-stagioni [data-stagione-chip].active'))
@@ -11749,11 +11798,19 @@ function attachHandlers(){
     state.pantrySheetPicker = null;
     sheetChanged();
   }));
-  document.querySelectorAll('[data-sheet-variant]').forEach(btn=> btn.addEventListener('click', ()=>{
+  const addVariantFromSheet = ()=>{
+    const it = sheetTarget(); const inp = document.getElementById('variant-new-input');
+    if(!it || !inp || !inp.value.trim()) return;
+    addIngredientVariant(it.nome, inp.value.trim());
+    persist(); render();
+  };
+  document.querySelectorAll('[data-variant-add]').forEach(btn=> btn.addEventListener('click', addVariantFromSheet));
+  const variantInput = document.getElementById('variant-new-input');
+  if(variantInput) variantInput.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); addVariantFromSheet(); } });
+  document.querySelectorAll('[data-variant-del]').forEach(btn=> btn.addEventListener('click', ()=>{
     const it = sheetTarget(); if(!it) return;
-    const v = btn.dataset.sheetVariant;
-    if(it.variante === v) delete it.variante; else it.variante = v;
-    sheetChanged();
+    removeIngredientVariant(it.nome, btn.dataset.variantDel);
+    persist(); render();
   }));
   document.querySelectorAll('[data-sheet-unit]').forEach(btn=> btn.addEventListener('click', ()=>{
     const it = sheetTarget(); if(!it) return;
