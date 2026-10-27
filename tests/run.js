@@ -3530,6 +3530,41 @@ test('grammi a porzione: pasta e riso si scalano, 0 lascia la ricetta, il resto 
   eq([r.due, r.zero], [4, 2], 'porzioni avanzo');
 });
 
+test('alimentazione: vegetariano senza carne né pesce, obiettivi modificabili, ingredienti da evitare', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; state.dietExclude = []; state.dietTargets = {};
+    state.dietType = 'vegetariano';
+    const vegCarne = [];
+    for(let k = 0; k < 3; k++){
+      generateWeek(1);
+      WEEK_DISPLAY_ORDER.forEach(d => ['pranzo','cena'].forEach(m => {
+        const x = effectiveRecipeMeta(1, d, m);
+        if(x && !dietAllows(x)) vegCarne.push(x.nome);
+      }));
+    }
+    const t = weekProteinTargets();
+    state.dietTargets = { legumi: [1, 2] };
+    const mod = weekProteinTargets().legumi;
+    state.dietType = 'onnivoro'; state.dietTargets = {};
+    state.dietExclude = ['pasta'];
+    const evitati = allRecipeMetas().filter(isMainDish).filter(dietAllows).filter(x => recipeIngredientText(x).includes('pasta')).length;
+    state.dietExclude = [];
+    return { vegCarne, carne: t['carne-rossa'], uova: t.uova, mod, evitati };
+  });
+  eq(r.vegCarne, [], 'nessun piatto con carne/pesce');
+  eq([r.carne, r.uova, r.mod], [[0, 0], [2, 3], [1, 2]]);
+  eq(r.evitati, 0, 'ingrediente evitato');
+});
+
+test('alimentazione: la sezione nelle Regole cambia tipo e aggiunge ingredienti da evitare', async ({ page }) => {
+  await page.evaluate(() => { state.dietType = 'onnivoro'; state.dietExclude = []; state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.tab = 'menu'; state.genSettingsOpen = 'plain'; render(); });
+  await page.click('[data-gen-diet="vegetariano"]');
+  await page.fill('.gen-exclude-input', 'funghi, noci');
+  await page.click('.gen-exclude-form button');
+  const r = await page.evaluate(() => ({ d: state.dietType, e: state.dietExclude, chips: document.querySelectorAll('.gen-chip').length }));
+  eq([r.d, r.e, r.chips], ['vegetariano', ['funghi', 'noci'], 2]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

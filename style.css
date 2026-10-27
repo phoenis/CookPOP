@@ -2610,3 +2610,13 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 
 .gen-grams-row{ padding:var(--s1) 0; }
 .gen-grams-row .gen-stepper-val{ min-width:8.5rem; font-size:var(--text-small); }
+
+.gen-diet-btn{ flex:1; width:auto; border-radius:var(--radius-pill,999px); padding:0 var(--s2); }
+.gen-diet-types{ display:flex; gap:var(--s1); }
+.gen-sublabel{ margin-top:var(--s4); }
+.gen-target-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--s2); padding:var(--s1) 0; }
+.gen-target-row .gen-stepper-val{ min-width:3rem; text-align:center; }
+.gen-exclude-chips{ display:flex; flex-wrap:wrap; gap:var(--s1); margin-bottom:var(--s1); }
+.gen-chip{ border:1px solid var(--line); border-radius:999px; padding:var(--s1) var(--s2); background:transparent; color:inherit; font:inherit; font-size:var(--text-small); }
+.gen-exclude-form{ display:flex; gap:var(--s1); }
+.gen-exclude-input{ flex:1; min-width:0; }
