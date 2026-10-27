@@ -11,6 +11,10 @@ Data: 2026-10-27. Confronto automatico tra il procedimento nel catalogo e la pag
 - **36** non hanno una fonte esterna ("ricettario" o "etichetta"): sono ricette tue.
 - Gli ingredienti e le quantità seguono le fonti: sono dati di fatto e in genere non sono protetti.
 
+## Dopo la riscrittura (2026-10-27)
+
+I 30 procedimenti sono stati riscritti in forma breve ("tu"), mantenendo ingredienti, dosi, tempi e temperature della fonte, senza aggiungere nulla. Nuovo confronto con la pagina: la parte identica scende al 10–16% (frasi comuni di cucina), rispetto al 90–100% di prima. Resta il link alla fonte in ogni scheda.
+
 ## Ricette con procedimento copiato dalla fonte (blog.giallozafferano.it)
 
 - Petto di pollo al limone (100%)
