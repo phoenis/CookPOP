@@ -3302,6 +3302,42 @@ test('ricette congelabili: nota "Come congelarla e usarla" nel dettaglio e per l
   assert(r.scheda, 'scheda del freezer');
 });
 
+test('avanzo e freezer: collegare un avanzo aggiunge una porzione, "(2 + 1 avanzo)", e le porzioni in freezer si possono usare con un tocco', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1); state.pantryItems = {};
+    const sl = allMealSlots().filter(m => m.weekIdx === 1);
+    // un pasto di partenza (cena) e un pranzo del giorno dopo, senza link
+    const k = sl.findIndex((m, n) => m.meal === 'cena' && sl[n + 1] && sl[n + 1].meal === 'pranzo' && sl[n + 1].i >= 4);
+    const cena = sl[k], pranzo = sl[k + 1];
+    delete state.dayLinks[pranzo.key]; delete state.dayPortions[cena.key];
+    const principale = effectiveMeal(1, cena.i, 'cena').principale;
+    const prima = mealPortions(cena.key, principale);
+    // collego il pranzo come avanzo della cena, come dal selettore
+    state.avanzoDiPickerOpenDay = pranzo.key; state.tab = 'menu'; render();
+    const pick = document.querySelector(`[data-avanzodi-pick="${cena.key}"]`);
+    let dopo = null, nota = '', sciolto = null;
+    if(pick){
+      pick.click();
+      dopo = mealPortions(cena.key, principale);
+      nota = personeRowHtml(dopo, cena.key, '');
+      document.querySelector(`[data-unlink-day="${pranzo.key}"]`).click();
+      sciolto = mealPortions(cena.key, principale);
+    }
+    // porzioni in freezer: suggerimento e un tocco
+    addFreezerPortions(principale, 2);
+    state.tab = 'menu'; render();
+    const hint = document.querySelector(`[data-use-freezer="${cena.key}"]`);
+    const hintTesto = hint ? hint.textContent.trim() : '';
+    if(hint) hint.click();
+    return { prima, dopo, sciolto, nota: nota.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), pick: !!pick, hintTesto, daFreezer: isFreezerDish(cena.key, principale), ancora: !!document.querySelector(`[data-use-freezer="${cena.key}"]`) };
+  });
+  assert(r.pick, 'selettore avanzo non trovato');
+  eq([r.dopo, r.sciolto], [r.prima + 1, r.prima], 'porzioni +1 collegando, -1 scollegando');
+  assert(/\(\d+ \+ 1 avanzo\)/.test(r.nota), 'nota: ' + r.nota);
+  assert(/porzion\w+ in freezer · usale/.test(r.hintTesto), 'suggerimento: ' + r.hintTesto);
+  eq([r.daFreezer, r.ancora], [true, false], 'usa dal freezer');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
