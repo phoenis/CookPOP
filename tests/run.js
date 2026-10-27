@@ -3404,6 +3404,48 @@ test('porzioni di partenza: 3 messo a mano torna a 2 una volta sola; l\'avanzo c
   eq([r.dopo3, r.dopo4, r.def, r.cenaConAvanzo, r.cenaSenza], [2, 4, 2, 3, 2]);
 });
 
+test('Spesa con due settimane: frutta, verdura e latticini della seconda vanno in "Più avanti"; il resto si compra insieme', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {}; state.extraWeeks = []; generateWeek(0); generateWeek(1);
+    const tutte = buildShopFlat().filter(x => x.isRecipe);
+    const dept = it => knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente);
+    const freschiSett1 = tutte.filter(x => x.weekIdx === 1 && SHOP_LATER_DEPTS.includes(dept(x)));
+    const altroSett1 = tutte.filter(x => x.weekIdx === 1 && !SHOP_LATER_DEPTS.includes(dept(x)));
+    state.tab = 'spesa'; state.shopView = 'reparto'; state.shopSearch = ''; render();
+    const gruppo = document.querySelector('.shop-later-group');
+    const principali = [...document.querySelectorAll('.shop-item-row .item-name')].filter(e => !e.closest('.shop-later-group')).map(e => e.textContent.trim().toLowerCase());
+    const piuAvanti = gruppo ? [...gruppo.querySelectorAll('.item-name')].map(e => e.textContent.trim().toLowerCase()) : [];
+    const fuori = principali.filter(n => !piuAvanti.includes(n));
+    return { n1: freschiSett1.length, n2: altroSett1.length, haGruppo: !!gruppo, titolo: gruppo ? gruppo.querySelector('.shop-day-title').textContent.replace(/\s+/g, ' ').trim() : '', piuAvanti: piuAvanti.length,
+      freschiFuori: freschiSett1.filter(x => principali.includes(x.ingrediente.toLowerCase()) && !tutte.some(y => y.weekIdx === 0 && y.ingrediente === x.ingrediente) && !buildShopFlat().some(y => !y.isRecipe && y.ingrediente.toLowerCase() === x.ingrediente.toLowerCase())).length,
+      chiusoDiDefault: gruppo ? gruppo.querySelector('.accordion-body').classList.contains('is-collapsed') : null };
+  });
+  assert(r.n1 > 0 && r.n2 > 0, 'la settimana 2 ha sia fresco sia il resto: ' + JSON.stringify([r.n1, r.n2]));
+  assert(r.haGruppo && /^Più avanti \(\d+\)/.test(r.titolo), 'accordion: ' + r.titolo);
+  assert(r.piuAvanti > 0 && r.freschiFuori === 0, 'il fresco della seconda settimana non è nella lista principale: ' + JSON.stringify(r));
+  eq(r.chiusoDiDefault, true, 'chiuso di default');
+});
+
+test('genera anche la settimana prossima: la seconda non ripete la prima e usa le porzioni in freezer', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {}; state.extraWeeks = []; generateWeek(0);
+    const congelabile = allRecipeMetas().filter(m => ['congelabile', 'meal-prep'].includes(m.freezerNew) && m.tipologia !== 'contorno' && m.tipologia !== 'dolce');
+    const nome = congelabile[0].nome;
+    addFreezerPortions(nome, 2); state.pantryItems[nome.toLowerCase()].frozenOn = isoLocalDate(new Date());
+    state.genTwoWeeks = true; state.genSettingsOpen = 0; render();
+    const toggle = !!document.querySelector('[data-toggle-gen-two]');
+    document.querySelector('[data-generate-week="0"]').click();
+    const w1 = WEEK_DISPLAY_ORDER.map(i => ['pranzo', 'cena'].map(m => effectiveMeal(1, i, m).principale)).flat().filter(Boolean);
+    const dalFreezer = WEEK_DISPLAY_ORDER.filter(i => isFreezerDish(mealKey(1, i, 'cena'), nome)).length;
+    const out = { toggle, haSettimana2: state.extraWeeks.length === 1, nome, dalFreezer, inW1: w1.includes(nome) };
+    state.genTwoWeeks = false;
+    return out;
+  });
+  assert(r.toggle, 'interruttore nelle Regole');
+  assert(r.haSettimana2, 'settimana 2 generata');
+  eq([r.dalFreezer, r.inW1], [1, true], 'le porzioni in freezer finiscono in una cena della seconda settimana');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
