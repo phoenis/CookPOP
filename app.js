@@ -2230,6 +2230,7 @@ const state = {
   pantryNamesCurated1: false,
   pantryNamesCurated2: false,
   pantryGroupMigrated3: false,
+  portionsBaseReset1: false, // una tantum: porzioni di partenza 3 (messe a mano per coprire l'avanzo) tornano a 2: l'avanzo collegato aggiunge la sua porzione da solo
   pantryGroupsBrodo: false, // una tantum: gruppi "Brodo vegetale" e "Brodo di carne" (il dado li copre)
   shopKeysByName1: false,
   baseDeptMigrated1: false,
@@ -2831,6 +2832,9 @@ const MIGRATIONS = [
   // gruppo "Grana o parmigiano a scaglie" confluisce in "Formaggio
   // grattugiato" (una voce sta in un solo gruppo, e le ricette che lo
   // chiedevano ora chiedono il formaggio grattugiato).
+  { flag: 'portionsBaseReset1', run(){
+    if(parseInt(state.weekPortionsBase, 10) === 3) state.weekPortionsBase = 2;
+  }},
   { flag: 'pantryGroupsBrodo', run(){
     ['brodo-vegetale', 'brodo-carne'].forEach(id => { if(!state.pantryGroups[id]) state.pantryGroups[id] = Object.assign({}, CURATED_PANTRY_GROUPS[id].group); });
   }},
