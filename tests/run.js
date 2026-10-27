@@ -3368,7 +3368,7 @@ test('pasto avanzo: un piatto aggiunto è nuovo e sta a parte; in riga restano s
     const k = Object.keys(state.dayLinks).filter(x => x.startsWith('1_')).sort()[0];
     const [w, d, m] = k.split('_'); const src = state.dayLinks[k];
     const prima = effectiveMeal(+w, +d, m);
-    addMealDish(+w, +d, m, 'Finocchi gratinati');
+    addMealDish(+w, +d, m, 'Piatto di prova nuovo');
     state.tab = 'menu'; render();
     const blocco = document.querySelector(`.meal-block[data-week-idx="${w}"][data-day-index="${d}"][data-meal="${m}"]`);
     const out = {
@@ -3381,15 +3381,15 @@ test('pasto avanzo: un piatto aggiunto è nuovo e sta a parte; in riga restano s
     const meal = allPlannedShoppingMeals().find(x => x.key === k);
     out.spesa = meal ? meal.principale : null;
     out.prima = prima.principale;
-    removeMealDish(+w, +d, m, 'Finocchi gratinati');
+    removeMealDish(+w, +d, m, 'Piatto di prova nuovo');
     out.dopoToglie = (effectiveMeal(+w, +d, m).ownExtras || []).length;
     out.aCapo = !allPlannedShoppingMeals().some(x => x.key === k);
     return out;
   });
-  assert(!/Finocchi/.test(r.inRiga) && r.inRiga.includes(r.prima), 'in riga solo avanzi: ' + r.inRiga);
-  eq(r.nuovi, ['Finocchi gratinati']);
-  eq(r.extras, ['Finocchi gratinati']);
-  eq(r.spesa, 'Finocchi gratinati');
+  assert(!/prova nuovo/.test(r.inRiga) && r.inRiga.includes(r.prima), 'in riga solo avanzi: ' + r.inRiga);
+  eq(r.nuovi, ['Piatto di prova nuovo']);
+  eq(r.extras, ['Piatto di prova nuovo']);
+  eq(r.spesa, 'Piatto di prova nuovo');
   eq([r.dopoToglie, r.aCapo], [0, true], 'tolto il piatto nuovo, resta solo l\'avanzo');
 });
 
