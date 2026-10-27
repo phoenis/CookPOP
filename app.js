@@ -72,6 +72,8 @@ const ATTREZZ_ORDER = ['Padella','Pentola','Forno','Piastra','Moulinex','Frullat
 // "Gestisci ingredienti". Come ogni reparto, la sezione compare in Dispensa/
 // Spesa solo quando contiene almeno una voce (stesso filtro presenza già
 // usato per tutti gli altri, vedi DEPT_ORDER.filter più sotto).
+// Reparti freschi e non congelabili: della settimana dopo si comprano più avanti.
+const SHOP_LATER_DEPTS = ['verdura', 'latticini'];
 const DEPT_ORDER = ['avanzi', 'verdura','carne','salumi','pesce','latticini','pane','pasta','legumi','conserve','base','salse','dolci','surgelati','bibite','altro','pulizia','igiene','cucina-casa','altro-casa','finiti'];
 const DEPT_LABEL = { avanzi:'Avanzi', verdura:'Frutta e verdura', carne:'Carne', salumi:'Salumi', pesce:'Pesce', latticini:'Latticini e uova', pane:'Pane e sostituti', pasta:'Pasta, riso e cereali', legumi:'Legumi', conserve:'Pomodoro e conserve', base:'Olio, aceto e spezie', salse:'Salse e brodi', dolci:'Dolci e forno', surgelati:'Surgelati', bibite:'Bevande', finiti:'Finiti', altro:'Altro', pulizia:'Pulizia', igiene:'Igiene e cura', 'cucina-casa':'Cucina', 'altro-casa':'Altro' };
 const DEPT_ICON = { avanzi:'🥡', verdura:'🥦', carne:'🥩', salumi:'🥓', pesce:'🐟', latticini:'🧀', pane:'🍞', pasta:'🍝', legumi:'🫘', conserve:'🥫', base:'🫒', salse:'🥣', dolci:'🍰', surgelati:'❄️', bibite:'🍷', finiti:'🗑️', altro:'🛒', pulizia:'🧽', igiene:'🧴', 'cucina-casa':'🧻', 'altro-casa':'📦' };
@@ -2316,6 +2318,7 @@ const state = {
   pantrySectionCollapsed: {}, // id sezione (luogo_X / cat_X) -> true se chiusa; aperta di default se assente
   pantrySelectMode: false, // true dopo una pressione lunga: un tap semplice seleziona/deseleziona invece di aprire il luogo-picker
   pantrySelected: {}, // pantryKey -> true, selezione corrente in Dispensa (qualsiasi riga, non solo Finiti; non persistita)
+  shopLaterOpen: false, // non persistito: accordion "Più avanti" (fresco delle settimane dopo)
   shopFinitiOpen: false, // accordion "Finiti", condiviso da Per reparto e Per giorno, chiuso di default
   shopSectionCollapsed: {}, // id sezione (reparto_X / giorno_X) -> true se chiusa; aperta di default se assente
   pantryConfirmedShop: {}, // pantryKey -> true (o la quantità scritta in "Aggiungi", es. "2 kg"), ingrediente finito "aggiunto alla lista": in Spesa/per reparto esce dal blocco Finiti e si mescola nel suo reparto vero
@@ -2343,6 +2346,7 @@ const state = {
   weekTempoBase: 'normale',
   weekLeftoverDays: null, // giorni con il pranzo = avanzo della cena di ieri (null = tutti quelli possibili)
   weekPortionsBase: 2, // porzioni di partenza di ogni pasto generato (Regole di generazione); le cene da cui avanza il pranzo dopo partono con una in più
+  genTwoWeeks: false, // non persistito: nelle Regole di generazione, genera anche la settimana prossima
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
   userEmojis: {}, // emoji del profilo scelta da ciascun utente (vuota = iniziale del nome)
@@ -4899,6 +4903,31 @@ function generateWeek(weekIdx){
   used.pantryShort = days.pantryShort || 0;
   return used;
 }
+// Mette nelle cene della settimana le porzioni che hai già in freezer (al più
+// due, le più vecchie per prime): "Dal freezer", niente ingredienti in Spesa.
+function placeFreezerMeals(weekIdx, max){
+  const plannedNames = new Set(allPlannedMeals().map(m => m.name));
+  const frozen = freezerMeals().filter(it => !plannedNames.has(it.nome)).sort((a, b) => String(a.frozenOn || '9999').localeCompare(String(b.frozenOn || '9999')));
+  const placed = [];
+  const todayIso = isoLocalDate(new Date());
+  for(const it of frozen){
+    if(placed.length >= (max || 2)) break;
+    const slot = WEEK_DISPLAY_ORDER.map(i => ({ i, meal: 'cena' })).find(({ i, meal }) => {
+      const mk = mealKey(weekIdx, i, meal);
+      if(state.mealLocked[mk] || isMealPast(weekIdx, i, meal)) return false;
+      if(Object.values(state.dayLinks).includes(mk)) return false; // da questa cena avanza un pranzo
+      if(placed.some(p => p.mk === mk)) return false;
+      return !!effectiveMeal(weekIdx, i, meal).principale;
+    });
+    if(!slot) break;
+    const mk = mealKey(weekIdx, slot.i, slot.meal);
+    const m = effectiveMeal(weekIdx, slot.i, slot.meal);
+    writeMealDishes(weekIdx, slot.i, slot.meal, it.nome, (m.contorni || []).filter(c => c !== it.nome));
+    setFreezerDish(mk, it.nome, true);
+    placed.push({ mk, name: it.nome });
+  }
+  return placed;
+}
 function addWeek(){
   generateWeek(state.extraWeeks.length + 1);
 }
@@ -7048,7 +7077,7 @@ function renderMenu(){
     const dayInitial = d => DATA.week1[d].giorno.slice(0, 1);
     const cookedLunches = 7 - leftoverLunchDays().length;
     const hintText = genSettingsTargetWeek === 0
-      ? `Sceglie ${7 + cookedLunches} ricette di stagione (7 cene${cookedLunches ? ` e ${cookedLunches} ${cookedLunches === 1 ? 'pranzo' : 'pranzi'}` : ''}), variando le categorie giorno per giorno.`
+      ? `${state.genTwoWeeks ? 'Per ciascuna settimana sceglie' : 'Sceglie'} ${7 + cookedLunches} ricette di stagione (7 cene${cookedLunches ? ` e ${cookedLunches} ${cookedLunches === 1 ? 'pranzo' : 'pranzi'}` : ''}), variando le categorie giorno per giorno.`
       : '';
     const weekForLabel = genSettingsTargetWeek !== null ? genSettingsTargetWeek : 0;
     return `
@@ -7081,6 +7110,10 @@ function renderMenu(){
           ${genSettingsTargetWeek !== null ? `<div class="gen-group gen-toggle-row">
             <button type="button" class="gen-toggle" data-toggle-gen-pantry role="switch" aria-checked="${!!state.genPantryOnly}"><span class="gen-toggle-text"><span aria-hidden="true">🧺</span> Solo con quello che ho in casa</span><span class="gen-switch${state.genPantryOnly ? ' on' : ''}" aria-hidden="true"></span></button>
             ${state.genPantryOnly ? '<p class="gen-note">Prima le ricette per cui hai tutto. Se non bastano, quelle a cui manca meno.</p>' : ''}
+          </div>` : ''}
+          ${genSettingsTargetWeek === 0 ? `<div class="gen-group gen-toggle-row">
+            <button type="button" class="gen-toggle" data-toggle-gen-two role="switch" aria-checked="${!!state.genTwoWeeks}"><span class="gen-toggle-text"><span aria-hidden="true">🗓️</span> Genera anche la settimana prossima</span><span class="gen-switch${state.genTwoWeeks ? ' on' : ''}" aria-hidden="true"></span></button>
+            <p class="gen-note">La seconda settimana non ripete le ricette della prima e usa le porzioni che hai in freezer. Frutta, verdura e latticini freschi si comprano più avanti.</p>
           </div>` : ''}
           <div class="gen-group">
             <div class="gen-label">Eccezioni</div>
@@ -7203,7 +7236,7 @@ function buildShopFlat(){
         // (niente riga da vedere/spuntare) — a meno che non l'avessi già
         // esplicitamente de-spuntato in passato per dire "mi serve comunque".
         if(pantryStatusFor(it.ingrediente, qta) === 'in-casa' && state.shopChecked[key] !== false) return;
-        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, spec:it.spec || '', context, contextShort, isRecipe: true });
+        flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, spec:it.spec || '', context, contextShort, isRecipe: true, weekIdx });
       });
     });
   });
@@ -7251,7 +7284,13 @@ function renderSpesa(){
   // "ce l'hai già" in base alla Dispensa (faceva partire già spuntato un
   // ingrediente aggiunto a mano proprio perché serviva comunque).
   const shopQuery = (state.shopSearch || '').trim().toLowerCase();
-  const mainFlat = buildShopFlat().filter(it => !shopQuery || (it.ingrediente || '').toLowerCase().includes(shopQuery));
+  const allShopFlat = buildShopFlat().filter(it => !shopQuery || (it.ingrediente || '').toLowerCase().includes(shopQuery));
+  // Con più settimane pianificate si compra insieme tutto ciò che si conserva
+  // (pasta, pane e carne che si congelano…), ma frutta, verdura e latticini
+  // freschi della settimana dopo si comprano più avanti: stanno a parte.
+  const isLaterRow = it => it.isRecipe && it.weekIdx > 0 && SHOP_LATER_DEPTS.includes(knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
+  const laterFlat = allShopFlat.filter(isLaterRow);
+  const mainFlat = allShopFlat.filter(it => !isLaterRow(it));
 
   // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
   // quantità testuale) in Per reparto: se ne hai spuntata una qualsiasi in
@@ -7574,6 +7613,24 @@ function renderSpesa(){
         </div>` : ''}
       </div>`;
     }
+  }
+
+  // "Più avanti": il fresco delle settimane dopo, chiuso di default.
+  const laterRows = laterFlat.filter(it => !state.shopChecked[it.key]);
+  if(laterRows.length){
+    const byWeek = {};
+    laterRows.forEach(it => { (byWeek[it.weekIdx] = byWeek[it.weekIdx] || {}); const k = (it.ingrediente || '').trim().toLowerCase() + (it.spec ? '\u0002' + it.spec : ''); (byWeek[it.weekIdx][k] = byWeek[it.weekIdx][k] || { ingrediente: it.ingrediente, spec: it.spec || '', keys: [], qtas: [] }); byWeek[it.weekIdx][k].keys.push(it.key); byWeek[it.weekIdx][k].qtas.push(it.qta); });
+    body += `
+      <div class="shop-day-group shop-later-group">
+        <div class="shop-day-title finished-toggle${state.shopLaterOpen ? ' open' : ''}" data-toggle-shop-later>
+          Più avanti (${laterRows.length})
+          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"/></svg>
+        </div>
+        <div class="accordion-body${state.shopLaterOpen ? '' : ' is-collapsed'}">
+          <p class="section-sub shop-later-note">Frutta, verdura e latticini freschi delle settimane dopo: si comprano più avanti.</p>
+          ${Object.keys(byWeek).sort().map(w => `<div class="shop-later-week">Settimana del ${escapeHtml(weekLabelFor(parseInt(w, 10)))}</div>${Object.values(byWeek[w]).sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente)).map(r => itemRow(r.keys, r.ingrediente, combineQtyTexts(r.qtas), '', '', undefined, undefined, r.spec)).join('')}`).join('')}
+        </div>
+      </div>`;
   }
 
   const completedList = Object.values(completedMap).sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente));
@@ -10316,6 +10373,9 @@ function attachHandlers(){
       const weekIdx = parseInt(e.currentTarget.dataset.generateWeek,10);
       const snap = snapshotPlanningState();
       const used = generateWeek(weekIdx);
+      // "Anche la settimana prossima": la seconda si genera subito dopo, sapendo cosa c'è nella prima,
+      // e usa le porzioni che hai in freezer.
+      if(state.genTwoWeeks && weekIdx === 0){ generateWeek(1); placeFreezerMeals(1, 2); }
       const usedText = used.length ? ` · usa ${used.slice(0, 2).join(' e ')}${used.length > 2 ? ` e altri ${used.length - 2}` : ''} prima che scada${used.length > 1 ? 'no' : ''}` : '';
       const pantryText = state.genPantryOnly ? (used.pantryShort ? ` · per ${used.pantryShort} past${used.pantryShort === 1 ? 'o' : 'i'} manca qualcosa` : ' · hai già tutto') : '';
       showUndoToast((state.genPantryOnly ? 'Menù con quello che hai' : 'Menù rigenerato') + pantryText + usedText, ()=>{
@@ -10323,6 +10383,9 @@ function attachHandlers(){
         persist(); render();
       });
     });
+  });
+  document.querySelectorAll('[data-toggle-gen-two]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.genTwoWeeks = !state.genTwoWeeks; render(); });
   });
   document.querySelectorAll('[data-toggle-gen-pantry]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.genPantryOnly = !state.genPantryOnly; render(); });
@@ -11176,6 +11239,9 @@ function attachHandlers(){
       state.pantryView = btn.dataset.pantryView;
       render();
     });
+  });
+  document.querySelectorAll('[data-toggle-shop-later]').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.shopLaterOpen = !state.shopLaterOpen; render(); });
   });
   document.querySelectorAll('[data-toggle-shop-finiti]').forEach(el=>{
     el.addEventListener('click', ()=>{

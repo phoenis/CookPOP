@@ -2598,3 +2598,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .gen-sheet .btn.is-chip.active{ background:color-mix(in srgb, var(--accent) 12%, var(--bg)); border-color:var(--accent); color:var(--accent); }
 
 .gen-notes{ display:flex; flex-direction:column; gap:var(--s2); text-align:left; }
+
+.shop-later-note{ margin:0 0 var(--s2); }
+.shop-later-week{ margin:var(--s3) 0 var(--s1); font-size:var(--text-xsmall); font-weight:var(--weight-medium); letter-spacing:.04em; text-transform:uppercase; color:var(--ink-light); }
+.gen-toggle-row + .gen-toggle-row{ border-top:0; margin-top:calc(-1 * var(--s4)); }
