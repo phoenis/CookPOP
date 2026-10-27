@@ -426,19 +426,64 @@ function manageableIngredientNames(text){
 // impostare nulla a mano. Se nessuna alternativa è in scorta, si restituisce
 // comunque la prima voce trovata (anche a 0), per mostrare "manca"/"poco"
 // invece di far sparire l'ingrediente.
+// Una voce di Dispensa per ogni coppia ingrediente + specifica: "limone" (intero)
+// e "limone|succo" possono esistere insieme.
+function pantryKeyFor(name, spec){
+  const k = String(name || '').trim().toLowerCase();
+  const sp = String(spec || '').trim().toLowerCase();
+  return sp ? `${k}|${sp}` : k;
+}
+// Cambia la chiave di una voce di Dispensa (es. "limone" → "limone|succo")
+// portandosi dietro i riferimenti.
+function pantryRekey(oldKey, newKey){
+  const it = state.pantryItems[oldKey];
+  if(!it || state.pantryItems[newKey]) return false;
+  state.pantryItems[newKey] = it; delete state.pantryItems[oldKey];
+  if(state.pantryConfirmedShop[oldKey] !== undefined){ state.pantryConfirmedShop[newKey] = state.pantryConfirmedShop[oldKey]; delete state.pantryConfirmedShop[oldKey]; }
+  if(Array.isArray(state.expiryConfirm)) state.expiryConfirm = state.expiryConfirm.map(k => k === oldKey ? newKey : k);
+  if(state.shopDismissed['oos_' + oldKey] !== undefined){ state.shopDismissed['oos_' + newKey] = state.shopDismissed['oos_' + oldKey]; delete state.shopDismissed['oos_' + oldKey]; }
+  if(state.pantrySelected && state.pantrySelected[oldKey]){ state.pantrySelected[newKey] = state.pantrySelected[oldKey]; delete state.pantrySelected[oldKey]; }
+  if(state.pantryEditKey === oldKey) state.pantryEditKey = newKey;
+  return true;
+}
+// Cosa è questa voce: intero (spec vuota) o una parte. Falso se quella voce c'è già.
+function setPantryItemSpec(key, spec){
+  const it = state.pantryItems[key]; if(!it) return false;
+  const newKey = pantryKeyFor(it.nome, spec);
+  if(newKey === key) return true;
+  if(state.pantryItems[newKey]) return false;
+  if(spec) it.spec = spec; else delete it.spec;
+  return pantryRekey(key, newKey);
+}
+// "Hai anche…": una seconda voce dello stesso ingrediente con un'altra specifica
+// (es. il succo in freezer e i limoni interi in frigo), nello stesso posto.
+function addPantrySibling(key, spec){
+  const it = state.pantryItems[key]; if(!it) return;
+  const newKey = pantryKeyFor(it.nome, spec);
+  if(!state.pantryItems[newKey]){
+    upsertPantryItem(it.nome, it.luogo || 'dispensa', 1, it.unit || undefined, it.cat, it.group, spec);
+  }
+  state.pantryEditKey = newKey;
+}
 function resolvePantryItem(ingrediente, spec){
   let fallback = null;
   for(const cand of splitIngredientCandidates(ingrediente)){
     const key = cand.toLowerCase();
+    // Se la riga chiede una parte (es. il succo) conta prima la voce di quella parte
+    // (anche "Limone · succo" in freezer); poi l'ingrediente intero, che copre tutto.
+    // Una riga che chiede l'intero non è coperta da una parte sola.
+    const part = spec ? state.pantryItems[pantryKeyFor(cand, spec)] : null;
+    if(part){
+      if(typeof part.qty === 'number' && part.qty > 0) return part;
+      if(!fallback) fallback = part;
+    }
     const direct = state.pantryItems[key];
     if(direct){
-      // Se in Dispensa hai solo una parte (es. il succo di limone), copre le righe
-      // che chiedono quella parte, non quelle che chiedono l'ingrediente intero.
-      if(direct.spec && direct.spec !== (spec || '')) continue;
       if(typeof direct.qty === 'number' && direct.qty > 0) return direct;
       if(!fallback) fallback = direct;
       continue;
     }
+    if(part) continue;
     const groupEntry = Object.entries(state.pantryGroups || {}).find(([id,g]) => (g.matchName||'').trim().toLowerCase() === key);
     const group = groupEntry ? groupEntry[0] : null;
     if(!group) continue;
@@ -1227,11 +1272,11 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
 // automatico quando si spunta un articolo in Spesa. Quantità = un contatore
 // numerico (stepper +/- in UI); finché non è impostata (o è 0) la voce non
 // compare nell'elenco.
-function upsertPantryItem(nome, luogo, amount, unit, cat, group){
+function upsertPantryItem(nome, luogo, amount, unit, cat, group, spec){
   const trimmedName = (nome||'').trim();
   if(!trimmedName) return;
-  const key = trimmedName.toLowerCase();
-  if(state.hiddenIngredients) delete state.hiddenIngredients[key]; // lo riaggiungi: torna nell'elenco
+  const key = pantryKeyFor(trimmedName, spec);
+  if(state.hiddenIngredients) delete state.hiddenIngredients[trimmedName.toLowerCase()]; // lo riaggiungi: torna nell'elenco
   const existing = state.pantryItems[key];
   const currentQty = (existing && typeof existing.qty === 'number') ? existing.qty : 0;
   const add = (typeof amount === 'number' && !Number.isNaN(amount)) ? amount : 1;
@@ -1246,7 +1291,7 @@ function upsertPantryItem(nome, luogo, amount, unit, cat, group){
     ...(finalCat ? { cat: finalCat } : {}),
     ...(finalUnit ? { unit: finalUnit } : {}),
     ...(finalGroup ? { group: finalGroup } : {}),
-    ...(existing && existing.spec ? { spec: existing.spec } : {}),
+    ...((spec || (existing && existing.spec)) ? { spec: spec || existing.spec } : {}),
     // La scadenza resta finché c'è ancora scorta (vale quella della confezione
     // già in casa, la più vicina); se era finita, quella nuova non si conosce.
     ...(currentQty > 0 && existing && existing.scadenza ? { scadenza: existing.scadenza } : {}),
@@ -1307,7 +1352,7 @@ function shopRowInfo(cb){
   if(!cb.dataset) return cb;
   const stepperBtn = cb.closest && cb.closest('.shop-item-row') ? cb.closest('.shop-item-row').querySelector('[data-shop-qty-inc]') : null;
   const qtyEl = cb.closest && cb.closest('.shop-item-row') ? cb.closest('.shop-item-row').querySelector('.qty-num') : null;
-  return { rowKey: cb.dataset.shopKeys, name: cb.dataset.shopName, unit: cb.dataset.shopUnit, per: cb.dataset.shopPer || '',
+  return { rowKey: cb.dataset.shopKeys, name: cb.dataset.shopName, spec: cb.dataset.shopSpec || '', unit: cb.dataset.shopUnit, per: cb.dataset.shopPer || '',
     qtyDefault: parseFloat(stepperBtn && stepperBtn.dataset.shopQtyDefault), qtyLabel: qtyEl ? qtyEl.textContent.trim() : '' };
 }
 // opts (dalla finestra "Metti in dispensa"): luogo scelto e scadenza ('' = nessuna,
@@ -1328,12 +1373,12 @@ function moveShopRowToPantry(cb, opts){
   // Se in Dispensa è già impostata "Non mostrare" per questo ingrediente,
   // quella scelta manuale vince sempre: la quantità della ricetta ("12 g"
   // di sale, es.) non deve poterla resettare a un'unità tracciabile.
-  const existingUnit = (state.pantryItems[(info.name||'').trim().toLowerCase()] || {}).unit;
+  const pantryKey = pantryKeyFor(info.name, info.spec);
+  const existingUnit = (state.pantryItems[pantryKey] || {}).unit;
   const unit = existingUnit === 'none' ? 'none' : (info.unit || undefined);
-  const pantryKey = (info.name||'').trim().toLowerCase();
   const before = state.pantryItems[pantryKey];
   const hadStock = !!(before && typeof before.qty === 'number' && before.qty > 0);
-  upsertPantryItem(info.name, (opts && opts.luogo) || 'dispensa', qty, unit);
+  upsertPantryItem(info.name, (opts && opts.luogo) || 'dispensa', qty, unit, undefined, undefined, info.spec);
   if(opts && opts.luogo && state.pantryItems[pantryKey]) state.pantryItems[pantryKey].luogo = opts.luogo;
   rowKey.split(',').forEach(k=>{ state.shopDismissed[k] = true; });
   const shopChoice = opts ? (opts.scad ? opts.scad : 'none') : (state.shopExpiry || {})[rowKey];
@@ -1366,7 +1411,7 @@ function moveShopRowToPantry(cb, opts){
 function snapshotShopRowForUndo(cb){
   const info = shopRowInfo(cb);
   const rowKeys = info.rowKey.split(',');
-  const pantryKey = (info.name||'').trim().toLowerCase();
+  const pantryKey = pantryKeyFor(info.name, info.spec);
   return {
     pantryKey,
     hadPantryItem: Object.prototype.hasOwnProperty.call(state.pantryItems, pantryKey),
@@ -2236,6 +2281,7 @@ const state = {
   pantryNamesCurated1: false,
   pantryNamesCurated2: false,
   pantryGroupMigrated3: false,
+  pantrySpecKeys1: false, // una tantum: le voci di Dispensa con una specifica passano alla chiave "nome|specifica"
   portionsBaseReset1: false, // una tantum: porzioni di partenza 3 (messe a mano per coprire l'avanzo) tornano a 2: l'avanzo collegato aggiunge la sua porzione da solo
   pantryGroupsBrodo: false, // una tantum: gruppi "Brodo vegetale" e "Brodo di carne" (il dado li copre)
   shopKeysByName1: false,
@@ -2840,6 +2886,13 @@ const MIGRATIONS = [
   // gruppo "Grana o parmigiano a scaglie" confluisce in "Formaggio
   // grattugiato" (una voce sta in un solo gruppo, e le ricette che lo
   // chiedevano ora chiedono il formaggio grattugiato).
+  { flag: 'pantrySpecKeys1', run(){
+    Object.keys(state.pantryItems).forEach(key => {
+      const it = state.pantryItems[key];
+      if(!it || !it.spec || key.includes('|')) return;
+      pantryRekey(key, pantryKeyFor(it.nome || key, it.spec));
+    });
+  }},
   { flag: 'portionsBaseReset1', run(){
     if(parseInt(state.weekPortionsBase, 10) === 3) state.weekPortionsBase = 2;
   }},
@@ -7276,7 +7329,7 @@ function buildShopFlat(){
     if(isLeftoverPantryItem(it)) return; // un avanzo non si ricompra
     if(state.shopDismissed[key]) return;
     const confirmedShop = state.pantryConfirmedShop[pantryKey];
-    flat.push({ key, ingrediente:it.nome, qta: typeof confirmedShop === 'string' ? confirmedShop : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!confirmedShop });
+    flat.push({ key, ingrediente:it.nome, spec: it.spec || '', qta: typeof confirmedShop === 'string' ? confirmedShop : '', dove:'', note:'', context:'Finiti in Dispensa', contextShort:'Finiti in Dispensa', confirmed: !!confirmedShop });
   });
   return flat;
 }
@@ -7369,7 +7422,7 @@ function renderSpesa(){
     <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(ingrediente)}">${TRASH_ICON_SVG}</button>
     <div class="shop-item-row swipe-content">
       <label class="shop-item ${checked?'checked':''}">
-        <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" ${per ? `data-shop-per="${escapeAttr(per)}" ` : ''}data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
+        <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" data-shop-spec="${escapeAttr(qual || '')}" ${per ? `data-shop-per="${escapeAttr(per)}" ` : ''}data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
         <span>
           <span class="item-name">${escapeHtml(ingrediente)}${qual ? `<small class="ing-qual"> · ${escapeHtml(qual)}</small>` : ''}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}${!ingNote && !editingIngNote ? `<button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Aggiungi una nota">${PENCIL_ICON_SVG}</button>` : ''}</span>
           ${(subtitle || note) ? `<span class="item-detail">${escapeHtml(subtitle||'')}${subtitle && note ? ' · ' : ''}${escapeHtml(note||'')}</span>` : ''}
@@ -9165,10 +9218,14 @@ function renderIngredientSheet(it, isNew){
         <h3 class="settings-section-title">Specifiche</h3>
         <div class="settings-card">
           <p class="settings-note">Se di questo ingrediente usi o hai solo una parte (es. il succo del limone), scegli cosa hai in casa o aggiungi una specifica: nelle ricette la scegli per riga, e in Spesa compri comunque ${escapeHtml(it.nome)}.</p>
-          ${fixed.length || custom.length ? `<div class="gen-label-sm">Cosa hai in casa</div><div class="chip-row variant-chips">
-            <button type="button" class="btn is-chip${it.spec ? '' : ' active'}" data-have-spec="" aria-pressed="${!it.spec}">Intero</button>
-            ${fixed.concat(custom).map(v => `<button type="button" class="btn is-chip${it.spec === v ? ' active' : ''}" data-have-spec="${escapeAttr(v)}" aria-pressed="${it.spec === v}">${escapeHtml(v)}${custom.includes(v) ? ` <span class="chip-x" data-variant-del="${escapeAttr(v)}" role="button" aria-label="Togli ${escapeAttr(v)}">✕</span>` : ''}</button>`).join('')}
-          </div>` : ''}
+          ${fixed.length || custom.length ? (() => {
+            const all = [''].concat(fixed, custom), cur = it.spec || '';
+            const exists = v => !!state.pantryItems[pantryKeyFor(it.nome, v)];
+            const label = v => v || 'Intero';
+            const others = all.filter(v => v !== cur && !exists(v));
+            return `<div class="gen-label-sm">Questa voce è</div><div class="chip-row variant-chips">
+            ${all.map(v => { const taken = v !== cur && exists(v); return `<button type="button" class="btn is-chip${cur === v ? ' active' : ''}" data-have-spec="${escapeAttr(v)}" aria-pressed="${cur === v}"${taken ? ' disabled title="Ce l\'hai già come voce a parte"' : ''}>${escapeHtml(label(v))}${v && custom.includes(v) ? ` <span class="chip-x" data-variant-del="${escapeAttr(v)}" role="button" aria-label="Togli ${escapeAttr(v)}">✕</span>` : ''}</button>`; }).join('')}
+          </div>${others.length ? `<div class="gen-label-sm">Hai anche</div><div class="chip-row variant-chips">${others.map(v => `<button type="button" class="btn is-chip" data-add-spec-sibling="${escapeAttr(v)}">+ ${escapeHtml(label(v))}</button>`).join('')}</div>` : ''}`; })() : ''}
           <div class="sheet-variant-add"><input type="text" id="variant-new-input" placeholder="Nuova specifica (es. succo)" autocomplete="off"><button type="button" class="btn is-outline" data-variant-add>Aggiungi</button></div>
         </div>
       </section>`; })()}
@@ -11995,9 +12052,14 @@ function attachHandlers(){
   document.querySelectorAll('[data-have-spec]').forEach(btn=> btn.addEventListener('click', e=>{
     if(e.target.closest('[data-variant-del]')) return; // la ✕ toglie la specifica, non la sceglie
     const it = sheetTarget(); if(!it) return;
-    const v = btn.dataset.haveSpec;
-    if(v) it.spec = v; else delete it.spec;
-    sheetChanged();
+    if(btn.disabled) return;
+    setPantryItemSpec(state.pantryEditKey, btn.dataset.haveSpec);
+    persist(); render();
+  }));
+  document.querySelectorAll('[data-add-spec-sibling]').forEach(btn=> btn.addEventListener('click', ()=>{
+    if(!state.pantryEditKey) return;
+    addPantrySibling(state.pantryEditKey, btn.dataset.addSpecSibling);
+    persist(); render();
   }));
   const addVariantFromSheet = ()=>{
     const it = sheetTarget(); const inp = document.getElementById('variant-new-input');

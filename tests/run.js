@@ -3157,7 +3157,7 @@ test('specifiche tue: la aggiungi all\'ingrediente (pompelmo · succo), la scegl
     document.getElementById('variant-new-input').value = 'succo';
     document.querySelector('[data-variant-add]').click();
     const dopo = variantOptionsFor('Pompelmo');
-    const chip = [...document.querySelectorAll('.variant-chips .btn')].map(e => e.textContent.replace('✕', '').trim());
+    const chip = [...document.querySelectorAll('[data-have-spec]')].map(e => e.textContent.replace('✕', '').trim());
     state.pantryEditKey = null;
     state.tab = 'prep'; state.recipeEditName = 'Carbonara'; render();
     document.getElementById('edit-add-ing-row').click();
@@ -3446,26 +3446,48 @@ test('genera anche la settimana prossima: la seconda non ripete la prima e usa l
   eq([r.dalFreezer, r.inW1], [1, true], 'le porzioni in freezer finiscono in una cena della seconda settimana');
 });
 
-test('Dispensa: scegli cosa hai (Limone · succo); copre le righe che chiedono il succo, non quelle che chiedono il limone intero', async ({ page }) => {
+test('Dispensa: due voci dello stesso ingrediente (Limone · succo in freezer e Limoni interi in frigo); ognuna copre le sue righe', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.pantryItems = {}; upsertPantryItem('Limone', 'freezer', 1);
     state.tab = 'dispensa'; state.pantryEditKey = 'limone'; render();
-    const chips = [...document.querySelectorAll('[data-have-spec]')].map(b => b.dataset.haveSpec || 'Intero');
-    document.querySelector('[data-have-spec="succo"]').click();
-    const spec = state.pantryItems.limone.spec;
-    const out = { chips, spec, succo: pantryStatusFor('Limone', '1', 'succo'), intero: pantryStatusFor('Limone', '1', ''), scorza: pantryStatusFor('Limone', '1', 'scorza') };
+    const chip = [...document.querySelectorAll('[data-have-spec]')].map(b => b.dataset.haveSpec || 'Intero');
+    document.querySelector('[data-have-spec="succo"]').click();           // questa voce è il succo
+    const dopoScelta = { chiavi: Object.keys(state.pantryItems), edit: state.pantryEditKey, spec: state.pantryItems['limone|succo'].spec };
+    const solo = { succo: pantryStatusFor('Limone', '1', 'succo'), intero: pantryStatusFor('Limone', '1', ''), scorza: pantryStatusFor('Limone', '1', 'scorza') };
+    document.querySelector('[data-add-spec-sibling=""]').click();           // hai anche i limoni interi
+    state.pantryItems['limone'].luogo = 'frigo';
+    const due = { chiavi: Object.keys(state.pantryItems).sort(), edit: state.pantryEditKey, luogoIntero: state.pantryItems['limone'].luogo, luogoSucco: state.pantryItems['limone|succo'].luogo };
+    const ora = { succo: pantryStatusFor('Limone', '1', 'succo'), intero: pantryStatusFor('Limone', '1', ''), scorza: pantryStatusFor('Limone', '1', 'scorza') };
     state.pantryEditKey = null; render();
-    out.riga = [...document.querySelectorAll('.inv-name')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).find(t => /^Limone/.test(t));
-    upsertPantryItem('Limone', 'freezer', 1); out.dopoUpsert = state.pantryItems.limone.spec;
-    document.querySelector('[data-pantry-edit="limone"]').click();
-    document.querySelector('[data-have-spec=""]').click();
-    out.intero2 = pantryStatusFor('Limone', '1', '');
-    return out;
+    const righe = [...document.querySelectorAll('.inv-name')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).filter(t => /^Limone/.test(t)).sort();
+    // finito il succo: l'intero resta
+    state.pantryItems['limone|succo'].qty = 0;
+    const senzaSucco = { succo: pantryStatusFor('Limone', '1', 'succo'), intero: pantryStatusFor('Limone', '1', '') };
+    return { chip, dopoScelta, solo, due, ora, righe, senzaSucco };
   });
-  eq(r.chips, ['Intero', 'scorza', 'succo']);
-  eq([r.spec, r.succo, r.intero, r.scorza], ['succo', 'in-casa', 'manca', 'manca'], 'il succo copre solo il succo');
-  eq(r.riga, 'Limone · succo');
-  eq([r.dopoUpsert, r.intero2], ['succo', 'in-casa'], 'la scelta resta; "Intero" la toglie');
+  eq(r.chip, ['Intero', 'scorza', 'succo']);
+  eq([r.dopoScelta.chiavi, r.dopoScelta.edit, r.dopoScelta.spec], [['limone|succo'], 'limone|succo', 'succo'], 'la voce passa a "limone|succo"');
+  eq([r.solo.succo, r.solo.intero, r.solo.scorza], ['in-casa', 'manca', 'manca'], 'solo il succo copre il succo');
+  eq(r.due.chiavi, ['limone', 'limone|succo'], 'due voci');
+  eq([r.due.luogoIntero, r.due.luogoSucco], ['frigo', 'freezer']);
+  eq([r.ora.succo, r.ora.intero, r.ora.scorza], ['in-casa', 'in-casa', 'in-casa'], 'con intero e succo, tutto coperto');
+  eq(r.righe, ['Limone', 'Limone · succo']);
+  eq([r.senzaSucco.succo, r.senzaSucco.intero], ['in-casa', 'in-casa'], 'finito il succo, i limoni interi coprono anche il succo');
+});
+
+test('Spesa: comprare "Limone · succo" lo mette nella voce del succo; "Limone" intero nella voce intera', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {}; state.shopExtras = {};
+    const mk = (id, ingrediente, spec) => { state.shopExtras[id] = { ingrediente, qta: '2', spec }; };
+    mk('a', 'Limone', ''); 
+    // simulo la riga di Spesa come checkbox
+    const cb = (name, spec) => { const el = document.createElement('input'); el.type = 'checkbox'; el.dataset.shopKeys = 'x_' + name + spec; el.dataset.shopName = name; el.dataset.shopSpec = spec; el.dataset.shopUnit = ''; return el; };
+    moveShopRowToPantry(cb('Limone', 'succo'), { luogo: 'freezer' });
+    moveShopRowToPantry(cb('Limone', ''), { luogo: 'frigo' });
+    return { chiavi: Object.keys(state.pantryItems).sort(), succo: state.pantryItems['limone|succo'], intero: state.pantryItems['limone'] };
+  });
+  eq(r.chiavi, ['limone', 'limone|succo']);
+  eq([r.succo.spec, r.succo.luogo, r.intero.spec, r.intero.luogo], ['succo', 'freezer', undefined, 'frigo']);
 });
 
 (async () => {
