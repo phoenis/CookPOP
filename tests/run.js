@@ -3267,6 +3267,40 @@ test('modalità cucina: "Ti serve" trova anche l\'uovo (singolare) e le specific
   eq([r.uovo, r.uova, r.succo, r.nulla], [['Uova'], ['Uova'], ['Limone'], []]);
 });
 
+test('dado da brodo: copre "Brodo vegetale" e "Brodo di carne" in Spesa, anche senza gruppo assegnato', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const ricetta = allRecipeMetas().find(m => getIngredientsFor(m.nome).some(i => i.ingrediente === 'Brodo vegetale')).nome;
+    state.pantryItems = {}; generateWeek(0);
+    const sl = allPlannedShoppingMeals().slice(-2);
+    writeMealDishes(sl[0].weekIdx, sl[0].i, sl[0].meal, ricetta, []);
+    const senza = buildShopFlat().some(x => x.ingrediente === 'Brodo vegetale');
+    upsertPantryItem('Dado da brodo', 'dispensa', 1);
+    const con = buildShopFlat().some(x => x.ingrediente === 'Brodo vegetale');
+    return { senza, con, vegetale: pantryStatusFor('Brodo vegetale'), carne: pantryStatusFor('Brodo di carne'), altro: pantryStatusFor('Brodo di pesce') };
+  });
+  eq([r.senza, r.con, r.vegetale, r.carne, r.altro], [true, false, 'in-casa', 'in-casa', 'manca']);
+});
+
+test('ricette congelabili: nota "Come congelarla e usarla" nel dettaglio e per le porzioni in freezer', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const congelabile = (re) => allRecipeMetas().find(m => ['congelabile', 'meal-prep'].includes(m.freezerNew) && re.test(m.nome.toLowerCase()));
+    const polpette = congelabile(/polpett/), sugo = congelabile(/rag[uù]|sugo/), non = allRecipeMetas().find(m => m.freezerNew === 'non-adatta');
+    const out = { polpette: freezeTipFor(polpette.nome), sugo: freezeTipFor(sugo.nome), non: freezeTipFor(non.nome) };
+    state.tab = 'prep'; state.prepView = 'ricette'; state.expandedRecipe = polpette.nome; state.dishPane['r|' + polpette.nome] = 'steps'; render();
+    out.dettaglio = [...document.querySelectorAll('.note-box')].map(e => e.textContent.replace(/\s+/g, ' ')).join(' | ');
+    state.expandedRecipe = null;
+    addFreezerPortions(polpette.nome, 2); state.pantryItems[polpette.nome.toLowerCase()].frozenOn = isoLocalDate(new Date());
+    state.tab = 'dispensa'; state.pantryEditKey = polpette.nome.toLowerCase(); render();
+    out.scheda = !!document.querySelector('.freeze-tip');
+    return out;
+  });
+  assert(/vassoio/.test(r.polpette) && /friggitrice/.test(r.polpette), 'polpette: ' + r.polpette);
+  assert(/cubetti/.test(r.sugo), 'sugo: ' + r.sugo);
+  eq(r.non, '', 'non congelabile: nessuna nota');
+  assert(/Come congelarla e usarla/.test(r.dettaglio), 'dettaglio: ' + r.dettaglio);
+  assert(r.scheda, 'scheda del freezer');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
