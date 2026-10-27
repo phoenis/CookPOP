@@ -2659,6 +2659,13 @@ function memberColor(id){
   const i = familyMembers().findIndex(m => m.id === id);
   return USER_COLOR_PRESETS[(i < 0 ? 0 : i) % USER_COLOR_PRESETS.length];
 }
+// Nome e colore li decide ognuno per sé (dal Profilo); in Persone si
+// modificano solo i propri e quelli delle persone aggiunte a mano, che non
+// hanno un accesso (es. i bambini, la nonna).
+function canEditMember(id){
+  const me = getCurrentUser(), m = memberById(id);
+  return !me || me === id || !!(m && m.manual);
+}
 // Chi viene dopo nel giro "nessuno → persona 1 → persona 2 → … → nessuno".
 function nextMemberId(cur){
   const ids = familyMembers().map(m => m.id);
@@ -13118,14 +13125,15 @@ function renderProfilePage(){
   const body = `
       <div class="profile-hero"><span class="settings-avatar is-big" style="background:${profileAvatarColor()}">${escapeHtml(profileAvatarChar())}</span></div>
       ${user ? `<section class="settings-section">
-        <h3 class="settings-section-title">Immagine</h3>
+        <h3 class="settings-section-title">Immagine e colore</h3>
         <div class="settings-card">
           <div class="emoji-grid">
             <button type="button" class="emoji-opt${cur ? '' : ' active'}" data-profile-emoji="" aria-label="Usa l'iniziale">Aa</button>
             ${PROFILE_EMOJIS.map(e => `<button type="button" class="emoji-opt${cur === e ? ' active' : ''}" data-profile-emoji="${e}">${e}</button>`).join('')}
           </div>
           <input type="text" id="profile-emoji-custom" placeholder="Oppure scrivi un'emoji" autocomplete="off" aria-label="Emoji personalizzata">
-          <p class="settings-note">Lo sfondo è il tuo colore, che si cambia in Persone.</p>
+          <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${memberColor(user) === c ? ' active' : ''}" style="background:${c}" data-member-color="${c}" data-member-id="${escapeAttr(user)}" aria-label="Scegli questo colore"></button>`).join('')}</div>
+          <p class="settings-note">Il colore è quello con cui compari nel Menù quando tocca a te cucinare, per tutti.</p>
         </div>
       </section>` : ''}
       <section class="settings-section">
@@ -13195,17 +13203,19 @@ function renderMembersPage(){
   const cards = list.map(m => `
         <div class="settings-card member-card" data-member="${escapeAttr(m.id)}">
           <div class="member-head"><span class="settings-avatar" style="background:${escapeAttr(memberColor(m.id))}" aria-hidden="true">${escapeHtml((((state.userEmojis || {})[m.id]) || memberName(m.id).charAt(0) || '?').toString().toUpperCase())}</span>
-            <input type="text" class="member-name" data-member-name="${escapeAttr(m.id)}" value="${escapeAttr(m.name || '')}" placeholder="Nome" maxlength="24" autocomplete="off" aria-label="Nome">
+            ${canEditMember(m.id)
+              ? `<input type="text" class="member-name" data-member-name="${escapeAttr(m.id)}" value="${escapeAttr(m.name || '')}" placeholder="Nome" maxlength="24" autocomplete="off" aria-label="Nome">`
+              : `<span class="member-name-fixed">${escapeHtml(memberName(m.id))}</span>`}
           </div>
-          <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${memberColor(m.id) === c ? ' active' : ''}" style="background:${c}" data-member-color="${c}" data-member-id="${escapeAttr(m.id)}" aria-label="Scegli questo colore"></button>`).join('')}</div>
-          ${list.length > 1 ? `<button type="button" class="btn is-outline settings-item-danger member-remove" data-member-remove="${escapeAttr(m.id)}">Togli ${escapeHtml(memberName(m.id))}</button>` : ''}
+          ${canEditMember(m.id) ? `<div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${memberColor(m.id) === c ? ' active' : ''}" style="background:${c}" data-member-color="${c}" data-member-id="${escapeAttr(m.id)}" aria-label="Scegli questo colore"></button>`).join('')}</div>` : ''}
+          ${list.length > 1 && m.manual ? `<button type="button" class="btn is-outline settings-item-danger member-remove" data-member-remove="${escapeAttr(m.id)}">Togli ${escapeHtml(memberName(m.id))}</button>` : ''}
         </div>`).join('');
   const body = `
       <section class="settings-section">
         <h3 class="settings-section-title">Chi mangia e cucina</h3>
         ${cards}
         ${list.length < MEMBERS_MAX ? `<button type="button" class="btn is-outline is-block" data-member-add>${uiIcon('plus')} Aggiungi una persona</button>` : ''}
-        <p class="settings-note">Nome e colore compaiono nel Menù, dove si sceglie chi cucina.</p>
+        <p class="settings-note">Nome e colore compaiono nel Menù, dove si sceglie chi cucina. Ognuno sceglie i propri dal suo Profilo; qui si modificano quelli delle persone aggiunte a mano.</p>
       </section>`;
   return managePageHtml({ key: 'members', title: 'Persone', closeAttr: 'data-close-members', body });
 }
@@ -13220,7 +13230,7 @@ document.addEventListener('click', e=>{
     if(list.length >= MEMBERS_MAX) return;
     const id = 'p' + Date.now().toString(36);
     const used = new Set(list.map(m => memberColor(m.id)));
-    state.members = [...list, { id, name: 'Persona ' + (list.length + 1) }];
+    state.members = [...list, { id, name: 'Persona ' + (list.length + 1), manual: true }];
     state.userColors[id] = USER_COLOR_PRESETS.find(c => !used.has(c)) || USER_COLOR_PRESETS[list.length % USER_COLOR_PRESETS.length];
     applyUserColors(); persist(); render(); return;
   }
