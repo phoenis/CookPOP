@@ -2540,3 +2540,9 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .sheet-variant-add{ display:flex; gap:var(--s2); align-items:center; }
 .sheet-variant-add input{ flex:1; min-width:0; box-sizing:border-box; height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-small); background:var(--surface); color:var(--ink); }
 .edit-ing-fields .edit-ing-qual-new{ flex:1; min-width:0; box-sizing:border-box; height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-small); background:var(--surface); color:var(--ink); }
+
+/* Porzioni in freezer: suggerimento sul piatto e nel dettaglio; "(2 + 1 avanzo)" accanto al numero di persone */
+.dish-freezer-hint{ display:inline-flex; align-items:center; gap:var(--s1); margin-top:var(--s1); padding:2px var(--s2); border:1px solid var(--line); border-radius:var(--r-full); background:transparent; color:var(--ink-light); font:inherit; font-size:var(--text-xsmall); cursor:pointer; }
+.dish-use-freezer{ margin-bottom:var(--s2); }
+.dish-freezer-have{ margin-left:var(--s2); font-size:var(--text-xsmall); color:var(--ink-light); }
+.persone-avanzi{ margin-left:var(--s2); color:var(--ink-light); font-size:var(--text-small); }

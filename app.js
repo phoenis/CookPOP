@@ -699,7 +699,10 @@ function personeRowHtml(n, mk, recipeName){
   const word = n === 1 ? 'persona' : 'persone';
   if(recipeName) return `<div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-recipe-portions-dec="${escapeAttr(recipeName)}" aria-label="Diminuisci porzioni">−</button><span class="qty-num">${n}</span><button type="button" class="qty-btn" data-recipe-portions-inc="${escapeAttr(recipeName)}" aria-label="Aumenta porzioni">+</button></span><span>${word}</span></div>`;
   if(!mk) return `<div class="persone-row"><span>Per ${n} ${word}</span></div>`;
-  return `<div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-portions-dec="${mk}" aria-label="Diminuisci porzioni">−</button><span class="qty-num">${n}</span><button type="button" class="qty-btn" data-portions-inc="${mk}" aria-label="Aumenta porzioni">+</button></span><span>${word}</span></div>`;
+  // "(2 + 1 avanzo)": quante porzioni sono per questo pasto e quante per gli avanzi che lo seguono.
+  const k = Object.keys(state.dayLinks || {}).filter(x => state.dayLinks[x] === mk).length;
+  const avanzi = k > 0 && n > k ? `<span class="persone-avanzi">(${n - k} + ${k} ${k === 1 ? 'avanzo' : 'avanzi'})</span>` : '';
+  return `<div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-portions-dec="${mk}" aria-label="Diminuisci porzioni">−</button><span class="qty-num">${n}</span><button type="button" class="qty-btn" data-portions-inc="${mk}" aria-label="Aumenta porzioni">+</button></span><span>${word}</span>${avanzi}</div>`;
 }
 // Ingredienti che servono in un passo: quelli il cui nome (una parola
 // significativa, senza l'ultima vocale per reggere singolare/plurale) compare
@@ -1165,9 +1168,11 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
     </div>`;
   const fromFreezer = isFreezerDish(mk, name);
   const plan = getDishPlan(mk, name);
-  const freezerInfo = fromFreezer
+  const haveFrozen = freezerPortionsOf(name);
+  const useFreezerBtn = (!fromFreezer && haveFrozen > 0) ? `<button type="button" class="btn is-chip dish-use-freezer" data-use-freezer="${mk}" data-use-freezer-name="${escapeAttr(name)}">❄️ Usa le ${haveFrozen} ${haveFrozen === 1 ? 'porzione' : 'porzioni'} in freezer</button>` : '';
+  const freezerInfo = useFreezerBtn + (fromFreezer
     ? `<div class="dish-freezer-note">❄️ Dal freezer: niente da comprare. In freezer: ${freezerPortionsOf(name)} porzioni. La sera prima ricordati di tirarlo fuori.</div>`
-    : (canFreeze(name) ? `<button type="button" class="btn is-chip dish-double${plan.double ? ' active' : ''}" data-prep-double data-prep-key="${mk}" data-prep-name="${escapeAttr(name)}" aria-pressed="${!!plan.double}">❄️ ${plan.double ? 'Doppia dose: metà in freezer' : 'Fai doppia dose e congela metà'}</button>` : '');
+    : (canFreeze(name) ? `<button type="button" class="btn is-chip dish-double${plan.double ? ' active' : ''}" data-prep-double data-prep-key="${mk}" data-prep-name="${escapeAttr(name)}" aria-pressed="${!!plan.double}">❄️ ${plan.double ? 'Doppia dose: metà in freezer' : 'Fai doppia dose e congela metà'}</button>${haveFrozen > 0 ? `<span class="dish-freezer-have">Ne hai già ${haveFrozen} in freezer</span>` : ''}` : ''));
   // Nel dettaglio del pasto il piatto attivo (scelto dalla tab) è un pannello
   // sempre aperto: niente chevron né apri/chiudi.
   const head = asPanel ? `
@@ -4293,6 +4298,15 @@ function unlinkDaysPointingTo(mealKey){
 // override porzioni): altrimenti resterebbero agganciati alla nuova ricetta
 // per puro riuso della chiave "weekIdx_i_meal", con effetti confusi (es.
 // porzioni scalate per una ricetta diversa da quella per cui erano impostate).
+// Collegare un pasto come "avanzo di" aggiunge una porzione al pasto di
+// partenza (si cucina per chi mangia ora + chi mangia l'avanzo); scollegarlo la toglie.
+function bumpSourcePortions(sourceKey, delta){
+  if(!sourceKey || !/^\d+_\d+_(pranzo|cena)$/.test(sourceKey)) return;
+  const { weekIdx, i, meal } = parseMealKey(sourceKey);
+  const m = effectiveMeal(weekIdx, i, meal);
+  if(!m || !m.principale) return;
+  state.dayPortions[sourceKey] = Math.max(1, mealPortions(sourceKey, m.principale) + delta);
+}
 function clearDayLink(mealKey){
   delete state.dayLinks[mealKey];
   delete state.dayLinkNotes[mealKey];
@@ -5804,6 +5818,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         <div class="dish-text">
           <div class="dish-course">${escapeHtml(courseLabel(dsh.tipo))}<span class="dish-tag">${escapeHtml(dishTag(dsh.name))}</span></div>
           <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>
+          ${freezerPortionsOf(dsh.name) > 0 && !isFreezerDish(mk, dsh.name) && !fixed ? `<button type="button" class="dish-freezer-hint" data-use-freezer="${mk}" data-use-freezer-name="${escapeAttr(dsh.name)}">❄️ ${freezerPortionsOf(dsh.name)} ${freezerPortionsOf(dsh.name) === 1 ? 'porzione' : 'porzioni'} in freezer · usale</button>` : ''}
         </div>
         ${fixed ? '' : `<div class="dish-actions">
           <button type="button" class="btn is-icon dish-act" data-open-dish-picker="${mk}" data-dish-replace="${escapeAttr(dsh.name)}" aria-label="Cambia ${escapeAttr(dsh.name)}">${ICON_SWAP}</button>
@@ -10012,6 +10027,7 @@ function attachHandlers(){
       const sourceKey = el.dataset.avanzodiPick; // pasto passato scelto, in cui è stato cucinato davvero
       const targetKey = el.dataset.avanzodiDay; // questo pasto, che ne mangia gli avanzi
       const { weekIdx, i, meal } = parseMealKey(targetKey);
+      if(state.dayLinks[targetKey] !== sourceKey) bumpSourcePortions(sourceKey, +1);
       state.dayLinks[targetKey] = sourceKey;
       clearMealFlag(weekOverridesRef(weekIdx), i, meal);
       clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
@@ -10026,6 +10042,7 @@ function attachHandlers(){
       const sourceKey = el.dataset.linkDay; // pasto in cui è stato cucinato (dove hai cliccato "Avanzata")
       const targetKey = el.dataset.linkPick; // pasto scelto in cui lo mangerete
       const { weekIdx, i, meal } = parseMealKey(targetKey);
+      if(state.dayLinks[targetKey] !== sourceKey) bumpSourcePortions(sourceKey, +1);
       state.dayLinks[targetKey] = sourceKey;
       clearMealFlag(weekOverridesRef(weekIdx), i, meal);
       clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
@@ -10040,12 +10057,15 @@ function attachHandlers(){
       const prevLink = state.dayLinks[key];
       const prevNote = state.dayLinkNotes[key];
       const prevPortions = state.dayPortions[key];
+      const prevSrcPortions = prevLink ? state.dayPortions[prevLink] : undefined;
       clearDayLink(key);
+      if(prevLink) bumpSourcePortions(prevLink, -1);
       persist(); render();
       showUndoToast('Pasto scollegato dall\'avanzo', ()=>{
         if(prevLink !== undefined) state.dayLinks[key] = prevLink;
         if(prevNote !== undefined) state.dayLinkNotes[key] = prevNote;
         if(prevPortions !== undefined) state.dayPortions[key] = prevPortions;
+        if(prevLink){ if(prevSrcPortions !== undefined) state.dayPortions[prevLink] = prevSrcPortions; else delete state.dayPortions[prevLink]; }
         persist(); render();
       });
     });
@@ -11889,6 +11909,18 @@ function attachHandlers(){
     });
   }
 }
+
+// "❄️ N porzioni in freezer · usale": il piatto passa a "Dal freezer" (niente da
+// comprare in Spesa); Annulla lo rimette com'era.
+document.addEventListener('click', e=>{
+  const btn = e.target.closest && e.target.closest('[data-use-freezer]');
+  if(!btn) return;
+  e.preventDefault(); e.stopPropagation();
+  const mk = btn.dataset.useFreezer, name = btn.dataset.useFreezerName;
+  setFreezerDish(mk, name, true);
+  persist(); render();
+  showUndoToast('Userai le porzioni dal freezer', ()=>{ setFreezerDish(mk, name, false); persist(); render(); });
+}, true);
 
 document.querySelectorAll('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
