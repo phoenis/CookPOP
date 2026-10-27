@@ -437,11 +437,13 @@ function resolvePantryItem(ingrediente){
     const groupEntry = Object.entries(state.pantryGroups || {}).find(([id,g]) => (g.matchName||'').trim().toLowerCase() === key);
     const group = groupEntry ? groupEntry[0] : null;
     if(!group) continue;
-    const inStock = Object.values(state.pantryItems).find(it => it.group === group && typeof it.qty === 'number' && it.qty > 0);
-    if(inStock) return inStock;
+    const curatedMembers = (CURATED_PANTRY_GROUPS[group] || {}).members || [];
+    const inGroup = (k, it) => it.group === group || curatedMembers.includes(k); // es. "Dado" copre "Brodo vegetale" anche se non è assegnato al gruppo
+    const inStock = Object.entries(state.pantryItems).find(([k, it]) => inGroup(k, it) && typeof it.qty === 'number' && it.qty > 0);
+    if(inStock) return inStock[1];
     if(!fallback){
-      const anyInGroup = Object.values(state.pantryItems).find(it => it.group === group);
-      if(anyInGroup) fallback = anyInGroup;
+      const anyInGroup = Object.entries(state.pantryItems).find(([k, it]) => inGroup(k, it));
+      if(anyInGroup) fallback = anyInGroup[1];
     }
   }
   return fallback;
@@ -960,14 +962,35 @@ function recipeNoteBoxHtml(title, text){
   return `<div class="detail-section note-box"><div class="detail-section-title">${NOTE_TITLE_SVG} ${title}</div><div class="detail-extra-note">${escapeHtml(text)}</div></div>`;
 }
 // { before: Consigli (sopra i passaggi), after: le altre note (sotto) }
-function recipeNotesHtml(det){
+// "Come congelarla e usarla": un consiglio breve per tipo di preparazione, per
+// le ricette che si possono congelare. Vale anche per le porzioni in freezer.
+function freezeTipFor(name){
+  const r = getRecipeMeta(name);
+  if(!r || !['congelabile', 'meal-prep'].includes(r.freezerNew)) return '';
+  const n = String(name || '').toLowerCase(), cat = r.categoriaNew || '';
+  const label = ' Scrivi nome e data sull\'etichetta.';
+  if(/polpett|burger|cotolett|crocchett|nugget|frittell|arancin|suppl|medaglion|svizzer/.test(n))
+    return 'Congelale in fila su un vassoio con carta forno per circa 2 ore, poi tutte insieme in un sacchetto: non si attaccano e ne prendi quante ne servono. Dal freezer vanno direttamente in forno o friggitrice ad aria, senza scongelare.' + label;
+  if(/sugo|rag[uù]|salsa|crema|vellutata|zuppa|minestr|passato|pesto|brodo|besciamella|soffritto|dado/.test(n))
+    return 'Congela a cubetti (stampi per ghiaccio) o in sacchetti piatti, schiacciando via l\'aria. Non serve scongelare: sciogli direttamente nel pentolino con un po\' d\'acqua o di brodo, oppure usa il microonde con la funzione defrost.' + label;
+  if(/pancake|waffle|muffin|focaccia|pizza|torta|biscott|pane\b/.test(n) || cat === 'dolci')
+    return 'Separa le fette con carta forno e congela in un sacchetto. Scalda direttamente nel tostapane, in friggitrice ad aria o in forno.' + label;
+  if(r.base === 'pasta' || r.base === 'riso' || r.base === 'cereali' || r.proteina === 'legumi')
+    return 'Porziona in monoporzioni e congela in sacchetti piatti o contenitori. Scalda dal freezer in pentola con un goccio d\'acqua o di brodo, senza scongelare.' + label;
+  if(cat === 'carne' || cat === 'pesce')
+    return 'Raffredda del tutto, porziona e congela in sacchetti piatti, senza aria. Scongela in frigorifero la sera prima (mai a temperatura ambiente) e poi scalda.' + label;
+  return 'Raffredda del tutto, porziona e congela in sacchetti piatti, senza aria. Scongela in frigorifero la sera prima e poi scalda.' + label;
+}
+function recipeNotesHtml(det, name){
   if(!det) return { before: '', after: '' };
+  const tip = name ? freezeTipFor(name) : '';
   return {
     before: det.consigli ? recipeNoteBoxHtml('Consigli', det.consigli) : '',
     after: [
       det.ricordare && det.ricordare !== 'Niente' ? recipeNoteBoxHtml('Da ricordare', det.ricordare) : '',
       det.avanzi ? recipeNoteBoxHtml('Avanzi', det.avanzi) : '',
-      det.freezer ? recipeNoteBoxHtml('Freezer', det.freezer) : ''
+      det.freezer ? recipeNoteBoxHtml('Freezer', det.freezer) : '',
+      tip ? recipeNoteBoxHtml('Come congelarla e usarla', tip) : ''
     ].join('')
   };
 }
@@ -1081,7 +1104,7 @@ function rdPersoneHtml(n, mk, recipeName){
 function recipeDetailBodyHtml(name, o){
   const rec = getRecipeMeta(name), det = getRecipeDetails(name);
   const steps = (det && det.procedimento) || [];
-  const notes = recipeNotesHtml(det);
+  const notes = recipeNotesHtml(det, name);
   const ingHtml = renderIngredientsSection(o.ing, o.ratio, Object.assign({ noButton: true, titleHtml: '', legend: true }, o.ctx || {}), o.persone, '');
   const stepsHtml = steps.length
     ? `<ol class="steps-list">${steps.map(t=>`<li>${escapeHtml(t)}</li>`).join('')}</ol>`
@@ -1132,7 +1155,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
   const stepsHtml = det && det.procedimento && det.procedimento.length
     ? `<div class="detail-section"><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
     : '';
-  const notes = recipeNotesHtml(det);
+  const notes = recipeNotesHtml(det, name);
   const linkHtml = sourceLinkHtml(det);
   const addFormHtml = det ? '' : `
     <div class="add-ing-form">
@@ -1896,6 +1919,8 @@ const CURATED_PANTRY_GROUPS = {
   'formaggio-grattugiato': { group:{ label:'Formaggio grattugiato', matchName:'formaggio grattugiato', cat:'latticini' }, members:['parmigiano','parmigiano grattugiato','parmigiano reggiano','grana','grana padano','pecorino','pecorino grattugiato','pecorino romano'] },
   'olive': { group:{ label:'Olive', matchName:'olive', cat:'dispensa' }, members:['olive nere','olive verdi','olive taggiasche','olive taggiasche denocciolate','olive nere di gaeta'] },
   'aceto': { group:{ label:'Aceto', matchName:'aceto', cat:'dispensa' }, members:['aceto balsamico','aceto di vino','aceto di vino bianco','aceto di vino rosso','aceto di mele'] },
+  'brodo-vegetale': { group:{ label:'Brodo vegetale', matchName:'brodo vegetale', cat:'dispensa' }, members:['dado','dado vegetale','dado da brodo','dado per brodo','dado di verdure','brodo vegetale','brodo granulare','brodo vegetale granulare','brodo vegetale in dadi'] },
+  'brodo-carne': { group:{ label:'Brodo di carne', matchName:'brodo di carne', cat:'dispensa' }, members:['dado','dado di carne','dado da brodo','dado per brodo','brodo di carne','brodo granulare'] },
   'carne-macinata': { group:{ label:'Carne macinata', matchName:'carne macinata', cat:'carne' }, members:['carne macinata mista','carne macinata di manzo','macinato','macinato misto','macinato di manzo'] }
 };
 // Un ingrediente di ricetta che va diviso in più righe: "Limone (scorza e
@@ -2200,6 +2225,7 @@ const state = {
   pantryNamesCurated1: false,
   pantryNamesCurated2: false,
   pantryGroupMigrated3: false,
+  pantryGroupsBrodo: false, // una tantum: gruppi "Brodo vegetale" e "Brodo di carne" (il dado li copre)
   shopKeysByName1: false,
   baseDeptMigrated1: false,
   ricettarioDupes1: false,
@@ -2799,6 +2825,9 @@ const MIGRATIONS = [
   // gruppo "Grana o parmigiano a scaglie" confluisce in "Formaggio
   // grattugiato" (una voce sta in un solo gruppo, e le ricette che lo
   // chiedevano ora chiedono il formaggio grattugiato).
+  { flag: 'pantryGroupsBrodo', run(){
+    ['brodo-vegetale', 'brodo-carne'].forEach(id => { if(!state.pantryGroups[id]) state.pantryGroups[id] = Object.assign({}, CURATED_PANTRY_GROUPS[id].group); });
+  }},
   { flag: 'pantryGroupMigrated3', run(){
     Object.entries(CURATED_PANTRY_GROUPS).forEach(([id, def])=>{ if(!state.pantryGroups[id]) state.pantryGroups[id] = Object.assign({}, def.group); });
     Object.keys(state.pantryItems).forEach(key=>{
@@ -7616,7 +7645,7 @@ function renderRecipeDetailScreen(name){
   const stepsHtml = det && det.procedimento && det.procedimento.length
     ? `<div class="detail-section"><ol class="steps-list">${det.procedimento.map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div>`
     : '';
-  const notes = recipeNotesHtml(det);
+  const notes = recipeNotesHtml(det, name);
   const linkHtml = sourceLinkHtml(det);
   const addFormHtml = det ? '' : `
     <div class="add-ing-form">
@@ -8913,6 +8942,7 @@ function renderIngredientSheet(it, isNew){
             <label class="btn is-chip sheet-date-chip">${uiIcon('calendar')} ${it.frozenOn ? escapeHtml(frozenOnShort(it.frozenOn)) : 'Data…'}<input type="date" id="pantry-edit-frozen" value="${escapeAttr(it.frozenOn || '')}" aria-label="Data di congelamento"></label>
           </div>
           ${it.freezerExp ? '<div class="sheet-hint-inline">La scadenza qui sotto è una stima per il freezer: la puoi cambiare.</div>' : ''}
+          ${it.frozenMeal && freezeTipFor(it.nome) ? `<div class="sheet-hint-inline freeze-tip"><b>Come usarla:</b> ${escapeHtml(freezeTipFor(it.nome))}</div>` : ''}
         </div>` : '';
   const scadenzaHtml = home ? '' : frozenHtml + (lotsHtml || `
         <div class="settings-field">
