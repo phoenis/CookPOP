@@ -751,7 +751,8 @@ function personeRowHtml(n, mk, recipeName){
   if(!mk) return `<div class="persone-row"><span>Per ${n} ${word}</span></div>`;
   // "(2 + 1 avanzo)": quante porzioni sono per questo pasto e quante per gli avanzi che lo seguono.
   const k = Object.keys(state.dayLinks || {}).filter(x => state.dayLinks[x] === mk).length;
-  const avanzi = k > 0 && n > k ? `<span class="persone-avanzi">(${n - k} + ${k} ${k === 1 ? 'avanzo' : 'avanzi'})</span>` : '';
+  const ex = k * leftoverPortionsN();
+  const avanzi = k > 0 && ex > 0 && n > ex ? `<span class="persone-avanzi">(${n - ex} + ${ex} ${ex === 1 ? 'avanzo' : 'avanzi'})</span>` : '';
   return `<div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-portions-dec="${mk}" aria-label="Diminuisci porzioni">−</button><span class="qty-num">${n}</span><button type="button" class="qty-btn" data-portions-inc="${mk}" aria-label="Aumenta porzioni">+</button></span><span>${word}</span>${avanzi}</div>`;
 }
 // Ingredienti che servono in un passo: quelli il cui nome (una parola
@@ -2010,6 +2011,33 @@ function mergeRenamedPantryItems(){
     delete state.shopDismissed['oos_'+oldKey];
   });
 }
+// Grammi a porzione scelti nelle Regole (state.portionGrams: pasta, riso; 0 =
+// come scritto nella ricetta). La quantità della ricetta ("320 g" per 4
+// porzioni) si porta ai grammi scelti a testa. Solo righe in grammi di pasta o
+// riso nei piatti dove sono l'ingrediente principale, con porzioni note.
+const PORTION_GRAMS_KIND = [
+  ['pasta', /^(pasta|spaghett|penne|rigaton|fusill|linguin|tagliatell|bucatin|mezze maniche|tortigliond|farfall|orecchiett|trofie|paccheri|maltagliati|cavatelli|ditalini|tubett|sedani|vermicelli|fettuccine)/i],
+  ['riso', /^riso\b/i]
+];
+function portionGramsKind(ingName){
+  const n = String(ingName || '').trim();
+  const hit = PORTION_GRAMS_KIND.find(([, re]) => re.test(n));
+  return hit ? hit[0] : '';
+}
+function applyPortionGrams(recipeName, it){
+  const kind = portionGramsKind(it.ingrediente);
+  const target = kind && state.portionGrams ? parseInt(state.portionGrams[kind], 10) : 0;
+  if(!kind || !(target > 0) || (state.fixedPortionRecipes || {})[recipeName]) return it;
+  const m = String(it.qta || '').trim().match(/^(\d+(?:[.,]\d+)?)\s*(g|kg)$/i);
+  const det = getRecipeDetails(recipeName);
+  const por = det ? parsePortionsBase(det.porzioni) : null;
+  if(!m || !por) return it;
+  const grams = parseFloat(m[1].replace(',', '.')) * (m[2].toLowerCase() === 'kg' ? 1000 : 1);
+  const implied = grams / por;
+  if(implied < 30 || implied > 200) return it; // non è una porzione di pasta/riso a testa (es. contorno, quantità strane)
+  const out = Math.round(target * por / 5) * 5;
+  return Object.assign({}, it, { qta: out >= 1000 ? `${String(out / 1000).replace('.', ',')} kg` : `${out} g` });
+}
 function getIngredientsFor(name){
   const edit = state.recipeEdits[name];
   const det = DATA.recipeDetails[name];
@@ -2029,13 +2057,13 @@ function getIngredientsFor(name){
     const variant = !it.qual && CURATED_INGREDIENT_VARIANTS[(it.ingrediente || '').trim().toLowerCase()];
     if(variant) return Object.assign({}, it, { ingrediente: resolveIngredientName(variant[0], renames), qual: variant[1], spec: variant[1] });
     const displayName = resolveIngredientName(it.ingrediente, renames);
-    if(displayName === it.ingrediente) return it;
+    if(displayName === it.ingrediente) return applyPortionGrams(name, it);
     // Il nome scritto nella ricetta ("Tuorli") resta come dettaglio accanto al
     // nome unificato ("Uova · tuorli"); se è solo una variante dello stesso
     // nome (singolare/plurale, "Sale" / "Sale fino") non si ripete.
     const orig = (it.ingrediente || '').trim().toLowerCase(), shown = displayName.toLowerCase();
     const qual = orig.slice(0, 3) === shown.slice(0, 3) ? '' : orig;
-    return Object.assign({}, it, { ingrediente: displayName, qual: it.qual || qual });
+    return applyPortionGrams(name, Object.assign({}, it, { ingrediente: displayName, qual: it.qual || qual }));
   }));
 }
 // Ordine fisso degli ingredienti in ogni ricetta: prima gli ingredienti
@@ -2395,6 +2423,8 @@ const state = {
   // possono avere un tetto diverso tra pranzo e cena dello stesso giorno).
   weekTempoBase: 'normale',
   weekLeftoverDays: null, // giorni con il pranzo = avanzo della cena di ieri (null = tutti quelli possibili)
+  portionGrams: { pasta: 0, riso: 0 }, // grammi a porzione di pasta e riso (0 = come nella ricetta)
+  weekLeftoverPortions: 1, // porzioni in più per ogni avanzo collegato
   weekPortionsBase: 2, // porzioni di partenza di ogni pasto generato (Regole di generazione); le cene da cui avanza il pranzo dopo partono con una in più
   genTwoWeeks: false, // non persistito: nelle Regole di generazione, genera anche la settimana prossima
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
@@ -3531,6 +3561,8 @@ function buildPersonalPayload(){
     mealLocked: state.mealLocked,
     weekTempoBase: state.weekTempoBase,
     weekPortionsBase: state.weekPortionsBase,
+    portionGrams: state.portionGrams,
+    weekLeftoverPortions: state.weekLeftoverPortions,
     weekLeftoverDays: state.weekLeftoverDays,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
@@ -4129,6 +4161,10 @@ function recipeProteina(r){ return (r && PROTEINA_ORDER.includes(r.proteina)) ? 
 // Il sabato (5) è il primo giorno della settimana: la sua "cena di ieri" è della
 // settimana scorsa, quindi il suo pranzo si cucina sempre.
 const LEFTOVER_LUNCH_ELIGIBLE = [0,1,2,3,4,6];
+function leftoverPortionsN(){
+  const n = parseInt(state.weekLeftoverPortions, 10);
+  return n >= 0 && n <= 4 ? n : 1;
+}
 function leftoverLunchDays(){
   const a = state.weekLeftoverDays;
   return Array.isArray(a) ? a.filter(d => LEFTOVER_LUNCH_ELIGIBLE.includes(d)) : LEFTOVER_LUNCH_ELIGIBLE.slice();
@@ -4909,7 +4945,7 @@ function generateWeek(weekIdx){
   const sourceDays = leftoverLunchDays().map(d => (d + 6) % 7);
   for(let i = 0; i < 7; i++){
     const basePor = defaultPortions();
-    state.dayPortions[`${weekIdx}_${i}_cena`] = sourceDays.includes(i) ? basePor + 1 : basePor;
+    state.dayPortions[`${weekIdx}_${i}_cena`] = sourceDays.includes(i) ? basePor + leftoverPortionsN() : basePor;
     if(!leftoverLunchDays().includes(i)) state.dayPortions[`${weekIdx}_${i}_pranzo`] = basePor;
   }
   // Ripristino i pasti bloccati: stessa ricetta/contorni di prima nella
@@ -7163,6 +7199,15 @@ function renderMenu(){
               const eligible = LEFTOVER_LUNCH_ELIGIBLE.includes(d), on = leftoverLunchDays().includes(d);
               return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ' disabled title="Il sabato, primo giorno della settimana, il pranzo si cucina sempre"'} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
             }).join('')}</div>
+          </div>
+          <div class="gen-group gen-row">
+            <div class="gen-label">Porzioni di ogni avanzo</div>
+            <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-leftover-portions="-1" aria-label="Meno porzioni di avanzo" ${leftoverPortionsN() <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${leftoverPortionsN() === 0 ? 'nessuna' : leftoverPortionsN() + (leftoverPortionsN() === 1 ? ' porzione' : ' porzioni')}</span><button type="button" class="qty-btn" data-gen-leftover-portions="1" aria-label="Più porzioni di avanzo" ${leftoverPortionsN() >= 4 ? 'disabled' : ''}>+</button></div>
+          </div>
+          <div class="gen-group">
+            <div class="gen-label">Grammi a porzione</div>
+            ${['pasta', 'riso'].map(k => { const g = parseInt((state.portionGrams || {})[k], 10) || 0; return `<div class="gen-row gen-grams-row"><span>${k === 'pasta' ? 'Pasta' : 'Riso'}</span><div class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></div></div>`; }).join('')}
+            <p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa (in Spesa, nel dettaglio e in cucina).</p>
           </div>
           ${genSettingsTargetWeek !== null ? `<div class="gen-group gen-toggle-row">
             <button type="button" class="gen-toggle" data-toggle-gen-pantry role="switch" aria-checked="${!!state.genPantryOnly}"><span class="gen-toggle-text"><span aria-hidden="true">🧺</span> Solo con quello che ho in casa</span><span class="gen-switch${state.genPantryOnly ? ' on' : ''}" aria-hidden="true"></span></button>
@@ -10210,7 +10255,7 @@ function attachHandlers(){
       const sourceKey = el.dataset.avanzodiPick; // pasto passato scelto, in cui è stato cucinato davvero
       const targetKey = el.dataset.avanzodiDay; // questo pasto, che ne mangia gli avanzi
       const { weekIdx, i, meal } = parseMealKey(targetKey);
-      if(state.dayLinks[targetKey] !== sourceKey) bumpSourcePortions(sourceKey, +1);
+      if(state.dayLinks[targetKey] !== sourceKey) bumpSourcePortions(sourceKey, +leftoverPortionsN());
       state.dayLinks[targetKey] = sourceKey;
       clearMealFlag(weekOverridesRef(weekIdx), i, meal);
       clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
@@ -10225,7 +10270,7 @@ function attachHandlers(){
       const sourceKey = el.dataset.linkDay; // pasto in cui è stato cucinato (dove hai cliccato "Avanzata")
       const targetKey = el.dataset.linkPick; // pasto scelto in cui lo mangerete
       const { weekIdx, i, meal } = parseMealKey(targetKey);
-      if(state.dayLinks[targetKey] !== sourceKey) bumpSourcePortions(sourceKey, +1);
+      if(state.dayLinks[targetKey] !== sourceKey) bumpSourcePortions(sourceKey, +leftoverPortionsN());
       state.dayLinks[targetKey] = sourceKey;
       clearMealFlag(weekOverridesRef(weekIdx), i, meal);
       clearMealFlag(weekOverridePickedRef(weekIdx), i, meal);
@@ -10242,7 +10287,7 @@ function attachHandlers(){
       const prevPortions = state.dayPortions[key];
       const prevSrcPortions = prevLink ? state.dayPortions[prevLink] : undefined;
       clearDayLink(key);
-      if(prevLink) bumpSourcePortions(prevLink, -1);
+      if(prevLink) bumpSourcePortions(prevLink, -leftoverPortionsN());
       persist(); render();
       showUndoToast('Pasto scollegato dall\'avanzo', ()=>{
         if(prevLink !== undefined) state.dayLinks[key] = prevLink;
@@ -10490,6 +10535,23 @@ function attachHandlers(){
     btn.addEventListener('click', ()=>{
       const d = btn.hasAttribute('data-gen-portions-inc') ? 1 : -1;
       state.weekPortionsBase = Math.min(12, Math.max(1, defaultPortions() + d));
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-leftover-portions]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.weekLeftoverPortions = Math.min(4, Math.max(0, leftoverPortionsN() + parseInt(btn.dataset.genLeftoverPortions, 10)));
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-grams]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const k = btn.dataset.genGrams, step = parseInt(btn.dataset.genGramsStep, 10);
+      const cur = parseInt((state.portionGrams || {})[k], 10) || 0;
+      // da "come nella ricetta" il primo + parte da 80 g; sotto i 40 g torna a "come nella ricetta"
+      let next = cur === 0 ? (step > 0 ? 80 : 0) : cur + step;
+      if(next < 40) next = 0;
+      state.portionGrams = Object.assign({ pasta: 0, riso: 0 }, state.portionGrams, { [k]: Math.min(150, next) });
       persist(); render();
     });
   });

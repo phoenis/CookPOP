@@ -3500,6 +3500,36 @@ test('Dispensa: il tooltip "è finito" è stretto e ancorato a destra', async ({
   assert(r.w < 140 && r.aDestra && r.botoni === 2, JSON.stringify(r));
 });
 
+test('grammi a porzione: pasta e riso si scalano, 0 lascia la ricetta, il resto non cambia; porzioni di avanzo configurabili', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    let trovata = null;
+    for (const nome of Object.keys(DATA.recipeDetails || {})) {
+      const por = parsePortionsBase(DATA.recipeDetails[nome].porzioni);
+      if(!por) continue;
+      state.portionGrams = { pasta: 0, riso: 0 };
+      const base = getIngredientsFor(nome).find(i => portionGramsKind(i.ingrediente) === 'pasta' && /^\d+(\.\d+)?\s*g$/i.test(String(i.qta).trim()));
+      if(base){ trovata = { nome, por, base: base.qta, ing: base.ingrediente }; break; }
+    }
+    if(!trovata) return null;
+    state.fixedPortionRecipes = {};
+    state.portionGrams = { pasta: 100, riso: 0 };
+    const q = getIngredientsFor(trovata.nome).find(i => i.ingrediente === trovata.ing).qta;
+    state.portionGrams = { pasta: 0, riso: 90 };
+    const sotto = getIngredientsFor(trovata.nome).find(i => i.ingrediente === trovata.ing).qta;
+    state.portionGrams = { pasta: 0, riso: 0 };
+    state.weekLeftoverPortions = 2; state.weekLeftoverDays = null; state.extraWeeks = []; state.weekPortionsBase = 2; generateWeek(1);
+    const due = state.dayPortions['1_3_cena'];
+    state.weekLeftoverPortions = 0; generateWeek(1);
+    const zero = state.dayPortions['1_3_cena'];
+    state.weekLeftoverPortions = 1;
+    return { trovata, q, sotto, due, zero };
+  });
+  assert(r, 'nessuna ricetta con pasta in grammi');
+  eq(parseFloat(r.q), r.trovata.por * 100, 'pasta a 100 g a testa');
+  eq(r.sotto, r.trovata.base, 'il riso non tocca la pasta');
+  eq([r.due, r.zero], [4, 2], 'porzioni avanzo');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
