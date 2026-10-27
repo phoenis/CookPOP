@@ -3490,6 +3490,16 @@ test('Spesa: comprare "Limone · succo" lo mette nella voce del succo; "Limone" 
   eq([r.succo.spec, r.succo.luogo, r.intero.spec, r.intero.luogo], ['succo', 'freezer', undefined, 'frigo']);
 });
 
+test('Dispensa: il tooltip "è finito" è stretto e ancorato a destra', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {}; upsertPantryItem('Latte', 'frigo', 1, 'l');
+    state.tab = 'dispensa'; state.pantryFinishPicker = 'latte'; render();
+    const e = document.querySelector('.finish-picker'), row = e.parentElement.getBoundingClientRect(), b = e.getBoundingClientRect();
+    return { w: Math.round(b.width), aDestra: Math.abs(row.right - b.right) < 2, botoni: e.querySelectorAll('button').length };
+  });
+  assert(r.w < 140 && r.aDestra && r.botoni === 2, JSON.stringify(r));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
