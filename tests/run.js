@@ -911,7 +911,7 @@ test('menù: un pasto vuoto non risulta mai cucinato, anche con una spunta rimas
 
 test('meal prep: lista nel giorno di prep (sabato di default), doppia dose in Spesa e in freezer, piatto dal freezer senza Spesa', async ({ page }) => {
   const r = await page.evaluate(() => {
-    state.extraWeeks = []; generateWeek(1);
+    state.extraWeeks = []; generateWeek(1); state.dayLinks = {}; // la generazione può collegare dei pranzi come avanzo: qui no
     ['pranzo', 'cena'].forEach(m => WEEK_DISPLAY_ORDER.forEach(i => writeMealDishes(1, i, m, 'Pasta al pesto', [])));
     const mp = allRecipeMetas().find(x => x.freezerNew === 'meal-prep' && getIngredientsFor(x.nome).length);
     writeMealDishes(1, 2, 'cena', mp.nome, []); // mercoledì
