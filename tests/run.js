@@ -3428,9 +3428,11 @@ test('Spesa con due settimane: frutta, verdura e latticini della seconda vanno i
 
 test('genera anche la settimana prossima: la seconda non ripete la prima e usa le porzioni in freezer', async ({ page }) => {
   const r = await page.evaluate(() => {
-    state.pantryItems = {}; state.extraWeeks = []; generateWeek(0);
+    state.pantryItems = {}; state.extraWeeks = [];
     const congelabile = allRecipeMetas().filter(m => ['congelabile', 'meal-prep'].includes(m.freezerNew) && m.tipologia !== 'contorno' && m.tipologia !== 'dolce');
     const nome = congelabile[0].nome;
+    state.dietExclude = [nome.toLowerCase()]; // il generatore non lo sceglie da solo: deve arrivare solo dal freezer
+    generateWeek(0);
     addFreezerPortions(nome, 2); state.pantryItems[nome.toLowerCase()].frozenOn = isoLocalDate(new Date());
     state.genTwoWeeks = true; state.genSettingsOpen = 0; render();
     const toggle = !!document.querySelector('[data-toggle-gen-two]');
@@ -3438,7 +3440,7 @@ test('genera anche la settimana prossima: la seconda non ripete la prima e usa l
     const w1 = WEEK_DISPLAY_ORDER.map(i => ['pranzo', 'cena'].map(m => effectiveMeal(1, i, m).principale)).flat().filter(Boolean);
     const dalFreezer = WEEK_DISPLAY_ORDER.filter(i => isFreezerDish(mealKey(1, i, 'cena'), nome)).length;
     const out = { toggle, haSettimana2: state.extraWeeks.length === 1, nome, dalFreezer, inW1: w1.includes(nome) };
-    state.genTwoWeeks = false;
+    state.genTwoWeeks = false; state.dietExclude = [];
     return out;
   });
   assert(r.toggle, 'interruttore nelle Regole');
