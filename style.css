@@ -2632,3 +2632,4 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .member-card .settings-avatar{ width:3rem; height:3rem; flex:none; font-size:1.25rem; }
 .member-name{ height:2.75rem; padding:0 var(--s3); border:1px solid var(--line); border-radius:var(--radius-pill,999px); background:var(--bg); color:var(--ink); font:inherit; }
 .member-remove{ min-height:2.5rem; font-size:var(--text-small); }
+.member-name-fixed{ flex:1; font-weight:var(--weight-medium); }

@@ -3645,6 +3645,25 @@ test('persone: nomi e colori propri, il giro "chi cucina" li attraversa tutti, t
   eq(page.errors, [], 'errori JS');
 });
 
+test('persone: il colore lo sceglie ognuno dal proprio Profilo; in Persone si modificano solo i propri e quelli aggiunti a mano', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.members = [{ id: 'mara', name: 'Mara' }, { id: 'ste', name: 'Ste' }, { id: 'p9', name: 'Nonna', manual: true }];
+    const orig = window.getCurrentUser; window.getCurrentUser = () => 'mara';
+    state.membersOpen = true; render();
+    const out = {
+      proprio: !!document.querySelector('[data-member-id="mara"][data-member-color]'),
+      altro: !!document.querySelector('[data-member-id="ste"][data-member-color]'),
+      aMano: !!document.querySelector('[data-member-id="p9"][data-member-color]'),
+      togliAltro: !!document.querySelector('[data-member-remove="ste"]'), togliAMano: !!document.querySelector('[data-member-remove="p9"]')
+    };
+    state.membersOpen = false; state.profileOpen = true; render();
+    out.nelProfilo = !!document.querySelector('[data-page="profile"] [data-member-id="mara"][data-member-color]');
+    state.profileOpen = false; window.getCurrentUser = orig; render();
+    return out;
+  });
+  eq(r, { proprio: true, altro: false, aMano: true, togliAltro: false, togliAMano: true, nelProfilo: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
