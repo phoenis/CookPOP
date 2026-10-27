@@ -2424,6 +2424,9 @@ const state = {
   weekTempoBase: 'normale',
   weekLeftoverDays: null, // giorni con il pranzo = avanzo della cena di ieri (null = tutti quelli possibili)
   portionGrams: { pasta: 0, riso: 0 }, // grammi a porzione di pasta e riso (0 = come nella ricetta)
+  dietType: 'onnivoro', // onnivoro | pescetariano | vegetariano (Regole di generazione)
+  dietTargets: {}, // obiettivi settimanali cambiati a mano: { proteina: [min, max] }
+  dietExclude: [], // ingredienti da evitare nella generazione
   weekLeftoverPortions: 1, // porzioni in più per ogni avanzo collegato
   weekPortionsBase: 2, // porzioni di partenza di ogni pasto generato (Regole di generazione); le cene da cui avanza il pranzo dopo partono con una in più
   genTwoWeeks: false, // non persistito: nelle Regole di generazione, genera anche la settimana prossima
@@ -3563,6 +3566,9 @@ function buildPersonalPayload(){
     weekPortionsBase: state.weekPortionsBase,
     portionGrams: state.portionGrams,
     weekLeftoverPortions: state.weekLeftoverPortions,
+    dietType: state.dietType,
+    dietTargets: state.dietTargets,
+    dietExclude: state.dietExclude,
     weekLeftoverDays: state.weekLeftoverDays,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
@@ -4102,6 +4108,33 @@ const PROTEINA_LABEL = { legumi:'Legumi', pesce:'Pesce', 'carne-bianca':'Carne b
 // salumi occasionali, uova 2-4 (1-2 pasti), formaggi circa 3; patate 1-2.
 // La pasta andrebbe bene anche ogni giorno: il tetto a 4 è per la varietà.
 const WEEK_PROTEINA_TARGETS = { legumi:[3,4], pesce:[2,3], 'carne-bianca':[2,2], 'carne-rossa':[0,1], salumi:[0,1], uova:[1,2], formaggi:[2,3], nessuna:[0,2] };
+const DIET_TYPES = { onnivoro: 'Onnivoro', pescetariano: 'Pescetariano', vegetariano: 'Vegetariano' };
+const DIET_TARGETS = {
+  onnivoro: {},
+  pescetariano: { pesce:[3,4], 'carne-bianca':[0,0], 'carne-rossa':[0,0], salumi:[0,0] },
+  vegetariano: { legumi:[3,5], pesce:[0,0], 'carne-bianca':[0,0], 'carne-rossa':[0,0], salumi:[0,0], uova:[2,3], formaggi:[2,3] }
+};
+function dietTypeNow(){ return DIET_TYPES[state.dietType] ? state.dietType : 'onnivoro'; }
+function weekProteinTargets(){
+  const out = Object.assign({}, WEEK_PROTEINA_TARGETS, DIET_TARGETS[dietTypeNow()]);
+  Object.entries(state.dietTargets || {}).forEach(([k, r]) => { if(out[k] && Array.isArray(r) && r.length === 2) out[k] = [r[0], r[1]]; });
+  return out;
+}
+const DIET_MEAT_WORDS = ['manzo','vitello','bistecca','brasato','ossibuch','macinata','agnello','maiale','arista','lonza','costine','cotenna','spezzatino','hamburger','pollo','tacchino','coniglio','salsiccia','salsicce','prosciutto','speck','pancetta','guanciale','mortadella','salame','wurstel','brodo di carne','bresaola'];
+const DIET_FISH_WORDS = ['salmone','merluzzo','tonno','baccalà','orata','branzino','pesce','gamberi','gamberetti','vongole','cozze','polpo','calamari','seppie','acciughe','alici','sgombro'];
+function dietAllows(r){
+  const txt = recipeIngredientText(r) + ' | ' + (r.nome || '').toLowerCase();
+  const diet = dietTypeNow();
+  if(diet !== 'onnivoro' && has(txt, DIET_MEAT_WORDS)) return false;
+  if(diet === 'vegetariano' && has(txt, DIET_FISH_WORDS)) return false;
+  return !(state.dietExclude || []).some(w => w && txt.includes(w));
+}
+// Toglie le ricette che non vanno bene; se ne resterebbero troppo poche
+// lascia l'elenco com'è, così la generazione non resta mai a secco.
+function dietFilter(list, min){
+  const ok = list.filter(dietAllows);
+  return ok.length >= (min || 1) ? ok : list;
+}
 const WEEK_BASE_TARGETS = { pasta:[0,4], riso:[0,3], patate:[0,2], cereali:[0,3], pane:[0,3], nessuna:[0,5] };
 const has = (text, words) => words.some(w => text.includes(w));
 function recipeIngredientText(r){
@@ -4198,7 +4231,7 @@ function weekPlanScore(picks, slots, seq){
     prot[p] = (prot[p] || 0) + 1;
     base[b] = (base[b] || 0) + 1;
   });
-  Object.entries(WEEK_PROTEINA_TARGETS).forEach(([k, range]) => { score += 10 * targetDistance(prot[k] || 0, range); });
+  Object.entries(weekProteinTargets()).forEach(([k, range]) => { score += 10 * targetDistance(prot[k] || 0, range); });
   Object.entries(WEEK_BASE_TARGETS).forEach(([k, range]) => { score += 6 * targetDistance(base[k] || 0, range); });
   // Varietà tra un pasto e il successivo (un avanzo accanto alla cena da cui
   // viene è lo stesso piatto per forza: non conta).
@@ -4312,9 +4345,9 @@ function pickWeekRecipes(fixed, weekIdx){
   fixed = fixed || {};
   const season = currentSeasonKey();
   const inSeason = r => r.stagioni.includes(season) || r.stagioni.includes('tutto');
-  let pool = allRecipeMetas().filter(isMainDish).filter(inSeason);
-  if(pool.length < 20) pool = allRecipeMetas().filter(isMainDish); // fallback di sicurezza, non dovrebbe servire
-  const contorniPool = allRecipeMetas().filter(r => r.tipologia === 'contorno' && inSeason(r) && recipeGivesVeg(r));
+  let pool = dietFilter(allRecipeMetas().filter(isMainDish).filter(inSeason), 8);
+  if(pool.length < 20) pool = dietFilter(allRecipeMetas().filter(isMainDish), 8); // fallback di sicurezza, non dovrebbe servire
+  const contorniPool = dietFilter(allRecipeMetas().filter(r => r.tipologia === 'contorno' && inSeason(r) && recipeGivesVeg(r)), 3);
   const rand = n => Math.floor(Math.random() * n);
   const shuffle = arr => { const a = arr.slice(); for(let i = a.length - 1; i > 0; i--){ const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const withinCap = (list, day, meal)=>{
@@ -4334,7 +4367,7 @@ function pickWeekRecipes(fixed, weekIdx){
   if(pantryOnly){
     // Con quello che ho, la stagione conta meno: si parte da tutte le ricette.
     const need = fixedAt.filter(f => !f).length;
-    pool = pantryOnlyPool(allRecipeMetas().filter(isMainDish).filter(r => !fixedNames.has(r.nome)), need, pantryCtx.expiring);
+    pool = pantryOnlyPool(dietFilter(allRecipeMetas().filter(isMainDish), 8).filter(r => !fixedNames.has(r.nome)), need, pantryCtx.expiring);
   }
   const recent = recentRecipeNames(weekIdx);
   const recentScore = picks => picks.reduce((sum, r) => sum + (recent.has(r.nome) && !fixedNames.has(r.nome) ? RECENT_PENALTY : 0), 0);
@@ -6780,8 +6813,8 @@ function weekBalance(weekIdx){
   });
   const checkLow = planned >= BALANCE_FULL_FROM;
   const status = (count, [min, max]) => count > max ? 'high' : (checkLow && count < min ? 'low' : 'ok');
-  const items = PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k=>({ key:k, count: prot[k] || 0, range: WEEK_PROTEINA_TARGETS[k], status: status(prot[k] || 0, WEEK_PROTEINA_TARGETS[k]) }))
-    .filter(it => it.key !== 'salumi' || it.count > 0);
+  const items = PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k=>({ key:k, count: prot[k] || 0, range: weekProteinTargets()[k], status: status(prot[k] || 0, weekProteinTargets()[k]) }))
+    .filter(it => (it.key !== 'salumi' || it.count > 0) && (it.range[1] > 0 || it.count > 0));
   const pasta = { key:'pasta', count: base.pasta || 0, range: WEEK_BASE_TARGETS.pasta, status: status(base.pasta || 0, WEEK_BASE_TARGETS.pasta) };
   return { planned, checkLow, items, pasta };
 }
@@ -7199,6 +7232,16 @@ function renderMenu(){
               const eligible = LEFTOVER_LUNCH_ELIGIBLE.includes(d), on = leftoverLunchDays().includes(d);
               return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ' disabled title="Il sabato, primo giorno della settimana, il pranzo si cucina sempre"'} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
             }).join('')}</div>
+          </div>
+          <div class="gen-group">
+            <div class="gen-label">Alimentazione</div>
+            <div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
+            <div class="gen-label gen-sublabel">Obiettivi a settimana</div>
+            ${PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k => { const [mn, mx] = weekProteinTargets()[k]; const stp = (end, d, v, lab) => `<button type="button" class="qty-btn" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${(d < 0 && v <= 0) || (d > 0 && v >= 7) ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`; return `<div class="gen-row gen-target-row"><span>${PROTEINA_ICON[k] || ''} ${PROTEINA_LABEL[k]}</span><div class="gen-stepper">${stp(0, -1, mn, 'Meno minimo')}<span class="gen-stepper-val">${mn === mx ? mn : mn + '–' + mx}</span>${stp(1, 1, mx, 'Più massimo')}</div></div>`; }).join('')}
+            <div class="gen-label gen-sublabel">Ingredienti da evitare</div>
+            <div class="gen-exclude-chips">${(state.dietExclude || []).map((w, i) => `<button type="button" class="gen-chip" data-gen-exclude-remove="${i}" aria-label="Togli ${escapeHtml(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
+            <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. funghi, noci" aria-label="Ingrediente da evitare" autocomplete="off"><button type="submit" class="btn-secondary">Aggiungi</button></form>
+            <p class="gen-note">Le ricette con questi ingredienti non vengono scelte. Controlla sempre le etichette: non è una garanzia per le allergie.</p>
           </div>
           <div class="gen-group gen-row">
             <div class="gen-label">Porzioni di ogni avanzo</div>
@@ -10535,6 +10578,31 @@ function attachHandlers(){
     btn.addEventListener('click', ()=>{
       const d = btn.hasAttribute('data-gen-portions-inc') ? 1 : -1;
       state.weekPortionsBase = Math.min(12, Math.max(1, defaultPortions() + d));
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-diet]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.dietType = btn.dataset.genDiet; state.dietTargets = {}; persist(); render(); });
+  });
+  document.querySelectorAll('[data-gen-target]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const k = btn.dataset.genTarget, end = parseInt(btn.dataset.genTargetEnd, 10), d = parseInt(btn.dataset.genTargetStep, 10);
+      const r = weekProteinTargets()[k].slice();
+      r[end] = Math.min(7, Math.max(0, r[end] + d));
+      if(r[0] > r[1]){ if(end === 0) r[1] = r[0]; else r[0] = r[1]; }
+      state.dietTargets = Object.assign({}, state.dietTargets, { [k]: r });
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-exclude-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.dietExclude = (state.dietExclude || []).filter((w, i) => i !== parseInt(btn.dataset.genExcludeRemove, 10)); persist(); render(); });
+  });
+  document.querySelectorAll('[data-gen-exclude-form]').forEach(form=>{
+    form.addEventListener('submit', e=>{
+      e.preventDefault();
+      const words = form.querySelector('input').value.split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
+      if(!words.length) return;
+      state.dietExclude = [...new Set([...(state.dietExclude || []), ...words])];
       persist(); render();
     });
   });
