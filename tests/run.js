@@ -1838,16 +1838,16 @@ test('impostazioni: "Tema e colori" è una pagina a parte e cambia tema e colore
   eq(r, { noInline: true, page: true, dark: true, accent: true, closed: true });
 });
 
-test('tema e colori: il colore dei turni di cucina è lì, e Impostazioni non ha più "Io" né il prossimo turno', async ({ page }) => {
+test('persone: il colore dei turni di cucina si sceglie lì, e Impostazioni non ha più "Io" né il prossimo turno', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
-    const user = getCurrentUser() || Object.keys(COOK_LABEL)[0];
-    window.getCurrentUser = () => user;
-    state.appearanceOpen = true; render();
-    const out = { swatches: document.querySelectorAll('[data-page="appearance"] [data-user-color]').length === USER_COLOR_PRESETS.length, noProfile: !document.getElementById('profile-panel') && !/Prossimo turno/.test(document.getElementById('settings-backdrop').textContent) };
+    const user = familyMembers()[0].id;
+    state.membersOpen = true; render();
+    const out = { swatches: document.querySelectorAll(`[data-member-id="${user}"][data-member-color]`).length === USER_COLOR_PRESETS.length, noProfile: !document.getElementById('profile-panel') && !/Prossimo turno/.test(document.body.textContent) };
     const c = USER_COLOR_PRESETS[2];
-    document.querySelector(`[data-user-color="${c}"]`).click();
-    out.saved = state.userColors[user] === c && !!document.querySelector(`[data-user-color="${c}"].active`);
+    document.querySelector(`[data-member-id="${user}"][data-member-color="${c}"]`).click();
+    out.saved = state.userColors[user] === c && !!document.querySelector(`[data-member-id="${user}"][data-member-color="${c}"].active`);
+    state.membersOpen = false; render();
     return out;
   });
   eq(r, { swatches: true, noProfile: true, saved: true });
@@ -3616,6 +3616,33 @@ test('allergie: sezione nelle Regole e avviso nella scheda ricetta', async ({ pa
   eq(r.a, ['uova', 'fragole']);
   eq(r.chips, 2);
   assert(r.nome, 'esiste una ricetta con uova');
+});
+
+test('persone: nomi e colori propri, il giro "chi cucina" li attraversa tutti, togliere una persona libera i suoi turni', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.members = [{ id: 'mara', name: 'Mara' }, { id: 'ste', name: 'Ste' }]; state.cooks = {};
+    state.membersOpen = true; state.tab = 'menu'; render();
+    document.querySelector('[data-member-add]').click();
+    const tre = state.members.length, nuovo = state.members[2].id;
+    const nome = document.querySelector(`[data-member-name="${nuovo}"]`);
+    nome.value = 'Nonna'; nome.dispatchEvent(new Event('change', { bubbles: true }));
+    const giro = []; let cur = null;
+    for(let k = 0; k < 4; k++){ cur = nextMemberId(cur); giro.push(cur); }
+    state.cooks['1_2_cena'] = nuovo; state.cooks['1_3_cena'] = 'mara';
+    const orig = window.confirm; window.confirm = () => true;
+    document.querySelector(`[data-member-remove="${nuovo}"]`).click();
+    window.confirm = orig;
+    const out = { tre, nome: memberName(nuovo), giro, dopo: state.members.map(m => m.id), cooks: Object.assign({}, state.cooks), payload: buildPersonalPayload().members.length };
+    state.membersOpen = false; state.cooks = {}; render();
+    return out;
+  });
+  eq(r.tre, 3);
+  eq(r.giro, ['mara', 'ste', r.giro[2], null]);
+  eq(r.dopo, ['mara', 'ste']);
+  eq(r.cooks, { '1_3_cena': 'mara' });
+  eq(r.payload, 2);
+  eq(page.errors, [], 'errori JS');
 });
 
 (async () => {

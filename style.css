@@ -370,8 +370,6 @@
   .day-time{ display:inline-block; /*margin-top:0.25rem; font-family:var(--font-family); font-weight:var(--weight-medium); */font-size:var(--text-xsmall); opacity:0.75; padding:0px; /*background:var(--surface-2); border-radius:var(--radius-pill); */}
   .day-menu-row{ display:flex; align-items:center; gap:var(--space-xsmall); margin-top:0.375rem; flex-wrap:wrap; position:relative; }
   .cook-pill{ min-width:var(--text-large); height:var(--text-large); border:var(--border) solid transparent; background:var(--gold-soft); color:var(--bg); /* font-family:var(--font-family); */line-height: var(--line-height-xsmall); font-weight:var(--weight-medium); font-size:var(--text-xsmall); border-radius: var(--radius-pill); padding: 0px; display: flex; align-items: center; justify-content: center; transition: width .15s ease, padding .15s ease;}
-  .cook-pill.cook-mara{ background:var(--user-color-mara);}
-  .cook-pill.cook-ste{ background:var(--user-color-ste);}
   .cook-pill.cook-empty{ background:transparent; border:var(--border) dashed var(--ink-light); color:var(--ink-light); }
   .day-card.open .cook-pill{ padding:0px var(--space-xsmall); }
   .day-menu{ font-size: var(--text-medium); font-weight:var(--weight-medium); line-height: var(--line-height-small); cursor:pointer; border-bottom:1px dotted var(--ink-light); }
@@ -611,8 +609,6 @@
  .shop-day-title .d{ font-family:var(--font-family); font-size:var(--text-xsmall); color:var(--ink-light); font-weight:var(--weight-normal); margin-right:0.375rem; }
   .shop-assignee-btn{ font-family:var(--font-family); font-weight:var(--weight-strong); font-size:var(--text-xsmall); text-transform:uppercase; color:var(--gold); visibility: hidden;}
   .shop-assignee-btn:not(.assigned){ color:var(--ink-light); }
-  .shop-assignee-btn.assignee-mara{ color:var(--user-color-mara); }
-  .shop-assignee-btn.assignee-ste{ color:var(--user-color-ste); }
   .dept-block{ margin-top:var(--space-large);}
   .dept-block:first-child{ margin-top:0; }
 /*   .dept-title{ display:flex; align-items:center; gap:var(--gap-icon); font-family:var(--font-family); font-weight:var(--weight-bold); font-size:var(--text-small); text-transform:uppercase; padding:1rem 0 0.5rem; border-bottom:var(--border) solid var(--line-strong); margin-bottom:0.125rem; }
@@ -1558,9 +1554,6 @@ body{ overflow-x:clip; }
 .recipe-edit-page .section-sub{ display:block; font-size:var(--text-xsmall); color:var(--ink-light); margin:var(--space-xxsmall) 0 0; }
 .edit-step-row .edit-step-text{ resize:none; }
 /* Colori dei turni chiari: testo scuro sopra, e scurito quando il colore fa da testo */
-.cook-pill.cook-mara, .cook-pill.cook-ste{ color:#2a1d1a; }
-.shop-assignee-btn.assignee-mara{ color:color-mix(in srgb, var(--user-color-mara) 60%, #000); }
-.shop-assignee-btn.assignee-ste{ color:color-mix(in srgb, var(--user-color-ste) 60%, #000); }
 .settings-avatar{ color:#2a1d1a; }
 /* Modalità cucina: passare da una ricetta all'altra */
 .cook-switch{ display:flex; gap:var(--space-xsmall); overflow-x:auto; padding:var(--space-xsmall) var(--space-medium); scrollbar-width:none; background:var(--surface); }
@@ -2629,3 +2622,13 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 
 .gen-exclude-input{ height:2.75rem; padding:0 var(--s3); border:1px solid var(--line); border-radius:var(--radius-pill,999px); background:var(--surface); color:var(--ink); font:inherit; }
 .gen-grams-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--s2); }
+
+.cook-pill.has-member{ background:var(--mc); color:#2a1d1a; }
+.member-card{ display:flex; flex-direction:column; gap:var(--s3); margin-bottom:var(--s3); }
+.member-head{ display:flex; align-items:center; gap:var(--s3); }
+.member-name{ flex:1; min-width:0; }
+
+.member-card{ padding:var(--s3); border:1px solid var(--line); border-radius:var(--radius-lg,16px); background:var(--surface); }
+.member-card .settings-avatar{ width:3rem; height:3rem; flex:none; font-size:1.25rem; }
+.member-name{ height:2.75rem; padding:0 var(--s3); border:1px solid var(--line); border-radius:var(--radius-pill,999px); background:var(--bg); color:var(--ink); font:inherit; }
+.member-remove{ min-height:2.5rem; font-size:var(--text-small); }

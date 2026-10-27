@@ -2354,6 +2354,7 @@ const state = {
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
   backupOpen: false, // non persistito: pagina "Backup"
+  membersOpen: false, // non persistito: pagina "Persone"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
   gradPicker: null, // ephemeral: nome della ricetta con il menu del gradimento aperto
   profileOpen: false, // non persistito: pagina "Profilo"
@@ -2434,6 +2435,7 @@ const state = {
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
   userEmojis: {}, // emoji del profilo scelta da ciascun utente (vuota = iniziale del nome)
+  members: [{ id: 'mara', name: 'Mara' }, { id: 'ste', name: 'Ste' }], // le persone della famiglia (nome; colore in userColors, emoji in userEmojis)
   userColors: { mara:'#ff7a66', ste:'#ff6f9c' }, // colore identità scelto da ciascun utente (profilo in Impostazioni)
   notifDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "tocca a te cucinare" già chiuso per quel pasto
   mealsDoneReminderDismissed: {}, // mealKey ("weekIdx_i_meal") -> true, promemoria "ieri hai mangiato X?" già chiuso per quel pasto (senza segnarlo mangiato)
@@ -2640,9 +2642,29 @@ function waitForAuth(){
 // (le due email contengono "mara"/"ste"), non serve più un toggle manuale.
 function getCurrentUser(){
   const email = (loggedInEmail || '').toLowerCase();
-  if(email.includes('mara')) return 'mara';
-  if(email.includes('ste')) return 'ste';
-  return null;
+  const m = familyMembers().find(x => email.includes(x.id));
+  return m ? m.id : null;
+}
+// Le persone della famiglia: nome e colore propri, al posto dei due nomi fissi
+// di prima. Gli id 'mara' e 'ste' restano quelli dei dati già salvati.
+const MEMBERS_MAX = 6;
+function familyMembers(){
+  const list = Array.isArray(state.members) ? state.members.filter(m => m && m.id) : [];
+  return list.length ? list : [{ id: 'mara', name: 'Mara' }, { id: 'ste', name: 'Ste' }];
+}
+function memberById(id){ return familyMembers().find(m => m.id === id) || null; }
+function memberName(id){ const m = memberById(id); return m && m.name ? m.name : (id ? id.charAt(0).toUpperCase() + id.slice(1) : ''); }
+function memberColor(id){
+  if(state.userColors && state.userColors[id]) return state.userColors[id];
+  const i = familyMembers().findIndex(m => m.id === id);
+  return USER_COLOR_PRESETS[(i < 0 ? 0 : i) % USER_COLOR_PRESETS.length];
+}
+// Chi viene dopo nel giro "nessuno → persona 1 → persona 2 → … → nessuno".
+function nextMemberId(cur){
+  const ids = familyMembers().map(m => m.id);
+  if(!cur) return ids[0];
+  const i = ids.indexOf(cur);
+  return i >= 0 && i < ids.length - 1 ? ids[i + 1] : null;
 }
 
 // Spazi diversi (nuclei familiari) che condividono lo stesso account
@@ -2696,7 +2718,6 @@ function encodeCatalogForFirebase(payload){
     ingredientVariants: encodeKeysForFirebase(payload.ingredientVariants)
   }));
 }
-const COOK_LABEL = { mara:'Mara', ste:'Ste' };
 // Tavolozza di colori preimpostati tra cui scegliere il proprio "colore identità"
 // (profilo in Impostazioni): solo toni abbastanza scuri/saturi da restare leggibili
 // col testo chiaro sopra (--bg) del cook-pill.
@@ -2706,8 +2727,7 @@ const USER_COLOR_PRESETS_OLD = ['#d6391c','#87282b','#c9702e','#b08d2b','#5a7517
 // Colore d'accento dell'app: tavolozza a sé (non cambia con quella dei turni di cucina).
 const ACCENT_PRESETS = USER_COLOR_PRESETS_OLD;
 function applyUserColors(){
-  document.documentElement.style.setProperty('--user-color-mara', state.userColors.mara || '#ff7a66');
-  document.documentElement.style.setProperty('--user-color-ste', state.userColors.ste || '#ff6f9c');
+  familyMembers().forEach(m => document.documentElement.style.setProperty('--user-color-' + m.id, memberColor(m.id)));
   if(typeof refreshProfileLink === 'function') refreshProfileLink();
 }
 
@@ -3574,6 +3594,7 @@ function buildPersonalPayload(){
     weekLeftoverDays: state.weekLeftoverDays,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
+    members: state.members,
     userEmojis: state.userEmojis,
     notifDismissed: state.notifDismissed,
     mealsDoneReminderDismissed: state.mealsDoneReminderDismissed,
@@ -4731,19 +4752,15 @@ function purgeRecipeFromPlanning(name){
     }
   }
 }
-// Ciclo nessuno -> mara -> ste -> nessuno, un tap alla volta, senza modali.
+// Ciclo nessuno -> persone della famiglia -> nessuno, un tap alla volta, senza modali.
 function toggleCook(dayKey){
-  const cur = state.cooks[dayKey];
-  if(!cur) state.cooks[dayKey] = 'mara';
-  else if(cur === 'mara') state.cooks[dayKey] = 'ste';
-  else delete state.cooks[dayKey];
+  const next = nextMemberId(state.cooks[dayKey]);
+  if(next) state.cooks[dayKey] = next; else delete state.cooks[dayKey];
   persist(); render();
 }
 function toggleShopAssignee(store){
-  const cur = state.shopAssignees[store];
-  if(!cur) state.shopAssignees[store] = 'mara';
-  else if(cur === 'mara') state.shopAssignees[store] = 'ste';
-  else delete state.shopAssignees[store];
+  const next = nextMemberId(state.shopAssignees[store]);
+  if(next) state.shopAssignees[store] = next; else delete state.shopAssignees[store];
   persist(); render();
 }
 // Stato legato a un pasto con il numero della settimana nella chiave
@@ -5351,7 +5368,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderMembersPage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -5484,6 +5501,7 @@ const MODAL_CHECKS = [
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
+  [()=> !!state.membersOpen, ()=>{ state.membersOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
   [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
   [()=> !!state.profileOpen, ()=>{ state.profileOpen = false; }],
@@ -6063,8 +6081,9 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // Un'unica fonte: iniziale sola a blocco chiuso, nome per esteso ad aperto.
   const cookPillHtml = ()=>{
     const cook = state.cooks[mk];
-    const cookLabel = cook ? (state.expandedDay === mk ? 'Cucina ' + COOK_LABEL[cook] : COOK_LABEL[cook][0]) : '?';
-    return `<button type="button" class="cook-pill${cook ? ' cook-'+cook : ' cook-empty'}" data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
+    const cookName = cook ? memberName(cook) : '';
+    const cookLabel = cook ? (state.expandedDay === mk ? 'Cucina ' + cookName : cookName.charAt(0).toUpperCase()) : '?';
+    return `<button type="button" class="cook-pill${cook ? ' has-member' : ' cook-empty'}"${cook ? ` style="--mc:${escapeAttr(memberColor(cook))}"` : ''} data-toggle-cook="${mk}" aria-label="Chi cucina: tocca per cambiare">${escapeHtml(cookLabel)}</button>`;
   };
   // Un pasto bloccato non viene toccato da "Rigenera settimana" (vedi
   // generateWeek). Solo sui pasti normali: un pranzo-avanzo segue sempre il
@@ -13071,7 +13090,7 @@ document.addEventListener('keydown', e=>{ if(e.target.id === 'new-recipe-name' &
 function profileDisplayName(){
   if(loggedInName) return loggedInName;
   const u = getCurrentUser();
-  return u ? u.charAt(0).toUpperCase() + u.slice(1) : '';
+  return u ? memberName(u) : '';
 }
 const PROFILE_EMOJIS = ['👩','👨','🧑','👧','👦','👵','👴','👩‍🍳','👨‍🍳','🧑‍🍳','🍕','🍝','🥗','🍋','🍓','🥑','🌶️','🍅','🧁','🍪','🦊','🐱','🐶','🐼','🦄','🌻','⭐','❤️'];
 function profileAvatarChar(){
@@ -13082,7 +13101,7 @@ function profileAvatarChar(){
 // Sfondo dell'immagine profilo: il tuo colore del turno di cucina.
 function profileAvatarColor(){
   const u = getCurrentUser();
-  return (u && state.userColors[u]) || '#ff7a66';
+  return u ? memberColor(u) : '#ff7a66';
 }
 function refreshProfileLink(){
   const el = document.getElementById('settings-profile-text');
@@ -13106,7 +13125,7 @@ function renderProfilePage(){
             ${PROFILE_EMOJIS.map(e => `<button type="button" class="emoji-opt${cur === e ? ' active' : ''}" data-profile-emoji="${e}">${e}</button>`).join('')}
           </div>
           <input type="text" id="profile-emoji-custom" placeholder="Oppure scrivi un'emoji" autocomplete="off" aria-label="Emoji personalizzata">
-          <p class="settings-note">Lo sfondo è il tuo colore dei turni di cucina (si cambia in Tema e colori).</p>
+          <p class="settings-note">Lo sfondo è il tuo colore, che si cambia in Persone.</p>
         </div>
       </section>` : ''}
       <section class="settings-section">
@@ -13170,20 +13189,68 @@ document.addEventListener('change', async e=>{
     if(status) status.textContent = 'Non sono riuscito a salvare il nome.';
   }
 });
+function renderMembersPage(){
+  if(!state.membersOpen) return '';
+  const list = familyMembers();
+  const cards = list.map(m => `
+        <div class="settings-card member-card" data-member="${escapeAttr(m.id)}">
+          <div class="member-head"><span class="settings-avatar" style="background:${escapeAttr(memberColor(m.id))}" aria-hidden="true">${escapeHtml((((state.userEmojis || {})[m.id]) || memberName(m.id).charAt(0) || '?').toString().toUpperCase())}</span>
+            <input type="text" class="member-name" data-member-name="${escapeAttr(m.id)}" value="${escapeAttr(m.name || '')}" placeholder="Nome" maxlength="24" autocomplete="off" aria-label="Nome">
+          </div>
+          <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${memberColor(m.id) === c ? ' active' : ''}" style="background:${c}" data-member-color="${c}" data-member-id="${escapeAttr(m.id)}" aria-label="Scegli questo colore"></button>`).join('')}</div>
+          ${list.length > 1 ? `<button type="button" class="btn is-outline settings-item-danger member-remove" data-member-remove="${escapeAttr(m.id)}">Togli ${escapeHtml(memberName(m.id))}</button>` : ''}
+        </div>`).join('');
+  const body = `
+      <section class="settings-section">
+        <h3 class="settings-section-title">Chi mangia e cucina</h3>
+        ${cards}
+        ${list.length < MEMBERS_MAX ? `<button type="button" class="btn is-outline is-block" data-member-add>${uiIcon('plus')} Aggiungi una persona</button>` : ''}
+        <p class="settings-note">Nome e colore compaiono nel Menù, dove si sceglie chi cucina.</p>
+      </section>`;
+  return managePageHtml({ key: 'members', title: 'Persone', closeAttr: 'data-close-members', body });
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  const closeEl = t.closest('[data-close-members]');
+  if(closeEl){ if(!isCloseTap(e, closeEl)) return; state.membersOpen = false; render(); return; }
+  const col = t.closest('[data-member-color]');
+  if(col){ state.userColors[col.dataset.memberId] = col.dataset.memberColor; applyUserColors(); persist(); render(); return; }
+  if(t.closest('[data-member-add]')){
+    const list = familyMembers();
+    if(list.length >= MEMBERS_MAX) return;
+    const id = 'p' + Date.now().toString(36);
+    const used = new Set(list.map(m => memberColor(m.id)));
+    state.members = [...list, { id, name: 'Persona ' + (list.length + 1) }];
+    state.userColors[id] = USER_COLOR_PRESETS.find(c => !used.has(c)) || USER_COLOR_PRESETS[list.length % USER_COLOR_PRESETS.length];
+    applyUserColors(); persist(); render(); return;
+  }
+  const rm = t.closest('[data-member-remove]');
+  if(rm){
+    const id = rm.dataset.memberRemove, list = familyMembers();
+    if(list.length <= 1) return;
+    const nome = memberName(id);
+    if(!confirm(`Togliere ${nome}? I turni di cucina assegnati a ${nome} restano senza nome.`)) return;
+    state.members = list.filter(m => m.id !== id);
+    Object.keys(state.cooks).forEach(k => { if(state.cooks[k] === id) delete state.cooks[k]; });
+    Object.keys(state.shopAssignees).forEach(k => { if(state.shopAssignees[k] === id) delete state.shopAssignees[k]; });
+    persist(); render();
+  }
+});
+document.addEventListener('change', e=>{
+  if(!e.target.dataset || !e.target.dataset.memberName) return;
+  const m = memberById(e.target.dataset.memberName);
+  if(!m) return;
+  const name = e.target.value.trim();
+  if(!name){ e.target.value = m.name || ''; return; }
+  state.members = familyMembers().map(x => x.id === m.id ? Object.assign({}, x, { name }) : x);
+  persist(); render();
+});
 function renderAppearancePage(){
   if(!state.appearanceOpen) return '';
   const theme = currentTheme();
   const accent = localStorage.getItem(ACCENT_KEY) || ACCENT_PRESETS[0];
   const themes = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']];
   const user = getCurrentUser();
-  const turni = user ? `
-      <section class="settings-section">
-        <h3 class="settings-section-title">Il tuo colore nei turni di cucina</h3>
-        <div class="settings-card">
-          <div class="color-swatch-row">${USER_COLOR_PRESETS.map(c => `<button type="button" class="color-swatch${state.userColors[user] === c ? ' active' : ''}" style="background:${c}" data-user-color="${c}" aria-label="Scegli questo colore"></button>`).join('')}</div>
-        </div>
-        <p class="settings-note">È il colore con cui compari nel Menù quando tocca a te cucinare, per tutti.</p>
-      </section>` : '';
   const body = `
       <section class="settings-section">
         <h3 class="settings-section-title">Tema</h3>
@@ -13197,7 +13264,7 @@ function renderAppearancePage(){
           <div class="color-swatch-row">${ACCENT_PRESETS.map(c => `<button type="button" class="color-swatch${accent === c ? ' active' : ''}" style="background:${c}" data-accent-color="${c}" aria-label="Scegli questo colore"></button>`).join('')}</div>
         </div>
         <p class="settings-note">Tema e colore valgono solo su questo telefono.</p>
-      </section>${turni}`;
+      </section>`;
   return managePageHtml({ key: 'appearance', title: 'Tema e colori', closeAttr: 'data-close-appearance', body });
 }
 document.addEventListener('click', e=>{
@@ -14317,6 +14384,7 @@ document.addEventListener('click', e=>{
   else if(what === 'aisles') state.aisleOrderOpen = true;
   else if(what === 'expiry') state.expiryEstOpen = true;
   else if(what === 'recurring'){ state.recurringOpen = true; state.recurringEditId = null; state.recurringDraft = null; }
+  else if(what === 'members') state.membersOpen = true;
   else if(what === 'appearance') state.appearanceOpen = true;
   else if(what === 'profile') state.profileOpen = true;
   else if(what === 'newrecipe'){ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); }
