@@ -3565,6 +3565,23 @@ test('alimentazione: la sezione nelle Regole cambia tipo e aggiunge ingredienti 
   eq([r.d, r.e, r.chips], ['vegetariano', ['funghi', 'noci'], 2]);
 });
 
+test('alimentazione: se nessuna ricetta è compatibile non si genera e non si propone un piatto vietato', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; state.dietType = 'onnivoro'; state.dietExclude = ['a', 'e', 'i', 'o'];
+    let errore = null; try { generateWeek(1); } catch(e){ errore = e.message; }
+    const avviso = state.undoToast && state.undoToast.message;
+    state.dietExclude = ['pasta'];
+    generateWeek(1);
+    const vietati = [];
+    WEEK_DISPLAY_ORDER.forEach(d => ['pranzo','cena'].forEach(m => { const x = effectiveRecipeMeta(1, d, m); if(x && !dietAllows(x)) vietati.push(x.nome); }));
+    state.dietExclude = []; state.undoToast = null;
+    return { errore, avviso, vietati };
+  });
+  eq(r.errore, null);
+  assert(/Nessuna ricetta compatibile/.test(r.avviso || ''), 'avviso');
+  eq(r.vietati, []);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

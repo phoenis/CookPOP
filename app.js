@@ -4129,12 +4129,9 @@ function dietAllows(r){
   if(diet === 'vegetariano' && has(txt, DIET_FISH_WORDS)) return false;
   return !(state.dietExclude || []).some(w => w && txt.includes(w));
 }
-// Toglie le ricette che non vanno bene; se ne resterebbero troppo poche
-// lascia l'elenco com'è, così la generazione non resta mai a secco.
-function dietFilter(list, min){
-  const ok = list.filter(dietAllows);
-  return ok.length >= (min || 1) ? ok : list;
-}
+// Toglie le ricette che non vanno bene. Mai un piatto vietato per riempire il
+// menu: se non bastano, si ripetono quelle che ci sono (e vanno aggiunte ricette).
+function dietFilter(list){ return list.filter(dietAllows); }
 const WEEK_BASE_TARGETS = { pasta:[0,4], riso:[0,3], patate:[0,2], cereali:[0,3], pane:[0,3], nessuna:[0,5] };
 const has = (text, words) => words.some(w => text.includes(w));
 function recipeIngredientText(r){
@@ -4345,9 +4342,9 @@ function pickWeekRecipes(fixed, weekIdx){
   fixed = fixed || {};
   const season = currentSeasonKey();
   const inSeason = r => r.stagioni.includes(season) || r.stagioni.includes('tutto');
-  let pool = dietFilter(allRecipeMetas().filter(isMainDish).filter(inSeason), 8);
-  if(pool.length < 20) pool = dietFilter(allRecipeMetas().filter(isMainDish), 8); // fallback di sicurezza, non dovrebbe servire
-  const contorniPool = dietFilter(allRecipeMetas().filter(r => r.tipologia === 'contorno' && inSeason(r) && recipeGivesVeg(r)), 3);
+  let pool = dietFilter(allRecipeMetas().filter(isMainDish).filter(inSeason));
+  if(pool.length < 20) pool = dietFilter(allRecipeMetas().filter(isMainDish)); // fallback di sicurezza, non dovrebbe servire
+  const contorniPool = dietFilter(allRecipeMetas().filter(r => r.tipologia === 'contorno' && inSeason(r) && recipeGivesVeg(r)));
   const rand = n => Math.floor(Math.random() * n);
   const shuffle = arr => { const a = arr.slice(); for(let i = a.length - 1; i > 0; i--){ const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const withinCap = (list, day, meal)=>{
@@ -4367,7 +4364,7 @@ function pickWeekRecipes(fixed, weekIdx){
   if(pantryOnly){
     // Con quello che ho, la stagione conta meno: si parte da tutte le ricette.
     const need = fixedAt.filter(f => !f).length;
-    pool = pantryOnlyPool(dietFilter(allRecipeMetas().filter(isMainDish), 8).filter(r => !fixedNames.has(r.nome)), need, pantryCtx.expiring);
+    pool = pantryOnlyPool(dietFilter(allRecipeMetas().filter(isMainDish)).filter(r => !fixedNames.has(r.nome)), need, pantryCtx.expiring);
   }
   const recent = recentRecipeNames(weekIdx);
   const recentScore = picks => picks.reduce((sum, r) => sum + (recent.has(r.nome) && !fixedNames.has(r.nome) ? RECENT_PENALTY : 0), 0);
@@ -4900,6 +4897,10 @@ function generateWeek(weekIdx){
   // il suo numero (blocchi, avanzi, porzioni... di una settimana eliminata in
   // passato, quando non venivano ripuliti) non le appartiene — si cancella,
   // altrimenti un vecchio blocco la lasciava con giorni vuoti.
+  if(!allRecipeMetas().some(r => isMainDish(r) && dietAllows(r))){
+    showUndoToast('Nessuna ricetta compatibile con le Regole: togli qualche ingrediente da evitare o aggiungi ricette', ()=>{});
+    return;
+  }
   if(weekIdx > 0 && !state.extraWeeks[weekIdx-1]) remapWeekKeys(w => w === weekIdx ? null : w);
   // Pasti bloccati (state.mealLocked) di questa settimana: catturo la loro
   // ricetta effettiva ATTUALE (principale+contorni) e l'eventuale link avanzo
