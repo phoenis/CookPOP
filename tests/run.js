@@ -911,7 +911,7 @@ test('menù: un pasto vuoto non risulta mai cucinato, anche con una spunta rimas
 
 test('meal prep: lista nel giorno di prep (sabato di default), doppia dose in Spesa e in freezer, piatto dal freezer senza Spesa', async ({ page }) => {
   const r = await page.evaluate(() => {
-    state.extraWeeks = []; generateWeek(1);
+    state.extraWeeks = []; generateWeek(1); state.dayLinks = {}; // la generazione può collegare dei pranzi come avanzo: qui no
     ['pranzo', 'cena'].forEach(m => WEEK_DISPLAY_ORDER.forEach(i => writeMealDishes(1, i, m, 'Pasta al pesto', [])));
     const mp = allRecipeMetas().find(x => x.freezerNew === 'meal-prep' && getIngredientsFor(x.nome).length);
     writeMealDishes(1, 2, 'cena', mp.nome, []); // mercoledì
@@ -3561,7 +3561,7 @@ test('alimentazione: la sezione nelle Regole cambia tipo e aggiunge ingredienti 
   await page.click('[data-gen-diet="vegetariano"]');
   await page.fill('.gen-exclude-input', 'funghi, noci');
   await page.click('.gen-exclude-form button');
-  const r = await page.evaluate(() => ({ d: state.dietType, e: state.dietExclude, chips: document.querySelectorAll('.gen-chip').length }));
+  const r = await page.evaluate(() => ({ d: state.dietType, e: state.dietExclude, chips: document.querySelectorAll('[data-gen-exclude-remove]').length }));
   eq([r.d, r.e, r.chips], ['vegetariano', ['funghi', 'noci'], 2]);
 });
 
@@ -3580,6 +3580,42 @@ test('alimentazione: se nessuna ricetta è compatibile non si genera e non si pr
   eq(r.errore, null);
   assert(/Nessuna ricetta compatibile/.test(r.avviso || ''), 'avviso');
   eq(r.vietati, []);
+});
+
+test('allergie: il menu le evita, le ricette che le contengono hanno l\'avviso, la sezione si compila', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.dietType = 'onnivoro'; state.dietExclude = []; state.dietTargets = {}; state.extraWeeks = [];
+    state.allergies = ['glutine', 'fragole'];
+    const conGlutine = allergenHitsInText('Spaghetti | pane'), spesa = allergenHitsInText('Fragole');
+    const nessuna = allergenHitsInText('Zucchine | riso');
+    generateWeek(1);
+    const vietati = [];
+    WEEK_DISPLAY_ORDER.forEach(d => ['pranzo','cena'].forEach(m => { const x = effectiveRecipeMeta(1, d, m); if(x && recipeAllergens(x).length) vietati.push(x.nome); }));
+    const conPasta = allRecipeMetas().find(x => isMainDish(x) && recipeAllergens(x).includes('glutine'));
+    state.allergies = [];
+    return { conGlutine, spesa, nessuna, vietati, badge: allergenBadgeHtml(conPasta) };
+  });
+  eq([r.conGlutine, r.spesa, r.nessuna], [['glutine'], ['fragole'], []]);
+  eq(r.vietati, []);
+  assert(r.badge === '', 'senza allergie nessun badge');
+});
+
+test('allergie: sezione nelle Regole e avviso nella scheda ricetta', async ({ page }) => {
+  await page.evaluate(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.allergies = []; state.tab = 'menu'; state.genSettingsOpen = 'plain'; render(); });
+  await page.click('[data-gen-allergy="uova"]');
+  await page.fill('[data-gen-allergy-form] input', 'fragole');
+  await page.click('[data-gen-allergy-form] button');
+  const r = await page.evaluate(() => {
+    const out = { a: state.allergies.slice(), chips: document.querySelectorAll('[data-gen-allergy].active').length };
+    state.genSettingsOpen = null;
+    const x = allRecipeMetas().find(m => recipeAllergens(m).length);
+    out.nome = x && x.nome;
+    state.allergies = [];
+    return out;
+  });
+  eq(r.a, ['uova', 'fragole']);
+  eq(r.chips, 2);
+  assert(r.nome, 'esiste una ricetta con uova');
 });
 
 (async () => {

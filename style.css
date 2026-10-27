@@ -2620,3 +2620,12 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .gen-chip{ border:1px solid var(--line); border-radius:999px; padding:var(--s1) var(--s2); background:transparent; color:inherit; font:inherit; font-size:var(--text-small); }
 .gen-exclude-form{ display:flex; gap:var(--s1); }
 .gen-exclude-input{ flex:1; min-width:0; }
+
+.gen-chip.active{ background:var(--accent-soft,#fbe3df); border-color:var(--accent,#d9391c); color:var(--accent,#d9391c); }
+.allergen-badge{ display:inline-block; margin-left:var(--s1); padding:0 var(--s1); border-radius:var(--radius-sm,6px); background:#fde8e6; color:#b3261e; font-size:var(--text-small); font-weight:var(--weight-medium); white-space:nowrap; }
+.allergen-banner{ margin:0 0 var(--s3); padding:var(--s2) var(--s3); border-radius:var(--radius-md,10px); background:#fde8e6; color:#b3261e; font-weight:var(--weight-medium); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .allergen-badge, :root:not([data-theme="light"]) .allergen-banner{ background:#4a1f1b; color:#ffb4ab; } }
+:root[data-theme="dark"] .allergen-badge, :root[data-theme="dark"] .allergen-banner{ background:#4a1f1b; color:#ffb4ab; }
+
+.gen-exclude-input{ height:2.75rem; padding:0 var(--s3); border:1px solid var(--line); border-radius:var(--radius-pill,999px); background:var(--surface); color:var(--ink); font:inherit; }
+.gen-grams-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--s2); }
