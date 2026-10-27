@@ -2605,3 +2605,5 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 
 .gen-label-sm{ font-size:var(--text-xsmall); font-weight:var(--weight-medium); letter-spacing:.04em; text-transform:uppercase; color:var(--ink-light); margin-bottom:var(--s2); }
 .variant-chips .chip-x{ margin-left:var(--s1); }
+/* Tooltip "è finito": stretto, ancorato a destra (la regola della lista Dispensa gli dava anche un bordo sinistro e lo allargava) */
+.pantry-list .swipe-content > .luogo-picker.finish-picker{ left:auto; right:0; width:max-content; }
