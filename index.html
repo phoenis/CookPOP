@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=267">
+<link rel="stylesheet" href="style.css?v=268">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -50,6 +50,20 @@
     <input id="login-password" type="password" placeholder="Password" autocomplete="current-password">
     <button id="login-submit" type="button" class="btn is-solid is-block">Accedi</button>
     <div class="login-error" id="login-error"></div>
+    <button id="login-toggle" type="button" class="login-link">Non hai un account? Creane uno</button>
+  </div>
+</div>
+<div id="family-gate">
+  <div class="login-box">
+    <h2>La tua famiglia</h2>
+    <p class="login-sub">Entra con un codice invito o crea una famiglia nuova</p>
+    <div class="family-tabs"><button type="button" id="family-tab-join" class="family-tab active">Ho un codice</button><button type="button" id="family-tab-create" class="family-tab">Creo una famiglia</button></div>
+    <input id="family-user-name" type="text" placeholder="Come ti chiami" autocomplete="given-name" maxlength="24">
+    <div id="family-name-wrap" style="display:none"><input id="family-name" type="text" placeholder="Nome della famiglia" maxlength="40"></div>
+    <input id="family-code" type="text" placeholder="Codice invito" autocomplete="off" autocapitalize="characters" maxlength="16">
+    <button id="family-submit" type="button" class="btn is-solid is-block">Entra</button>
+    <div class="login-error" id="family-error"></div>
+    <button id="family-out" type="button" class="login-link">Esci</button>
   </div>
 </div>
 <header class="topbar">
@@ -125,6 +139,6 @@
 });
 </script>
 <script src="catalog.js?v=22"></script>
-<script src="app.js?v=349"></script>
+<script src="app.js?v=350"></script>
 </body>
 </html>

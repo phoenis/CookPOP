@@ -1,0 +1,77 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "userFamily": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "invites": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && root.child('families').child(newData.val()).child('members').child(auth.uid).exists()) || (data.exists() && !newData.exists()))"
+      }
+    },
+
+    "creationCodes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && data.exists() && !newData.exists()"
+      }
+    },
+
+    "families": {
+      "$famId": {
+        "meta": {
+          ".read": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()",
+          ".write": "auth != null && !data.exists() && newData.child('createdBy').val() === auth.uid && root.child('creationCodes').child(newData.child('code').val()).exists()"
+        },
+        "members": {
+          "$uid": {
+            ".read": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()",
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && (root.child('invites').child(newData.child('code').val()).val() === $famId || root.child('families').child($famId).child('meta').child('createdBy').val() === auth.uid)"
+          }
+        },
+        "state": {
+          ".read": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()",
+          ".write": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()"
+        },
+        "catalog": {
+          ".read": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()",
+          ".write": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()"
+        },
+        "photos": {
+          ".read": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()",
+          ".write": "auth != null && root.child('families').child($famId).child('members').child(auth.uid).exists()"
+        }
+      }
+    },
+
+    "quaderno-state": {
+      ".read": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE')",
+      ".write": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE')"
+    },
+    "catalog-state": {
+      ".read": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE' || auth.token.email === 'EMAIL_CUGINA' || auth.token.email === 'EMAIL_MAMMA')",
+      ".write": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE')"
+    },
+    "recipe-photos": {
+      ".read": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE' || auth.token.email === 'EMAIL_CUGINA' || auth.token.email === 'EMAIL_MAMMA')",
+      ".write": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE' || auth.token.email === 'EMAIL_CUGINA' || auth.token.email === 'EMAIL_MAMMA')"
+    },
+    "spaces": {
+      "cugina": {
+        ".read": "auth != null && auth.token.email === 'EMAIL_CUGINA'",
+        ".write": "auth != null && auth.token.email === 'EMAIL_CUGINA'"
+      },
+      "mamma": {
+        ".read": "auth != null && auth.token.email === 'EMAIL_MAMMA'",
+        ".write": "auth != null && auth.token.email === 'EMAIL_MAMMA'"
+      }
+    }
+  }
+}
