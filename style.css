@@ -2602,3 +2602,6 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .shop-later-note{ margin:0 0 var(--s2); }
 .shop-later-week{ margin:var(--s3) 0 var(--s1); font-size:var(--text-xsmall); font-weight:var(--weight-medium); letter-spacing:.04em; text-transform:uppercase; color:var(--ink-light); }
 .gen-toggle-row + .gen-toggle-row{ border-top:0; margin-top:calc(-1 * var(--s4)); }
+
+.gen-label-sm{ font-size:var(--text-xsmall); font-weight:var(--weight-medium); letter-spacing:.04em; text-transform:uppercase; color:var(--ink-light); margin-bottom:var(--s2); }
+.variant-chips .chip-x{ margin-left:var(--s1); }
