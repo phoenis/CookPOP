@@ -3779,6 +3779,39 @@ test('famiglie: la schermata "La tua famiglia" cambia scheda, segnala un codice 
   eq(r.chiusa, true);
 });
 
+test('primo avvio guidato: solo per le famiglie nuove, 3 passi con gli stessi controlli delle Regole, poi genera il menù', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const oldRoute = activeRoute, oldSynced = personalSynced;
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    activeRoute = null; state.onboardingDone = false; render();
+    out.nelleVecchie = !document.querySelector('[data-page="onboarding"]');
+    activeRoute = familyRouteFor('abc'); personalSynced = true; state.onbStep = 0; state.dietType = 'onnivoro'; state.allergies = []; state.weekPortionsBase = 2; state.extraWeeks = [];
+    render();
+    out.passo1 = !!document.querySelector('[data-page="onboarding"] [data-gen-diet="vegetariano"]');
+    document.querySelector('[data-gen-diet="vegetariano"]').click();
+    document.querySelector('[data-gen-allergy="glutine"]').click();
+    out.scelte = [state.dietType, state.allergies.slice()];
+    document.querySelector('[data-onb-next]').click();
+    document.querySelector('[data-gen-portions-inc]').click(); document.querySelector('[data-gen-portions-inc]').click();
+    out.porzioni = state.weekPortionsBase;
+    document.querySelector('[data-onb-next]').click();
+    out.finale = !!document.querySelector('[data-onb-finish="generate"]');
+    document.querySelector('[data-onb-finish="generate"]').click();
+    out.fatto = [state.onboardingDone, !document.querySelector('[data-page="onboarding"]'), state.tab, !!effectiveRecipeMeta(0, 5, 'cena') || !!effectiveRecipeMeta(0, 6, 'cena') || !!effectiveRecipeMeta(0, 0, 'cena') || !!effectiveRecipeMeta(0, 1, 'cena')];
+    out.payload = buildPersonalPayload().onboardingDone;
+    activeRoute = oldRoute; personalSynced = oldSynced; state.dietType = 'onnivoro'; state.allergies = []; state.weekPortionsBase = 2; render();
+    return out;
+  });
+  eq(r.nelleVecchie, true);
+  eq(r.passo1, true);
+  eq(r.scelte, ['vegetariano', ['glutine']]);
+  eq(r.porzioni, 4);
+  eq(r.finale, true);
+  eq(r.fatto, [true, true, 'menu', true]);
+  eq(r.payload, true);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

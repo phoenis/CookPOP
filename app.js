@@ -2356,6 +2356,7 @@ const state = {
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
   backupOpen: false, // non persistito: pagina "Backup"
   inviteCode: '', // non persistito: ultimo codice invito mostrato in Persone
+  onbStep: 0, // non persistito: passo del primo avvio guidato
   membersOpen: false, // non persistito: pagina "Persone"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
   gradPicker: null, // ephemeral: nome della ricetta con il menu del gradimento aperto
@@ -2427,6 +2428,7 @@ const state = {
   weekTempoBase: 'normale',
   weekLeftoverDays: null, // giorni con il pranzo = avanzo della cena di ieri (null = tutti quelli possibili)
   portionGrams: { pasta: 0, riso: 0 }, // grammi a porzione di pasta e riso (0 = come nella ricetta)
+  onboardingDone: false, // primo avvio guidato delle famiglie nuove completato
   dietType: 'onnivoro', // onnivoro | pescetariano | vegetariano (Regole di generazione)
   dietTargets: {}, // obiettivi settimanali cambiati a mano: { proteina: [min, max] }
   allergies: [], // allergie/intolleranze: chiavi di ALLERGEN_PRESETS o parole libere
@@ -3792,6 +3794,7 @@ function buildPersonalPayload(){
     weekPortionsBase: state.weekPortionsBase,
     portionGrams: state.portionGrams,
     weekLeftoverPortions: state.weekLeftoverPortions,
+    onboardingDone: state.onboardingDone,
     dietType: state.dietType,
     dietTargets: state.dietTargets,
     dietExclude: state.dietExclude,
@@ -5573,7 +5576,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderMembersPage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderMembersPage() + renderOnboardingPage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -13393,6 +13396,46 @@ document.addEventListener('change', async e=>{
     if(status) status.textContent = 'Nome salvato.';
   }catch(err){
     if(status) status.textContent = 'Non sono riuscito a salvare il nome.';
+  }
+});
+// Primo avvio guidato: solo per le famiglie nuove, una volta. Riusa gli stessi
+// controlli delle Regole di generazione (stessi data-gen-*, stessi gestori).
+function onboardingActive(){ return !!(activeRoute && activeRoute.newFamily && personalSynced && !state.onboardingDone); }
+function renderOnboardingPage(){
+  if(!onboardingActive()) return '';
+  const step = Math.min(2, Math.max(0, state.onbStep || 0));
+  const pills = Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('');
+  const allergies = Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${(state.allergies || []).includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${(state.allergies || []).includes(k)}">${escapeHtml(k)}</button>`).join('');
+  const grams = ['pasta', 'riso'].map(k => { const g = parseInt((state.portionGrams || {})[k], 10) || 0; return `<div class="gen-row gen-grams-row"><span>${k === 'pasta' ? 'Pasta' : 'Riso'}</span><div class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></div></div>`; }).join('');
+  const steps = [
+    { title: 'Come mangiate?', body: `
+        <div class="gen-group"><div class="gen-label">Alimentazione</div><div class="gen-days gen-diet-types">${pills}</div></div>
+        <div class="gen-group"><div class="gen-label">Allergie e intolleranze</div><div class="gen-exclude-chips">${allergies}</div>
+          <p class="gen-note">Il menu le evita. Controlla sempre le etichette: non è una garanzia. Altro (ingredienti da evitare, obiettivi settimanali) lo trovi in Impostazioni → Regole di generazione.</p></div>` },
+    { title: 'Quanti siete?', body: `
+        <div class="gen-group gen-row"><div class="gen-label">Porzioni di partenza</div>
+          <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></div></div>
+        <div class="gen-group"><div class="gen-label">Grammi a porzione</div>${grams}<p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa. Tutto si cambia dopo.</p></div>` },
+    { title: 'Tutto pronto', body: `
+        <p class="settings-card-text">Ora puoi generare il primo menù della settimana. Si aggiusta come vuoi: cambi un piatto, lo blocchi, lo rigeneri. La spesa si compila da sola.</p>
+        <p class="settings-note">Altre persone entrano dal tuo codice invito (Impostazioni → Persone).</p>` }
+  ];
+  const cur = steps[step];
+  const footer = step < 2
+    ? `<button type="button" class="btn is-solid is-block" data-onb-next>Avanti</button><button type="button" class="login-link" data-onb-skip>Salta, lo faccio dopo</button>`
+    : `<button type="button" class="btn is-solid is-block" data-onb-finish="generate">Genera il primo menù</button><button type="button" class="login-link" data-onb-finish="">Più tardi</button>`;
+  return managePageHtml({ key: 'onboarding', title: `${cur.title} <span class="onb-count">${step + 1}/3</span>`, closeAttr: step > 0 ? 'data-onb-back' : 'data-onb-skip', body: `<section class="settings-section">${cur.body}</section>`, footer });
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  if(t.closest('[data-onb-next]')){ state.onbStep = Math.min(2, (state.onbStep || 0) + 1); render(); return; }
+  if(t.closest('[data-onb-back]')){ state.onbStep = Math.max(0, (state.onbStep || 0) - 1); render(); return; }
+  if(t.closest('[data-onb-skip]')){ state.onboardingDone = true; persist(); render(); return; }
+  const fin = t.closest('[data-onb-finish]');
+  if(fin){
+    state.onboardingDone = true;
+    if(fin.dataset.onbFinish === 'generate'){ state.tab = 'menu'; generateWeek(0); }
+    persist(); render();
   }
 });
 function renderMembersPage(){
