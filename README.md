@@ -25,62 +25,45 @@ solo la logica: se modifichi `catalog.js` alza il suo `?v=` in `index.html`.
   non è raggiungibile (rete assente), l'app resta funzionante in locale su
   `localStorage` come cache/fallback.
 
-### Spazi multipli
+### Famiglie
 
-Più nuclei familiari possono usare lo stesso CookPOP senza vedere i dati
-personali gli uni degli altri, ma condividendo la stessa curatela di
-ricette/ingredienti. Login sempre email/password Firebase Auth "finti" (email
-che contiene solo un nome, password a scelta — non servono account reali):
-l'email determina lo **spazio** (vedi `SPACE_ROUTES` in `app.js`), che a sua
-volta determina il percorso Firebase per i dati personali:
+Ogni famiglia ha dati propri e separati: dispensa, menù, spesa, chi cucina,
+persone, **e anche il catalogo** (ricette aggiunte/modificate/nascoste,
+ingredienti, gruppi) e le foto delle ricette.
 
-- `mara`/`ste` → spazio `default` → percorso `quaderno-state` (quello di
-  sempre, mai rinominato/spostato)
-- `cugina` → spazio `cugina` → percorso `spaces/cugina/state`
-- `mamma` → spazio `mamma` → percorso `spaces/mamma/state`
+- **Famiglie di prima** (`SPACE_ROUTES` in `app.js`): si riconoscono
+  dall'email, che contiene un nome.
+  - `mara`/`ste` → `quaderno-state` + catalogo `catalog-state` (mai spostati)
+  - `cugina` → `spaces/cugina/state` + `spaces/cugina/catalog`
+  - `mamma` → `spaces/mamma/state` + `spaces/mamma/catalog`
+  `cugina` e `mamma` alla prima apertura partono da una copia del catalogo
+  originale (`seedFromShared`), poi vanno per conto loro.
+- **Famiglie nuove**: `families/<id>/{meta,members,state,catalog,photos}`.
+  L'account dice a quale famiglia appartiene con `userFamily/<uid>`.
+  Si parte dalle sole ricette di base.
 
-Condiviso da **tutti** gli spazi, su un percorso a sé (`catalog-state`,
-`CATALOG_STATE_PATH` in app.js): ricette aggiunte/modificate/nascoste,
-ingredienti delle ricette, sinonimi ingredienti (`ingredientRenames`), gruppi
-Dispensa (`pantryGroups`, es. "Pasta corta") — vedi `CATALOG_FIELDS`. Tutto il
-resto (dispensa reale, menù della settimana, spesa, chi cucina, colori
-profilo, note personali su un ingrediente) resta nel percorso personale dello
-spazio, isolato dagli altri.
+**Creare un account**: nella schermata di accesso, "Non hai un account?
+Creane uno" (email + password). Chi non è di una famiglia di prima vede
+"La tua famiglia":
+- **Ho un codice**: un codice invito (8 caratteri, monouso, si crea da
+  Impostazioni → Persone → "Invita una persona con un codice") scritto in
+  `invites/<codice>`;
+- **Creo una famiglia**: serve un **codice di creazione**, che si inserisce a
+  mano nella console Firebase: Realtime Database → `creationCodes` → aggiungi
+  una chiave a piacere (es. `MARA2026`) con valore `true`. Si consuma al primo
+  uso: ne serve uno per ogni famiglia nuova.
 
-**Aggiungere un nuovo spazio**: (1) in Firebase Console → Authentication,
-crea un nuovo utente email/password con un'email che contiene il nome dello
-spazio (es. `zia@qualcosa.it`); (2) aggiungi una riga a `SPACE_ROUTES` in
-`app.js` (`{ id: 'zia', match: ['zia'], path: 'spaces/zia/state' }`); (3)
-aggiorna le regole del Realtime Database (vedi sotto) se non coprono già
-`spaces/*` in generale.
+**Regole del Realtime Database**: il file `database.rules.json` contiene le
+regole da incollare in Console → Realtime Database → Regole. Prima di
+pubblicarle sostituisci `EMAIL_MARA`, `EMAIL_STE`, `EMAIL_CUGINA`,
+`EMAIL_MAMMA` con le email esatte dei 4 account di prima (servono perché i loro
+dati non hanno ancora un'appartenenza nel database, quindi si riconoscono
+dall'email). Controlla con "Playground" che un account di prima legga ancora
+`quaderno-state` e che un account nuovo no. Le famiglie nuove sono protette da
+`families/<id>/members/<uid>`: solo chi è tra i membri legge e scrive.
 
-**Regole del Realtime Database**: devono permettere lettura/scrittura (a
-qualunque utente autenticato, stesso livello di sicurezza "finto" del login)
-sia sul percorso storico `quaderno-state`, sia su `catalog-state`, sia su
-tutto l'albero `spaces` — tre blocchi allo stesso livello, con le stesse
-regole che ha oggi `quaderno-state`, es.:
-```json
-{
-  "rules": {
-    "quaderno-state": { ".read": "auth != null", ".write": "auth != null" },
-    "catalog-state":  { ".read": "auth != null", ".write": "auth != null" },
-    "spaces":         { ".read": "auth != null", ".write": "auth != null" },
-    "recipe-photos":  { ".read": "auth != null", ".write": "auth != null" }
-  }
-}
-```
-`recipe-photos` contiene le foto dei piatti (una per ricetta, ridotta sul
-telefono a ~100-200 KB, vedi `recipePhotoHtml` in app.js): è un percorso a
-parte perché si scarica solo quando si apre quella ricetta, non a ogni
-sincronizzazione del catalogo.
-(adatta la condizione `auth != null` a quella che le regole attuali usano già
-per `quaderno-state`, se diversa — l'importante è che `catalog-state` e
-`spaces` abbiano la stessa).
-
-Il primo avvio in assoluto con `catalog-state` ancora vuoto copia lì dentro
-la curatela già presente nello spazio `default` (se c'è), una volta sola —
-vedi il commento nel blocco `if(route.id === 'default')` di `loadState()` in
-app.js. Gli spazi nuovi la trovano quindi già pronta, senza doverla rifare.
+L'integrazione Google Home (`scripts/google-home-shopping-sync.gs`) accede con
+l'account che le assegni: deve essere uno di quelli di `EMAIL_MARA`/`EMAIL_STE`.
 
 Le 4 tab dell'app: **Menù** (settimana corrente + generatore automatico),
 **Spesa** (lista aggiornata in automatico in base al menù, per giorno o per

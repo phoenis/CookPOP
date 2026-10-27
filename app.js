@@ -1654,7 +1654,8 @@ function getRecipeMeta(name){
 // catalogo: la vede chiunque apra la stessa ricetta.
 const RECIPE_PHOTOS_PATH = 'recipe-photos';
 const recipePhotoCache = {}; // nome -> { status:'loading'|'ok'|'none'|'error', src }
-function recipePhotoPath(name){ return `${RECIPE_PHOTOS_PATH}/${fbKeyEncode(name)}`; }
+// Le foto sono per famiglia (le famiglie di prima continuano a condividere quelle già caricate).
+function recipePhotoPath(name){ return `${activeRoute && activeRoute.newFamily ? `families/${activeRoute.famId}/photos` : RECIPE_PHOTOS_PATH}/${fbKeyEncode(name)}`; }
 function ensureRecipePhoto(name){
   if(!name || recipePhotoCache[name] || !window.cookpopSync || !window.cookpopSync.load) return;
   recipePhotoCache[name] = { status:'loading' };
@@ -2354,6 +2355,7 @@ const state = {
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
   backupOpen: false, // non persistito: pagina "Backup"
+  inviteCode: '', // non persistito: ultimo codice invito mostrato in Persone
   membersOpen: false, // non persistito: pagina "Persone"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
   gradPicker: null, // ephemeral: nome della ricetta con il menu del gradimento aperto
@@ -2542,7 +2544,7 @@ const firebaseReady = (async ()=>{
   try{
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js");
     const { getDatabase, ref, set: fbSet, update: fbUpdate, onValue, get: fbGet } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-database.js");
-    const { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js");
+    const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } = await import("https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js");
     const firebaseConfig = {
       apiKey: "AIzaSyDVlyYgyJ1rTtyitMc3xoNhvBm3HPpC0g8",
       authDomain: "cookpop-c91d6.firebaseapp.com",
@@ -2566,11 +2568,13 @@ const firebaseReady = (async ()=>{
       onChange(path, cb){ onValue(ref(db, path), (snap)=>cb(snap.val())); },
       // Lettura una tantum (niente ascolto continuo): per le foto delle
       // ricette, che si scaricano solo quando si apre quella ricetta.
-      load(path){ return fbGet(ref(db, path)).then(snap => snap.val()); }
+      load(path){ return fbGet(ref(db, path)).then(snap => snap.val()); },
+      remove(path){ return fbSet(ref(db, path), null); }
     };
     const auth = getAuth(app);
     window.cookpopAuth = {
       signIn(email, password){ return signInWithEmailAndPassword(auth, email, password); },
+      createUser(email, password){ return createUserWithEmailAndPassword(auth, email, password); },
       signOut(){ return signOut(auth); },
       updateName(name){ return auth.currentUser ? updateProfile(auth.currentUser, { displayName: name }) : Promise.reject(new Error('non connesso')); },
       onAuthStateChanged(cb){ onAuthStateChanged(auth, cb); }
@@ -2601,6 +2605,7 @@ function decodeKeysFromFirebase(obj){
 // subito se Firebase non è raggiungibile (offline: si procede con la sola
 // cache locale, coerente col fallback già previsto in loadState/persist).
 let loggedInEmail = null;
+let loggedInUid = null;
 let loggedInName = ''; // nome del profilo (Firebase Auth displayName), se impostato
 function waitForAuth(){
   return new Promise((resolve)=>{
@@ -2615,6 +2620,7 @@ function waitForAuth(){
 
     window.cookpopAuth.onAuthStateChanged((user)=>{
       loggedInEmail = user ? user.email : null;
+      loggedInUid = user ? user.uid : null;
       loggedInName = user && user.displayName ? user.displayName : '';
       if(typeof refreshProfileLink === 'function') refreshProfileLink();
       gate.style.display = user ? 'none' : 'flex';
@@ -2622,13 +2628,35 @@ function waitForAuth(){
       if(user && !resolved){ resolved = true; resolve(); }
     });
 
+    let signupMode = false;
+    const toggleBtn = document.getElementById('login-toggle');
+    const subEl = gate.querySelector('.login-sub');
+    function setSignupMode(on){
+      signupMode = on;
+      submitBtn.textContent = on ? 'Crea account' : 'Accedi';
+      if(subEl) subEl.textContent = on ? 'Crea il tuo account' : 'Accedi per continuare';
+      if(toggleBtn) toggleBtn.textContent = on ? 'Ho già un account' : 'Non hai un account? Creane uno';
+      passInput.autocomplete = on ? 'new-password' : 'current-password';
+      errorBox.textContent = '';
+    }
+    if(toggleBtn) toggleBtn.addEventListener('click', ()=> setSignupMode(!signupMode));
     async function doLogin(){
       errorBox.textContent = '';
       submitBtn.disabled = true;
       try{
-        await window.cookpopAuth.signIn(emailInput.value.trim(), passInput.value);
+        if(signupMode){
+          if(passInput.value.length < 6){ errorBox.textContent = 'La password deve avere almeno 6 caratteri.'; submitBtn.disabled = false; return; }
+          await window.cookpopAuth.createUser(emailInput.value.trim(), passInput.value);
+        } else {
+          await window.cookpopAuth.signIn(emailInput.value.trim(), passInput.value);
+        }
       }catch(e){
-        errorBox.textContent = 'Email o password non corretti.';
+        const code = (e && e.code) || '';
+        errorBox.textContent = !signupMode ? 'Email o password non corretti.'
+          : code.includes('email-already-in-use') ? 'Esiste già un account con questa email.'
+          : code.includes('invalid-email') ? 'Questa email non sembra valida.'
+          : code.includes('weak-password') ? 'La password è troppo debole.'
+          : 'Non sono riuscito a creare l\'account.';
       }
       submitBtn.disabled = false;
     }
@@ -2638,9 +2666,135 @@ function waitForAuth(){
   });
 }
 
+// --- Famiglie con codice invito ---------------------------------------------
+// userFamily/<uid> dice a quale famiglia appartiene un account. Entrare in una
+// famiglia richiede un codice invito (invites/<codice> → id famiglia, monouso);
+// crearne una nuova richiede un codice di creazione (creationCodes/<codice>),
+// che si mette a mano nella console Firebase. Le regole di sicurezza
+// (database.rules.json) fanno rispettare tutto questo anche lato server.
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randomCode(n){
+  const out = [];
+  const buf = new Uint32Array(n);
+  (window.crypto || window.msCrypto).getRandomValues(buf);
+  for(let i = 0; i < n; i++) out.push(CODE_ALPHABET[buf[i] % CODE_ALPHABET.length]);
+  return out.join('');
+}
+function normalizeCode(c){ return (c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+async function joinFamily(code, name){
+  const sync = window.cookpopSync;
+  code = normalizeCode(code);
+  if(!sync || !loggedInUid) throw new Error('offline');
+  const famId = code ? await sync.load('invites/' + code) : null;
+  if(!famId) throw new Error('codice');
+  await sync.save(`families/${famId}/members/${loggedInUid}`, { code, name: name || '' });
+  await sync.save('userFamily/' + loggedInUid, famId);
+  try{ await sync.remove('invites/' + code); }catch(e){ /* codice già consumato: va bene */ }
+  return famId;
+}
+async function createFamily(familyName, code, name){
+  const sync = window.cookpopSync;
+  code = normalizeCode(code);
+  if(!sync || !loggedInUid) throw new Error('offline');
+  const ok = code ? await sync.load('creationCodes/' + code) : null;
+  if(!ok) throw new Error('codice');
+  const famId = randomCode(10).toLowerCase();
+  await sync.save(`families/${famId}/meta`, { name: familyName || '', createdBy: loggedInUid, code });
+  await sync.save(`families/${famId}/members/${loggedInUid}`, { name: name || '', creator: true });
+  await sync.save('userFamily/' + loggedInUid, famId);
+  try{ await sync.remove('creationCodes/' + code); }catch(e){ /* già consumato */ }
+  return famId;
+}
+// Un nuovo codice invito per la famiglia (monouso), da dare a chi deve entrare.
+async function makeInvite(){
+  const sync = window.cookpopSync, r = activeRoute;
+  if(!sync || !r || !r.famId) throw new Error('nessuna famiglia');
+  const code = randomCode(8);
+  await sync.save('invites/' + code, r.famId);
+  return code;
+}
+// Trova la famiglia di questo account all'avvio. Chi non ne ha una e non è
+// uno degli account di prima passa dalla schermata "Entra o crea".
+async function resolveFamilyRoute(){
+  const sync = window.cookpopSync;
+  if(!sync || !loggedInUid){ activeRoute = null; return; }
+  const cacheKey = 'cookpop-family-' + loggedInUid;
+  let famId = null;
+  try{
+    famId = await Promise.race([sync.load('userFamily/' + loggedInUid), new Promise((_, rej)=> setTimeout(()=> rej(new Error('timeout')), 5000))]);
+  }catch(e){
+    try{ famId = localStorage.getItem(cacheKey); }catch(_){}
+    if(!famId){ activeRoute = legacyRouteStrict(loggedInEmail) === null && loggedInEmail ? { id: 'sola-lettura', path: 'senza-rete/state', catalogPath: 'senza-rete/catalog', newFamily: true } : legacyRouteFor(loggedInEmail); return; }
+  }
+  if(!famId){
+    if(legacyRouteStrict(loggedInEmail)){ activeRoute = null; return; }
+    // Un nome contenuto in una parola più lunga (es. "stefano"): si prova a
+    // leggere lo spazio di prima; se le regole lo negano, non è di quella famiglia.
+    const loose = legacyRouteFor(loggedInEmail);
+    if(loose && loggedInEmail){
+      try{ await sync.load(loose.path + '/week0Start'); activeRoute = null; return; }catch(e){ /* non è dei loro */ }
+    }
+    famId = await runFamilyGate();
+  }
+  try{ localStorage.setItem(cacheKey, famId); }catch(e){}
+  activeRoute = familyRouteFor(famId);
+}
+function runFamilyGate(){
+  return new Promise((resolve)=>{
+    const gate = document.getElementById('family-gate');
+    if(!gate){ resolve(null); return; }
+    const q = id => document.getElementById(id);
+    let mode = 'join';
+    const render = ()=>{
+      q('family-tab-join').classList.toggle('active', mode === 'join');
+      q('family-tab-create').classList.toggle('active', mode === 'create');
+      q('family-name-wrap').style.display = mode === 'create' ? '' : 'none';
+      q('family-code').placeholder = mode === 'create' ? 'Codice di creazione' : 'Codice invito';
+      q('family-submit').textContent = mode === 'create' ? 'Crea la famiglia' : 'Entra';
+      q('family-error').textContent = '';
+    };
+    q('family-tab-join').onclick = ()=>{ mode = 'join'; render(); };
+    q('family-tab-create').onclick = ()=>{ mode = 'create'; render(); };
+    q('family-out').onclick = ()=> window.cookpopAuth && window.cookpopAuth.signOut();
+    q('family-submit').onclick = async ()=>{
+      const err = q('family-error'), btn = q('family-submit');
+      err.textContent = ''; btn.disabled = true;
+      try{
+        const name = q('family-user-name').value.trim() || (loggedInEmail || '').split('@')[0];
+        const famId = mode === 'create'
+          ? await createFamily(q('family-name').value.trim(), q('family-code').value, name)
+          : await joinFamily(q('family-code').value, name);
+        gate.style.display = 'none';
+        resolve(famId);
+      }catch(e){
+        err.textContent = e && e.message === 'codice' ? (mode === 'create' ? 'Codice di creazione non valido.' : 'Codice invito non valido o già usato.') : 'Non sono riuscito, riprova tra poco.';
+      }
+      btn.disabled = false;
+    };
+    render();
+    gate.style.display = 'flex';
+  });
+}
+// Chi ha un accesso nuovo compare tra le persone della famiglia al primo avvio.
+function ensureSelfMember(){
+  const r = activeRoute;
+  if(!r || !r.newFamily || !loggedInUid) return;
+  const list = familyMembers();
+  if(list.some(m => m.uid === loggedInUid)) return;
+  const id = 'u' + loggedInUid.slice(0, 8).toLowerCase();
+  const used = new Set(list.map(m => memberColor(m.id)));
+  const name = loggedInName || (loggedInEmail || '').split('@')[0] || 'Io';
+  state.members = [...list, { id, name, uid: loggedInUid }];
+  state.userColors = Object.assign({}, state.userColors, { [id]: USER_COLOR_PRESETS.find(c => !used.has(c)) || USER_COLOR_PRESETS[0] });
+  persist();
+}
+
 // Chi sta usando l'app ora: dedotto dall'account con cui ha fatto login
 // (le due email contengono "mara"/"ste"), non serve più un toggle manuale.
 function getCurrentUser(){
+  const byUid = loggedInUid && familyMembers().find(x => x.uid === loggedInUid);
+  if(byUid) return byUid.id;
+  if(activeRoute && activeRoute.newFamily) return null;
   const email = (loggedInEmail || '').toLowerCase();
   const m = familyMembers().find(x => email.includes(x.id));
   return m ? m.id : null;
@@ -2650,7 +2804,8 @@ function getCurrentUser(){
 const MEMBERS_MAX = 6;
 function familyMembers(){
   const list = Array.isArray(state.members) ? state.members.filter(m => m && m.id) : [];
-  return list.length ? list : [{ id: 'mara', name: 'Mara' }, { id: 'ste', name: 'Ste' }];
+  if(list.length || (activeRoute && activeRoute.newFamily)) return list;
+  return [{ id: 'mara', name: 'Mara' }, { id: 'ste', name: 'Ste' }];
 }
 function memberById(id){ return familyMembers().find(m => m.id === id) || null; }
 function memberName(id){ const m = memberById(id); return m && m.name ? m.name : (id ? id.charAt(0).toUpperCase() + id.slice(1) : ''); }
@@ -2695,9 +2850,30 @@ const SPACE_ROUTES = [
 ];
 function catalogPath(){ return getSpaceRoute().catalogPath || CATALOG_STATE_PATH; }
 function catalogCacheKey(){ const r = getSpaceRoute(); return r.id === 'default' ? 'catalog-state-cache' : 'catalog-state-cache-' + r.id; }
+// Famiglie nate dopo (con codice invito): il percorso dipende dall'id della
+// famiglia, che si legge da userFamily/<uid> all'avvio (vedi resolveFamilyRoute).
+function familyRouteFor(famId){
+  return { id: 'f-' + famId, famId, newFamily: true, path: `families/${famId}/state`, catalogPath: `families/${famId}/catalog` };
+}
+let activeRoute = null;
+// Le famiglie di prima si riconoscono dall'email; chi ha un accesso nuovo non
+// finisce mai nello spazio di default per sbaglio. Senza email (offline) resta
+// lo spazio originale, come sempre.
+function legacyRouteFor(email){
+  email = (email || '').toLowerCase();
+  if(!email) return SPACE_ROUTES[0];
+  return SPACE_ROUTES.find(r => r.match.some(m => email.includes(m))) || null;
+}
+// Riconoscimento sicuro: il nome deve essere una parola intera dell'email
+// ("mara.rossi@…" sì, "stefano@…" no), così chi si registra adesso non finisce
+// per sbaglio nello spazio di un'altra famiglia.
+function legacyRouteStrict(email){
+  const local = (email || '').toLowerCase().split('@')[0];
+  const words = local.split(/[^a-z]+/).filter(Boolean);
+  return SPACE_ROUTES.find(r => r.match.some(m => words.includes(m))) || null;
+}
 function getSpaceRoute(){
-  const email = (loggedInEmail || '').toLowerCase();
-  return SPACE_ROUTES.find(r => r.match.some(m => email.includes(m))) || SPACE_ROUTES[0];
+  return activeRoute || legacyRouteFor(loggedInEmail) || SPACE_ROUTES[0];
 }
 // Campi del catalogo condiviso: curatela ricette (aggiunte/modificate/
 // nascoste), ingredienti delle ricette, sinonimi e definizioni dei gruppi —
@@ -3294,6 +3470,9 @@ function runMigrations(){
 
 async function loadState(){
   const route = getSpaceRoute();
+  // Una famiglia nuova parte senza persone: la prima è chi crea/entra (vedi
+  // ensureSelfMember), non i due nomi della famiglia originale.
+  if(route.newFamily){ state.members = []; state.userColors = {}; }
   const personalKey = 'quaderno-state-' + route.id;
   // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
   try{
@@ -13234,6 +13413,11 @@ function renderMembersPage(){
         <h3 class="settings-section-title">Chi mangia e cucina</h3>
         ${cards}
         ${list.length < MEMBERS_MAX ? `<button type="button" class="btn is-outline is-block" data-member-add>${uiIcon('plus')} Aggiungi una persona</button>` : ''}
+        ${activeRoute && activeRoute.newFamily ? `<div class="settings-card invite-card">
+          ${state.inviteCode ? `<div class="invite-code" aria-live="polite">${escapeHtml(state.inviteCode)}</div><p class="settings-note">Dallo a chi deve entrare: vale una volta sola. Dopo aver creato l'account sceglie "Entra" e lo scrive.</p>` : ''}
+          <button type="button" class="btn is-outline is-block" data-make-invite>${state.inviteCode ? 'Nuovo codice' : 'Invita una persona con un codice'}</button>
+          <p class="settings-note" id="invite-status"></p>
+        </div>` : ''}
         <p class="settings-note">Nome e colore compaiono nel Menù, dove si sceglie chi cucina. Ognuno sceglie i propri dal suo Profilo; qui si modificano quelli delle persone aggiunte a mano.</p>
       </section>`;
   return managePageHtml({ key: 'members', title: 'Persone', closeAttr: 'data-close-members', body });
@@ -13244,6 +13428,11 @@ document.addEventListener('click', e=>{
   if(closeEl){ if(!isCloseTap(e, closeEl)) return; state.membersOpen = false; render(); return; }
   const col = t.closest('[data-member-color]');
   if(col){ state.userColors[col.dataset.memberId] = col.dataset.memberColor; applyUserColors(); persist(); render(); return; }
+  if(t.closest('[data-make-invite]')){
+    const st = document.getElementById('invite-status');
+    makeInvite().then(code => { state.inviteCode = code; render(); }).catch(() => { if(st) st.textContent = 'Non sono riuscito a creare il codice, riprova.'; });
+    return;
+  }
   if(t.closest('[data-member-add]')){
     const list = familyMembers();
     if(list.length >= MEMBERS_MAX) return;
@@ -14168,7 +14357,9 @@ document.addEventListener('change', e=>{
 (async function init(){
   await firebaseReady;
   await waitForAuth();
+  await resolveFamilyRoute();
   await loadState();
+  ensureSelfMember();
   applyUserColors();
   runMigrations();
   // Apriva in automatico la cena di oggi al caricamento, ma con una chiave

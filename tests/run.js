@@ -3700,6 +3700,85 @@ test('catalogo per famiglia: ognuna il suo percorso; chi lo condivideva parte da
   assert(r.sync && r.vista, 'catalogo copiato e letto');
 });
 
+test('famiglie: codice di creazione, codice invito monouso, appartenenza e riconoscimento sicuro delle famiglie di prima', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    const oldSync = window.cookpopSync, oldEmail = loggedInEmail, oldUid = loggedInUid, oldRoute = activeRoute;
+    const store = { creationCodes: { MARA2026: true } };
+    const get = p => p.split('/').reduce((o, k) => (o == null ? null : o[k]), store);
+    const put = (p, v) => { const ks = p.split('/'); let o = store; ks.slice(0, -1).forEach(k => { o[k] = o[k] || {}; o = o[k]; }); if(v === null) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = JSON.parse(JSON.stringify(v)); };
+    window.cookpopSync = { load: p => Promise.resolve(get(p) === undefined ? null : get(p)), save: (p, v) => { put(p, v); return Promise.resolve(); }, patch: () => Promise.resolve(), onChange: () => {}, remove: p => { put(p, null); return Promise.resolve(); } };
+    // riconoscimento: "stefano" non è "ste"
+    out.strict = [legacyRouteStrict('mara.rossi@x.it') && legacyRouteStrict('mara.rossi@x.it').id, legacyRouteStrict('stefano@x.it'), legacyRouteStrict('cugina@x.it').id];
+    // creare una famiglia con un codice sbagliato e con quello giusto
+    loggedInUid = 'uidAAAA1111'; loggedInEmail = 'anna@x.it';
+    try { await createFamily('Rossi', 'SBAGLIATO', 'Anna'); out.sbagliato = 'creata'; } catch(e){ out.sbagliato = e.message; }
+    const famId = await createFamily('Rossi', 'mara-2026', 'Anna');
+    out.creata = { meta: get(`families/${famId}/meta`).name, creatore: !!get(`families/${famId}/members/uidAAAA1111`), puntatore: get('userFamily/uidAAAA1111') === famId, codiceConsumato: get('creationCodes/MARA2026') == null };
+    try { await createFamily('Altra', 'MARA2026', 'X'); out.riuso = 'creata'; } catch(e){ out.riuso = e.message; }
+    // invito
+    activeRoute = familyRouteFor(famId);
+    const code = await makeInvite();
+    out.codice = { lungo: code.length, punta: get('invites/' + code) === famId };
+    loggedInUid = 'uidBBBB2222'; loggedInEmail = 'stefano@x.it';
+    try { await joinFamily('NONESISTE', 'Ste'); out.joinErrato = 'entrato'; } catch(e){ out.joinErrato = e.message; }
+    const dentro = await joinFamily(code.toLowerCase(), 'Stefano');
+    out.join = { stessa: dentro === famId, membro: !!get(`families/${famId}/members/uidBBBB2222`), puntatore: get('userFamily/uidBBBB2222') === famId, monouso: get('invites/' + code) == null };
+    try { await joinFamily(code, 'Altro'); out.secondo = 'entrato'; } catch(e){ out.secondo = e.message; }
+    // risolve la famiglia all'avvio e mette sé stesso tra le persone
+    activeRoute = null; state.members = []; state.userColors = {};
+    await resolveFamilyRoute();
+    out.route = [activeRoute.path === `families/${famId}/state`, activeRoute.catalogPath === `families/${famId}/catalog`, activeRoute.newFamily];
+    state.members = []; ensureSelfMember();
+    out.persone = state.members.map(m => m.uid + ':' + m.name);
+    out.io = getCurrentUser() === state.members[0].id;
+    out.foto = recipePhotoPath('Pasta').startsWith(`families/${famId}/photos/`);
+    window.cookpopSync = oldSync; loggedInEmail = oldEmail; loggedInUid = oldUid; activeRoute = oldRoute;
+    state.members = [{ id: 'mara', name: 'Mara' }, { id: 'ste', name: 'Ste' }];
+    return out;
+  });
+  eq(r.strict, ['default', null, 'cugina']);
+  eq(r.sbagliato, 'codice');
+  eq(r.creata, { meta: 'Rossi', creatore: true, puntatore: true, codiceConsumato: true });
+  eq(r.riuso, 'codice');
+  eq(r.codice, { lungo: 8, punta: true });
+  eq(r.joinErrato, 'codice');
+  eq(r.join, { stessa: true, membro: true, puntatore: true, monouso: true });
+  eq(r.secondo, 'codice');
+  eq(r.route, [true, true, true]);
+  eq(r.persone, ['uidBBBB2222:stefano']);
+  assert(r.io && r.foto, 'persona e foto della famiglia');
+});
+
+test('famiglie: la schermata "La tua famiglia" cambia scheda, segnala un codice sbagliato ed entra con quello giusto', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const oldSync = window.cookpopSync, oldUid = loggedInUid, oldEmail = loggedInEmail;
+    const store = { invites: { ZZZZ2222: 'fam1' } };
+    window.cookpopSync = { load: p => Promise.resolve(p.split('/').reduce((o, k) => (o == null ? null : o[k]), store) ?? null), save: () => Promise.resolve(), remove: () => Promise.resolve() };
+    loggedInUid = 'uidCCCC3333'; loggedInEmail = 'nuova@x.it';
+    const q = id => document.getElementById(id);
+    const done = runFamilyGate();
+    const out = { visibile: getComputedStyle(q('family-gate')).display !== 'none', nomeFamigliaNascosto: q('family-name-wrap').style.display === 'none' };
+    q('family-tab-create').click();
+    out.crea = [q('family-name-wrap').style.display !== 'none', q('family-code').placeholder, q('family-submit').textContent];
+    q('family-tab-join').click();
+    q('family-code').value = 'SBAGLIATO'; q('family-submit').click();
+    await new Promise(r => setTimeout(r, 50));
+    out.errore = q('family-error').textContent;
+    q('family-code').value = 'zzzz-2222'; q('family-submit').click();
+    out.famId = await done;
+    out.chiusa = getComputedStyle(q('family-gate')).display === 'none';
+    window.cookpopSync = oldSync; loggedInUid = oldUid; loggedInEmail = oldEmail;
+    return out;
+  });
+  eq(r.visibile, true);
+  eq(r.nomeFamigliaNascosto, true);
+  eq(r.crea, [true, 'Codice di creazione', 'Crea la famiglia']);
+  eq(r.errore, 'Codice invito non valido o già usato.');
+  eq(r.famId, 'fam1');
+  eq(r.chiusa, true);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
