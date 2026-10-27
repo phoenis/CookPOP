@@ -2683,12 +2683,18 @@ function nextMemberId(cur){
 // Console con un'email che contiene quel nome, nessun'altra modifica.
 // Il catalogo ricette/ingredienti (vedi CATALOG_STATE_PATH) resta invece
 // condiviso da tutti gli spazi, non è qui.
-const CATALOG_STATE_PATH = 'catalog-state';
+const CATALOG_STATE_PATH = 'catalog-state'; // catalogo della famiglia originale: le altre famiglie ne hanno uno proprio
+// catalogPath: dove sta il catalogo della famiglia (ricette curate, ingredienti,
+// gruppi). seedFromShared: alla prima apertura si parte da una copia di quello
+// originale, per le famiglie che finora lo condividevano; una famiglia nuova
+// parte invece dalle sole ricette di base.
 const SPACE_ROUTES = [
-  { id: 'default', match: ['mara','ste'], path: 'quaderno-state' },
-  { id: 'cugina', match: ['cugina'], path: 'spaces/cugina/state' },
-  { id: 'mamma', match: ['mamma'], path: 'spaces/mamma/state' }
+  { id: 'default', match: ['mara','ste'], path: 'quaderno-state', catalogPath: CATALOG_STATE_PATH },
+  { id: 'cugina', match: ['cugina'], path: 'spaces/cugina/state', catalogPath: 'spaces/cugina/catalog', seedFromShared: true },
+  { id: 'mamma', match: ['mamma'], path: 'spaces/mamma/state', catalogPath: 'spaces/mamma/catalog', seedFromShared: true }
 ];
+function catalogPath(){ return getSpaceRoute().catalogPath || CATALOG_STATE_PATH; }
+function catalogCacheKey(){ const r = getSpaceRoute(); return r.id === 'default' ? 'catalog-state-cache' : 'catalog-state-cache-' + r.id; }
 function getSpaceRoute(){
   const email = (loggedInEmail || '').toLowerCase();
   return SPACE_ROUTES.find(r => r.match.some(m => email.includes(m))) || SPACE_ROUTES[0];
@@ -3304,7 +3310,7 @@ async function loadState(){
     }
   }catch(e){ /* nessuno stato salvato ancora */ }
   try{
-    const catalogCached = localStorage.getItem('catalog-state-cache');
+    const catalogCached = localStorage.getItem(catalogCacheKey());
     if(catalogCached) Object.assign(state, JSON.parse(catalogCached));
   }catch(e){ /* nessun catalogo in cache ancora */ }
   // Baseline "locale" prima ancora che Firebase risponda: se l'utente tocca
@@ -3359,13 +3365,13 @@ async function loadState(){
     setTimeout(()=>{ if(!done){ done = true; resolve(); } }, 2500);
   });
 
-  // Catalogo ricette/ingredienti: un solo percorso condiviso da tutti gli
-  // spazi (vedi CATALOG_STATE_PATH) — chi cura una ricetta o rinomina un
-  // ingrediente lo fa per tutti, non solo per il proprio spazio.
+  // Catalogo ricette/ingredienti: uno per famiglia (vedi SPACE_ROUTES) — chi
+  // cura una ricetta o rinomina un ingrediente lo fa solo per la sua famiglia.
   await new Promise((resolve)=>{
-    let done = false;
-    window.cookpopSync.onChange(CATALOG_STATE_PATH, (saved)=>{
+    let done = false, seeding = false;
+    window.cookpopSync.onChange(catalogPath(), (saved)=>{
       if(saved){
+        seeding = false;
         decodeCatalogSaved(saved);
         // Stessa cautela del percorso personale qui sopra: una modifica al
         // catalogo (es. una ricetta curata) fatta mentre si aspettava questa
@@ -3373,8 +3379,21 @@ async function loadState(){
         const localEdits = buildFirebasePatch(buildCatalogPayload(), lastSyncedCatalog, CATALOG_DICT_FIELDS);
         Object.assign(state, saved);
         applyFirebasePatch(localEdits);
-        try{ localStorage.setItem('catalog-state-cache', JSON.stringify(saved)); }catch(e){}
+        try{ localStorage.setItem(catalogCacheKey(), JSON.stringify(saved)); }catch(e){}
         lastSyncedCatalog = JSON.parse(JSON.stringify(saved));
+      } else if(route.seedFromShared){
+        // Famiglia che finora usava il catalogo originale: alla prima apertura
+        // se ne prende una copia (così com'è su Firebase) nel suo percorso; il
+        // listener la rilegge appena scritta.
+        // Finché la copia non è arrivata non si scrive nulla (catalogSynced
+        // resta falso): la riga sotto lo riattiva alla lettura successiva.
+        lastSyncedCatalog = {};
+        seeding = true;
+        window.cookpopSync.load(CATALOG_STATE_PATH).then(base=>{
+          if(base) return window.cookpopSync.save(catalogPath(), base);
+          catalogSynced = true; render();
+          if(catalogSaveDeferred){ catalogSaveDeferred = false; persist(); }
+        }).catch(e=>{ console.error('Copia del catalogo fallita', e); catalogSynced = true; });
       } else if(route.id === 'default'){
         // Primissimo avvio in assoluto del catalogo condiviso: se questo è
         // lo spazio originale e ha già curatela fatta (ricette aggiunte/
@@ -3394,10 +3413,10 @@ async function loadState(){
         } else {
           lastSyncedCatalog = {};
         }
+      } else {
+        lastSyncedCatalog = {}; // famiglia nuova: solo le ricette di base
       }
-      catalogSynced = true;
-      render();
-      if(catalogSaveDeferred){ catalogSaveDeferred = false; persist(); }
+      if(!seeding){ catalogSynced = true; render(); if(catalogSaveDeferred){ catalogSaveDeferred = false; persist(); } }
       if(!done){ done = true; resolve(); }
     });
     setTimeout(()=>{ if(!done){ done = true; resolve(); } }, 2500);
@@ -3647,7 +3666,7 @@ async function runPersist(){
     const personalPayload = buildPersonalPayload();
     const catalogPayload = buildCatalogPayload();
     try{ localStorage.setItem('quaderno-state-' + route.id, JSON.stringify(personalPayload)); }catch(e){}
-    try{ localStorage.setItem('catalog-state-cache', JSON.stringify(catalogPayload)); }catch(e){}
+    try{ localStorage.setItem(catalogCacheKey(), JSON.stringify(catalogPayload)); }catch(e){}
     try{
       await firebaseReady;
       if(window.cookpopSync){
@@ -3680,7 +3699,7 @@ async function runPersist(){
           const catalogPatch = JSON.parse(JSON.stringify(
             buildFirebasePatch(catalogPayload, lastSyncedCatalog, CATALOG_DICT_FIELDS)
           ));
-          saveCatalog = window.cookpopSync.patch(CATALOG_STATE_PATH, catalogPatch)
+          saveCatalog = window.cookpopSync.patch(catalogPath(), catalogPatch)
             .then(()=>{ lastSyncedCatalog = JSON.parse(JSON.stringify(catalogPayload)); });
         } else catalogSaveDeferred = true;
         await Promise.all([savePersonal, saveCatalog]);
