@@ -2426,6 +2426,7 @@ const state = {
   portionGrams: { pasta: 0, riso: 0 }, // grammi a porzione di pasta e riso (0 = come nella ricetta)
   dietType: 'onnivoro', // onnivoro | pescetariano | vegetariano (Regole di generazione)
   dietTargets: {}, // obiettivi settimanali cambiati a mano: { proteina: [min, max] }
+  allergies: [], // allergie/intolleranze: chiavi di ALLERGEN_PRESETS o parole libere
   dietExclude: [], // ingredienti da evitare nella generazione
   weekLeftoverPortions: 1, // porzioni in più per ogni avanzo collegato
   weekPortionsBase: 2, // porzioni di partenza di ogni pasto generato (Regole di generazione); le cene da cui avanza il pranzo dopo partono con una in più
@@ -3569,6 +3570,7 @@ function buildPersonalPayload(){
     dietType: state.dietType,
     dietTargets: state.dietTargets,
     dietExclude: state.dietExclude,
+    allergies: state.allergies,
     weekLeftoverDays: state.weekLeftoverDays,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
@@ -4044,7 +4046,7 @@ function suggestSwaps(weekIdx, i, exclude){
   WEEK_DISPLAY_ORDER.forEach(di => { const n = effectiveRecipeName(weekIdx, di); if(n) inPlan.add(n); });
   const isWeekend = i === 5 || i === 6;
   const WEEKDAY_TEMPO = ['express','veloce','normale'];
-  const scored = allRecipeMetas().filter(r => isMainDish(r) && !inPlan.has(r.nome) && !(exclude && exclude.has(r.nome))).map(r=>{
+  const scored = allRecipeMetas().filter(r => isMainDish(r) && dietAllows(r) && !inPlan.has(r.nome) && !(exclude && exclude.has(r.nome))).map(r=>{
     const isLong = r.tempoBucket === 'progetto' || r.tempoBucket === 'lunga';
     const isFreezable = r.freezerNew === 'congelabile';
     let motivo;
@@ -4122,11 +4124,29 @@ function weekProteinTargets(){
 }
 const DIET_MEAT_WORDS = ['manzo','vitello','bistecca','brasato','ossibuch','macinata','agnello','maiale','arista','lonza','costine','cotenna','spezzatino','hamburger','pollo','tacchino','coniglio','salsiccia','salsicce','prosciutto','speck','pancetta','guanciale','mortadella','salame','wurstel','brodo di carne','bresaola'];
 const DIET_FISH_WORDS = ['salmone','merluzzo','tonno','baccalà','orata','branzino','pesce','gamberi','gamberetti','vongole','cozze','polpo','calamari','seppie','acciughe','alici','sgombro'];
+const ALLERGEN_PRESETS = {
+  'glutine': ['pasta','spaghett','penne','rigaton','fusill','linguin','tagliatell','bucatin','maccheron','farfall','orecchiett','trofie','paccheri','ditalini','lasagn','gnocchi','pane','pangrattato','crostini','cracker','fette biscottate','piadina','tortilla','pizza','farina','semola','couscous','cous cous','orzo','farro','seitan','grano','biscott','sfoglia','brisée','pasta frolla','bulgur','avena'],
+  'latte e latticini': ['latte','panna','burro','formaggi','formaggio','mozzarella','ricotta','parmigiano','grana','pecorino','gorgonzola','taleggio','provola','scamorza','fontina','stracchino','burrata','mascarpone','yogurt','besciamella','caciocavallo','philadelphia','feta','halloumi','robiola','caciotta','fiocchi di latte','crescenza','emmental'],
+  'uova': ['uova','uovo','tuorl','albume','albumi','maionese','frittata'],
+  'frutta a guscio': ['noci','noce','mandorl','nocciol','pistacch','anacardi','pinoli','arachidi','frutta secca','pecan'],
+  'pesce': ['salmone','merluzzo','tonno','baccalà','orata','branzino','pesce','acciughe','alici','sgombro','trota','nasello','platessa','sogliola','stoccafisso'],
+  'crostacei e molluschi': ['gamberi','gamberetti','scampi','aragosta','granchio','vongole','cozze','polpo','calamari','seppie','ostriche','molluschi','crostacei','frutti di mare']
+};
+function allergenHitsInText(txt){
+  txt = (txt || '').toLowerCase();
+  return (state.allergies || []).filter(k => (ALLERGEN_PRESETS[k] || [k]).some(w => w && txt.includes(w)));
+}
+function recipeAllergens(r){ return (state.allergies || []).length ? allergenHitsInText(recipeIngredientText(r) + ' | ' + (r.nome || '')) : []; }
+function allergenBadgeHtml(r){
+  const hits = r ? recipeAllergens(r) : [];
+  return hits.length ? `<span class="allergen-badge" title="Contiene ${escapeAttr(hits.join(', '))}">⚠ ${escapeHtml(hits.join(', '))}</span>` : '';
+}
 function dietAllows(r){
   const txt = recipeIngredientText(r) + ' | ' + (r.nome || '').toLowerCase();
   const diet = dietTypeNow();
   if(diet !== 'onnivoro' && has(txt, DIET_MEAT_WORDS)) return false;
   if(diet === 'vegetariano' && has(txt, DIET_FISH_WORDS)) return false;
+  if(allergenHitsInText(txt).length) return false;
   return !(state.dietExclude || []).some(w => w && txt.includes(w));
 }
 // Toglie le ricette che non vanno bene. Mai un piatto vietato per riempire il
@@ -6325,7 +6345,7 @@ function renderSwapScreen(weekIdx, i, meal){
   const resultsHtml = results.slice(0, 60).map(r=>`
     <div class="swap-result" data-swap-pick="${escapeAttr(r.nome)}" data-swap-day="${mk}">
       <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
-      <span class="swap-result-name">${escapeHtml(r.nome)}${swapMissingHtml(swapMatches[r.nome])}</span>
+      <span class="swap-result-name">${escapeHtml(r.nome)}${swapMissingHtml(swapMatches[r.nome])}${allergenBadgeHtml(r)}</span>
       <span class="swap-result-time">${escapeHtml(TEMPO_LABEL[r.tempoBucket])}</span>
     </div>`).join('');
   // "Un'altra proposta" chiede suggerimenti diversi da quelli già mostrati in
@@ -6487,7 +6507,7 @@ function renderDishPickerScreen(){
   const resultsHtml = results.slice(0, 60).map(r=>`
     <div class="swap-result" data-dish-pick="${escapeAttr(r.nome)}" data-dish-key="${mk}">
       <span class="swap-result-icon">${catIcon(r.categoriaNew)}</span>
-      <span class="swap-result-name">${escapeHtml(r.nome)}</span>
+      <span class="swap-result-name">${escapeHtml(r.nome)}${allergenBadgeHtml(r)}</span>
       <span class="swap-result-time">${dp.tipo === 'freezer' ? `❄️ ${freezerPortionsOf(r.nome)} porz.` : escapeHtml(String(TEMPO_LABEL[r.tempoBucket] || '').replace(/^\S+\s/, ''))}${pantryNote(pantryMatches[r.nome])}</span>
     </div>`).join('');
   const chips = `<button type="button" class="btn is-chip ${dp.pantry?'active':''}" data-dish-pantry aria-pressed="${!!dp.pantry}">🧺 Con quello che ho</button><span class="dsh-chip-sep" aria-hidden="true"></span>`
@@ -7241,8 +7261,12 @@ function renderMenu(){
             ${PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k => { const [mn, mx] = weekProteinTargets()[k]; const stp = (end, d, v, lab) => `<button type="button" class="qty-btn" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${(d < 0 && v <= 0) || (d > 0 && v >= 7) ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`; return `<div class="gen-row gen-target-row"><span>${PROTEINA_ICON[k] || ''} ${PROTEINA_LABEL[k]}</span><div class="gen-stepper">${stp(0, -1, mn, 'Meno minimo')}<span class="gen-stepper-val">${mn === mx ? mn : mn + '–' + mx}</span>${stp(1, 1, mx, 'Più massimo')}</div></div>`; }).join('')}
             <div class="gen-label gen-sublabel">Ingredienti da evitare</div>
             <div class="gen-exclude-chips">${(state.dietExclude || []).map((w, i) => `<button type="button" class="gen-chip" data-gen-exclude-remove="${i}" aria-label="Togli ${escapeHtml(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
-            <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. funghi, noci" aria-label="Ingrediente da evitare" autocomplete="off"><button type="submit" class="btn-secondary">Aggiungi</button></form>
-            <p class="gen-note">Le ricette con questi ingredienti non vengono scelte. Controlla sempre le etichette: non è una garanzia per le allergie.</p>
+            <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. funghi, noci" aria-label="Ingrediente da evitare" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
+            <p class="gen-note">Le ricette con questi ingredienti non vengono scelte.</p>
+            <div class="gen-label gen-sublabel">Allergie e intolleranze</div>
+            <div class="gen-exclude-chips">${Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${(state.allergies || []).includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${(state.allergies || []).includes(k)}">${escapeHtml(k)}</button>`).join('')}${(state.allergies || []).filter(k => !ALLERGEN_PRESETS[k]).map(w => `<button type="button" class="gen-chip active" data-gen-allergy="${escapeAttr(w)}" aria-label="Togli ${escapeAttr(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
+            <form class="gen-exclude-form" data-gen-allergy-form><input type="text" class="gen-exclude-input" placeholder="es. fragole, kiwi" aria-label="Allergia o intolleranza" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
+            <p class="gen-note">Il menu le rispetta e le ricette che le contengono hanno un avviso ⚠. Il controllo legge solo gli ingredienti scritti nelle ricette: non vede tracce o ingredienti nascosti nei prodotti confezionati. Controlla sempre le etichette, non è una garanzia.</p>
           </div>
           <div class="gen-group gen-row">
             <div class="gen-label">Porzioni di ogni avanzo</div>
@@ -7513,7 +7537,7 @@ function renderSpesa(){
       <label class="shop-item ${checked?'checked':''}">
         <input type="checkbox" data-shop-keys="${rowKey}" data-shop-name="${escapeAttr(ingrediente)}" data-shop-spec="${escapeAttr(qual || '')}" ${per ? `data-shop-per="${escapeAttr(per)}" ` : ''}data-shop-unit="${escapeAttr(unit)}" ${checked?'checked':''}>
         <span>
-          <span class="item-name">${escapeHtml(ingrediente)}${qual ? `<small class="ing-qual"> · ${escapeHtml(qual)}</small>` : ''}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}${!ingNote && !editingIngNote ? `<button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Aggiungi una nota">${PENCIL_ICON_SVG}</button>` : ''}</span>
+          <span class="item-name">${escapeHtml(ingrediente)}${allergenHitsInText(ingrediente).length ? `<span class="allergen-badge" title="Controlla l'etichetta">⚠</span>` : ''}${qual ? `<small class="ing-qual"> · ${escapeHtml(qual)}</small>` : ''}${isPartial ? `<span class="partial-mark" title="Spuntato solo per ${checkedCount} giorno/i su ${keys.length}, non per tutti">◐</span>` : ''}${!ingNote && !editingIngNote ? `<button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Aggiungi una nota">${PENCIL_ICON_SVG}</button>` : ''}</span>
           ${(subtitle || note) ? `<span class="item-detail">${escapeHtml(subtitle||'')}${subtitle && note ? ' · ' : ''}${escapeHtml(note||'')}</span>` : ''}
           ${ingNoteHtml}
         </span>
@@ -7950,6 +7974,7 @@ function renderRecipeDetailScreen(name){
   const cookFab = cookFabHtml(name, rRatio);
   return managePageHtml({ key: 'recipe-' + name, title: '<span class="rd-back-label">Ricette</span>', closeAttr: `data-toggle-recipe="${escapeAttr(name)}"`, action: menuAction, body: `
     <div class="meal-detail-body${cookFab ? ' has-cook-fab' : ''}">
+      ${recipeAllergens(r).length ? `<div class="allergen-banner" role="alert">⚠ Contiene ${escapeHtml(recipeAllergens(r).join(', '))}</div>` : ''}
       ${recipePhotoHtml(name)}
       ${recipeDetailBodyHtml(name, { paneKey: 'r|' + name, ing, ratio: rRatio, ctx: {}, persone: nPers, personeHtml: rdPersoneHtml(nPers, '', name),
         mancantiHtml: mancantiTop, linkHtml: linkHtml ? `<div class="button-wrapper">${linkHtml}</div>` : '' })}
@@ -10592,6 +10617,22 @@ function attachHandlers(){
       r[end] = Math.min(7, Math.max(0, r[end] + d));
       if(r[0] > r[1]){ if(end === 0) r[1] = r[0]; else r[0] = r[1]; }
       state.dietTargets = Object.assign({}, state.dietTargets, { [k]: r });
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-allergy]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const k = btn.dataset.genAllergy, cur = state.allergies || [];
+      state.allergies = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k];
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-allergy-form]').forEach(form=>{
+    form.addEventListener('submit', e=>{
+      e.preventDefault();
+      const words = form.querySelector('input').value.split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
+      if(!words.length) return;
+      state.allergies = [...new Set([...(state.allergies || []), ...words])];
       persist(); render();
     });
   });
