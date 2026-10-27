@@ -7084,10 +7084,9 @@ function renderMenu(){
             ${excPickerHtml}
             <button type="button" class="btn is-text gen-add-exc" data-toggle-tempo-exception-picker>+ Aggiungi un'eccezione</button>
           </div>
+          ${hintText || (genSettingsTargetWeek !== null && regenNote) ? `<div class="gen-notes">${hintText ? `<p class="gen-hint">${hintText}</p>` : ''}${genSettingsTargetWeek !== null && regenNote ? `<p class="gen-hint">${regenNote}</p>` : ''}</div>` : ''}
         </div>
         <div class="gen-footer">
-          ${hintText ? `<p class="gen-hint">${hintText}</p>` : ''}
-          ${genSettingsTargetWeek !== null && regenNote ? `<p class="gen-hint">${regenNote}</p>` : ''}
           ${genSettingsTargetWeek !== null
             ? `<button class="btn is-solid gen-go" data-generate-week="${genSettingsTargetWeek}">${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : (regenCount ? `Rigenera ${regenCount} pasti` : 'Rigenera settimana')}</button>
                ${genSettingsTargetWeek > 0 ? `<button type="button" class="btn is-text color-delete gen-remove" data-remove-week="${genSettingsTargetWeek}">Elimina questa settimana</button>` : ''}`
