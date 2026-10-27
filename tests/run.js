@@ -3428,9 +3428,11 @@ test('Spesa con due settimane: frutta, verdura e latticini della seconda vanno i
 
 test('genera anche la settimana prossima: la seconda non ripete la prima e usa le porzioni in freezer', async ({ page }) => {
   const r = await page.evaluate(() => {
-    state.pantryItems = {}; state.extraWeeks = []; generateWeek(0);
+    state.pantryItems = {}; state.extraWeeks = [];
     const congelabile = allRecipeMetas().filter(m => ['congelabile', 'meal-prep'].includes(m.freezerNew) && m.tipologia !== 'contorno' && m.tipologia !== 'dolce');
     const nome = congelabile[0].nome;
+    state.dietExclude = [nome.toLowerCase()]; // il generatore non lo sceglie da solo: deve arrivare solo dal freezer
+    generateWeek(0);
     addFreezerPortions(nome, 2); state.pantryItems[nome.toLowerCase()].frozenOn = isoLocalDate(new Date());
     state.genTwoWeeks = true; state.genSettingsOpen = 0; render();
     const toggle = !!document.querySelector('[data-toggle-gen-two]');
@@ -3438,7 +3440,7 @@ test('genera anche la settimana prossima: la seconda non ripete la prima e usa l
     const w1 = WEEK_DISPLAY_ORDER.map(i => ['pranzo', 'cena'].map(m => effectiveMeal(1, i, m).principale)).flat().filter(Boolean);
     const dalFreezer = WEEK_DISPLAY_ORDER.filter(i => isFreezerDish(mealKey(1, i, 'cena'), nome)).length;
     const out = { toggle, haSettimana2: state.extraWeeks.length === 1, nome, dalFreezer, inW1: w1.includes(nome) };
-    state.genTwoWeeks = false;
+    state.genTwoWeeks = false; state.dietExclude = [];
     return out;
   });
   assert(r.toggle, 'interruttore nelle Regole');
@@ -3777,6 +3779,39 @@ test('famiglie: la schermata "La tua famiglia" cambia scheda, segnala un codice 
   eq(r.errore, 'Codice invito non valido o già usato.');
   eq(r.famId, 'fam1');
   eq(r.chiusa, true);
+});
+
+test('primo avvio guidato: solo per le famiglie nuove, 3 passi con gli stessi controlli delle Regole, poi genera il menù', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const oldRoute = activeRoute, oldSynced = personalSynced;
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const out = {};
+    activeRoute = null; state.onboardingDone = false; render();
+    out.nelleVecchie = !document.querySelector('[data-page="onboarding"]');
+    activeRoute = familyRouteFor('abc'); personalSynced = true; state.onbStep = 0; state.dietType = 'onnivoro'; state.allergies = []; state.weekPortionsBase = 2; state.extraWeeks = [];
+    render();
+    out.passo1 = !!document.querySelector('[data-page="onboarding"] [data-gen-diet="vegetariano"]');
+    document.querySelector('[data-gen-diet="vegetariano"]').click();
+    document.querySelector('[data-gen-allergy="glutine"]').click();
+    out.scelte = [state.dietType, state.allergies.slice()];
+    document.querySelector('[data-onb-next]').click();
+    document.querySelector('[data-gen-portions-inc]').click(); document.querySelector('[data-gen-portions-inc]').click();
+    out.porzioni = state.weekPortionsBase;
+    document.querySelector('[data-onb-next]').click();
+    out.finale = !!document.querySelector('[data-onb-finish="generate"]');
+    document.querySelector('[data-onb-finish="generate"]').click();
+    out.fatto = [state.onboardingDone, !document.querySelector('[data-page="onboarding"]'), state.tab, !!effectiveRecipeMeta(0, 5, 'cena') || !!effectiveRecipeMeta(0, 6, 'cena') || !!effectiveRecipeMeta(0, 0, 'cena') || !!effectiveRecipeMeta(0, 1, 'cena')];
+    out.payload = buildPersonalPayload().onboardingDone;
+    activeRoute = oldRoute; personalSynced = oldSynced; state.dietType = 'onnivoro'; state.allergies = []; state.weekPortionsBase = 2; render();
+    return out;
+  });
+  eq(r.nelleVecchie, true);
+  eq(r.passo1, true);
+  eq(r.scelte, ['vegetariano', ['glutine']]);
+  eq(r.porzioni, 4);
+  eq(r.finale, true);
+  eq(r.fatto, [true, true, 'menu', true]);
+  eq(r.payload, true);
 });
 
 (async () => {
