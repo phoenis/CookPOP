@@ -3393,6 +3393,17 @@ test('pasto avanzo: un piatto aggiunto è nuovo e sta a parte; in riga restano s
   eq([r.dopoToglie, r.aCapo], [0, true], 'tolto il piatto nuovo, resta solo l\'avanzo');
 });
 
+test('porzioni di partenza: 3 messo a mano torna a 2 una volta sola; l\'avanzo collegato aggiunge la sua porzione', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const mig = MIGRATIONS.find(m => m.flag === 'portionsBaseReset1');
+    state.weekPortionsBase = 3; state.portionsBaseReset1 = false; mig.run(); const dopo3 = state.weekPortionsBase;
+    state.weekPortionsBase = 4; mig.run(); const dopo4 = state.weekPortionsBase;
+    state.weekPortionsBase = 2; state.weekLeftoverDays = null; state.extraWeeks = []; generateWeek(1);
+    return { dopo3, dopo4, def: defaultPortions(), cenaConAvanzo: state.dayPortions['1_3_cena'], cenaSenza: state.dayPortions['1_4_cena'] };
+  });
+  eq([r.dopo3, r.dopo4, r.def, r.cenaConAvanzo, r.cenaSenza], [2, 4, 2, 3, 2]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
