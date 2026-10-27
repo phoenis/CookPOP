@@ -1921,7 +1921,7 @@ test('regole di generazione: porzioni di partenza configurabili, salvate e usate
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.weekPortionsBase = 2; state.tab = 'menu'; state.genSettingsOpen = 'plain'; render();
-    const out = { start: document.querySelector('.filters-modal .qty-num').textContent };
+    const out = { start: document.querySelector('.gen-stepper-val').textContent.split(' ')[0] };
     document.querySelector('[data-gen-portions-inc]').click(); document.querySelector('[data-gen-portions-inc]').click();
     out.after = state.weekPortionsBase;
     out.payload = buildPersonalPayload().weekPortionsBase;

@@ -7030,7 +7030,7 @@ function renderMenu(){
       let lockedCount = 0, pastCount = 0, totalMeals = 0;
       for(let d = 0; d < 7; d++){
         ['pranzo','cena'].forEach(m=>{
-          if(m === 'pranzo' && !(d===4||d===5||d===6)) return;
+          if(m === 'pranzo' && leftoverLunchDays().includes(d)) return;
           totalMeals++;
           if(isMealPast(genSettingsTargetWeek, d, m)) pastCount++;
           else if(state.mealLocked[`${genSettingsTargetWeek}_${d}_${m}`]) lockedCount++;
@@ -7040,51 +7040,59 @@ function renderMenu(){
       const kept = [lockedCount ? `i <b>${lockedCount} bloccati</b>` : '', pastCount ? `i <b>${pastCount} già passati</b>` : ''].filter(Boolean).join(' e ');
       regenNote = kept ? `Rigenerare sostituisce <b>${regenCount} pasti</b> e conserva ${kept}.` : '';
     }
+    const tempoChipLabel = { express:'≤20 min', veloce:'30 min', normale:'30–45 min', lunga:'1 h', progetto:'oltre 1 h' };
+    const dayInitial = d => DATA.week1[d].giorno.slice(0, 1);
+    const cookedLunches = 7 - leftoverLunchDays().length;
+    const hintText = genSettingsTargetWeek === 0
+      ? `Sceglie ${7 + cookedLunches} ricette di stagione (7 cene${cookedLunches ? ` e ${cookedLunches} ${cookedLunches === 1 ? 'pranzo' : 'pranzi'}` : ''}), variando le categorie giorno per giorno.`
+      : '';
+    const weekForLabel = genSettingsTargetWeek !== null ? genSettingsTargetWeek : 0;
     return `
-    <div class="filters-modal-backdrop" data-close-gen-settings>
-      <div class="filters-modal" data-stop-close>
-        <div class="filters-modal-header">
-          <h3>Regole di generazione</h3>
-          <button class="btn is-icon filters-close-btn" data-close-gen-settings>✕</button>
+    <div class="move-backdrop" data-close-gen-settings>
+      <div class="move-sheet gen-sheet" role="dialog" aria-label="Regole di generazione" data-stop-close>
+        <div class="move-handle" aria-hidden="true"></div>
+        <div class="dsh-head">
+          <div class="dsh-head-text">
+            <span class="dsh-kicker">Settimana del ${escapeHtml(weekLabelFor(weekForLabel))}</span>
+            <h2 class="move-title">Regole di generazione</h2>
+          </div>
+          <button type="button" class="btn is-icon dsh-close" data-close-gen-settings aria-label="Chiudi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>
-        <div class="filter-groups">
-          <div class="filter-group">
-            <div class="filter-group-label">Tempo massimo, tutti i giorni</div>
-            <div class="tempo-base-list">
-              ${TEMPO_ORDER.map(t=>`<button type="button" class="tempo-base-row${state.weekTempoBase===t?' active':''}" data-set-tempo-base="${t}"><span>${escapeHtml(TEMPO_LABEL[t])}</span>${state.weekTempoBase===t?'<span class="tempo-base-check">✓</span>':''}</button>`).join('')}
-            </div>
+        <div class="gen-body">
+          <div class="gen-group">
+            <div class="gen-label">Tempo massimo, tutti i giorni</div>
+            <div class="chip-row">${TEMPO_ORDER.map(t => `<button type="button" class="btn is-chip${state.weekTempoBase === t ? ' active' : ''}" data-set-tempo-base="${t}" aria-pressed="${state.weekTempoBase === t}">${escapeHtml(tempoChipLabel[t])}</button>`).join('')}</div>
           </div>
-          <div class="filter-group">
-            <div class="filter-group-label">Porzioni di partenza</div>
-            <div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="qty-num">${defaultPortions()}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></span><span>${defaultPortions() === 1 ? 'persona' : 'persone'}</span></div>
-            <p class="section-sub" style="margin:0;">Valgono dalla prossima generazione. Le cene da cui avanza il pranzo del giorno dopo partono con una porzione in più.</p>
+          <div class="gen-group gen-row">
+            <div class="gen-label">Porzioni di partenza</div>
+            <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></div>
           </div>
-          <div class="filter-group">
-            <div class="filter-group-label">Pranzo = avanzo della sera prima</div>
-            <div class="chip-row gen-leftover-days">${[0,1,2,3,4,6].map(d => `<button type="button" class="btn is-chip${leftoverLunchDays().includes(d) ? ' active' : ''}" data-gen-leftover-day="${d}" aria-pressed="${leftoverLunchDays().includes(d)}">${escapeHtml(DATA.week1[d].giorno.slice(0, 3))}</button>`).join('')}</div>
-            <p class="section-sub" style="margin:0;">Nei giorni scelti il pranzo è l'avanzo della cena del giorno prima; gli altri pranzi si cucinano. Il sabato, primo giorno della settimana, si cucina sempre. Vale dalla prossima generazione.</p>
+          <div class="gen-group">
+            <div class="gen-label">Pranzo con l'avanzo della sera prima</div>
+            <div class="gen-days gen-leftover-days">${[0,1,2,3,4,5,6].map(d => {
+              const eligible = LEFTOVER_LUNCH_ELIGIBLE.includes(d), on = leftoverLunchDays().includes(d);
+              return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ' disabled title="Il sabato, primo giorno della settimana, il pranzo si cucina sempre"'} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
+            }).join('')}</div>
           </div>
-          ${genSettingsTargetWeek !== null ? `<div class="filter-group">
-            <div class="filter-group-label">Ingredienti</div>
-            <div class="tempo-base-list">
-              <button type="button" class="tempo-base-row${state.genPantryOnly ? ' active' : ''}" data-toggle-gen-pantry aria-pressed="${!!state.genPantryOnly}"><span>🧺 Solo con quello che ho in casa</span>${state.genPantryOnly ? '<span class="tempo-base-check">✓</span>' : ''}</button>
-            </div>
-            ${state.genPantryOnly ? '<p class="section-sub" style="margin:0.5rem 0 0;">Prima le ricette per cui hai tutto. Se non bastano, quelle a cui manca meno.</p>' : ''}
+          ${genSettingsTargetWeek !== null ? `<div class="gen-group gen-toggle-row">
+            <button type="button" class="gen-toggle" data-toggle-gen-pantry role="switch" aria-checked="${!!state.genPantryOnly}"><span class="gen-toggle-text"><span aria-hidden="true">🧺</span> Solo con quello che ho in casa</span><span class="gen-switch${state.genPantryOnly ? ' on' : ''}" aria-hidden="true"></span></button>
+            ${state.genPantryOnly ? '<p class="gen-note">Prima le ricette per cui hai tutto. Se non bastano, quelle a cui manca meno.</p>' : ''}
           </div>` : ''}
-          <div class="filter-group">
-            <div class="filter-group-label">Eccezioni</div>
-            ${excRowsHtml || '<p class="section-sub" style="margin:0;">Nessuna: tutti i giorni seguono il valore di base.</p>'}
-            <button type="button" class="btn is-text" data-toggle-tempo-exception-picker style="margin-top:0.5rem;">+ aggiungi un'eccezione</button>
+          <div class="gen-group">
+            <div class="gen-label">Eccezioni</div>
+            ${excRowsHtml || ''}
             ${excPickerHtml}
+            <button type="button" class="btn is-text gen-add-exc" data-toggle-tempo-exception-picker>+ Aggiungi un'eccezione</button>
           </div>
         </div>
-        ${genSettingsTargetWeek !== null ? `
-        <p class="generate-week-hint">${genSettingsTargetWeek === 0 ? "Sceglie 7 ricette di stagione, variando le categorie giorno per giorno." : ''}</p>
-        ${regenNote ? `<p class="section-sub" style="margin:0 0 0.75rem;">${regenNote}</p>` : ''}
-        <div class="filters-modal-footer">
-          <button class="btn is-solid mini-add-btn" data-generate-week="${genSettingsTargetWeek}">${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : (regenCount ? `Rigenera ${regenCount} pasti` : 'Rigenera settimana')}</button>
+        <div class="gen-footer">
+          ${hintText ? `<p class="gen-hint">${hintText}</p>` : ''}
+          ${genSettingsTargetWeek !== null && regenNote ? `<p class="gen-hint">${regenNote}</p>` : ''}
+          ${genSettingsTargetWeek !== null
+            ? `<button class="btn is-solid gen-go" data-generate-week="${genSettingsTargetWeek}">${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : (regenCount ? `Rigenera ${regenCount} pasti` : 'Rigenera settimana')}</button>
+               ${genSettingsTargetWeek > 0 ? `<button type="button" class="btn is-text color-delete gen-remove" data-remove-week="${genSettingsTargetWeek}">Elimina questa settimana</button>` : ''}`
+            : `<button class="btn is-solid gen-go" data-close-gen-settings>Fatto</button>`}
         </div>
-        ${genSettingsTargetWeek > 0 ? `<div style="text-align:center;margin-top:0.75rem;"><button type="button" class="btn is-text color-delete" data-remove-week="${genSettingsTargetWeek}">Elimina questa settimana</button></div>` : ''}` : ''}
       </div>
     </div>`;
   })() : '';
