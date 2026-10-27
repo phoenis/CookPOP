@@ -3068,7 +3068,8 @@ test('Aggiungi piatto: da un pasto vuoto è lo stesso foglio, con "Con quello ch
 
 test('avanzo: niente promemoria di preparazione (ammollo) né nel pasto né la sera prima', async ({ page }) => {
   const r = await page.evaluate(() => {
-    const sl = allMealSlots().filter(m => m.weekIdx === 0);
+    state.extraWeeks = []; generateWeek(1); // la settimana prossima: sempre nel futuro, qualunque giorno sia oggi
+    const sl = allMealSlots().filter(m => m.weekIdx === 1);
     const k = sl.findIndex((m, n) => m.meal === 'cena' && sl[n + 1] && sl[n + 1].meal === 'pranzo');
     const cena = sl[k], next = sl[k + 1];
     writeMealDishes(cena.weekIdx, cena.i, 'cena', 'Pasta e ceci', []);
@@ -3077,9 +3078,9 @@ test('avanzo: niente promemoria di preparazione (ammollo) né nel pasto né la s
     state.showPastDays = true; state.tab = 'menu'; render();
     const blk = () => document.querySelector(`.meal-block[data-day-index="${next.i}"][data-meal="${next.meal}"]`);
     const pos = WEEK_DISPLAY_ORDER.indexOf(cena.i);
-    const before = { note: !!(blk() && blk().querySelector('.meal-notes')), soak: /Pasta e ceci/.test(soakReminderHtml(0, pos)) };
+    const before = { note: !!(blk() && blk().querySelector('.meal-notes')), soak: /Pasta e ceci/.test(soakReminderHtml(1, pos)) };
     state.dayLinks[next.key] = cena.key; render();
-    const after = { note: !!(blk() && blk().querySelector('.meal-notes')), soak: /Pasta e ceci/.test(soakReminderHtml(0, pos)) };
+    const after = { note: !!(blk() && blk().querySelector('.meal-notes')), soak: /Pasta e ceci/.test(soakReminderHtml(1, pos)) };
     return { before, after };
   });
   eq(r.before, { note: true, soak: true }, 'senza avanzo i promemoria ci sono');
