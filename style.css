@@ -2558,3 +2558,11 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Avanzo: icona nel cerchio come le portate, su grigino */
 .leftover-line .leftover-ic.dish-ic{ width:1.5rem; height:1.5rem; min-width:0; background:var(--avanzo-gray); font-size:0.8125rem; }
 .leftover-line{ gap:0.75rem; }
+
+/* Linea tra i piatti: stesso spessore, tratti più lunghi e più marcati; ora anche tra l'avanzo e il "+" */
+:root{ --dish-dash: repeating-linear-gradient(to bottom, var(--dish-hint) 0 5px, transparent 5px 8px); }
+.dish-item::before{ border-left:0; width:1px; background:var(--dish-dash); }
+.dish-line.is-leftover{ position:relative; }
+.leftover-line{ position:relative; }
+.leftover-line::after{ content:""; position:absolute; left:0.75rem; top:calc(var(--s2) + 1.5rem + 0.25rem); bottom:-0.125rem; width:1px; background:var(--dish-dash); }
+.dish-line.is-leftover:has(+ .is-new-dishes) .leftover-line::after{ bottom:calc(-1 * var(--s2) - var(--space-small) - 0.125rem); }
