@@ -3664,6 +3664,42 @@ test('persone: il colore lo sceglie ognuno dal proprio Profilo; in Persone si mo
   eq(r, { proprio: true, altro: false, aMano: true, togliAltro: false, togliAMano: true, nelProfilo: true });
 });
 
+test('catalogo per famiglia: ognuna il suo percorso; chi lo condivideva parte da una copia di quello originale', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    const oldEmail = loggedInEmail, oldSync = window.cookpopSync;
+    const fake = store => ({
+      save: (p, d) => { store[p] = JSON.parse(JSON.stringify(d)); (fake.cbs[p] || []).forEach(cb => cb(JSON.parse(JSON.stringify(store[p])))); return Promise.resolve(); },
+      patch: (p, d) => { store[p] = Object.assign(store[p] || {}, d); return Promise.resolve(); },
+      onChange: (p, cb) => { (fake.cbs[p] = fake.cbs[p] || []).push(cb); cb(store[p] ? JSON.parse(JSON.stringify(store[p])) : null); },
+      load: p => Promise.resolve(store[p] ? JSON.parse(JSON.stringify(store[p])) : null)
+    });
+    fake.cbs = {};
+    loggedInEmail = 'mara@x.it'; out.mara = catalogPath() + '|' + catalogCacheKey();
+    loggedInEmail = 'cugina@x.it'; out.cugina = catalogPath() + '|' + catalogCacheKey();
+    loggedInEmail = 'mamma@x.it'; out.mamma = catalogPath();
+    // la cugina apre l'app per la prima volta: il suo catalogo parte da una copia di quello originale
+    const store = { 'catalog-state': { hiddenRecipes: { 'Ricetta di prova': true } } };
+    window.cookpopSync = fake(store);
+    loggedInEmail = 'cugina@x.it';
+    personalSynced = false; catalogSynced = false;
+    await loadState();
+    await new Promise(r => setTimeout(r, 50));
+    out.copia = JSON.stringify(store['spaces/cugina/catalog']);
+    out.originale = JSON.stringify(store['catalog-state']);
+    out.sync = catalogSynced;
+    out.vista = !!(state.hiddenRecipes && state.hiddenRecipes['Ricetta di prova']);
+    window.cookpopSync = oldSync; loggedInEmail = oldEmail; catalogSynced = false;
+    return out;
+  });
+  eq(r.mara, 'catalog-state|catalog-state-cache');
+  eq(r.cugina, 'spaces/cugina/catalog|catalog-state-cache-cugina');
+  eq(r.mamma, 'spaces/mamma/catalog');
+  eq(r.copia, '{"hiddenRecipes":{"Ricetta di prova":true}}');
+  eq(r.originale, '{"hiddenRecipes":{"Ricetta di prova":true}}');
+  assert(r.sync && r.vista, 'catalogo copiato e letto');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
