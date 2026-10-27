@@ -2340,6 +2340,7 @@ const state = {
   // base, chiave "i_meal" (es. "5_cena", "5_pranzo" — così ven/sab/dom
   // possono avere un tetto diverso tra pranzo e cena dello stesso giorno).
   weekTempoBase: 'normale',
+  weekLeftoverDays: null, // giorni con il pranzo = avanzo della cena di ieri (null = tutti quelli possibili)
   weekPortionsBase: 2, // porzioni di partenza di ogni pasto generato (Regole di generazione); le cene da cui avanza il pranzo dopo partono con una in più
   genPantryOnly: false, // non persistito: "Solo con quello che ho" nelle Regole di generazione
   weekTempoExceptions: {},
@@ -3465,6 +3466,7 @@ function buildPersonalPayload(){
     mealLocked: state.mealLocked,
     weekTempoBase: state.weekTempoBase,
     weekPortionsBase: state.weekPortionsBase,
+    weekLeftoverDays: state.weekLeftoverDays,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
     userEmojis: state.userEmojis,
@@ -3668,9 +3670,13 @@ function effectiveMeal(weekIdx, i, meal){
   if(link){
     const { weekIdx: sw, i: si, meal: sm } = parseMealKey(link);
     const source = effectiveMeal(sw, si, sm);
+    // I piatti dell'avanzo seguono la fonte; quelli aggiunti a questo pasto
+    // (override.contorni) sono piatti nuovi, a parte: ownExtras.
     const ownOverride = readMealSlot(weekOverridesRef(weekIdx), i, meal);
-    if(ownOverride && ownOverride.contorni && ownOverride.contorni.length) return { principale: source.principale, contorni: ownOverride.contorni };
-    return source;
+    const own = (ownOverride && ownOverride.contorni) || [];
+    const base = source.contorni || [];
+    const extra = own.filter((c, k) => c !== source.principale && !base.includes(c) && own.indexOf(c) === k);
+    return { principale: source.principale, contorni: base.concat(extra), ownExtras: extra };
   }
   const override = readMealSlot(weekOverridesRef(weekIdx), i, meal);
   if(override && override.principale === MEAL_EMPTY) return { principale: null, contorni: [] };
@@ -3781,7 +3787,22 @@ function allPlannedShoppingMeals(){
     const dates = weekDatesFor(weekIdx);
     WEEK_DISPLAY_ORDER.forEach((i,pos)=>{
       ['pranzo','cena'].forEach(meal=>{
-        if(linkedSourceMealKey(weekIdx, i, meal)) return;
+        if(linkedSourceMealKey(weekIdx, i, meal)){
+          // Avanzo: gli ingredienti sono già quelli della fonte, ma i piatti aggiunti a questo pasto sono nuovi.
+          const extras = (effectiveMeal(weekIdx, i, meal).ownExtras || []);
+          if(!extras.length) return;
+          meals.push({
+            weekIdx, i, meal,
+            key: mealKey(weekIdx, i, meal),
+            giorno: DATA.week1[i].giorno,
+            dateLabel: formatShortDate(dates[pos]),
+            isPast: new Date(dates[pos]).setHours(0,0,0,0) < new Date().setHours(0,0,0,0),
+            principale: extras[0],
+            contorni: extras.slice(1),
+            dishLabel: extras.join(', ')
+          });
+          return;
+        }
         const mealData = effectiveMeal(weekIdx, i, meal);
         if(!mealData.principale) return;
         meals.push({
@@ -4039,11 +4060,18 @@ function recipeProteina(r){ return (r && PROTEINA_ORDER.includes(r.proteina)) ? 
 // nell'equilibrio ma non si cambiano.
 // Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
 // (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
-const LEFTOVER_SOURCE_DAYS = [6,0,1,2]; // cene che fanno anche da pranzo il giorno dopo
+// Giorni in cui il pranzo è l'avanzo della cena di ieri (Regole di generazione).
+// Il sabato (5) è il primo giorno della settimana: la sua "cena di ieri" è della
+// settimana scorsa, quindi il suo pranzo si cucina sempre.
+const LEFTOVER_LUNCH_ELIGIBLE = [0,1,2,3,4,6];
+function leftoverLunchDays(){
+  const a = state.weekLeftoverDays;
+  return Array.isArray(a) ? a.filter(d => LEFTOVER_LUNCH_ELIGIBLE.includes(d)) : LEFTOVER_LUNCH_ELIGIBLE.slice();
+}
 function weekPlanSlots(){
   const slots = [];
   for(let day = 0; day < 7; day++){
-    if(day >= 4) slots.push({ day, meal:'pranzo' });
+    if(!leftoverLunchDays().includes(day)) slots.push({ day, meal:'pranzo' });
     slots.push({ day, meal:'cena' });
   }
   return slots; // nell'ordine in cui si mangia (pranzi lun-gio a parte: sono avanzi)
@@ -4053,7 +4081,7 @@ function weekEatenSequence(slots){
   const idx = (day, meal) => slots.findIndex(s => s.day === day && s.meal === meal);
   const seq = [];
   for(let day = 0; day < 7; day++){
-    if(day <= 3) seq.push({ slot: idx((day + 6) % 7, 'cena'), leftover: true });
+    if(leftoverLunchDays().includes(day)) seq.push({ slot: idx((day + 6) % 7, 'cena'), leftover: true });
     else seq.push({ slot: idx(day, 'pranzo'), leftover: false });
     seq.push({ slot: idx(day, 'cena'), leftover: false });
   }
@@ -4368,7 +4396,7 @@ function mealDishes(weekIdx, i, meal){
   if(!m.principale) return [];
   const list = [{ name: m.principale, role: 'p' }].concat((m.contorni || []).map((c, ci) => ({ name: c, role: `c${ci}` })));
   const rank = t => { const k = COURSE_ORDER.indexOf(t); return k < 0 ? COURSE_ORDER.length : k; };
-  list.forEach((d, idx) => { d.tipo = dishCourse(d.name); d.idx = idx; });
+  list.forEach((d, idx) => { d.tipo = dishCourse(d.name); d.idx = idx; if((m.ownExtras || []).includes(d.name)) d.own = true; });
   return list.sort((a, b) => rank(a.tipo) - rank(b.tipo) || a.idx - b.idx);
 }
 // Salva il pasto come override {principale, contorni}. Se cambia il principale,
@@ -4418,6 +4446,7 @@ function addMealDish(weekIdx, i, meal, name){
   const m = effectiveMeal(weekIdx, i, meal);
   if(!m.principale){ writeMealDishes(weekIdx, i, meal, name, []); return; }
   if(m.principale === name || m.contorni.includes(name)) return;
+  if(linkedSourceMealKey(weekIdx, i, meal)){ setMealContorni(weekIdx, i, meal, (m.ownExtras || []).concat(name)); return; }
   setMealContorni(weekIdx, i, meal, m.contorni.concat(name));
 }
 // Sostituisce un solo piatto, lasciando gli altri come sono.
@@ -4425,6 +4454,14 @@ function replaceMealDish(weekIdx, i, meal, oldName, newName){
   const m = effectiveMeal(weekIdx, i, meal);
   if(oldName === newName) return;
   if(m.principale === oldName && linkedSourceMealKey(weekIdx, i, meal)) return; // l'avanzo segue la sua fonte
+  if(linkedSourceMealKey(weekIdx, i, meal)){
+    // Solo i piatti aggiunti a questo pasto si sostituiscono; gli avanzi seguono la fonte.
+    if(!(m.ownExtras || []).includes(oldName)) return;
+    forgetDish(weekIdx, i, meal, oldName);
+    const next = m.ownExtras.map(c => c === oldName ? newName : c);
+    setMealContorni(weekIdx, i, meal, next.filter((c, idx) => next.indexOf(c) === idx));
+    return;
+  }
   forgetDish(weekIdx, i, meal, oldName);
   if(m.principale === oldName){
     writeMealDishes(weekIdx, i, meal, newName, m.contorni.filter(c => c !== newName));
@@ -4449,9 +4486,11 @@ function removeMealDish(weekIdx, i, meal, name){
     showUndoToast('Piatto tolto', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
     return;
   }
+  const linked = !!linkedSourceMealKey(weekIdx, i, meal);
+  if(linked && !(m.ownExtras || []).includes(name)) return; // un avanzo segue la sua fonte
   const snap = snapshotMealDishes(weekIdx, i, meal);
   forgetDish(weekIdx, i, meal, name);
-  setMealContorni(weekIdx, i, meal, m.contorni.filter(c => c !== name));
+  setMealContorni(weekIdx, i, meal, (linked ? m.ownExtras : m.contorni).filter(c => c !== name));
   persist(); render();
   showUndoToast('Piatto tolto', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
 }
@@ -4766,7 +4805,7 @@ function generateWeek(weekIdx){
   const fixed = {};
   lockedMeals.forEach(({i, meal, data, link, past, lockedNames})=>{
     const meta = !link && data.principale && (past || lockedNames.includes(data.principale)) ? getRecipeMeta(data.principale) : null;
-    if(meta && (meal === 'cena' || i >= 4)) fixed[`${i}_${meal}`] = meta;
+    if(meta && (meal === 'cena' || !leftoverLunchDays().includes(i))) fixed[`${i}_${meal}`] = meta;
   });
   const days = pickWeekRecipes(fixed, weekIdx);
   const baseline = {};
@@ -4795,17 +4834,18 @@ function generateWeek(weekIdx){
   // Dom(6)cena->Lun(0)pranzo, Lun(0)cena->Mar(1)pranzo, Mar(1)cena->Mer(2)pranzo,
   // Mer(2)cena->Gio(3)pranzo. È un link come uno scelto a mano con "è avanzo
   // di": sostituibile/rimuovibile allo stesso identico modo.
-  for(let i = 0; i <= 3; i++){
+  leftoverLunchDays().forEach(i => {
     const sourceDay = (i - 1 + 7) % 7;
     state.dayLinks[`${weekIdx}_${i}_pranzo`] = `${weekIdx}_${sourceDay}_cena`;
-  }
+  });
   // Porzioni di base: 2, tranne le cene "apripista" di Dom/Lun/Mar/Mer (indici
   // 6,0,1,2 — quelle da cui Lun-Gio pranzo prende l'avanzo), che partono a 3
   // per coprire anche il pranzo del giorno dopo.
+  const sourceDays = leftoverLunchDays().map(d => (d + 6) % 7);
   for(let i = 0; i < 7; i++){
     const basePor = defaultPortions();
-    state.dayPortions[`${weekIdx}_${i}_cena`] = [6,0,1,2].includes(i) ? basePor + 1 : basePor;
-    if(i === 4 || i === 5 || i === 6) state.dayPortions[`${weekIdx}_${i}_pranzo`] = basePor;
+    state.dayPortions[`${weekIdx}_${i}_cena`] = sourceDays.includes(i) ? basePor + 1 : basePor;
+    if(!leftoverLunchDays().includes(i)) state.dayPortions[`${weekIdx}_${i}_pranzo`] = basePor;
   }
   // Ripristino i pasti bloccati: stessa ricetta/contorni di prima nella
   // baseline appena generata, ed eventuale link avanzo preservato al posto
@@ -5803,16 +5843,10 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
   // La matita per la variante sta subito dopo il nome dell'avanzo.
   const leftoverPencil = (name && linkSource && !state.dayLinkNotes[mk] && state.linkNoteEditingKey !== mk)
     ? `<button type="button" class="avanzo-note-pencil" data-link-note-show="${mk}" aria-label="Aggiungi una variante (es. fatta a frittata)">${PENCIL_ICON_SVG}</button>` : '';
-  const leftoverHtml = (name && linkSource) ? `
-    <div class="dish-line is-leftover">
-      <div class="leftover-line"><button type="button" class="dish-ic leftover-ic${dishLockedHas(mk, dishes[0].name) ? ' is-locked' : ''}" data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(dishes[0].name)}" aria-pressed="${dishLockedHas(mk, dishes[0].name)}" aria-label="Avanzo: blocca o sblocca il pasto">🥡</button><span class="leftover-names">${dishes.map(dsh => `<span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>`).join('<span class="leftover-sep"> + </span>')}${leftoverPencil}</span></div>
-      <button type="button" class="btn dish-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>
-    </div>` : '';
-  const dishesHtml = leftoverHtml || (name ? `
-    <div class="dish-line">
-      ${dishes.map(dsh=>{
-        const fixed = !!linkSource && dsh.role === 'p';
-        return `
+  const addDishBtn = `<button type="button" class="btn dish-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>`;
+  const dishItemHtml = dsh => {
+    const fixed = !!linkSource && dsh.role === 'p';
+    return `
       <div class="dish-item">
         <button type="button" class="dish-ic${dishLockedHas(mk, dsh.name) ? ' is-locked' : ''}" data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(dsh.name)}" aria-pressed="${dishLockedHas(mk, dsh.name)}" aria-label="${dishLockedHas(mk, dsh.name) ? 'Sblocca' : 'Blocca'} ${escapeAttr(dsh.name)}">${dishLockedHas(mk, dsh.name) ? uiIcon('lock') : tipoIcon(dsh.tipo)}</button>
         <div class="dish-text">
@@ -5825,8 +5859,20 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
           <button type="button" class="btn is-icon dish-act" data-dish-remove="${mk}" data-dish-name="${escapeAttr(dsh.name)}" aria-label="Togli ${escapeAttr(dsh.name)}">✕</button>
         </div>`}
       </div>`;
-      }).join('')}
-      <button type="button" class="btn dish-add" data-open-dish-picker="${mk}" aria-label="Aggiungi un piatto" title="Aggiungi un piatto"><span class="dish-add-ic" aria-hidden="true">+</span></button>
+  };
+  // Pasto avanzo: in riga restano solo gli avanzi (icona su grigio, nomi uno dopo
+  // l'altro); i piatti aggiunti a questo pasto sono nuovi e stanno a parte.
+  const leftoverDishes = dishes.filter(d => !d.own), newDishes = dishes.filter(d => d.own);
+  const leftoverHtml = (name && linkSource) ? `
+    <div class="dish-line is-leftover">
+      <div class="leftover-line"><button type="button" class="dish-ic leftover-ic${dishLockedHas(mk, dishes[0].name) ? ' is-locked' : ''}" data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(dishes[0].name)}" aria-pressed="${dishLockedHas(mk, dishes[0].name)}" aria-label="Avanzo: blocca o sblocca il pasto">🥡</button><span class="leftover-names">${leftoverDishes.map(dsh => `<span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>`).join('<span class="leftover-sep"> + </span>')}${leftoverPencil}</span></div>
+      ${newDishes.length ? '' : addDishBtn}
+    </div>${newDishes.length ? `
+    <div class="dish-line is-new-dishes">${newDishes.map(dishItemHtml).join('')}${addDishBtn}</div>` : ''}` : '';
+  const dishesHtml = leftoverHtml || (name ? `
+    <div class="dish-line">
+      ${dishes.map(dishItemHtml).join('')}
+      ${addDishBtn}
     </div>` : '');
 
   // Un pasto vuoto non è mai "cucinato", anche se è rimasta la spunta di una
@@ -7012,6 +7058,11 @@ function renderMenu(){
             <div class="filter-group-label">Porzioni di partenza</div>
             <div class="persone-row"><span>Per</span><span class="qty-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="qty-num">${defaultPortions()}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></span><span>${defaultPortions() === 1 ? 'persona' : 'persone'}</span></div>
             <p class="section-sub" style="margin:0;">Valgono dalla prossima generazione. Le cene da cui avanza il pranzo del giorno dopo partono con una porzione in più.</p>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-label">Pranzo = avanzo della sera prima</div>
+            <div class="chip-row gen-leftover-days">${[0,1,2,3,4,6].map(d => `<button type="button" class="btn is-chip${leftoverLunchDays().includes(d) ? ' active' : ''}" data-gen-leftover-day="${d}" aria-pressed="${leftoverLunchDays().includes(d)}">${escapeHtml(DATA.week1[d].giorno.slice(0, 3))}</button>`).join('')}</div>
+            <p class="section-sub" style="margin:0;">Nei giorni scelti il pranzo è l'avanzo della cena del giorno prima; gli altri pranzi si cucinano. Il sabato, primo giorno della settimana, si cucina sempre. Vale dalla prossima generazione.</p>
           </div>
           ${genSettingsTargetWeek !== null ? `<div class="filter-group">
             <div class="filter-group-label">Ingredienti</div>
@@ -10301,6 +10352,14 @@ function attachHandlers(){
     btn.addEventListener('click', ()=>{
       const d = btn.hasAttribute('data-gen-portions-inc') ? 1 : -1;
       state.weekPortionsBase = Math.min(12, Math.max(1, defaultPortions() + d));
+      persist(); render();
+    });
+  });
+  document.querySelectorAll('[data-gen-leftover-day]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const d = parseInt(btn.dataset.genLeftoverDay, 10);
+      const cur = leftoverLunchDays();
+      state.weekLeftoverDays = (cur.includes(d) ? cur.filter(x => x !== d) : cur.concat(d)).sort((a, b) => a - b);
       persist(); render();
     });
   });

@@ -1925,9 +1925,9 @@ test('regole di generazione: porzioni di partenza configurabili, salvate e usate
     document.querySelector('[data-gen-portions-inc]').click(); document.querySelector('[data-gen-portions-inc]').click();
     out.after = state.weekPortionsBase;
     out.payload = buildPersonalPayload().weekPortionsBase;
-    state.genSettingsOpen = null; state.extraWeeks = []; generateWeek(1);
+    state.genSettingsOpen = null; state.extraWeeks = []; state.weekLeftoverDays = [0, 1, 2, 3]; generateWeek(1);
     out.cena = state.dayPortions['1_3_cena']; out.apripista = state.dayPortions['1_6_cena']; out.pranzo = state.dayPortions['1_5_pranzo'];
-    state.weekPortionsBase = 2;
+    state.weekPortionsBase = 2; state.weekLeftoverDays = null;
     return out;
   });
   eq(r, { start: '2', after: 4, payload: 4, cena: 4, apripista: 5, pranzo: 4 });
@@ -3310,6 +3310,7 @@ test('avanzo e freezer: collegare un avanzo aggiunge una porzione, "(2 + 1 avanz
     const k = sl.findIndex((m, n) => m.meal === 'cena' && sl[n + 1] && sl[n + 1].meal === 'pranzo' && sl[n + 1].i >= 4);
     const cena = sl[k], pranzo = sl[k + 1];
     delete state.dayLinks[pranzo.key]; delete state.dayPortions[cena.key];
+    if(!effectiveMeal(1, pranzo.i, 'pranzo').principale) writeMealDishes(1, pranzo.i, 'pranzo', 'Pasta al pesto', []); // il pranzo è vuoto se prima era un avanzo
     const principale = effectiveMeal(1, cena.i, 'cena').principale;
     const prima = mealPortions(cena.key, principale);
     // collego il pranzo come avanzo della cena, come dal selettore
@@ -3336,6 +3337,60 @@ test('avanzo e freezer: collegare un avanzo aggiunge una porzione, "(2 + 1 avanz
   assert(/\(\d+ \+ 1 avanzo\)/.test(r.nota), 'nota: ' + r.nota);
   assert(/porzion\w+ in freezer · usale/.test(r.hintTesto), 'suggerimento: ' + r.hintTesto);
   eq([r.daFreezer, r.ancora], [true, false], 'usa dal freezer');
+});
+
+test('pranzo = avanzo: di default tutti i giorni tranne il sabato (primo giorno della settimana); si sceglie nelle Regole di generazione', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.weekLeftoverDays = null; state.extraWeeks = []; generateWeek(1);
+    const link = d => state.dayLinks[`1_${d}_pranzo`] || '';
+    const out = { giorni: leftoverLunchDays(), ven: link(4), sab: link(5), dom: link(6), cenaGio: state.dayPortions['1_3_cena'], cenaSab: state.dayPortions['1_5_cena'], cenaVen: state.dayPortions['1_4_cena'] };
+    out.sabPranzoCucinato = !!effectiveMeal(1, 5, 'pranzo').principale && !state.dayLinks['1_5_pranzo'];
+    // la sequenza dei pasti mangiati conta gli avanzi
+    out.slotsPranzi = weekPlanSlots().filter(s => s.meal === 'pranzo').map(s => s.day);
+    // dalle Regole: tolgo il venerdì
+    state.genSettingsOpen = 'plain'; render();
+    document.querySelector('[data-gen-leftover-day="4"]').click();
+    out.dopo = leftoverLunchDays();
+    state.genSettingsOpen = null; state.weekLeftoverDays = null;
+    return out;
+  });
+  eq(r.giorni, [0, 1, 2, 3, 4, 6]);
+  eq([r.ven, r.sab, r.dom], ['1_3_cena', '', '1_5_cena']);
+  eq([r.cenaGio, r.cenaVen, r.cenaSab], [3, 2, 3], 'le cene da cui avanza il pranzo partono con una porzione in più (il venerdì no: il sabato si cucina)');
+  assert(r.sabPranzoCucinato, 'il pranzo del sabato si cucina');
+  eq(r.slotsPranzi, [5], 'solo il pranzo del sabato è un pasto da cucinare');
+  eq(r.dopo, [0, 1, 2, 3, 6], 'toggle venerdì');
+});
+
+test('pasto avanzo: un piatto aggiunto è nuovo e sta a parte; in riga restano solo gli avanzi; in Spesa entra il piatto nuovo', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.extraWeeks = []; generateWeek(1); state.pantryItems = {}; state.showPastDays = true;
+    const k = Object.keys(state.dayLinks).filter(x => x.startsWith('1_')).sort()[0];
+    const [w, d, m] = k.split('_'); const src = state.dayLinks[k];
+    const prima = effectiveMeal(+w, +d, m);
+    addMealDish(+w, +d, m, 'Finocchi gratinati');
+    state.tab = 'menu'; render();
+    const blocco = document.querySelector(`.meal-block[data-week-idx="${w}"][data-day-index="${d}"][data-meal="${m}"]`);
+    const out = {
+      inRiga: blocco.querySelector('.leftover-names').textContent,
+      nuovi: [...blocco.querySelectorAll('.is-new-dishes .day-menu')].map(e => e.textContent),
+      extras: effectiveMeal(+w, +d, m).ownExtras,
+      conSource: mealDishes(+w, +d, m).filter(x => !x.own).map(x => x.name),
+      fonteIntatta: JSON.stringify(effectiveMeal(...parseMealKey(src).__proto__ ? [] : []) ) && true
+    };
+    const meal = allPlannedShoppingMeals().find(x => x.key === k);
+    out.spesa = meal ? meal.principale : null;
+    out.prima = prima.principale;
+    removeMealDish(+w, +d, m, 'Finocchi gratinati');
+    out.dopoToglie = (effectiveMeal(+w, +d, m).ownExtras || []).length;
+    out.aCapo = !allPlannedShoppingMeals().some(x => x.key === k);
+    return out;
+  });
+  assert(!/Finocchi/.test(r.inRiga) && r.inRiga.includes(r.prima), 'in riga solo avanzi: ' + r.inRiga);
+  eq(r.nuovi, ['Finocchi gratinati']);
+  eq(r.extras, ['Finocchi gratinati']);
+  eq(r.spesa, 'Finocchi gratinati');
+  eq([r.dopoToglie, r.aCapo], [0, true], 'tolto il piatto nuovo, resta solo l\'avanzo');
 });
 
 (async () => {

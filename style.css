@@ -2546,3 +2546,15 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .dish-use-freezer{ margin-bottom:var(--s2); }
 .dish-freezer-have{ margin-left:var(--s2); font-size:var(--text-xsmall); color:var(--ink-light); }
 .persone-avanzi{ margin-left:var(--s2); color:var(--ink-light); font-size:var(--text-small); }
+
+/* Scheda del pasto: linea tra i piatti e cerchio del "+" con lo stesso spessore e lo stesso tratteggio del cerchio di chi cucina */
+.dish-item::before{ border-left:1px dashed var(--dish-hint); }
+.dish-add-ic, .dish-add:hover .dish-add-ic, .dish-add:focus-visible .dish-add-ic{ border:1px dashed var(--dish-hint); }
+/* Cerchio di chi cucina: grande come quello del "+"; quello vuoto grigio scuro */
+.cook-pill{ min-width:1.5rem; height:1.5rem; box-sizing:border-box; padding:0; display:inline-grid; place-items:center; font-size:0.75rem; }
+.day-card.open .cook-pill, .meal-block .cook-pill{ padding:0; }
+.cook-pill.cook-empty{ border:1px dashed var(--cook-gray); color:var(--cook-gray); }
+:root{ --cook-gray: color-mix(in srgb, var(--ink) 65%, var(--bg)); --avanzo-gray: color-mix(in srgb, var(--ink) 10%, var(--bg)); }
+/* Avanzo: icona nel cerchio come le portate, su grigino */
+.leftover-line .leftover-ic.dish-ic{ width:1.5rem; height:1.5rem; min-width:0; background:var(--avanzo-gray); font-size:0.8125rem; }
+.leftover-line{ gap:0.75rem; }
