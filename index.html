@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=265">
+<link rel="stylesheet" href="style.css?v=266">
 <script>
 // Applica tema e colore d'accento (preferenze di QUESTO dispositivo, salvate
 // in localStorage — non sincronizzate via Firebase) prima del primo paint,
@@ -108,6 +108,7 @@
         <h3 class="settings-section-title">App</h3>
         <div class="settings-card is-links">
           <button type="button" class="settings-link settings-profile" data-settings-go="profile"><span class="settings-avatar" id="settings-avatar" aria-hidden="true"></span><span class="settings-link-text" id="settings-profile-text">Profilo e condivisione<small>Nome, email, esci</small></span></button>
+          <button type="button" class="settings-link" data-settings-go="members"><span class="settings-link-ico" data-ico="user"></span><span class="settings-link-text">Persone<small>Nomi e colori di chi cucina</small></span></button>
           <button type="button" class="settings-link" data-settings-go="appearance"><span class="settings-link-ico" data-ico="palette"></span><span class="settings-link-text">Tema e colori</span></button>
           <button type="button" class="settings-link" data-settings-go="backup"><span class="settings-link-ico" data-ico="database"></span><span class="settings-link-text">Backup<small>Scarica e ripristina, backup automatico mensile</small></span></button>
           <button type="button" class="settings-link" id="refresh-btn"><span class="settings-link-ico" data-ico="refresh"></span><span class="settings-link-text">Aggiorna app<small>Se qualcosa non si vede bene, scarica l'ultima versione</small></span></button>
@@ -124,6 +125,6 @@
 });
 </script>
 <script src="catalog.js?v=22"></script>
-<script src="app.js?v=346"></script>
+<script src="app.js?v=347"></script>
 </body>
 </html>
