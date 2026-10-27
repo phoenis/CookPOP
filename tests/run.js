@@ -3174,7 +3174,7 @@ test('specifiche tue: la aggiungi all\'ingrediente (pompelmo · succo), la scegl
     return { prima, dopo, chip, opzioni, salvata, poi: variantOptionsFor('Pompelmo') };
   });
   eq([r.prima, r.dopo], [[], ['succo']], 'aggiunta dalla scheda');
-  eq(r.chip, ['succo'], 'chip');
+  eq(r.chip, ['Intero', 'succo'], 'chip');
   eq(r.opzioni, ['', 'succo', '__new'], 'scelta nella ricetta');
   assert(r.salvata && r.salvata.qual === 'scorza', 'salvata: ' + JSON.stringify(r.salvata));
   eq(r.poi, ['succo', 'scorza'], 'la nuova specifica resta disponibile');
@@ -3444,6 +3444,28 @@ test('genera anche la settimana prossima: la seconda non ripete la prima e usa l
   assert(r.toggle, 'interruttore nelle Regole');
   assert(r.haSettimana2, 'settimana 2 generata');
   eq([r.dalFreezer, r.inW1], [1, true], 'le porzioni in freezer finiscono in una cena della seconda settimana');
+});
+
+test('Dispensa: scegli cosa hai (Limone · succo); copre le righe che chiedono il succo, non quelle che chiedono il limone intero', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {}; upsertPantryItem('Limone', 'freezer', 1);
+    state.tab = 'dispensa'; state.pantryEditKey = 'limone'; render();
+    const chips = [...document.querySelectorAll('[data-have-spec]')].map(b => b.dataset.haveSpec || 'Intero');
+    document.querySelector('[data-have-spec="succo"]').click();
+    const spec = state.pantryItems.limone.spec;
+    const out = { chips, spec, succo: pantryStatusFor('Limone', '1', 'succo'), intero: pantryStatusFor('Limone', '1', ''), scorza: pantryStatusFor('Limone', '1', 'scorza') };
+    state.pantryEditKey = null; render();
+    out.riga = [...document.querySelectorAll('.inv-name')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).find(t => /^Limone/.test(t));
+    upsertPantryItem('Limone', 'freezer', 1); out.dopoUpsert = state.pantryItems.limone.spec;
+    document.querySelector('[data-pantry-edit="limone"]').click();
+    document.querySelector('[data-have-spec=""]').click();
+    out.intero2 = pantryStatusFor('Limone', '1', '');
+    return out;
+  });
+  eq(r.chips, ['Intero', 'scorza', 'succo']);
+  eq([r.spec, r.succo, r.intero, r.scorza], ['succo', 'in-casa', 'manca', 'manca'], 'il succo copre solo il succo');
+  eq(r.riga, 'Limone · succo');
+  eq([r.dopoUpsert, r.intero2], ['succo', 'in-casa'], 'la scelta resta; "Intero" la toglie');
 });
 
 (async () => {
