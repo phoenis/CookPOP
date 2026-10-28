@@ -7563,20 +7563,7 @@ function renderMenu(){
               return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ' disabled title="Il sabato, primo giorno della settimana, il pranzo si cucina sempre"'} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
             }).join('')}</div>
           </div>
-          <div class="gen-group">
-            <div class="gen-label">Alimentazione</div>
-            <div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
-            <div class="gen-label gen-sublabel">Obiettivi a settimana</div>
-            ${PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k => { const [mn, mx] = weekProteinTargets()[k]; const stp = (end, d, v, lab) => `<button type="button" class="qty-btn" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${(d < 0 && v <= 0) || (d > 0 && v >= 7) ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`; return `<div class="gen-row gen-target-row"><span>${PROTEINA_ICON[k] || ''} ${PROTEINA_LABEL[k]}</span><div class="gen-stepper">${stp(0, -1, mn, 'Meno minimo')}<span class="gen-stepper-val">${mn === mx ? mn : mn + '–' + mx}</span>${stp(1, 1, mx, 'Più massimo')}</div></div>`; }).join('')}
-            <div class="gen-label gen-sublabel">Ingredienti da evitare</div>
-            <div class="gen-exclude-chips">${(state.dietExclude || []).map((w, i) => `<button type="button" class="gen-chip" data-gen-exclude-remove="${i}" aria-label="Togli ${escapeHtml(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
-            <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. funghi, noci" aria-label="Ingrediente da evitare" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
-            <p class="gen-note">Le ricette con questi ingredienti non vengono scelte.</p>
-            <div class="gen-label gen-sublabel">Allergie e intolleranze</div>
-            <div class="gen-exclude-chips">${Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${(state.allergies || []).includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${(state.allergies || []).includes(k)}">${escapeHtml(k)}</button>`).join('')}${(state.allergies || []).filter(k => !ALLERGEN_PRESETS[k]).map(w => `<button type="button" class="gen-chip active" data-gen-allergy="${escapeAttr(w)}" aria-label="Togli ${escapeAttr(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
-            <form class="gen-exclude-form" data-gen-allergy-form><input type="text" class="gen-exclude-input" placeholder="es. fragole, kiwi" aria-label="Allergia o intolleranza" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
-            <p class="gen-note">Il menu le rispetta e le ricette che le contengono hanno un avviso ⚠. Il controllo legge solo gli ingredienti scritti nelle ricette: non vede tracce o ingredienti nascosti nei prodotti confezionati. Controlla sempre le etichette, non è una garanzia.</p>
-          </div>
+          ${genSettingsTargetWeek === null ? genDietGroupHtml() : genDietSummaryHtml()}
           <div class="gen-group gen-row">
             <div class="gen-label">Porzioni di ogni avanzo</div>
             <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-leftover-portions="-1" aria-label="Meno porzioni di avanzo" ${leftoverPortionsN() <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${leftoverPortionsN() === 0 ? 'nessuna' : leftoverPortionsN() + (leftoverPortionsN() === 1 ? ' porzione' : ' porzioni')}</span><button type="button" class="qty-btn" data-gen-leftover-portions="1" aria-label="Più porzioni di avanzo" ${leftoverPortionsN() >= 4 ? 'disabled' : ''}>+</button></div>
@@ -13503,6 +13490,36 @@ document.addEventListener('click', e=>{
     persist(); render();
   }
 });
+// Alimentazione, ingredienti da evitare e allergie valgono per tutta la famiglia, non
+// per una settimana: si cambiano da Impostazioni → Regole di generazione.
+function genDietGroupHtml(){
+  return `
+          <div class="gen-group">
+            <div class="gen-label">Alimentazione</div>
+            <div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
+            <div class="gen-label gen-sublabel">Obiettivi a settimana</div>
+            ${PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k => { const [mn, mx] = weekProteinTargets()[k]; const stp = (end, d, v, lab) => `<button type="button" class="qty-btn" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${(d < 0 && v <= 0) || (d > 0 && v >= 7) ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`; return `<div class="gen-row gen-target-row"><span>${PROTEINA_ICON[k] || ''} ${PROTEINA_LABEL[k]}</span><div class="gen-stepper">${stp(0, -1, mn, 'Meno minimo')}<span class="gen-stepper-val">${mn === mx ? mn : mn + '–' + mx}</span>${stp(1, 1, mx, 'Più massimo')}</div></div>`; }).join('')}
+            <div class="gen-label gen-sublabel">Ingredienti da evitare</div>
+            <div class="gen-exclude-chips">${(state.dietExclude || []).map((w, i) => `<button type="button" class="gen-chip" data-gen-exclude-remove="${i}" aria-label="Togli ${escapeHtml(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
+            <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. funghi, noci" aria-label="Ingrediente da evitare" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
+            <p class="gen-note">Le ricette con questi ingredienti non vengono scelte.</p>
+            <div class="gen-label gen-sublabel">Allergie e intolleranze</div>
+            <div class="gen-exclude-chips">${Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${(state.allergies || []).includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${(state.allergies || []).includes(k)}">${escapeHtml(k)}</button>`).join('')}${(state.allergies || []).filter(k => !ALLERGEN_PRESETS[k]).map(w => `<button type="button" class="gen-chip active" data-gen-allergy="${escapeAttr(w)}" aria-label="Togli ${escapeAttr(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
+            <form class="gen-exclude-form" data-gen-allergy-form><input type="text" class="gen-exclude-input" placeholder="es. fragole, kiwi" aria-label="Allergia o intolleranza" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
+            <p class="gen-note">Il menu le rispetta e le ricette che le contengono hanno un avviso ⚠. Il controllo legge solo gli ingredienti scritti nelle ricette: non vede tracce o ingredienti nascosti nei prodotti confezionati. Controlla sempre le etichette, non è una garanzia.</p>
+          </div>
+`;
+}
+function genDietSummaryHtml(){
+  const parts = [DIET_TYPES[dietTypeNow()]];
+  if((state.allergies || []).length) parts.push('allergie: ' + state.allergies.join(', '));
+  if((state.dietExclude || []).length) parts.push('da evitare: ' + state.dietExclude.join(', '));
+  return `
+          <div class="gen-group">
+            <div class="gen-label">Alimentazione</div>
+            <p class="gen-note">${escapeHtml(parts.join(' · '))}. Per cambiarla vai in Impostazioni → Regole di generazione: vale per tutte le settimane.</p>
+          </div>`;
+}
 function renderMembersPage(){
   if(!state.membersOpen) return '';
   const list = familyMembers();

@@ -3912,6 +3912,23 @@ test('Gruppi: pieni di formati anche con la Dispensa vuota; si aggiunge e si tog
   eq([r.conPenne, r.senzaPenne], ['in-casa', 'manca']);
 });
 
+test('Alimentazione e allergie: nelle Regole generali si modificano, nella finestra di una settimana c\'è solo il riepilogo (valgono per tutte)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.dietType = 'vegetariano'; state.allergies = ['glutine']; state.dietExclude = ['funghi']; state.tab = 'menu';
+    state.genSettingsOpen = 'plain'; render();
+    const generali = { dieta: !!document.querySelector('[data-gen-diet]'), form: !!document.querySelector('[data-gen-exclude-form]'), allergie: !!document.querySelector('[data-gen-allergy-form]') };
+    state.genSettingsOpen = 0; render();
+    const settimana = { dieta: !!document.querySelector('[data-gen-diet]'), form: !!document.querySelector('[data-gen-exclude-form]'), allergie: !!document.querySelector('[data-gen-allergy-form]'),
+      riepilogo: (document.querySelector('.gen-sheet') || document.body).textContent.replace(/\s+/g, ' ') };
+    state.genSettingsOpen = null; state.dietType = 'onnivoro'; state.allergies = []; state.dietExclude = []; render();
+    return { generali, settimana };
+  });
+  eq(r.generali, { dieta: true, form: true, allergie: true });
+  eq([r.settimana.dieta, r.settimana.form, r.settimana.allergie], [false, false, false]);
+  assert(/Vegetariano · allergie: glutine · da evitare: funghi/.test(r.settimana.riepilogo), 'riepilogo: ' + r.settimana.riepilogo.slice(0, 200));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
