@@ -1460,10 +1460,10 @@ test('con quello che ho: genera e cambia un pasto con le ricette per cui hai gli
   eq(r, { missing: 0, inPool: true, poolAllComplete: true, picked: true, short: 'number' });
   await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
-    state.genSettingsOpen = null; state.tab = 'menu'; state.swapOpenDay = '0_4_cena'; render();
+    state.genSettingsOpen = null; state.tab = 'menu'; state.dishPicker = { key: '0_4_cena', replace: null, tipo: 'all', search: '' }; render();
   });
-  await page.click('[data-swap-cat="pantry"]');
-  eq(await page.locator('.swap-result-missing').first().textContent(), 'hai tutto', 'prima chi ha tutto');
+  await page.click('[data-dish-pantry]');
+  assert(/hai tutto/.test(await page.locator('.dsh-results .swap-result-time').first().textContent()), 'prima chi ha tutto');
   eq(page.errors, [], 'errori JS');
 });
 
@@ -4075,6 +4075,34 @@ test('Regole della settimana: riepilogo fisso sopra il bottone, "Niente da rigen
   eq(r.bottone, ['Genera nuovo menù', false]);
   eq([r.sabato, r.sabatoDisabilitato], [true, 'S']);
   eq(r.tuttoBloccato, ['Niente da rigenerare', true]);
+});
+
+test('Scegli ricetta: "Cambia piatto", "Aggiungi piatto" e pasto vuoto sono lo stesso foglio; chip Suggeriti con "Un\'altra proposta"; scorre fino alla portata scelta', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.extraWeeks = []; generateWeek(1); state.tab = 'menu'; render();
+    const out = {};
+    const apri = mk => { state.dishPicker = null; document.querySelector('[data-open-swap="' + mk + '"]'); };
+    // pasto con un piatto: stessa apertura ma "Cambia piatto" con "Al posto di"
+    const mk = '1_3_cena';
+    const piatto = effectiveMeal(1, 3, 'cena').principale;
+    const btn = document.createElement('button'); btn.setAttribute('data-open-swap', mk); document.body.appendChild(btn);
+    render(); // gli ascoltatori si attaccano al render
+    document.querySelector('[data-open-swap="' + mk + '"]').click();
+    out.cambia = [document.querySelector('.dish-sheet .move-title').textContent, !!document.querySelector('.dsh-cur'), !!document.querySelector('.meal-detail-screen'), (document.querySelector('.dsh-cur') || { textContent: '' }).textContent.includes(piatto)];
+    out.senzaAnnulla = !/Annulla|Oppure cerca/i.test(document.querySelector('.dish-sheet').textContent);
+    document.querySelector('[data-dish-course="suggeriti"]').click();
+    const nomi = () => [...document.querySelectorAll('[data-dish-pick]')].map(e => e.dataset.dishPick);
+    out.suggeriti = nomi().length > 0 && nomi().length <= 3;
+    const primi = nomi();
+    document.querySelector('[data-dish-more-suggest]').click();
+    out.altre = nomi().length > 0 && nomi().every(n => !primi.includes(n));
+    state.dishPicker = null; render();
+    return out;
+  });
+  eq(r.cambia, ['Cambia piatto', true, false, true]);
+  eq(r.senzaAnnulla, true);
+  eq([r.suggeriti, r.altre], [true, true]);
 });
 
 (async () => {
