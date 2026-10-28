@@ -1988,7 +1988,7 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     TAB_MENU_ITEMS.dispensa[3].action(); out.grp = state.pantryGroupsModalOpen === true; state.pantryGroupsModalOpen = false;
     TAB_MENU_ITEMS.dispensa[4].action(); out.dept = state.deptsModalOpen === true; state.deptsModalOpen = false;
     TAB_MENU_ITEMS.spesa[0].action(); out.aisle = state.aisleOrderOpen === true; state.aisleOrderOpen = false;
-    TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genSettingsOpen === 'plain'; state.genSettingsOpen = null;
+    TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genGeneralOpen === true && state.genSettingsOpen === null; state.genGeneralOpen = false;
     return out;
   });
   eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Regole di generazione'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true });
