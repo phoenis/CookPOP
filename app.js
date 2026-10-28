@@ -1655,7 +1655,11 @@ function getRecipeMeta(name){
 const RECIPE_PHOTOS_PATH = 'recipe-photos';
 const recipePhotoCache = {}; // nome -> { status:'loading'|'ok'|'none'|'error', src }
 // Le foto sono per famiglia (le famiglie di prima continuano a condividere quelle già caricate).
-function recipePhotoPath(name){ return `${activeRoute && activeRoute.newFamily ? `families/${activeRoute.famId}/photos` : RECIPE_PHOTOS_PATH}/${fbKeyEncode(name)}`; }
+function recipePhotoPath(name){
+  const r = activeRoute;
+  const base = r && r.photosPath ? r.photosPath : (r && r.newFamily ? `families/${r.famId}/photos` : RECIPE_PHOTOS_PATH);
+  return `${base}/${fbKeyEncode(name)}`;
+}
 function ensureRecipePhoto(name){
   if(!name || recipePhotoCache[name] || !window.cookpopSync || !window.cookpopSync.load) return;
   recipePhotoCache[name] = { status:'loading' };
@@ -2739,7 +2743,12 @@ async function resolveFamilyRoute(){
     famId = await runFamilyGate();
   }
   try{ localStorage.setItem(cacheKey, famId); }catch(e){}
-  activeRoute = familyRouteFor(famId);
+  const info = await loadFamilyInfo(famId);
+  // Collegata ma senza i dati di dove stanno (migrazione a metà): chi è di una
+  // famiglia di prima resta sul suo spazio, invece di trovarne uno vuoto.
+  if(!info.meta && legacyRouteStrict(loggedInEmail)){ activeRoute = null; return; }
+  selfMemberId = info.memberId;
+  activeRoute = familyRouteFor(famId, info.meta);
 }
 function runFamilyGate(){
   return new Promise((resolve)=>{
@@ -2780,7 +2789,7 @@ function runFamilyGate(){
 // Chi ha un accesso nuovo compare tra le persone della famiglia al primo avvio.
 function ensureSelfMember(){
   const r = activeRoute;
-  if(!r || !r.newFamily || !loggedInUid) return;
+  if(!r || !r.famId || !loggedInUid || selfMemberId) return;
   const list = familyMembers();
   if(list.some(m => m.uid === loggedInUid)) return;
   const id = 'u' + loggedInUid.slice(0, 8).toLowerCase();
@@ -2794,9 +2803,10 @@ function ensureSelfMember(){
 // Chi sta usando l'app ora: dedotto dall'account con cui ha fatto login
 // (le due email contengono "mara"/"ste"), non serve più un toggle manuale.
 function getCurrentUser(){
+  if(selfMemberId && familyMembers().some(x => x.id === selfMemberId)) return selfMemberId;
   const byUid = loggedInUid && familyMembers().find(x => x.uid === loggedInUid);
   if(byUid) return byUid.id;
-  if(activeRoute && activeRoute.newFamily) return null;
+  if(activeRoute && activeRoute.famId) return null;
   const email = (loggedInEmail || '').toLowerCase();
   const m = familyMembers().find(x => email.includes(x.id));
   return m ? m.id : null;
@@ -2854,8 +2864,34 @@ function catalogPath(){ return getSpaceRoute().catalogPath || CATALOG_STATE_PATH
 function catalogCacheKey(){ const r = getSpaceRoute(); return r.id === 'default' ? 'catalog-state-cache' : 'catalog-state-cache-' + r.id; }
 // Famiglie nate dopo (con codice invito): il percorso dipende dall'id della
 // famiglia, che si legge da userFamily/<uid> all'avvio (vedi resolveFamilyRoute).
-function familyRouteFor(famId){
+// meta.paths (scritto a mano nella console per le famiglie di prima) dice dove
+// stanno i loro dati, che non vengono spostati: stato, catalogo, foto.
+function familyRouteFor(famId, meta){
+  const p = meta && meta.paths;
+  if(p && p.state){
+    return { id: famId, famId, newFamily: false, path: p.state, catalogPath: p.catalog || `families/${famId}/catalog`, photosPath: p.photos || null,
+      seedFromShared: !!p.seedCatalogFrom, seedPath: p.seedCatalogFrom || null };
+  }
   return { id: 'f-' + famId, famId, newFamily: true, path: `families/${famId}/state`, catalogPath: `families/${famId}/catalog` };
+}
+// Chi sono io tra le persone della famiglia (families/<id>/members/<uid>/memberId):
+// vale per le famiglie di prima, dove "mara" e "ste" esistevano già nei dati.
+let selfMemberId = null;
+async function loadFamilyInfo(famId){
+  const sync = window.cookpopSync, key = 'cookpop-family-info-' + loggedInUid + '-' + famId;
+  const withTimeout = p => Promise.race([p, new Promise((_, rej)=> setTimeout(()=> rej(new Error('timeout')), 5000))]);
+  try{
+    const [meta, me] = await Promise.all([
+      withTimeout(sync.load(`families/${famId}/meta`)),
+      withTimeout(sync.load(`families/${famId}/members/${loggedInUid}`))
+    ]);
+    const info = { meta: meta || null, memberId: me && me.memberId ? me.memberId : null };
+    try{ localStorage.setItem(key, JSON.stringify(info)); }catch(e){}
+    return info;
+  }catch(e){
+    try{ const c = localStorage.getItem(key); if(c) return JSON.parse(c); }catch(_){}
+    return { meta: null, memberId: null };
+  }
 }
 let activeRoute = null;
 // Le famiglie di prima si riconoscono dall'email; chi ha un accesso nuovo non
@@ -3570,7 +3606,7 @@ async function loadState(){
         // resta falso): la riga sotto lo riattiva alla lettura successiva.
         lastSyncedCatalog = {};
         seeding = true;
-        window.cookpopSync.load(CATALOG_STATE_PATH).then(base=>{
+        window.cookpopSync.load(route.seedPath || CATALOG_STATE_PATH).then(base=>{
           if(base) return window.cookpopSync.save(catalogPath(), base);
           catalogSynced = true; render();
           if(catalogSaveDeferred){ catalogSaveDeferred = false; persist(); }
@@ -13456,7 +13492,7 @@ function renderMembersPage(){
         <h3 class="settings-section-title">Chi mangia e cucina</h3>
         ${cards}
         ${list.length < MEMBERS_MAX ? `<button type="button" class="btn is-outline is-block" data-member-add>${uiIcon('plus')} Aggiungi una persona</button>` : ''}
-        ${activeRoute && activeRoute.newFamily ? `<div class="settings-card invite-card">
+        ${activeRoute && activeRoute.famId ? `<div class="settings-card invite-card">
           ${state.inviteCode ? `<div class="invite-code" aria-live="polite">${escapeHtml(state.inviteCode)}</div><p class="settings-note">Dallo a chi deve entrare: vale una volta sola. Dopo aver creato l'account sceglie "Entra" e lo scrive.</p>` : ''}
           <button type="button" class="btn is-outline is-block" data-make-invite>${state.inviteCode ? 'Nuovo codice' : 'Invita una persona con un codice'}</button>
           <p class="settings-note" id="invite-status"></p>

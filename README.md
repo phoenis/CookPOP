@@ -53,17 +53,19 @@ Creane uno" (email + password). Chi non è di una famiglia di prima vede
   una chiave a piacere (es. `MARA2026`) con valore `true`. Si consuma al primo
   uso: ne serve uno per ogni famiglia nuova.
 
-**Regole del Realtime Database**: il file `database.rules.json` contiene le
-regole da incollare in Console → Realtime Database → Regole. Prima di
-pubblicarle sostituisci `EMAIL_MARA`, `EMAIL_STE`, `EMAIL_CUGINA`,
-`EMAIL_MAMMA` con le email esatte dei 4 account di prima (servono perché i loro
-dati non hanno ancora un'appartenenza nel database, quindi si riconoscono
-dall'email). Controlla con "Playground" che un account di prima legga ancora
-`quaderno-state` e che un account nuovo no. Le famiglie nuove sono protette da
-`families/<id>/members/<uid>`: solo chi è tra i membri legge e scrive.
+**Famiglie di prima nel sistema nuovo**: dopo la migrazione (vedi
+`docs/migrazione-famiglie/LEGGIMI.md`) anche le 4 famiglie di prima sono
+registrate nel database (`families/default|cugina|mamma`, con `meta.paths` che
+dice dove stanno i loro dati, e `userFamily/<uid>`). Le email non devono più
+contenere nessun nome. Finché non è fatta, l'app continua a riconoscerle
+dall'email (`SPACE_ROUTES`).
 
-L'integrazione Google Home (`scripts/google-home-shopping-sync.gs`) accede con
-l'account che le assegni: deve essere uno di quelli di `EMAIL_MARA`/`EMAIL_STE`.
+**Regole del Realtime Database**: `database.rules.json` da incollare in Console
+→ Realtime Database → Regole, **dopo** la migrazione. L'accesso ai dati delle
+famiglie di prima dipende da `families/<id>/members`, quello delle famiglie
+nuove dalla stessa struttura. L'integrazione Google Home
+(`scripts/google-home-shopping-sync.gs`) accede con un account che deve essere
+tra i membri di `families/default`.
 
 Le 4 tab dell'app: **Menù** (settimana corrente + generatore automatico),
 **Spesa** (lista aggiornata in automatico in base al menù, per giorno o per
