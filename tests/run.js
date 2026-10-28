@@ -3800,7 +3800,7 @@ test('primo avvio guidato: solo per le famiglie nuove, 3 passi con gli stessi co
     document.querySelector('[data-onb-next]').click();
     out.finale = !!document.querySelector('[data-onb-finish="generate"]');
     document.querySelector('[data-onb-finish="generate"]').click();
-    out.fatto = [state.onboardingDone, !document.querySelector('[data-page="onboarding"]'), state.tab, !!effectiveRecipeMeta(0, 5, 'cena') || !!effectiveRecipeMeta(0, 6, 'cena') || !!effectiveRecipeMeta(0, 0, 'cena') || !!effectiveRecipeMeta(0, 1, 'cena')];
+    out.fatto = [state.onboardingDone, !document.querySelector('[data-page="onboarding"]'), state.tab, WEEK_DISPLAY_ORDER.some(i => !!effectiveRecipeMeta(0, i, 'cena'))];
     out.payload = buildPersonalPayload().onboardingDone;
     activeRoute = oldRoute; personalSynced = oldSynced; state.dietType = 'onnivoro'; state.allergies = []; state.weekPortionsBase = 2; render();
     return out;
@@ -3812,6 +3812,45 @@ test('primo avvio guidato: solo per le famiglie nuove, 3 passi con gli stessi co
   eq(r.finale, true);
   eq(r.fatto, [true, true, 'menu', true]);
   eq(r.payload, true);
+});
+
+test('famiglie di prima nel sistema nuovo: dati dove sono, io = mara senza nome nell\'email, invito disponibile, niente primo avvio', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    const oldSync = window.cookpopSync, oldEmail = loggedInEmail, oldUid = loggedInUid, oldRoute = activeRoute, oldSelf = selfMemberId;
+    const store = {
+      userFamily: { uidMara: 'default', uidCug: 'cugina' },
+      families: {
+        default: { meta: { name: 'Mara e Ste', paths: { state: 'quaderno-state', catalog: 'catalog-state', photos: 'recipe-photos' } }, members: { uidMara: { name: 'Mara', memberId: 'mara' } } },
+        cugina: { meta: { name: 'Cugina', paths: { state: 'spaces/cugina/state', catalog: 'spaces/cugina/catalog', photos: 'recipe-photos', seedCatalogFrom: 'catalog-state' } }, members: { uidCug: { name: 'Cugina' } } }
+      }
+    };
+    const get = p => p.split('/').reduce((o, k) => (o == null ? null : o[k]), store);
+    window.cookpopSync = { load: p => Promise.resolve(get(p) === undefined ? null : get(p)), save: () => Promise.resolve(), onChange: () => {}, remove: () => Promise.resolve() };
+    // email senza nessun nome: la famiglia viene da userFamily
+    loggedInUid = 'uidMara'; loggedInEmail = 'qualunque.cosa@x.it'; activeRoute = null; selfMemberId = null;
+    await resolveFamilyRoute();
+    out.mara = [activeRoute.path, activeRoute.catalogPath, activeRoute.photosPath, activeRoute.newFamily, activeRoute.famId, activeRoute.id, selfMemberId, getCurrentUser()];
+    out.foto = recipePhotoPath('Pasta');
+    out.onboarding = onboardingActive();
+    out.invito = (state.membersOpen = true, render(), !!document.querySelector('[data-make-invite]'));
+    state.membersOpen = false;
+    loggedInUid = 'uidCug'; loggedInEmail = 'altra@x.it'; activeRoute = null; selfMemberId = null;
+    await resolveFamilyRoute();
+    out.cug = [activeRoute.path, activeRoute.catalogPath, activeRoute.seedFromShared, activeRoute.seedPath, catalogPath(), catalogCacheKey()];
+    // migrazione a metà: userFamily c'è ma i dati della famiglia mancano -> chi è di prima resta sul suo spazio
+    store.userFamily.uidX = 'zzz'; loggedInUid = 'uidX'; loggedInEmail = 'mamma@x.it'; activeRoute = null; selfMemberId = null;
+    await resolveFamilyRoute();
+    out.mezzo = activeRoute === null && getSpaceRoute().id;
+    window.cookpopSync = oldSync; loggedInEmail = oldEmail; loggedInUid = oldUid; activeRoute = oldRoute; selfMemberId = oldSelf; render();
+    return out;
+  });
+  eq(r.mara, ['quaderno-state', 'catalog-state', 'recipe-photos', false, 'default', 'default', 'mara', 'mara']);
+  eq(r.foto, 'recipe-photos/Pasta');
+  eq(r.onboarding, false);
+  eq(r.invito, true);
+  eq(r.cug, ['spaces/cugina/state', 'spaces/cugina/catalog', true, 'catalog-state', 'spaces/cugina/catalog', 'catalog-state-cache-cugina']);
+  eq(r.mezzo, 'mamma');
 });
 
 (async () => {

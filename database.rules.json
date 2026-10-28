@@ -52,25 +52,25 @@
     },
 
     "quaderno-state": {
-      ".read": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE')",
-      ".write": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE')"
+      ".read": "auth != null && root.child('families').child('default').child('members').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('families').child('default').child('members').child(auth.uid).exists()"
     },
     "catalog-state": {
-      ".read": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE' || auth.token.email === 'EMAIL_CUGINA' || auth.token.email === 'EMAIL_MAMMA')",
-      ".write": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE')"
+      ".read": "auth != null && (root.child('families').child('default').child('members').child(auth.uid).exists() || root.child('families').child('cugina').child('members').child(auth.uid).exists() || root.child('families').child('mamma').child('members').child(auth.uid).exists())",
+      ".write": "auth != null && root.child('families').child('default').child('members').child(auth.uid).exists()"
     },
     "recipe-photos": {
-      ".read": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE' || auth.token.email === 'EMAIL_CUGINA' || auth.token.email === 'EMAIL_MAMMA')",
-      ".write": "auth != null && (auth.token.email === 'EMAIL_MARA' || auth.token.email === 'EMAIL_STE' || auth.token.email === 'EMAIL_CUGINA' || auth.token.email === 'EMAIL_MAMMA')"
+      ".read": "auth != null && (root.child('families').child('default').child('members').child(auth.uid).exists() || root.child('families').child('cugina').child('members').child(auth.uid).exists() || root.child('families').child('mamma').child('members').child(auth.uid).exists())",
+      ".write": "auth != null && (root.child('families').child('default').child('members').child(auth.uid).exists() || root.child('families').child('cugina').child('members').child(auth.uid).exists() || root.child('families').child('mamma').child('members').child(auth.uid).exists())"
     },
     "spaces": {
       "cugina": {
-        ".read": "auth != null && auth.token.email === 'EMAIL_CUGINA'",
-        ".write": "auth != null && auth.token.email === 'EMAIL_CUGINA'"
+        ".read": "auth != null && root.child('families').child('cugina').child('members').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('families').child('cugina').child('members').child(auth.uid).exists()"
       },
       "mamma": {
-        ".read": "auth != null && auth.token.email === 'EMAIL_MAMMA'",
-        ".write": "auth != null && auth.token.email === 'EMAIL_MAMMA'"
+        ".read": "auth != null && root.child('families').child('mamma').child('members').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('families').child('mamma').child('members').child(auth.uid).exists()"
       }
     }
   }

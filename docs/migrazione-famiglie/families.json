@@ -1,0 +1,30 @@
+{
+  "default": {
+    "meta": {
+      "name": "Mara e Ste",
+      "paths": { "state": "quaderno-state", "catalog": "catalog-state", "photos": "recipe-photos" }
+    },
+    "members": {
+      "UID_MARA": { "name": "Mara", "memberId": "mara" },
+      "UID_STE": { "name": "Ste", "memberId": "ste" }
+    }
+  },
+  "cugina": {
+    "meta": {
+      "name": "Cugina",
+      "paths": { "state": "spaces/cugina/state", "catalog": "spaces/cugina/catalog", "photos": "recipe-photos", "seedCatalogFrom": "catalog-state" }
+    },
+    "members": {
+      "UID_CUGINA": { "name": "Cugina" }
+    }
+  },
+  "mamma": {
+    "meta": {
+      "name": "Mamma",
+      "paths": { "state": "spaces/mamma/state", "catalog": "spaces/mamma/catalog", "photos": "recipe-photos", "seedCatalogFrom": "catalog-state" }
+    },
+    "members": {
+      "UID_MAMMA": { "name": "Mamma" }
+    }
+  }
+}
