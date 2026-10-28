@@ -8441,7 +8441,7 @@ function normalizeLots(it){
     if(m) m.qty = r2(m.qty + l.qty); else merged.push(l);
   });
   sortLots(merged);
-  if(merged.length <= 1 || it.unit === 'none' || target <= 0){
+  if(merged.length <= 1 || target <= 0){
     delete it.lots;
     if(merged[0] && merged[0].scadenza) it.scadenza = merged[0].scadenza;
     else if(merged.length) delete it.scadenza;
@@ -9458,15 +9458,15 @@ function renderIngredientSheet(it, isNew){
   const days = it.scadenza ? daysUntilDate(it.scadenza) : null;
   const existingForNew = isNew ? existingPantryFor(it.nome) : null;
   const addsLot = !!(existingForNew && typeof existingForNew.qty === 'number' && existingForNew.qty > 0 && unit !== 'none');
-  const canLots = !isNew && !home && unit !== 'none' && typeof it.qty === 'number' && it.qty > 0;
+  const canLots = !isNew && !home && typeof it.qty === 'number' && it.qty > 0; // anche per "solo se c'è": un'altra confezione con un'altra data
   const lotsHtml = (canLots && Array.isArray(it.lots)) ? `
         <div class="settings-field">
           <div class="settings-field-label">Scadenze <span class="sheet-hint-inline">una per confezione</span></div>
           <div class="lots-list">
             ${it.lots.map((l, i) => `
             <div class="lot-row">
-              <input type="number" inputmode="decimal" min="0" step="${qtyStepFor(unit)}" class="lot-qty" data-lot-qty="${i}" value="${l.qty}" aria-label="Quantità della confezione ${i + 1}">
-              <span class="lot-unit">${escapeHtml(UNIT_SHORT[unit] || unit)}</span>
+              ${unit === 'none' ? `<span class="lot-unit lot-n">Confezione ${i + 1}</span>` : `<input type="number" inputmode="decimal" min="0" step="${qtyStepFor(unit)}" class="lot-qty" data-lot-qty="${i}" value="${l.qty}" aria-label="Quantità della confezione ${i + 1}">
+              <span class="lot-unit">${escapeHtml(UNIT_SHORT[unit] || unit)}</span>`}
               <input type="date" class="lot-date" data-lot-date="${i}" value="${escapeAttr(l.scadenza || '')}" aria-label="Scadenza della confezione ${i + 1}">
               <button type="button" class="btn is-icon lot-remove" data-lot-remove="${i}" aria-label="Togli questa confezione">✕</button>
               <span class="lot-badge">${l.scadenza ? expiryBadgeHtml(daysUntilDate(l.scadenza), l.scadenza) : '<span class="sheet-hint-inline">nessuna scadenza</span>'}</span>
@@ -12376,7 +12376,8 @@ function attachHandlers(){
   }));
   document.querySelectorAll('[data-sheet-presence-set]').forEach(btn=> btn.addEventListener('click', ()=>{
     const it = sheetTarget(); if(!it) return;
-    it.qty = btn.dataset.sheetPresenceSet === '1' ? 1 : 0;
+    it.qty = btn.dataset.sheetPresenceSet === '1' ? (it.qty > 0 ? it.qty : 1) : 0;
+    if(!(it.qty > 0)) delete it.lots;
     sheetChanged();
   }));
   document.querySelectorAll('[data-sheet-mode]').forEach(btn=> btn.addEventListener('click', ()=>{

@@ -4105,6 +4105,29 @@ test('Scegli ricetta: "Cambia piatto", "Aggiungi piatto" e pasto vuoto sono lo s
   eq([r.suggeriti, r.altre], [true, true]);
 });
 
+test('scheda ingrediente "solo se c\'è": "+ Altra scadenza (un\'altra confezione)" aggiunge una confezione con la sua data; Finito le toglie', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.pantryItems = {}; upsertPantryItem('Cipolle rosse', 'frigo', 1, 'none'); state.pantryItems['cipolle rosse'].scadenza = '2030-01-10';
+    state.tab = 'dispensa'; state.pantryEditKey = 'cipolle rosse'; render();
+    const out = { link: !!document.querySelector('.lot-add-link'), seg: !!document.querySelector('.sheet-seg') };
+    document.querySelector('.lot-add-link').click();
+    const it = state.pantryItems['cipolle rosse'];
+    out.lotti = [Array.isArray(it.lots) ? it.lots.length : 0, it.qty, it.unit];
+    out.righe = document.querySelectorAll('.lot-row').length;
+    out.senzaQuantita = !document.querySelector('.lot-row .lot-qty');
+    out.dateInput = document.querySelectorAll('.lot-row .lot-date').length;
+    document.querySelector('[data-sheet-presence-set="0"]').click();
+    out.finito = [state.pantryItems['cipolle rosse'].qty, !state.pantryItems['cipolle rosse'].lots];
+    state.pantryEditKey = null; render();
+    return out;
+  });
+  eq([r.link, r.seg], [true, true]);
+  eq(r.lotti, [2, 2, 'none']);
+  eq([r.righe, r.senzaQuantita, r.dateInput], [2, true, 2]);
+  eq(r.finito, [0, true]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
