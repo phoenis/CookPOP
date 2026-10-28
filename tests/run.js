@@ -3563,7 +3563,7 @@ test('alimentazione: tipo e ingredienti che non piacciono si cambiano nelle pagi
   await page.evaluate(() => { state.dietType = 'onnivoro'; state.dietExclude = []; state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.tab = 'menu'; state.genGeneralOpen = true; state.genGeneralPage = null; render(); });
   await page.click('[data-gen-go="diet"]');
   await page.click('[data-gen-diet="vegetariano"]');
-  await page.click('[data-gen-general-back]');
+  await page.click('.gen-mini-sheet [data-gen-sheet-close].gen-go');
   await page.click('[data-gen-go="avoid"]');
   await page.fill('[data-gen-exclude-form] input', 'funghi, noci');
   await page.click('[data-gen-exclude-form] button');
@@ -3924,8 +3924,13 @@ test('Regole generali: pagina con righe e sotto-pagine; la finestra della settim
     const testo = () => (document.querySelector('[data-page^="gen-general"]') || document.body).textContent.replace(/\s+/g, ' ');
     const out = { righe: [...document.querySelectorAll('[data-gen-go]')].map(b => b.dataset.genGo), porzioni: has('[data-gen-portions-inc]'), toggle: has('[data-toggle-gen-leftover]'), testo: testo() };
     const sotto = {};
-    ['diet', 'targets', 'grams', 'avoid'].forEach(p => { state.genGeneralPage = p; render(); sotto[p] = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), allergie: has('[data-gen-allergy-form]'), non: has('[data-gen-exclude-form]') }; });
+    ['targets', 'avoid'].forEach(p => { state.genGeneralPage = p; render(); sotto[p] = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), allergie: has('[data-gen-allergy-form]'), non: has('[data-gen-exclude-form]') }; });
     out.sotto = sotto;
+    state.genGeneralPage = null; state.genGeneralSheet = 'diet'; render();
+    const pannelli = { diet: has('.gen-mini-sheet [data-gen-diet]') && !!document.querySelector('[data-page="gen-general"]') };
+    state.genGeneralSheet = 'grams'; render(); pannelli.grams = has('.gen-mini-sheet [data-gen-grams]');
+    document.querySelector('.gen-mini-sheet .gen-go').click(); pannelli.chiuso = !has('.gen-mini-sheet');
+    out.pannelli = pannelli;
     state.genGeneralOpen = false; state.genGeneralPage = null; state.genSettingsOpen = 0; render();
     out.settimana = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), porzioni: has('[data-gen-portions-inc]'), titolo: document.querySelector('.gen-sheet .move-title').textContent };
     state.genSettingsOpen = null; state.dietType = 'onnivoro'; state.allergies = []; state.dietExclude = []; state.portionGrams = { pasta: 0, riso: 0 }; render();
@@ -3934,7 +3939,8 @@ test('Regole generali: pagina con righe e sotto-pagine; la finestra della settim
   eq(r.righe, ['grams', 'diet', 'targets', 'avoid', 'avoid']);
   eq([r.porzioni, r.toggle], [true, true]);
   assert(/Pasta 70 g · Riso 50 g/.test(r.testo) && /Vegetariano/.test(r.testo) && /glutine/i.test(r.testo) && /funghi/i.test(r.testo), 'riepiloghi: ' + r.testo.slice(0, 300));
-  eq(r.sotto.diet.diet, true); eq(r.sotto.targets.target, true); eq(r.sotto.grams.grams, true);
+  eq(r.sotto.targets.target, true);
+  eq([r.pannelli.diet, r.pannelli.grams, r.pannelli.chiuso], [true, true, true]);
   eq([r.sotto.avoid.allergie, r.sotto.avoid.non], [true, true]);
   eq(r.settimana, { diet: false, target: false, grams: false, porzioni: false, titolo: 'Regole della settimana' });
 });
