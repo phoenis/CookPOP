@@ -8495,15 +8495,26 @@ function reconcileFreezer(){
 // Un pasto di un giorno futuro non può essere già cucinato: se compare "cucinato"
 // è un segno vecchio (settimana passata) rimesso da un telefono non aggiornato
 // che lo risincronizza. Lo si toglie ogni volta, non solo una volta.
+// Segno "fatto" di un pasto: `true` per oggi e i giorni passati; per un pasto dei giorni dopo (es. l'avanzo
+// di domani mangiato in anticipo) 'anticipato', così non si confonde con un vecchio `true` rimasto su un
+// giorno futuro (rimesso da un altro telefono con una versione vecchia), che invece si toglie a ogni disegno.
+function doneValueFor(weekIdx, i){
+  const tp = findTodayPos();
+  const pos = WEEK_DISPLAY_ORDER.indexOf(parseInt(i, 10));
+  return (weekIdx > 0 || (tp !== null && pos > tp)) ? 'anticipato' : true;
+}
 function clearFutureMealsDone(){
   let changed = false;
+  const dropOld = (md, day) => {
+    if(!md || !md[day]) return;
+    Object.keys(md[day]).forEach(m => { if(md[day][m] === true){ delete md[day][m]; changed = true; } });
+    if(!Object.keys(md[day]).length){ delete md[day]; changed = true; }
+  };
   const todayPos = findTodayPos();
   if(todayPos !== null){
-    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{
-      if(pos > todayPos && state.mealsDone && state.mealsDone[i]){ delete state.mealsDone[i]; changed = true; }
-    });
+    WEEK_DISPLAY_ORDER.forEach((i, pos)=>{ if(pos > todayPos) dropOld(state.mealsDone, i); });
   }
-  (state.extraWeeks || []).forEach(w => { if(w && w.mealsDone && Object.keys(w.mealsDone).length){ w.mealsDone = {}; changed = true; } });
+  (state.extraWeeks || []).forEach(w => { if(w && w.mealsDone) Object.keys(w.mealsDone).forEach(day => dropOld(w.mealsDone, day)); });
   return changed;
 }
 function reconcileAllLots(){
@@ -11051,7 +11062,7 @@ function attachHandlers(){
         // modale di aggiornamento Dispensa. I consumi "con i pasti" (pane)
         // valgono anche con l'avanzo: si tolgono qui, con Annulla.
         if(!mealsDone[i]) mealsDone[i] = {};
-        mealsDone[i][meal] = true;
+        mealsDone[i][meal] = doneValueFor(weekIdx, i);
         const counts = {};
         mealRecurringList().forEach(r=>{ if(mealUsesRecurring(i, meal)) counts[r.id] = r.qty; });
         const took = takeRecurringMeal(counts);
@@ -11306,7 +11317,7 @@ function attachHandlers(){
         });
         const mealsDone = weekMealsDoneRef(weekIdx);
         if(!mealsDone[i]) mealsDone[i] = {};
-        mealsDone[i][meal] = true;
+        mealsDone[i][meal] = doneValueFor(weekIdx, i);
       }
       closeDoneSheet();
       persist(); render();

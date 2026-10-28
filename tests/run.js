@@ -4128,6 +4128,32 @@ test('scheda ingrediente "solo se c\'è": "+ Altra scadenza (un\'altra confezion
   eq(r.finito, [0, true]);
 });
 
+test('pasto di un giorno futuro: "Da mangiare" diventa "Mangiata" e resta; i vecchi segni `true` sui giorni futuri si tolgono ancora', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.leftoverLunchOn = true; state.extraWeeks = []; generateWeek(0); state.tab = 'menu'; state.balanceDetailsOpen = true; render();
+    const key = Object.keys(state.dayLinks).find(k => k.startsWith('0_') && k.endsWith('_pranzo'));
+    if(!key) return null;
+    const btn = () => document.querySelector(`[data-toggle-done="${key}"]`);
+    const out = { prima: btn().textContent.trim() };
+    btn().click();
+    out.dopo = btn().textContent.trim();
+    render();
+    out.dopoRender = btn().textContent.trim();
+    const { i, meal } = parseMealKey(key);
+    out.valore = weekMealsDoneRef(0)[i][meal];
+    btn().click();
+    out.annullato = btn().textContent.trim();
+    // un vecchio `true` su un giorno futuro si toglie ancora
+    const tp = findTodayPos(), futuro = WEEK_DISPLAY_ORDER[tp + 1];
+    state.mealsDone = { [futuro]: { cena: true } }; render();
+    out.vecchioTrue = !!state.mealsDone[futuro];
+    return out;
+  });
+  if(!r) return;
+  eq([r.prima, r.dopo, r.dopoRender, r.valore, r.annullato, r.vecchioTrue], ['Da mangiare', 'Mangiata', 'Mangiata', 'anticipato', 'Da mangiare', false]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
