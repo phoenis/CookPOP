@@ -671,7 +671,8 @@ test('gruppi: formati nel gruppo, aggiunta e rimozione dalla riga, nuovo gruppo 
     upsertPantryItem('Farfalle', 'dispensa', 1);
     state.tab = 'dispensa'; state.pantryGroupsModalOpen = true; render();
   });
-  eq(await page.$eval('[data-group-edit="pasta-corta"] .manage-row-sub', el => el.textContent), 'Fusilli, Penne', 'formati mostrati');
+  const mostrati = await page.$eval('[data-group-edit="pasta-corta"] .manage-row-sub', el => el.textContent);
+  assert(/Fusilli/.test(mostrati) && /Penne/.test(mostrati) && /Rigatoni/.test(mostrati), 'formati mostrati: ' + mostrati);
   await page.click('[data-group-edit="pasta-corta"]');
   await page.fill('#group-member-search', 'farf');
   await page.click('[data-group-member-add="farfalle"]');
@@ -3876,6 +3877,39 @@ test('niente scorte né spesa fissa di partenza; l\'insalata fissa della famigli
   eq(r.cugina, [0, 0]);
   eq(r.originale, [true, 2, 7, true, 0]);
   eq(r.nessunDato, [true, true]);
+});
+
+test('Gruppi: pieni di formati anche con la Dispensa vuota; si aggiunge e si toglie un formato senza passare dalla Dispensa', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.pantryItems = {}; state.recurringItems = {};
+    Object.values(state.pantryGroups).forEach(g => { delete g.members; });
+    state.pantryGroupsModalOpen = true; state.tab = 'dispensa'; render();
+    const righe = [...document.querySelectorAll('[data-group-edit]')].map(b => b.textContent.replace(/\s+/g, ' ').trim());
+    const vuoti = righe.filter(t => /nessun formato/.test(t)).length;
+    const corta = righe.find(t => /^.*Pasta corta/.test(t)) || '';
+    // aggiungo un formato solo per nome, senza voce in Dispensa
+    state.groupEditId = 'pasta-corta'; state.groupDraft = Object.assign({}, state.pantryGroups['pasta-corta']); render();
+    const prima = [...document.querySelectorAll('.manage-member')].map(e => e.firstChild.textContent.trim().toLowerCase());
+    state.groupMemberSearch = 'casarecce'; render();
+    document.querySelector('[data-group-member-new]').click();
+    const dopoAdd = state.pantryGroups['pasta-corta'].members.includes('casarecce');
+    const nessunaVoce = !state.pantryItems['casarecce'];
+    // lo tolgo
+    document.querySelector('[data-group-member-remove="casarecce"]').click();
+    const tolto = !state.pantryGroups['pasta-corta'].members.includes('casarecce');
+    // tolgo penne: avere le penne non copre più "pasta corta"
+    upsertPantryItem('Penne', 'dispensa', 1, 'g');
+    const conPenne = pantryStatusFor('Pasta corta', '200', '');
+    document.querySelector('[data-group-member-remove="penne"]').click();
+    const senzaPenne = pantryStatusFor('Pasta corta', '200', '');
+    state.pantryGroupsModalOpen = false; state.groupEditId = null; render();
+    return { vuoti, cortaHaFusilli: /fusilli/i.test(corta), prima: prima.includes('penne') && prima.includes('fusilli'), dopoAdd, nessunaVoce, tolto, conPenne, senzaPenne };
+  });
+  eq(r.vuoti, 0, 'nessun gruppo vuoto');
+  eq([r.cortaHaFusilli, r.prima], [true, true]);
+  eq([r.dopoAdd, r.nessunaVoce, r.tolto], [true, true, true]);
+  eq([r.conPenne, r.senzaPenne], ['in-casa', 'manca']);
 });
 
 (async () => {
