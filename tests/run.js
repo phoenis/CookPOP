@@ -1158,7 +1158,7 @@ test('ordine corsie: trascinando dalla maniglia la categoria si sposta e l\'ordi
 test('lista spesa leggera: tendina Raggruppa per (Corsia, Giorno, A-Z), sezioni senza conteggio, matita per la nota', async ({ page }) => {
   await page.evaluate(() => {
     state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Detersivo piatti', qta: '' } };
-    state.ingredientNotes = {};
+    state.ingredientNotes = {}; state.pantryItems = {};
     state.tab = 'spesa'; state.shopView = 'reparto'; render();
   });
   const r1 = await page.evaluate(() => ({
@@ -2529,7 +2529,7 @@ test('pasti futuri rimasti cucinati: la migrazione li toglie, quelli di oggi e p
 test('spesa: vista Categoria (ordine Dispensa) e Ordine spesa trascinabile', async ({ page }) => {
   await page.evaluate(() => {
     state.shopExtras = { a: { ingrediente: 'Pane', qta: '1' }, b: { ingrediente: 'Latte', qta: '1' }, c: { ingrediente: 'Uova', qta: '6' }, d: { ingrediente: 'Carote', qta: '1' } };
-    state.shopDismissed = {}; state.shopChecked = {}; state.shopOrderCustom = [];
+    state.shopDismissed = {}; state.shopChecked = {}; state.shopOrderCustom = []; state.pantryItems = {};
     state.tab = 'spesa'; state.shopView = 'categoria'; render();
   });
   const cat = await page.evaluate(() => [...document.querySelectorAll('.dept-title')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).filter(t => /verdura|Latticini|Pane/i.test(t)).map(t => t.replace(/\s*\(.*$/, '')));
@@ -3853,25 +3853,29 @@ test('famiglie di prima nel sistema nuovo: dati dove sono, io = mara senza nome 
   eq(r.mezzo, 'mamma');
 });
 
-test('famiglia nuova: Dispensa e Spesa partono vuote (niente scorte né spesa fissa della famiglia originale)', async ({ page }) => {
+test('niente scorte né spesa fissa di partenza; l\'insalata fissa della famiglia originale diventa un consumo ricorrente', async ({ page }) => {
   const r = await page.evaluate(async () => {
-    const oldRoute = activeRoute;
-    const out = {};
-    state.pantryItems = {}; state.pantrySeeded = false; state.breadRecurring1 = false; state.recurringItems = {}; state.extraWeeks = []; state.shopExtras = {}; state.shopDismissed = {};
-    activeRoute = familyRouteFor('nuova'); await loadState();
+    const oldRoute = activeRoute, out = {};
+    const pulisci = () => { state.pantryItems = {}; state.pantrySeeded = false; state.generalShoppingRecurring1 = false; state.breadRecurring1 = false; state.recurringItems = {}; state.shopExtras = {}; state.shopDismissed = {}; state.extraWeeks = []; };
+    // famiglia nuova
+    pulisci(); activeRoute = familyRouteFor('nuova'); await loadState(); runMigrations();
+    out.nuova = [Object.keys(state.pantryItems).length, Object.keys(state.recurringItems).length];
+    // un'altra famiglia di prima (cugina): niente scorte, niente insalata
+    pulisci(); activeRoute = { id: 'cugina', famId: 'cugina', newFamily: false, path: 'spaces/cugina/state', catalogPath: 'spaces/cugina/catalog' };
     runMigrations();
-    out.ricorrenti = Object.keys(state.recurringItems).length;
-    out.dispensa = Object.keys(state.pantryItems).length;
-    out.spesaFissa = buildShopFlat().filter(x => x.context === 'Ogni settimana').length;
-    activeRoute = null; state.pantryItems = {}; state.pantrySeeded = false;
-    runMigrations();
-    out.dispensaPrima = Object.keys(state.pantryItems).length > 0;
-    out.spesaFissaPrima = buildShopFlat().filter(x => x.context === 'Ogni settimana').length;
+    out.cugina = [Object.keys(state.pantryItems).length, Object.keys(state.recurringItems).length];
+    // famiglia originale: l'insalata ricorrente c'è
+    pulisci(); activeRoute = null; runMigrations();
+    const rec = Object.values(state.recurringItems).find(x => /insalata/i.test(x.nome));
+    out.originale = [!!rec, rec && rec.qty, rec && rec.every, !!resolvePantryItem('Insalata'), buildShopFlat().filter(x => x.context === 'Ogni settimana').length];
+    out.nessunDato = [DATA.pantry === undefined, DATA.generalShopping === undefined];
     activeRoute = oldRoute;
     return out;
   });
-  eq([r.dispensa, r.ricorrenti, r.spesaFissa], [0, 0, 0]);
-  eq([r.dispensaPrima, r.spesaFissaPrima], [true, 1]);
+  eq(r.nuova, [0, 0]);
+  eq(r.cugina, [0, 0]);
+  eq(r.originale, [true, 2, 7, true, 0]);
+  eq(r.nessunDato, [true, true]);
 });
 
 (async () => {
