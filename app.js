@@ -7552,14 +7552,14 @@ function renderMenu(){
         });
       }
       regenCount = totalMeals - lockedCount - pastCount;
-      const kept = [lockedCount ? `i <b>${lockedCount} bloccati</b>` : '', pastCount ? `i <b>${pastCount} già passati</b>` : ''].filter(Boolean).join(' e ');
-      regenNote = kept ? `Rigenerare sostituisce <b>${regenCount} pasti</b> e conserva ${kept}.` : '';
+      const kept = [lockedCount ? `tiene ${lockedCount === 1 ? '' : 'i '}<b>${lockedCount} ${lockedCount === 1 ? 'bloccato' : 'bloccati'}</b>` : '', pastCount ? `${lockedCount ? '' : 'tiene '}${pastCount === 1 ? '' : 'i '}<b>${pastCount} ${pastCount === 1 ? 'già passato' : 'già passati'}</b>` : ''].filter(Boolean).join(' e ');
+      regenNote = `Cambia <b>${regenCount} ${regenCount === 1 ? 'pasto' : 'pasti'}</b>${kept ? ', ' + kept : ''}.`;
     }
     const tempoChipLabel = { express:'≤20 min', veloce:'30 min', normale:'30–45 min', lunga:'1 h', progetto:'oltre 1 h' };
     const dayInitial = d => DATA.week1[d].giorno.slice(0, 1);
     const cookedLunches = 7 - leftoverLunchDays().length;
     const hintText = genSettingsTargetWeek === 0
-      ? `${state.genTwoWeeks ? 'Per ciascuna settimana sceglie' : 'Sceglie'} ${7 + cookedLunches} ricette di stagione (7 cene${cookedLunches ? ` e ${cookedLunches} ${cookedLunches === 1 ? 'pranzo' : 'pranzi'}` : ''}), variando le categorie giorno per giorno.`
+      ? `${state.genTwoWeeks ? 'Per ciascuna settimana: ' : ''}${7 + cookedLunches} ricette di stagione: 7 cene${cookedLunches ? ` e ${cookedLunches} ${cookedLunches === 1 ? 'pranzo' : 'pranzi'}` : ''}.`
       : '';
     const weekForLabel = genSettingsTargetWeek !== null ? genSettingsTargetWeek : 0;
     return `
@@ -7585,6 +7585,7 @@ function renderMenu(){
               const eligible = LEFTOVER_LUNCH_ELIGIBLE.includes(d), on = leftoverLunchDays().includes(d);
               return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ' disabled title="Il sabato, primo giorno della settimana, il pranzo si cucina sempre"'} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
             }).join('')}</div>
+            <p class="gen-note">Il sabato non c'è: è il primo giorno della settimana, il pranzo si cucina sempre.</p>
           </div>
           <div class="gen-group gen-row">
             <div class="gen-label">Porzioni per ogni avanzo</div>
@@ -7605,11 +7606,11 @@ function renderMenu(){
             ${excPickerHtml}
             <button type="button" class="btn is-text gen-add-exc" data-toggle-tempo-exception-picker>+ Aggiungi un'eccezione</button>
           </div>
-          ${hintText || (genSettingsTargetWeek !== null && regenNote) ? `<div class="gen-notes">${hintText ? `<p class="gen-hint">${hintText}</p>` : ''}${genSettingsTargetWeek !== null && regenNote ? `<p class="gen-hint">${regenNote}</p>` : ''}</div>` : ''}
         </div>
         <div class="gen-footer">
+          ${hintText || (genSettingsTargetWeek !== null && regenNote) ? `<div class="gen-notes">${hintText ? `<p class="gen-hint">${hintText}</p>` : ''}${genSettingsTargetWeek !== null && regenNote ? `<p class="gen-hint">${regenNote}</p>` : ''}</div>` : ''}
           ${genSettingsTargetWeek !== null
-            ? `<button class="btn is-solid gen-go" data-generate-week="${genSettingsTargetWeek}">${genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : (regenCount ? `Rigenera ${regenCount} pasti` : 'Rigenera settimana')}</button>
+            ? `<button class="btn is-solid gen-go" data-generate-week="${genSettingsTargetWeek}"${regenCount ? '' : ' disabled'}>${!regenCount ? 'Niente da rigenerare' : genSettingsTargetWeek === 0 ? 'Genera nuovo menù' : `Rigenera ${regenCount} pasti`}</button>
                ${genSettingsTargetWeek > 0 ? `<button type="button" class="btn is-text color-delete gen-remove" data-remove-week="${genSettingsTargetWeek}">Elimina questa settimana</button>` : ''}`
             : `<button class="btn is-solid gen-go" data-close-gen-settings>Fatto</button>`}
         </div>

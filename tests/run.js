@@ -4055,6 +4055,28 @@ test('obiettivi a settimana: il valore apre un fumetto con minimo e massimo sepa
   eq([r.min0, r.salvato, r.chiuso], [[0, 5], [0, 5], true]);
 });
 
+test('Regole della settimana: riepilogo fisso sopra il bottone, "Niente da rigenerare" quando non c\'è nulla da cambiare, sabato spiegato', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.leftoverLunchOn = true; state.tab = 'menu'; state.extraWeeks = []; generateWeek(0);
+    state.genSettingsOpen = 0; render();
+    const q = sel => document.querySelector(sel);
+    const out = { riepilogo: !!q('.gen-footer .gen-notes'), nelCorpo: !!q('.gen-body .gen-notes'), testo: q('.gen-footer .gen-notes').textContent.replace(/\s+/g, ' '),
+      bottone: [q('.gen-footer .gen-go').textContent.trim(), q('.gen-footer .gen-go').disabled], sabato: /sabato non c'è/i.test(q('.gen-body').textContent), sabatoDisabilitato: q('.gen-leftover-days .gen-day:disabled').textContent.trim() };
+    // blocco tutti i pasti: niente da rigenerare
+    WEEK_DISPLAY_ORDER.forEach(i => ['pranzo', 'cena'].forEach(m => { state.mealLocked[mealKey(0, i, m)] = true; }));
+    render();
+    out.tuttoBloccato = [q('.gen-footer .gen-go').textContent.trim(), q('.gen-footer .gen-go').disabled];
+    state.mealLocked = {}; state.genSettingsOpen = null; render();
+    return out;
+  });
+  assert(r.riepilogo && !r.nelCorpo, 'riepilogo nel footer fisso');
+  assert(/Cambia \d+ pasti?/.test(r.testo) && /ricette di stagione/.test(r.testo), 'testo: ' + r.testo);
+  eq(r.bottone, ['Genera nuovo menù', false]);
+  eq([r.sabato, r.sabatoDisabilitato], [true, 'S']);
+  eq(r.tuttoBloccato, ['Niente da rigenerare', true]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
