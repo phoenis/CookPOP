@@ -3075,6 +3075,8 @@ test('avanzo: niente promemoria di preparazione (ammollo) né nel pasto né la s
     const cena = sl[k], next = sl[k + 1];
     writeMealDishes(cena.weekIdx, cena.i, 'cena', 'Pasta e ceci', []);
     writeMealDishes(next.weekIdx, next.i, next.meal, 'Pasta e ceci', []);
+    const altro = next.meal === 'pranzo' ? 'cena' : 'pranzo'; // l'altro pasto del giorno dopo può avere legumi a caso
+    writeMealDishes(next.weekIdx, next.i, altro, 'Insalata mista', []);
     delete state.dayLinks[next.key];
     state.showPastDays = true; state.tab = 'menu'; render();
     const blk = () => document.querySelector(`.meal-block[data-day-index="${next.i}"][data-meal="${next.meal}"]`);
