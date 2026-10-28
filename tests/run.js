@@ -3075,6 +3075,8 @@ test('avanzo: niente promemoria di preparazione (ammollo) né nel pasto né la s
     const cena = sl[k], next = sl[k + 1];
     writeMealDishes(cena.weekIdx, cena.i, 'cena', 'Pasta e ceci', []);
     writeMealDishes(next.weekIdx, next.i, next.meal, 'Pasta e ceci', []);
+    const altro = next.meal === 'pranzo' ? 'cena' : 'pranzo'; // l'altro pasto del giorno dopo può avere legumi a caso
+    writeMealDishes(next.weekIdx, next.i, altro, 'Insalata mista', []);
     delete state.dayLinks[next.key];
     state.showPastDays = true; state.tab = 'menu'; render();
     const blk = () => document.querySelector(`.meal-block[data-day-index="${next.i}"][data-meal="${next.meal}"]`);
@@ -4126,6 +4128,32 @@ test('scheda ingrediente "solo se c\'è": "+ Altra scadenza (un\'altra confezion
   eq(r.lotti, [2, 2, 'none']);
   eq([r.righe, r.senzaQuantita, r.dateInput], [2, true, 2]);
   eq(r.finito, [0, true]);
+});
+
+test('pasto di un giorno futuro: "Da mangiare" diventa "Mangiata" e resta; i vecchi segni `true` sui giorni futuri si tolgono ancora', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.leftoverLunchOn = true; state.extraWeeks = []; generateWeek(0); state.tab = 'menu'; state.balanceDetailsOpen = true; render();
+    const key = Object.keys(state.dayLinks).find(k => k.startsWith('0_') && k.endsWith('_pranzo'));
+    if(!key) return null;
+    const btn = () => document.querySelector(`[data-toggle-done="${key}"]`);
+    const out = { prima: btn().textContent.trim() };
+    btn().click();
+    out.dopo = btn().textContent.trim();
+    render();
+    out.dopoRender = btn().textContent.trim();
+    const { i, meal } = parseMealKey(key);
+    out.valore = weekMealsDoneRef(0)[i][meal];
+    btn().click();
+    out.annullato = btn().textContent.trim();
+    // un vecchio `true` su un giorno futuro si toglie ancora
+    const tp = findTodayPos(), futuro = WEEK_DISPLAY_ORDER[tp + 1];
+    state.mealsDone = { [futuro]: { cena: true } }; render();
+    out.vecchioTrue = !!state.mealsDone[futuro];
+    return out;
+  });
+  if(!r) return;
+  eq([r.prima, r.dopo, r.dopoRender, r.valore, r.annullato, r.vecchioTrue], ['Da mangiare', 'Mangiata', 'Mangiata', 'anticipato', 'Da mangiare', false]);
 });
 
 (async () => {
