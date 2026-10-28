@@ -2653,3 +2653,9 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 #settings-backdrop .settings-profile .settings-link-text small{ font-size:var(--text-xsmall); line-height:1.25; }
 .gen-general .gen-group{ margin-bottom:var(--s5,1.5rem); }
 .gen-general .gen-label{ margin-bottom:var(--s2); }
+
+.gen-inline-row{ cursor:default; }
+.gen-toggle-inline{ width:auto; flex:none; }
+.gen-avoid .gen-exclude-chips{ margin:var(--s2) 0; }
+.gen-avoid .gen-warn{ padding:var(--s2) var(--s3); border-radius:var(--radius-md,10px); background:var(--surface-2,#f4efe6); }
+.gen-avoid + .gen-avoid{ margin-top:var(--s5,1.5rem); padding-top:var(--s4); border-top:1px solid var(--line); }

@@ -2398,7 +2398,8 @@ const state = {
   backupOpen: false, // non persistito: pagina "Backup"
   inviteCode: '', // non persistito: ultimo codice invito mostrato in Persone
   onbStep: 0, // non persistito: passo del primo avvio guidato
-  genGeneralOpen: false, // non persistito: pagina "Regole di generazione" generali
+  genGeneralOpen: false, // non persistito: pagina "Regole generali"
+  genGeneralPage: null, // non persistito: sotto-pagina aperta (diet, targets, grams, avoid)
   membersOpen: false, // non persistito: pagina "Persone"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
   gradPicker: null, // ephemeral: nome della ricetta con il menu del gradimento aperto
@@ -4458,9 +4459,12 @@ const ALLERGEN_PRESETS = {
   'pesce': ['salmone','merluzzo','tonno','baccalà','orata','branzino','pesce','acciughe','alici','sgombro','trota','nasello','platessa','sogliola','stoccafisso'],
   'crostacei e molluschi': ['gamberi','gamberetti','scampi','aragosta','granchio','vongole','cozze','polpo','calamari','seppie','ostriche','molluschi','crostacei','frutti di mare']
 };
+// Una parola scritta a mano ("pomodori", "fragole") si cerca senza l'ultima vocale,
+// così trova anche singolare e derivati (pomodoro, pomodorini, fragola).
+function avoidStem(w){ w = (w || '').trim().toLowerCase(); return w.length >= 5 ? w.replace(/[aeiou]$/, '') : w; }
 function allergenHitsInText(txt){
   txt = (txt || '').toLowerCase();
-  return (state.allergies || []).filter(k => (ALLERGEN_PRESETS[k] || [k]).some(w => w && txt.includes(w)));
+  return (state.allergies || []).filter(k => (ALLERGEN_PRESETS[k] || [avoidStem(k)]).some(w => w && txt.includes(w)));
 }
 function recipeAllergens(r){ return (state.allergies || []).length ? allergenHitsInText(recipeIngredientText(r) + ' | ' + (r.nome || '')) : []; }
 function allergenBadgeHtml(r){
@@ -4473,7 +4477,7 @@ function dietAllows(r){
   if(diet !== 'onnivoro' && has(txt, DIET_MEAT_WORDS)) return false;
   if(diet === 'vegetariano' && has(txt, DIET_FISH_WORDS)) return false;
   if(allergenHitsInText(txt).length) return false;
-  return !(state.dietExclude || []).some(w => w && txt.includes(w));
+  return !(state.dietExclude || []).some(w => w && txt.includes(avoidStem(w)));
 }
 // Toglie le ricette che non vanno bene. Mai un piatto vietato per riempire il
 // menu: se non bastano, si ripetono quelle che ci sono (e vanno aggiunte ricette).
@@ -5807,7 +5811,8 @@ const MODAL_CHECKS = [
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
-  [()=> !!state.genGeneralOpen, ()=>{ state.genGeneralOpen = false; }],
+  [()=> !!state.genGeneralPage, ()=>{ state.genGeneralPage = null; }],
+  [()=> !!state.genGeneralOpen, ()=>{ state.genGeneralOpen = false; state.genGeneralPage = null; }],
   [()=> !!state.membersOpen, ()=>{ state.membersOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
   [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
@@ -7555,12 +7560,12 @@ function renderMenu(){
     const weekForLabel = genSettingsTargetWeek !== null ? genSettingsTargetWeek : 0;
     return `
     <div class="move-backdrop" data-close-gen-settings>
-      <div class="move-sheet gen-sheet" role="dialog" aria-label="Regole di generazione" data-stop-close>
+      <div class="move-sheet gen-sheet" role="dialog" aria-label="Regole della settimana" data-stop-close>
         <div class="move-handle" aria-hidden="true"></div>
         <div class="dsh-head">
           <div class="dsh-head-text">
             <span class="dsh-kicker">Settimana del ${escapeHtml(weekLabelFor(weekForLabel))}</span>
-            <h2 class="move-title">Regole di generazione</h2>
+            <h2 class="move-title">Regole della settimana</h2>
           </div>
           <button type="button" class="btn is-icon dsh-close" data-close-gen-settings aria-label="Chiudi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>
@@ -7578,18 +7583,17 @@ function renderMenu(){
             }).join('')}</div>
           </div>
           <div class="gen-group gen-row">
-            <div class="gen-label">Porzioni di ogni avanzo</div>
+            <div class="gen-label">Porzioni per ogni avanzo</div>
             <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-leftover-portions="-1" aria-label="Meno porzioni di avanzo" ${leftoverPortionsN() <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${leftoverPortionsN() === 0 ? 'nessuna' : leftoverPortionsN() + (leftoverPortionsN() === 1 ? ' porzione' : ' porzioni')}</span><button type="button" class="qty-btn" data-gen-leftover-portions="1" aria-label="Più porzioni di avanzo" ${leftoverPortionsN() >= 4 ? 'disabled' : ''}>+</button></div>
           </div>
           ` : ''}
-          ${genDietSummaryHtml()}
           ${genSettingsTargetWeek !== null ? `<div class="gen-group gen-toggle-row">
             <button type="button" class="gen-toggle" data-toggle-gen-pantry role="switch" aria-checked="${!!state.genPantryOnly}"><span class="gen-toggle-text"><span aria-hidden="true">🧺</span> Solo con quello che ho in casa</span><span class="gen-switch${state.genPantryOnly ? ' on' : ''}" aria-hidden="true"></span></button>
             ${state.genPantryOnly ? '<p class="gen-note">Prima le ricette per cui hai tutto. Se non bastano, quelle a cui manca meno.</p>' : ''}
           </div>` : ''}
           ${genSettingsTargetWeek === 0 ? `<div class="gen-group gen-toggle-row">
             <button type="button" class="gen-toggle" data-toggle-gen-two role="switch" aria-checked="${!!state.genTwoWeeks}"><span class="gen-toggle-text"><span aria-hidden="true">🗓️</span> Genera anche la settimana prossima</span><span class="gen-switch${state.genTwoWeeks ? ' on' : ''}" aria-hidden="true"></span></button>
-            <p class="gen-note">La seconda settimana non ripete le ricette della prima e usa le porzioni che hai in freezer. Frutta, verdura e latticini freschi si comprano più avanti.</p>
+            <p class="gen-note">Senza ripetere ricette e usando il freezer; i freschi si comprano dopo.</p>
           </div>` : ''}
           <div class="gen-group">
             <div class="gen-label">Eccezioni</div>
@@ -12672,7 +12676,7 @@ const TAB_MENU_ITEMS = {
   ],
   menu: [
     { label: uiIcon('refresh') + ' Rigenera menu', action: ()=>{ regenerateAllWeeks(); } },
-    { label: uiIcon('gear') + ' Regole di generazione', action: ()=>{ state.genGeneralOpen = true; } }
+    { label: uiIcon('gear') + ' Regole di generazione', action: ()=>{ state.genGeneralOpen = true; state.genGeneralPage = null; } }
   ],
   prep: [
     { label: uiIcon('plus') + ' Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); } },
@@ -13503,62 +13507,113 @@ document.addEventListener('click', e=>{
     persist(); render();
   }
 });
-// Alimentazione, ingredienti da evitare e allergie valgono per tutta la famiglia, non
-// per una settimana: si cambiano da Impostazioni → Regole di generazione.
-function genDietGroupHtml(){
-  return `
-          <div class="gen-group">
-            <div class="gen-label">Alimentazione</div>
-            <div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
-            <div class="gen-label gen-sublabel">Obiettivi a settimana</div>
-            ${PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k => { const [mn, mx] = weekProteinTargets()[k]; const stp = (end, d, v, lab) => `<button type="button" class="qty-btn" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${(d < 0 && v <= 0) || (d > 0 && v >= 7) ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`; return `<div class="gen-row gen-target-row"><span>${PROTEINA_ICON[k] || ''} ${PROTEINA_LABEL[k]}</span><div class="gen-stepper">${stp(0, -1, mn, 'Meno minimo')}<span class="gen-stepper-val">${mn === mx ? mn : mn + '–' + mx}</span>${stp(1, 1, mx, 'Più massimo')}</div></div>`; }).join('')}
-            <div class="gen-label gen-sublabel">Ingredienti da evitare</div>
-            <div class="gen-exclude-chips">${(state.dietExclude || []).map((w, i) => `<button type="button" class="gen-chip" data-gen-exclude-remove="${i}" aria-label="Togli ${escapeHtml(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
-            <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. funghi, noci" aria-label="Ingrediente da evitare" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
-            <p class="gen-note">Le ricette con questi ingredienti non vengono scelte.</p>
-            <div class="gen-label gen-sublabel">Allergie e intolleranze</div>
-            <div class="gen-exclude-chips">${Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${(state.allergies || []).includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${(state.allergies || []).includes(k)}">${escapeHtml(k)}</button>`).join('')}${(state.allergies || []).filter(k => !ALLERGEN_PRESETS[k]).map(w => `<button type="button" class="gen-chip active" data-gen-allergy="${escapeAttr(w)}" aria-label="Togli ${escapeAttr(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
-            <form class="gen-exclude-form" data-gen-allergy-form><input type="text" class="gen-exclude-input" placeholder="es. fragole, kiwi" aria-label="Allergia o intolleranza" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
-            <p class="gen-note">Il menu le rispetta e le ricette che le contengono hanno un avviso ⚠. Il controllo legge solo gli ingredienti scritti nelle ricette: non vede tracce o ingredienti nascosti nei prodotti confezionati. Controlla sempre le etichette, non è una garanzia.</p>
-          </div>
-`;
+// --- Regole generali: una pagina con sotto-pagine, come le altre Impostazioni ----------
+// Valgono per tutta la famiglia. Quelle di una sola settimana stanno nella finestra
+// dell'ingranaggio del Menù.
+function genGramsSummary(){
+  const g = state.portionGrams || {}, p = [];
+  if(g.pasta > 0) p.push('Pasta ' + g.pasta + ' g');
+  if(g.riso > 0) p.push('Riso ' + g.riso + ' g');
+  return p.length ? p.join(' · ') : 'Come nelle ricette';
 }
-function genDietSummaryHtml(){
-  const parts = [DIET_TYPES[dietTypeNow()]];
-  if((state.allergies || []).length) parts.push('allergie: ' + state.allergies.join(', '));
-  if((state.dietExclude || []).length) parts.push('da evitare: ' + state.dietExclude.join(', '));
-  return `
-          <div class="gen-group">
-            <div class="gen-label">Alimentazione</div>
-            <p class="gen-note">${escapeHtml(parts.join(' · '))}. Per cambiarla vai in Impostazioni → Regole di generazione: vale per tutte le settimane.</p>
-          </div>`;
+function genTargetsSummary(){
+  const t = weekProteinTargets();
+  return PROTEINA_ORDER.filter(k => k !== 'nessuna' && t[k][1] > 0).map(k => `${k === 'salumi' ? 'Salumi' : PROTEINA_LABEL[k]} ${t[k][0] === t[k][1] ? t[k][0] : t[k][0] + '–' + t[k][1]}`).join(' · ');
 }
-// Regole di generazione generali: una pagina come le altre Impostazioni (non la finestra
-// di una settimana). Valgono per tutta la famiglia.
+function genTargetRowsHtml(){
+  return PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k => {
+    const [mn, mx] = weekProteinTargets()[k];
+    const stp = (end, d, v, lab) => `<button type="button" class="qty-btn" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${(d < 0 && v <= 0) || (d > 0 && v >= 7) ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`;
+    return `<div class="manage-row gen-inline-row"><span class="manage-row-icon">${PROTEINA_ICON[k] || ''}</span><span class="manage-row-main">${PROTEINA_LABEL[k]}</span><span class="gen-stepper">${stp(0, -1, mn, 'Meno minimo')}<span class="gen-stepper-val">${mn === mx ? mn : mn + '–' + mx}</span>${stp(1, 1, mx, 'Più massimo')}</span></div>`;
+  }).join('');
+}
+function genGramsRowsHtml(){
+  return ['pasta', 'riso'].map(k => {
+    const g = parseInt((state.portionGrams || {})[k], 10) || 0;
+    return `<div class="manage-row gen-inline-row"><span class="manage-row-icon">${k === 'pasta' ? '🍝' : '🍚'}</span><span class="manage-row-main">${k === 'pasta' ? 'Pasta' : 'Riso'}</span><span class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></span></div>`;
+  }).join('');
+}
+function genGoRow(go, icon, label, value, side){
+  return `<button type="button" class="manage-row" data-gen-go="${go}"><span class="manage-row-icon">${icon}</span><span class="manage-row-main">${escapeHtml(label)}${!side && value ? `<span class="manage-row-sub">${escapeHtml(value.charAt(0).toUpperCase() + value.slice(1))}</span>` : ''}</span>${side ? `<span class="manage-row-side">${escapeHtml(value)}</span>` : ''}<span class="manage-row-chevron" aria-hidden="true">›</span></button>`;
+}
+function genAvoidPageHtml(){
+  const allergies = state.allergies || [];
+  return `
+      <section class="settings-section gen-avoid">
+        <h3 class="settings-section-title">⚠️ Allergie e intolleranze</h3>
+        <p class="settings-note">Il menù le rispetta. Le ricette che le contengono hanno ⚠️.</p>
+        <div class="gen-exclude-chips">${Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${allergies.includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${allergies.includes(k)}">${escapeHtml(k)}</button>`).join('')}${allergies.filter(k => !ALLERGEN_PRESETS[k]).map(w => `<button type="button" class="gen-chip active" data-gen-allergy="${escapeAttr(w)}" aria-label="Togli ${escapeAttr(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
+        <form class="gen-exclude-form" data-gen-allergy-form><input type="text" class="gen-exclude-input" placeholder="Altro, es. fragole" aria-label="Altra allergia o intolleranza" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
+        <p class="settings-note gen-warn">Legge solo gli ingredienti scritti nelle ricette: non vede tracce o prodotti confezionati. Controlla sempre le etichette.</p>
+      </section>
+      <section class="settings-section gen-avoid">
+        <h3 class="settings-section-title">🚫 Ingredienti che non piacciono</h3>
+        <p class="settings-note">Le ricette con questi ingredienti non vengono scelte.</p>
+        <div class="gen-exclude-chips">${(state.dietExclude || []).map((w, i) => `<button type="button" class="gen-chip active" data-gen-exclude-remove="${i}" aria-label="Togli ${escapeAttr(w)}">${escapeHtml(w)} ✕</button>`).join('')}</div>
+        <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. noci, cipolla" aria-label="Ingrediente che non piace" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
+      </section>`;
+}
 function renderGenGeneralPage(){
   if(!state.genGeneralOpen) return '';
-  const body = `
-      <section class="settings-section gen-general">
-        <div class="gen-group gen-row">
-          <div class="gen-label">Porzioni di partenza</div>
-          <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></div>
-        </div>
-        <div class="gen-group gen-toggle-row">
-            <button type="button" class="gen-toggle" data-toggle-gen-leftover role="switch" aria-checked="${!!state.leftoverLunchOn}"><span class="gen-toggle-text"><span aria-hidden="true">🍱</span> Pranzo con l'avanzo della sera prima</span><span class="gen-switch${state.leftoverLunchOn ? ' on' : ''}" aria-hidden="true"></span></button>
-            ${state.leftoverLunchOn ? '' : '<p class="gen-note">Se lo attivi, a pranzo si mangia quello che avanza dalla cena prima, nei giorni che scegli.</p>'}
-          </div>
-        ${genDietGroupHtml()}
-        <div class="gen-group">
-            <div class="gen-label">Grammi a porzione</div>
-            ${['pasta', 'riso'].map(k => { const g = parseInt((state.portionGrams || {})[k], 10) || 0; return `<div class="gen-row gen-grams-row"><span>${k === 'pasta' ? 'Pasta' : 'Riso'}</span><div class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></div></div>`; }).join('')}
-            <p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa (in Spesa, nel dettaglio e in cucina).</p>
-          </div>
+  const sub = state.genGeneralPage || null;
+  let title = 'Regole generali', body = '';
+  if(sub === 'diet'){
+    title = 'Alimentazione';
+    body = `<section class="settings-section">
+        <div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
+        <p class="settings-note">Con pescetariano e vegetariano il menù non sceglie piatti con carne (e con pesce, per i vegetariani) e gli obiettivi settimanali si adattano: li ritocchi in Obiettivi a settimana.</p>
       </section>`;
-  return managePageHtml({ key: 'gen-general', title: 'Regole di generazione', closeAttr: 'data-close-gen-general', body });
+  } else if(sub === 'targets'){
+    title = 'Obiettivi a settimana';
+    body = `<p class="settings-note manage-intro">Quante volte a settimana, a pranzo o a cena. Sono i numeri che vedi in cima al Menù.</p>
+      <section class="settings-section"><div class="settings-card manage-list">${genTargetRowsHtml()}</div></section>`;
+  } else if(sub === 'grams'){
+    title = 'Grammi a porzione';
+    body = `<p class="settings-note manage-intro">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa, in Spesa, nel dettaglio e in cucina.</p>
+      <section class="settings-section"><div class="settings-card manage-list">${genGramsRowsHtml()}</div></section>`;
+  } else if(sub === 'avoid'){
+    title = 'Da evitare';
+    body = genAvoidPageHtml();
+  } else {
+    const allergies = (state.allergies || []).join(', '), dislikes = (state.dietExclude || []).join(', ');
+    body = `
+      <p class="settings-note manage-intro">Valgono per tutte le settimane. Quelle di una sola settimana si cambiano dal Menù, con l'ingranaggio.</p>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Quanto si cucina</h3>
+        <div class="settings-card manage-list">
+          <div class="manage-row gen-inline-row"><span class="manage-row-icon">👥</span><span class="manage-row-main">Porzioni</span>
+            <span class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></span></div>
+          <div class="manage-row gen-inline-row"><span class="manage-row-icon">🍱</span><span class="manage-row-main">Pranzo con l'avanzo<span class="manage-row-sub">I giorni li scegli ogni settimana</span></span>
+            <button type="button" class="gen-toggle gen-toggle-inline" data-toggle-gen-leftover role="switch" aria-checked="${!!state.leftoverLunchOn}" aria-label="Pranzo con l'avanzo"><span class="gen-switch${state.leftoverLunchOn ? ' on' : ''}" aria-hidden="true"></span></button></div>
+          ${genGoRow('grams', '🍝', 'Grammi a porzione', genGramsSummary())}
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Cosa si mangia</h3>
+        <div class="settings-card manage-list">
+          ${genGoRow('diet', '🥗', 'Alimentazione', DIET_TYPES[dietTypeNow()], true)}
+          ${genGoRow('targets', '⚖️', 'Obiettivi a settimana', genTargetsSummary())}
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Da evitare</h3>
+        <div class="settings-card manage-list">
+          ${genGoRow('avoid', '⚠️', 'Allergie e intolleranze', allergies || 'Nessuna')}
+          ${genGoRow('avoid', '🚫', 'Ingredienti che non piacciono', dislikes || 'Nessuno')}
+        </div>
+      </section>`;
+  }
+  return managePageHtml({ key: sub ? 'gen-general-' + sub : 'gen-general', title, closeAttr: 'data-gen-general-back', body });
 }
 document.addEventListener('click', e=>{
-  const closeEl = e.target.closest('[data-close-gen-general]');
-  if(closeEl){ if(!isCloseTap(e, closeEl)) return; state.genGeneralOpen = false; render(); }
+  const go = e.target.closest('[data-gen-go]');
+  if(go){ state.genGeneralPage = go.dataset.genGo; render(); return; }
+  const back = e.target.closest('[data-gen-general-back]');
+  if(back){
+    if(!isCloseTap(e, back)) return;
+    if(state.genGeneralPage) state.genGeneralPage = null; else state.genGeneralOpen = false;
+    render();
+  }
 });
 function renderMembersPage(){
   if(!state.membersOpen) return '';
@@ -14762,7 +14817,7 @@ document.addEventListener('click', e=>{
   // Le Impostazioni restano aperte sotto: chiusa la pagina si torna all'elenco.
   const tabFor = { ingredients:'dispensa', groups:'dispensa', depts:'dispensa', recurring:'dispensa' }[what];
   if(tabFor && state.tab !== tabFor){ if(!state.settingsReturnTab) state.settingsReturnTab = state.tab; state.tab = tabFor; }
-  if(what === 'gen') state.genGeneralOpen = true;
+  if(what === 'gen'){ state.genGeneralOpen = true; state.genGeneralPage = null; }
   else if(what === 'ingredients') state.ingredientManagerOpen = true;
   else if(what === 'groups') state.pantryGroupsModalOpen = true;
   else if(what === 'depts') state.deptsModalOpen = true;
