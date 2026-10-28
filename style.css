@@ -2674,3 +2674,10 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .gen-sts button:disabled{ opacity:.35; cursor:default; }
 .gen-sts b{ min-width:36px; text-align:center; font-weight:700; }
 .gen-target-pop .qty-pop-done{ align-self:flex-end; width:auto; margin-top:var(--s2); height:36px; padding:0 var(--s4); }
+
+/* Regole della settimana (DS-Regole): il giorno senza avanzo ha lo stesso aspetto degli altri non scelti, con una riga che spiega; riepilogo fisso sopra il bottone */
+.gen-leftover-days .gen-day:disabled{ opacity:1; cursor:default; }
+.gen-footer .gen-notes{ display:flex; flex-direction:column; gap:2px; margin:0 0 var(--s2); text-align:center; }
+.gen-footer .gen-hint{ margin:0; font-size:var(--fs-small); color:var(--muted); }
+.gen-footer .gen-go:disabled{ background:var(--surface-2,#f1f1f1); color:var(--muted); cursor:default; }
+.tempo-exception-row .btn.is-icon{ color:var(--muted); }
