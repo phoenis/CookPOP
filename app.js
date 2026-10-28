@@ -2222,7 +2222,6 @@ function allIngredientNamesForManager(){
     });
   });
   Object.values(state.shopExtras).forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
-  DATA.generalShopping.forEach(it=>{ if(it.ingrediente) names.add(it.ingrediente.trim()); });
   return Array.from(names.values()).filter(n => !(state.hiddenIngredients || {})[n.trim().toLowerCase()]).sort((a,b)=>IT_COLLATOR.compare(a, b));
 }
 
@@ -2306,6 +2305,7 @@ const state = {
   pantryChecked: {},
   pantryItems: {},
   pantrySeeded: false,
+  generalShoppingRecurring1: false,
   pantryQtyMigrated: false,
   pantryUtilityLuogoMigrated: false,
   pantryUnitReviewed: false,
@@ -3023,12 +3023,9 @@ function applyAccent(hex){
 // rinominare né riordinare quelle esistenti: il flag è ciò che ricorda che è
 // già stata fatta). Girano in init, subito dopo loadState, vedi runMigrations.
 const MIGRATIONS = [
-  // 1. Una tantum: porta gli elementi del vecchio elenco statico (DATA.pantry)
-  // nell'inventario editabile, così la Dispensa parte già popolata invece
-  // che vuota. Il flag evita di rimetterceli se poi vengono rimossi a mano.
-  { flag: 'pantrySeeded', run(){
-    DATA.pantry.forEach(p=> upsertPantryItem(p.elemento, ''));
-  }},
+  // 1. Il vecchio elenco statico di scorte (DATA.pantry) non esiste più: la
+  // Dispensa parte vuota. Il flag resta per chi l'aveva già popolata.
+  { flag: 'pantrySeeded', run(){} },
   // 2. Una tantum: rimuove dalla Dispensa 4 voci segnaposto del vecchio elenco
   // statico (mai davvero usate) che restavano a 0 e comparivano di continuo
   // in Spesa sotto "Finiti in Dispensa".
@@ -3234,6 +3231,18 @@ const MIGRATIONS = [
     if(Object.values(state.recurringItems).some(r => r.mode === 'meal')) return;
     const it = ['pane', 'panini', 'panino'].map(k => state.pantryItems && state.pantryItems[k]).find(Boolean);
     if(it) state.recurringItems['rpane'] = { nome: it.nome, qty: 1, every: 1, mode: 'meal', last: isoLocalDate(new Date()) };
+  } },
+  // La riga fissa "Insalata, 2 cespi ogni settimana" era della famiglia
+  // originale: ora è un consumo ricorrente (Impostazioni → Consumi ricorrenti),
+  // come il latte. Solo per quella famiglia.
+  { flag: 'generalShoppingRecurring1', run(){
+    if(getSpaceRoute().id !== 'default') return;
+    if(!state.recurringItems) state.recurringItems = {};
+    if(Object.values(state.recurringItems).some(r => /^insalata/i.test(r.nome || ''))) return;
+    if(!resolvePantryItem('Insalata')){ upsertPantryItem('Insalata', 'frigo', 0); }
+    const it = resolvePantryItem('Insalata');
+    if(it && typeof it.qty !== 'number') it.qty = 0;
+    state.recurringItems['rinsalata'] = { nome: it ? it.nome : 'Insalata', qty: 2, every: 7, mode: 'time', last: isoLocalDate(new Date()) };
   } },
   { flag: 'userColorsLight1', run(){
     Object.keys(state.userColors || {}).forEach(u=>{
@@ -7678,12 +7687,6 @@ function buildShopFlat(){
     if(state.shopDismissed[n.key]) return;
     flat.push({ key: n.key, ingrediente: n.nome, qta: String(n.need), dove:'', note:'', context: `${n.nome} per i pasti`, contextShort: `${n.nome} per ${n.meals} pasti` });
   });
-  (activeRoute && activeRoute.newFamily ? [] : DATA.generalShopping).forEach((it,idx)=>{
-    const key = `gen_${idx}`;
-    if(state.shopDismissed[key]) return;
-    if(pantryStatusFor(it.ingrediente, it.qta) === 'in-casa' && state.shopChecked[key] !== false) return;
-    flat.push({ key, ingrediente:it.ingrediente, qta:it.qta, dove:it.dove, note:it.note, context:'Ogni settimana', contextShort:'Ogni settimana' });
-  });
   Object.entries(state.shopExtras).forEach(([id, it])=>{
     if(state.shopDismissed[id]) return;
     // Per un'altra persona (it.per, es. "Papà"): si compra insieme ma resta una
@@ -7987,18 +7990,6 @@ function renderSpesa(){
     displayDoneShoppable = giornoMergedAll.filter(it=>isItemChecked(it.keys, it.ingrediente)).length
       + nonDayItems.filter(it=> it.context !== 'Finiti in Dispensa' && isItemChecked([it.key], it.ingrediente)).length;
     const notDone = it => { if(isItemChecked([it.key], it.ingrediente)){ addCompleted(it); return false; } return true; };
-    const genContext = mainFlat.filter(it => it.context === 'Ogni settimana').filter(notDone);
-    if(genContext.length){
-      const genOpen = !state.shopSectionCollapsed['giorno_ogni-settimana'];
-      body += `
-      <div class="shop-day-group">
-        <div class="shop-day-title finished-toggle${genOpen ? ' open' : ''}" data-toggle-shop-section="giorno_ogni-settimana">
-          Ogni settimana
-          <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>
-        </div>
-        <div class="accordion-body${genOpen ? '' : ' is-collapsed'}">${genContext.map(it=>itemRow([it.key], it.ingrediente, it.qta)).join('')}</div>
-      </div>`;
-    }
     const perSections = [...new Set(mainFlat.filter(it => it.per).map(it => it.per))].map(per => {
       const rowsPer = mainFlat.filter(it => it.per === per).filter(notDone);
       if(!rowsPer.length) return '';
