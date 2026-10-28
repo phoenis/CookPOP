@@ -2651,3 +2651,5 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 #settings-backdrop .settings-link .settings-avatar, #settings-backdrop .settings-link #settings-avatar{ width:2.5rem; height:2.5rem; min-width:2.5rem; font-size:1.125rem; margin-right:var(--space-xsmall); border-radius:50%; }
 #settings-backdrop .settings-profile{ padding-top:0.75rem; padding-bottom:0.75rem; }
 #settings-backdrop .settings-profile .settings-link-text small{ font-size:var(--text-xsmall); line-height:1.25; }
+.gen-general .gen-group{ margin-bottom:var(--s5,1.5rem); }
+.gen-general .gen-label{ margin-bottom:var(--s2); }

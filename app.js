@@ -2342,6 +2342,7 @@ const state = {
   pantryItems: {},
   pantrySeeded: false,
   generalShoppingRecurring1: false,
+  familyDefaults1: false,
   pantryQtyMigrated: false,
   pantryUtilityLuogoMigrated: false,
   pantryUnitReviewed: false,
@@ -2397,6 +2398,7 @@ const state = {
   backupOpen: false, // non persistito: pagina "Backup"
   inviteCode: '', // non persistito: ultimo codice invito mostrato in Persone
   onbStep: 0, // non persistito: passo del primo avvio guidato
+  genGeneralOpen: false, // non persistito: pagina "Regole di generazione" generali
   membersOpen: false, // non persistito: pagina "Persone"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
   gradPicker: null, // ephemeral: nome della ricetta con il menu del gradimento aperto
@@ -2466,6 +2468,7 @@ const state = {
   // base, chiave "i_meal" (es. "5_cena", "5_pranzo" — così ven/sab/dom
   // possono avere un tetto diverso tra pranzo e cena dello stesso giorno).
   weekTempoBase: 'normale',
+  leftoverLunchOn: false, // pranzo = avanzo della sera prima: attivo o no (Regole di generazione); si imposta per famiglia, vedi leftoverLunchOn1
   weekLeftoverDays: null, // giorni con il pranzo = avanzo della cena di ieri (null = tutti quelli possibili)
   portionGrams: { pasta: 0, riso: 0 }, // grammi a porzione di pasta e riso (0 = come nella ricetta)
   onboardingDone: false, // primo avvio guidato delle famiglie nuove completato
@@ -2906,9 +2909,9 @@ function familyRouteFor(famId, meta){
   const p = meta && meta.paths;
   if(p && p.state){
     return { id: famId, famId, newFamily: false, path: p.state, catalogPath: p.catalog || `families/${famId}/catalog`, photosPath: p.photos || null,
-      seedFromShared: !!p.seedCatalogFrom, seedPath: p.seedCatalogFrom || null };
+      seedFromShared: !!p.seedCatalogFrom, seedPath: p.seedCatalogFrom || null, defaults: (meta && meta.defaults) || {} };
   }
-  return { id: 'f-' + famId, famId, newFamily: true, path: `families/${famId}/state`, catalogPath: `families/${famId}/catalog` };
+  return { id: 'f-' + famId, famId, newFamily: true, path: `families/${famId}/state`, catalogPath: `families/${famId}/catalog`, defaults: (meta && meta.defaults) || {} };
 }
 // Chi sono io tra le persone della famiglia (families/<id>/members/<uid>/memberId):
 // vale per le famiglie di prima, dove "mara" e "ste" esistevano già nei dati.
@@ -3279,6 +3282,17 @@ const MIGRATIONS = [
     const it = resolvePantryItem('Insalata');
     if(it && typeof it.qty !== 'number') it.qty = 0;
     state.recurringItems['rinsalata'] = { nome: it ? it.nome : 'Insalata', qty: 2, every: 7, mode: 'time', last: isoLocalDate(new Date()) };
+  } },
+  // Impostazioni di partenza di ogni famiglia: pranzo con l'avanzo e porzioni.
+  // Si possono dare da Firebase (families/<id>/meta/defaults: { leftoverLunch,
+  // portionsBase }); altrimenti la famiglia originale lo tiene attivo e con 2
+  // porzioni, la cugina lo ha spento e parte da 1, le altre spento e 2.
+  { flag: 'familyDefaults1', run(){
+    const r = getSpaceRoute();
+    const fallback = { default: { leftoverLunch: true }, cugina: { leftoverLunch: false, portionsBase: 1 } }[r.id] || { leftoverLunch: false };
+    const d = Object.assign({}, fallback, r.defaults || {});
+    state.leftoverLunchOn = !!d.leftoverLunch;
+    if(Number.isFinite(d.portionsBase) && d.portionsBase >= 1) state.weekPortionsBase = Math.min(12, Math.round(d.portionsBase));
   } },
   { flag: 'userColorsLight1', run(){
     Object.keys(state.userColors || {}).forEach(u=>{
@@ -3881,6 +3895,7 @@ function buildPersonalPayload(){
     dietTargets: state.dietTargets,
     dietExclude: state.dietExclude,
     allergies: state.allergies,
+    leftoverLunchOn: state.leftoverLunchOn,
     weekLeftoverDays: state.weekLeftoverDays,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
@@ -4527,6 +4542,7 @@ function leftoverPortionsN(){
   return n >= 0 && n <= 4 ? n : 1;
 }
 function leftoverLunchDays(){
+  if(!state.leftoverLunchOn) return [];
   const a = state.weekLeftoverDays;
   return Array.isArray(a) ? a.filter(d => LEFTOVER_LUNCH_ELIGIBLE.includes(d)) : LEFTOVER_LUNCH_ELIGIBLE.slice();
 }
@@ -5658,7 +5674,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderMembersPage() + renderOnboardingPage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderGenGeneralPage() + renderMembersPage() + renderOnboardingPage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -5791,6 +5807,7 @@ const MODAL_CHECKS = [
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
+  [()=> !!state.genGeneralOpen, ()=>{ state.genGeneralOpen = false; }],
   [()=> !!state.membersOpen, ()=>{ state.membersOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
   [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
@@ -7552,10 +7569,7 @@ function renderMenu(){
             <div class="gen-label">Tempo massimo, tutti i giorni</div>
             <div class="chip-row">${TEMPO_ORDER.map(t => `<button type="button" class="btn is-chip${state.weekTempoBase === t ? ' active' : ''}" data-set-tempo-base="${t}" aria-pressed="${state.weekTempoBase === t}">${escapeHtml(tempoChipLabel[t])}</button>`).join('')}</div>
           </div>
-          <div class="gen-group gen-row">
-            <div class="gen-label">Porzioni di partenza</div>
-            <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></div>
-          </div>
+          ${state.leftoverLunchOn ? `
           <div class="gen-group">
             <div class="gen-label">Pranzo con l'avanzo della sera prima</div>
             <div class="gen-days gen-leftover-days">${[0,1,2,3,4,5,6].map(d => {
@@ -7563,16 +7577,12 @@ function renderMenu(){
               return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ' disabled title="Il sabato, primo giorno della settimana, il pranzo si cucina sempre"'} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
             }).join('')}</div>
           </div>
-          ${genSettingsTargetWeek === null ? genDietGroupHtml() : genDietSummaryHtml()}
           <div class="gen-group gen-row">
             <div class="gen-label">Porzioni di ogni avanzo</div>
             <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-leftover-portions="-1" aria-label="Meno porzioni di avanzo" ${leftoverPortionsN() <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${leftoverPortionsN() === 0 ? 'nessuna' : leftoverPortionsN() + (leftoverPortionsN() === 1 ? ' porzione' : ' porzioni')}</span><button type="button" class="qty-btn" data-gen-leftover-portions="1" aria-label="Più porzioni di avanzo" ${leftoverPortionsN() >= 4 ? 'disabled' : ''}>+</button></div>
           </div>
-          <div class="gen-group">
-            <div class="gen-label">Grammi a porzione</div>
-            ${['pasta', 'riso'].map(k => { const g = parseInt((state.portionGrams || {})[k], 10) || 0; return `<div class="gen-row gen-grams-row"><span>${k === 'pasta' ? 'Pasta' : 'Riso'}</span><div class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></div></div>`; }).join('')}
-            <p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa (in Spesa, nel dettaglio e in cucina).</p>
-          </div>
+          ` : ''}
+          ${genDietSummaryHtml()}
           ${genSettingsTargetWeek !== null ? `<div class="gen-group gen-toggle-row">
             <button type="button" class="gen-toggle" data-toggle-gen-pantry role="switch" aria-checked="${!!state.genPantryOnly}"><span class="gen-toggle-text"><span aria-hidden="true">🧺</span> Solo con quello che ho in casa</span><span class="gen-switch${state.genPantryOnly ? ' on' : ''}" aria-hidden="true"></span></button>
             ${state.genPantryOnly ? '<p class="gen-note">Prima le ricette per cui hai tutto. Se non bastano, quelle a cui manca meno.</p>' : ''}
@@ -10843,6 +10853,9 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-gen-two]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.genTwoWeeks = !state.genTwoWeeks; render(); });
   });
+  document.querySelectorAll('[data-toggle-gen-leftover]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.leftoverLunchOn = !state.leftoverLunchOn; persist(); render(); });
+  });
   document.querySelectorAll('[data-toggle-gen-pantry]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.genPantryOnly = !state.genPantryOnly; render(); });
   });
@@ -13520,6 +13533,33 @@ function genDietSummaryHtml(){
             <p class="gen-note">${escapeHtml(parts.join(' · '))}. Per cambiarla vai in Impostazioni → Regole di generazione: vale per tutte le settimane.</p>
           </div>`;
 }
+// Regole di generazione generali: una pagina come le altre Impostazioni (non la finestra
+// di una settimana). Valgono per tutta la famiglia.
+function renderGenGeneralPage(){
+  if(!state.genGeneralOpen) return '';
+  const body = `
+      <section class="settings-section gen-general">
+        <div class="gen-group gen-row">
+          <div class="gen-label">Porzioni di partenza</div>
+          <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></div>
+        </div>
+        <div class="gen-group gen-toggle-row">
+            <button type="button" class="gen-toggle" data-toggle-gen-leftover role="switch" aria-checked="${!!state.leftoverLunchOn}"><span class="gen-toggle-text"><span aria-hidden="true">🍱</span> Pranzo con l'avanzo della sera prima</span><span class="gen-switch${state.leftoverLunchOn ? ' on' : ''}" aria-hidden="true"></span></button>
+            ${state.leftoverLunchOn ? '' : '<p class="gen-note">Se lo attivi, a pranzo si mangia quello che avanza dalla cena prima, nei giorni che scegli.</p>'}
+          </div>
+        ${genDietGroupHtml()}
+        <div class="gen-group">
+            <div class="gen-label">Grammi a porzione</div>
+            ${['pasta', 'riso'].map(k => { const g = parseInt((state.portionGrams || {})[k], 10) || 0; return `<div class="gen-row gen-grams-row"><span>${k === 'pasta' ? 'Pasta' : 'Riso'}</span><div class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></div></div>`; }).join('')}
+            <p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa (in Spesa, nel dettaglio e in cucina).</p>
+          </div>
+      </section>`;
+  return managePageHtml({ key: 'gen-general', title: 'Regole di generazione', closeAttr: 'data-close-gen-general', body });
+}
+document.addEventListener('click', e=>{
+  const closeEl = e.target.closest('[data-close-gen-general]');
+  if(closeEl){ if(!isCloseTap(e, closeEl)) return; state.genGeneralOpen = false; render(); }
+});
 function renderMembersPage(){
   if(!state.membersOpen) return '';
   const list = familyMembers();
@@ -14720,9 +14760,9 @@ document.addEventListener('click', e=>{
   if(!go) return;
   const what = go.dataset.settingsGo;
   // Le Impostazioni restano aperte sotto: chiusa la pagina si torna all'elenco.
-  const tabFor = { gen:'menu', ingredients:'dispensa', groups:'dispensa', depts:'dispensa', recurring:'dispensa' }[what];
+  const tabFor = { ingredients:'dispensa', groups:'dispensa', depts:'dispensa', recurring:'dispensa' }[what];
   if(tabFor && state.tab !== tabFor){ if(!state.settingsReturnTab) state.settingsReturnTab = state.tab; state.tab = tabFor; }
-  if(what === 'gen') state.genSettingsOpen = 'plain';
+  if(what === 'gen') state.genGeneralOpen = true;
   else if(what === 'ingredients') state.ingredientManagerOpen = true;
   else if(what === 'groups') state.pantryGroupsModalOpen = true;
   else if(what === 'depts') state.deptsModalOpen = true;
