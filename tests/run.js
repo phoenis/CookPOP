@@ -3963,6 +3963,28 @@ test('pranzo con l\'avanzo: interruttore nelle Regole generali, giorni e porzion
   eq(r.daFirebase, [true, 3]);
 });
 
+test('menu ⋮ di Menù: "Regole di generazione" apre la pagina generale; la finestra semplice solo dall\'ingranaggio della settimana o di "Aggiungi settimana"', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.genGeneralOpen = false; state.genSettingsOpen = null; state.tab = 'menu'; state.extraWeeks = []; generateWeek(0); render();
+    const out = {};
+    document.getElementById('topbar-menu-btn').click();
+    const voce = [...document.querySelectorAll('.topbar-menu-item')].find(b => /Regole di generazione/.test(b.textContent));
+    voce.click();
+    out.dalMenu = [state.genGeneralOpen, state.genSettingsOpen, !!document.querySelector('[data-page="gen-general"]'), !!document.querySelector('.gen-sheet')];
+    state.genGeneralOpen = false; render();
+    const gear = document.querySelector('[data-open-gen-settings]');
+    out.ingranaggi = [...document.querySelectorAll('[data-open-gen-settings]')].map(b => b.dataset.openGenSettings);
+    gear.click();
+    out.dalGear = [state.genGeneralOpen, state.genSettingsOpen !== null, !!document.querySelector('.gen-sheet')];
+    state.genSettingsOpen = null; render();
+    return out;
+  });
+  eq(r.dalMenu, [true, null, true, false]);
+  assert(r.ingranaggi.length >= 1, 'ingranaggi presenti');
+  eq(r.dalGear, [false, true, true]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

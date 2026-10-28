@@ -12672,7 +12672,7 @@ const TAB_MENU_ITEMS = {
   ],
   menu: [
     { label: uiIcon('refresh') + ' Rigenera menu', action: ()=>{ regenerateAllWeeks(); } },
-    { label: uiIcon('gear') + ' Regole di generazione', action: ()=>{ state.genSettingsOpen = 'plain'; } }
+    { label: uiIcon('gear') + ' Regole di generazione', action: ()=>{ state.genGeneralOpen = true; } }
   ],
   prep: [
     { label: uiIcon('plus') + ' Aggiungi ricetta', action: ()=>{ state.newRecipeModalOpen = true; state.newRecipeError = ''; state.newRecipeName = ''; setTimeout(()=>{ const el = document.getElementById('new-recipe-name'); if(el) el.focus(); }, 80); } },
