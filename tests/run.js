@@ -1921,7 +1921,7 @@ test('catalogo: nove dolci dal ricettario, con ingredienti, procedimento e repar
 test('regole di generazione: porzioni di partenza configurabili, salvate e usate alla generazione', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
-    state.weekPortionsBase = 2; state.tab = 'menu'; state.genSettingsOpen = 'plain'; render();
+    state.weekPortionsBase = 2; state.tab = 'menu'; state.genGeneralOpen = true; render();
     const out = { start: document.querySelector('.gen-stepper-val').textContent.split(' ')[0] };
     document.querySelector('[data-gen-portions-inc]').click(); document.querySelector('[data-gen-portions-inc]').click();
     out.after = state.weekPortionsBase;
@@ -3560,7 +3560,7 @@ test('alimentazione: vegetariano senza carne né pesce, obiettivi modificabili, 
 });
 
 test('alimentazione: la sezione nelle Regole cambia tipo e aggiunge ingredienti da evitare', async ({ page }) => {
-  await page.evaluate(() => { state.dietType = 'onnivoro'; state.dietExclude = []; state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.tab = 'menu'; state.genSettingsOpen = 'plain'; render(); });
+  await page.evaluate(() => { state.dietType = 'onnivoro'; state.dietExclude = []; state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.tab = 'menu'; state.genGeneralOpen = true; render(); });
   await page.click('[data-gen-diet="vegetariano"]');
   await page.fill('.gen-exclude-input', 'funghi, noci');
   await page.click('.gen-exclude-form button');
@@ -3604,7 +3604,7 @@ test('allergie: il menu le evita, le ricette che le contengono hanno l\'avviso, 
 });
 
 test('allergie: sezione nelle Regole e avviso nella scheda ricetta', async ({ page }) => {
-  await page.evaluate(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.allergies = []; state.tab = 'menu'; state.genSettingsOpen = 'plain'; render(); });
+  await page.evaluate(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.allergies = []; state.tab = 'menu'; state.genGeneralOpen = true; render(); });
   await page.click('[data-gen-allergy="uova"]');
   await page.fill('[data-gen-allergy-form] input', 'fragole');
   await page.click('[data-gen-allergy-form] button');
@@ -3916,9 +3916,9 @@ test('Alimentazione e allergie: nelle Regole generali si modificano, nella fines
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.dietType = 'vegetariano'; state.allergies = ['glutine']; state.dietExclude = ['funghi']; state.tab = 'menu';
-    state.genSettingsOpen = 'plain'; render();
+    state.genGeneralOpen = true; render();
     const generali = { dieta: !!document.querySelector('[data-gen-diet]'), form: !!document.querySelector('[data-gen-exclude-form]'), allergie: !!document.querySelector('[data-gen-allergy-form]') };
-    state.genSettingsOpen = 0; render();
+    state.genGeneralOpen = false; state.genSettingsOpen = 0; render();
     const settimana = { dieta: !!document.querySelector('[data-gen-diet]'), form: !!document.querySelector('[data-gen-exclude-form]'), allergie: !!document.querySelector('[data-gen-allergy-form]'),
       riepilogo: (document.querySelector('.gen-sheet') || document.body).textContent.replace(/\s+/g, ' ') };
     state.genSettingsOpen = null; state.dietType = 'onnivoro'; state.allergies = []; state.dietExclude = []; render();
@@ -3927,6 +3927,40 @@ test('Alimentazione e allergie: nelle Regole generali si modificano, nella fines
   eq(r.generali, { dieta: true, form: true, allergie: true });
   eq([r.settimana.dieta, r.settimana.form, r.settimana.allergie], [false, false, false]);
   assert(/Vegetariano · allergie: glutine · da evitare: funghi/.test(r.settimana.riepilogo), 'riepilogo: ' + r.settimana.riepilogo.slice(0, 200));
+});
+
+test('pranzo con l\'avanzo: interruttore nelle Regole generali, giorni e porzioni nella finestra solo se attivo; grammi solo nelle generali; partenze per famiglia', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const has = sel => !!document.querySelector(sel);
+    const out = {};
+    state.leftoverLunchOn = false; state.tab = 'menu'; state.genGeneralOpen = true; render();
+    out.spento = { toggle: has('[data-toggle-gen-leftover]'), giorni: has('[data-gen-leftover-day]'), porzioni: has('[data-gen-leftover-portions]'), grammi: has('[data-gen-grams]'), giorniLogici: leftoverLunchDays().length };
+    document.querySelector('[data-toggle-gen-leftover]').click();
+    out.acceso = { on: state.leftoverLunchOn, giorni: has('[data-gen-leftover-day]'), porzioni: has('[data-gen-leftover-portions]'), giorniLogici: leftoverLunchDays().length > 0 };
+    state.genGeneralOpen = false; state.genSettingsOpen = 0; render();
+    out.settimana = { toggle: has('[data-toggle-gen-leftover]'), giorni: has('[data-gen-leftover-day]'), porzioni: has('[data-gen-leftover-portions]'), grammi: has('[data-gen-grams]'), obiettivi: has('[data-gen-target]') };
+    state.leftoverLunchOn = false; render();
+    out.settimanaSpento = { giorni: has('[data-gen-leftover-day]'), porzioni: has('[data-gen-leftover-portions]') };
+    state.genSettingsOpen = null;
+    // partenze per famiglia
+    const oldRoute = activeRoute;
+    const prova = route => { state.familyDefaults1 = false; state.leftoverLunchOn = null; state.weekPortionsBase = 2; activeRoute = route; runMigrations(); return [state.leftoverLunchOn, state.weekPortionsBase]; };
+    out.originale = prova(null);
+    out.cugina = prova({ id: 'cugina', famId: 'cugina', newFamily: false, path: 'x', catalogPath: 'y' });
+    out.nuova = prova(familyRouteFor('nuova'));
+    out.daFirebase = prova(familyRouteFor('altra', { defaults: { leftoverLunch: true, portionsBase: 3 } }));
+    activeRoute = oldRoute; state.leftoverLunchOn = true; state.weekPortionsBase = 2;
+    return out;
+  });
+  eq(r.spento, { toggle: true, giorni: false, porzioni: false, grammi: true, giorniLogici: 0 });
+  eq(r.acceso, { on: true, giorni: false, porzioni: false, giorniLogici: true });
+  eq(r.settimana, { toggle: false, giorni: true, porzioni: true, grammi: false, obiettivi: false });
+  eq(r.settimanaSpento, { giorni: false, porzioni: false });
+  eq(r.originale, [true, 2]);
+  eq(r.cugina, [false, 1]);
+  eq(r.nuova, [false, 2]);
+  eq(r.daFirebase, [true, 3]);
 });
 
 (async () => {
