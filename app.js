@@ -2399,6 +2399,7 @@ const state = {
   inviteCode: '', // non persistito: ultimo codice invito mostrato in Persone
   onbStep: 0, // non persistito: passo del primo avvio guidato
   genGeneralOpen: false, // non persistito: pagina "Regole generali"
+  genTargetEdit: null, // non persistito: categoria degli obiettivi con il fumetto aperto
   genGeneralPage: null, // non persistito: sotto-pagina aperta (diet, targets, grams, avoid)
   membersOpen: false, // non persistito: pagina "Persone"
   appearanceOpen: false, // non persistito: pagina "Tema e colori"
@@ -5811,7 +5812,8 @@ const MODAL_CHECKS = [
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
-  [()=> !!state.genGeneralPage, ()=>{ state.genGeneralPage = null; }],
+  [()=> !!state.genTargetEdit, ()=>{ state.genTargetEdit = null; }],
+  [()=> !!state.genGeneralPage, ()=>{ state.genGeneralPage = null; state.genTargetEdit = null; }],
   [()=> !!state.genGeneralOpen, ()=>{ state.genGeneralOpen = false; state.genGeneralPage = null; }],
   [()=> !!state.membersOpen, ()=>{ state.membersOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
@@ -10905,12 +10907,18 @@ function attachHandlers(){
   document.querySelectorAll('[data-gen-diet]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.dietType = btn.dataset.genDiet; state.dietTargets = {}; persist(); render(); });
   });
+  document.querySelectorAll('[data-gen-target-open]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.genTargetEdit = state.genTargetEdit === btn.dataset.genTargetOpen ? null : btn.dataset.genTargetOpen; render(); });
+  });
+  document.querySelectorAll('[data-gen-target-close]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.genTargetEdit = null; render(); });
+  });
   document.querySelectorAll('[data-gen-target]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const k = btn.dataset.genTarget, end = parseInt(btn.dataset.genTargetEnd, 10), d = parseInt(btn.dataset.genTargetStep, 10);
       const r = weekProteinTargets()[k].slice();
-      r[end] = Math.min(7, Math.max(0, r[end] + d));
-      if(r[0] > r[1]){ if(end === 0) r[1] = r[0]; else r[0] = r[1]; }
+      // il minimo non supera il massimo, e il massimo non scende sotto il minimo
+      r[end] = end === 0 ? Math.min(r[1], Math.max(0, r[0] + d)) : Math.max(r[0], Math.min(7, r[1] + d));
       state.dietTargets = Object.assign({}, state.dietTargets, { [k]: r });
       persist(); render();
     });
@@ -13521,10 +13529,18 @@ function genTargetsSummary(){
   return PROTEINA_ORDER.filter(k => k !== 'nessuna' && t[k][1] > 0).map(k => `${k === 'salumi' ? 'Salumi' : PROTEINA_LABEL[k]} ${t[k][0] === t[k][1] ? t[k][0] : t[k][0] + '–' + t[k][1]}`).join(' · ');
 }
 function genTargetRowsHtml(){
+  const editing = state.genTargetEdit;
   return PROTEINA_ORDER.filter(k => k !== 'nessuna').map(k => {
     const [mn, mx] = weekProteinTargets()[k];
-    const stp = (end, d, v, lab) => `<button type="button" class="qty-btn" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${(d < 0 && v <= 0) || (d > 0 && v >= 7) ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`;
-    return `<div class="manage-row gen-inline-row"><span class="manage-row-icon">${PROTEINA_ICON[k] || ''}</span><span class="manage-row-main">${PROTEINA_LABEL[k]}</span><span class="gen-stepper">${stp(0, -1, mn, 'Meno minimo')}<span class="gen-stepper-val">${mn === mx ? mn : mn + '–' + mx}</span>${stp(1, 1, mx, 'Più massimo')}</span></div>`;
+    const stp = (end, d, v, lab, off) => `<button type="button" data-gen-target="${k}" data-gen-target-end="${end}" data-gen-target-step="${d}" aria-label="${lab} ${PROTEINA_LABEL[k]}" ${off ? 'disabled' : ''}>${d < 0 ? '−' : '+'}</button>`;
+    const pop = editing === k ? `
+        <div class="qty-pop-backdrop" data-gen-target-close></div>
+        <div class="qty-pop gen-target-pop" role="dialog" aria-label="${escapeAttr(PROTEINA_LABEL[k])} a settimana">
+          <div class="gen-target-pr"><span>Almeno</span><span class="gen-sts">${stp(0, -1, mn, 'Meno minimo', mn <= 0)}<b>${mn}</b>${stp(0, 1, mn, 'Più minimo', mn >= mx)}</span></div>
+          <div class="gen-target-pr"><span>Al massimo</span><span class="gen-sts">${stp(1, -1, mx, 'Meno massimo', mx <= mn)}<b>${mx}</b>${stp(1, 1, mx, 'Più massimo', mx >= 7)}</span></div>
+          <button type="button" class="btn btn--primary qty-pop-done" data-gen-target-close>Fatto</button>
+        </div>` : '';
+    return `<div class="manage-row gen-inline-row"><span class="manage-row-icon">${PROTEINA_ICON[k] || ''}</span><span class="manage-row-main">${PROTEINA_LABEL[k]}</span><span class="gen-rv-wrap"><button type="button" class="gen-rv${editing === k ? ' on' : ''}" data-gen-target-open="${k}" aria-expanded="${editing === k}" aria-label="${escapeAttr(PROTEINA_LABEL[k])}: ${mn === mx ? mn : mn + ' a ' + mx} a settimana. Modifica"><u>${mn === mx ? mn : mn + '–' + mx}</u></button>${pop}</span></div>`;
   }).join('');
 }
 function genGramsRowsHtml(){
@@ -13565,7 +13581,7 @@ function renderGenGeneralPage(){
       </section>`;
   } else if(sub === 'targets'){
     title = 'Obiettivi a settimana';
-    body = `<p class="settings-note manage-intro">Quante volte a settimana, a pranzo o a cena. Sono i numeri che vedi in cima al Menù.</p>
+    body = `<p class="settings-note manage-intro">Quante volte a settimana, tra pranzi e cene. Tocca il numero per scegliere il minimo e il massimo. Sono i numeri in cima al Menù.</p>
       <section class="settings-section"><div class="settings-card manage-list">${genTargetRowsHtml()}</div></section>`;
   } else if(sub === 'grams'){
     title = 'Grammi a porzione';
@@ -13607,10 +13623,11 @@ function renderGenGeneralPage(){
 }
 document.addEventListener('click', e=>{
   const go = e.target.closest('[data-gen-go]');
-  if(go){ state.genGeneralPage = go.dataset.genGo; render(); return; }
+  if(go){ state.genGeneralPage = go.dataset.genGo; state.genTargetEdit = null; render(); return; }
   const back = e.target.closest('[data-gen-general-back]');
   if(back){
     if(!isCloseTap(e, back)) return;
+    state.genTargetEdit = null;
     if(state.genGeneralPage) state.genGeneralPage = null; else state.genGeneralOpen = false;
     render();
   }
