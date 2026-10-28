@@ -1988,7 +1988,7 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     TAB_MENU_ITEMS.dispensa[3].action(); out.grp = state.pantryGroupsModalOpen === true; state.pantryGroupsModalOpen = false;
     TAB_MENU_ITEMS.dispensa[4].action(); out.dept = state.deptsModalOpen === true; state.deptsModalOpen = false;
     TAB_MENU_ITEMS.spesa[0].action(); out.aisle = state.aisleOrderOpen === true; state.aisleOrderOpen = false;
-    TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genSettingsOpen === 'plain'; state.genSettingsOpen = null;
+    TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genGeneralOpen === true && state.genSettingsOpen === null; state.genGeneralOpen = false;
     return out;
   });
   eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Regole di generazione'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true });
@@ -3961,6 +3961,28 @@ test('pranzo con l\'avanzo: interruttore nelle Regole generali, giorni e porzion
   eq(r.cugina, [false, 1]);
   eq(r.nuova, [false, 2]);
   eq(r.daFirebase, [true, 3]);
+});
+
+test('menu ⋮ di Menù: "Regole di generazione" apre la pagina generale; la finestra semplice solo dall\'ingranaggio della settimana o di "Aggiungi settimana"', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.genGeneralOpen = false; state.genSettingsOpen = null; state.tab = 'menu'; state.extraWeeks = []; generateWeek(0); render();
+    const out = {};
+    document.getElementById('topbar-menu-btn').click();
+    const voce = [...document.querySelectorAll('.topbar-menu-item')].find(b => /Regole di generazione/.test(b.textContent));
+    voce.click();
+    out.dalMenu = [state.genGeneralOpen, state.genSettingsOpen, !!document.querySelector('[data-page="gen-general"]'), !!document.querySelector('.gen-sheet')];
+    state.genGeneralOpen = false; render();
+    const gear = document.querySelector('[data-open-gen-settings]');
+    out.ingranaggi = [...document.querySelectorAll('[data-open-gen-settings]')].map(b => b.dataset.openGenSettings);
+    gear.click();
+    out.dalGear = [state.genGeneralOpen, state.genSettingsOpen !== null, !!document.querySelector('.gen-sheet')];
+    state.genSettingsOpen = null; render();
+    return out;
+  });
+  eq(r.dalMenu, [true, null, true, false]);
+  assert(r.ingranaggi.length >= 1, 'ingranaggi presenti');
+  eq(r.dalGear, [false, true, true]);
 });
 
 (async () => {
