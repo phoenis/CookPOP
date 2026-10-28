@@ -2659,3 +2659,18 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .gen-avoid .gen-exclude-chips{ margin:var(--s2) 0; }
 .gen-avoid .gen-warn{ padding:var(--s2) var(--s3); border-radius:var(--radius-md,10px); background:var(--surface-2,#f4efe6); }
 .gen-avoid + .gen-avoid{ margin-top:var(--s5,1.5rem); padding-top:var(--s4); border-top:1px solid var(--line); }
+
+/* Obiettivi a settimana: il valore è un tocco, con un fumetto "Almeno / Al massimo" (DS-RegoleObiettivi) */
+.gen-rv-wrap{ position:relative; flex:none; display:flex; align-items:center; justify-content:flex-end; }
+.gen-rv{ min-width:72px; height:44px; display:flex; align-items:center; justify-content:flex-end; border:0; background:transparent; padding:0; color:var(--text); font:700 var(--fs-body)/1 var(--font); cursor:pointer; }
+.gen-rv u{ text-decoration:underline dotted var(--line-strong); text-underline-offset:5px; text-decoration-thickness:1.5px; }
+.gen-rv.on u{ color:var(--accent-text); text-decoration-color:var(--accent); }
+.gen-target-pop{ width:248px; right:-4px; top:calc(100% + 2px); gap:0; padding:var(--s2) var(--s3) var(--s3); }
+.gen-target-pop::before{ content:""; position:absolute; top:-6px; right:20px; width:12px; height:12px; background:var(--bg); border-left:1px solid var(--line); border-top:1px solid var(--line); transform:rotate(45deg); }
+.gen-target-pr{ display:flex; align-items:center; justify-content:space-between; min-height:44px; font-size:var(--fs-body); }
+.gen-target-pr + .gen-target-pr{ border-top:1px solid var(--line); }
+.gen-sts{ display:inline-flex; align-items:center; flex:none; }
+.gen-sts button{ width:28px; height:40px; border:0; background:transparent; font-size:20px; line-height:1; color:var(--muted); padding:0; cursor:pointer; }
+.gen-sts button:disabled{ opacity:.35; cursor:default; }
+.gen-sts b{ min-width:36px; text-align:center; font-weight:700; }
+.gen-target-pop .qty-pop-done{ align-self:flex-end; width:auto; margin-top:var(--s2); height:36px; padding:0 var(--s4); }

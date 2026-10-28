@@ -3924,10 +3924,10 @@ test('Regole generali: pagina con righe e sotto-pagine; la finestra della settim
     const testo = () => (document.querySelector('[data-page^="gen-general"]') || document.body).textContent.replace(/\s+/g, ' ');
     const out = { righe: [...document.querySelectorAll('[data-gen-go]')].map(b => b.dataset.genGo), porzioni: has('[data-gen-portions-inc]'), toggle: has('[data-toggle-gen-leftover]'), testo: testo() };
     const sotto = {};
-    ['diet', 'targets', 'grams', 'avoid'].forEach(p => { state.genGeneralPage = p; render(); sotto[p] = { diet: has('[data-gen-diet]'), target: has('[data-gen-target]'), grams: has('[data-gen-grams]'), allergie: has('[data-gen-allergy-form]'), non: has('[data-gen-exclude-form]') }; });
+    ['diet', 'targets', 'grams', 'avoid'].forEach(p => { state.genGeneralPage = p; render(); sotto[p] = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), allergie: has('[data-gen-allergy-form]'), non: has('[data-gen-exclude-form]') }; });
     out.sotto = sotto;
     state.genGeneralOpen = false; state.genGeneralPage = null; state.genSettingsOpen = 0; render();
-    out.settimana = { diet: has('[data-gen-diet]'), target: has('[data-gen-target]'), grams: has('[data-gen-grams]'), porzioni: has('[data-gen-portions-inc]'), titolo: document.querySelector('.gen-sheet .move-title').textContent };
+    out.settimana = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), porzioni: has('[data-gen-portions-inc]'), titolo: document.querySelector('.gen-sheet .move-title').textContent };
     state.genSettingsOpen = null; state.dietType = 'onnivoro'; state.allergies = []; state.dietExclude = []; state.portionGrams = { pasta: 0, riso: 0 }; render();
     return out;
   });
@@ -4013,6 +4013,42 @@ test('ingredienti che non piacciono e allergie: due liste, e una parola come "po
   eq(r.allergia, [true, false]);
   eq(r.corte, ['noci', 'fungh', 'fragol']);
 });
+test('obiettivi a settimana: il valore apre un fumetto con minimo e massimo separati, che non si incrociano', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.dietType = 'onnivoro'; state.dietTargets = {};
+    state.genGeneralOpen = true; state.genGeneralPage = 'targets'; state.genTargetEdit = null; render();
+    const out = {};
+    const val = k => document.querySelector(`[data-gen-target-open="${k}"]`).textContent.trim();
+    out.valori = [val('legumi'), val('carne-bianca')];
+    out.senzaStepper = !document.querySelector('[data-gen-target]');
+    document.querySelector('[data-gen-target-open="legumi"]').click();
+    const bt = (end, d) => document.querySelector(`[data-gen-target="legumi"][data-gen-target-end="${end}"][data-gen-target-step="${d}"]`);
+    out.fumetto = [!!document.querySelector('.gen-target-pop'), document.querySelector('.gen-target-pop').textContent.replace(/\s+/g, ' ').includes('Almeno'), document.querySelector('.gen-target-pop').textContent.includes('Al massimo'), !!document.querySelector('.gen-target-pop .qty-pop-done')];
+    // minimo 3, massimo 4: alzo il minimo fino al massimo, poi si ferma
+    bt(0, 1).click(); out.min4 = weekProteinTargets().legumi.slice();
+    out.minPiuBloccato = document.querySelector('[data-gen-target="legumi"][data-gen-target-end="0"][data-gen-target-step="1"]').disabled;
+    out.maxMenoBloccato = document.querySelector('[data-gen-target="legumi"][data-gen-target-end="1"][data-gen-target-step="-1"]').disabled;
+    out.valoreUguale = val('legumi');
+    // il massimo sale, il minimo resta
+    document.querySelector('[data-gen-target="legumi"][data-gen-target-end="1"][data-gen-target-step="1"]').click(); out.max5 = weekProteinTargets().legumi.slice();
+    // minimo giù fino a 0
+    for(let i = 0; i < 6; i++){ const b = document.querySelector('[data-gen-target="legumi"][data-gen-target-end="0"][data-gen-target-step="-1"]'); if(b && !b.disabled) b.click(); }
+    out.min0 = weekProteinTargets().legumi.slice();
+    out.salvato = state.dietTargets.legumi.slice();
+    document.querySelector('.gen-target-pop .qty-pop-done').click();
+    out.chiuso = !document.querySelector('.gen-target-pop');
+    state.genGeneralOpen = false; state.genGeneralPage = null; state.dietTargets = {}; render();
+    return out;
+  });
+  eq(r.valori, ['3–4', '2']);
+  eq(r.senzaStepper, true);
+  eq(r.fumetto, [true, true, true, true]);
+  eq([r.min4, r.minPiuBloccato, r.maxMenoBloccato, r.valoreUguale], [[4, 4], true, true, '4']);
+  eq(r.max5, [4, 5]);
+  eq([r.min0, r.salvato, r.chiuso], [[0, 5], [0, 5], true]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
