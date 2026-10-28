@@ -2646,3 +2646,8 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 [data-page="onboarding"] .sheet-footer{ display:flex; flex-direction:column; gap:var(--s2); }
 [data-page="onboarding"] .gen-group{ margin-bottom:var(--s5,1.5rem); }
 [data-page="onboarding"] .gen-label{ margin-bottom:var(--s2); }
+
+/* Impostazioni: l'immagine del profilo ha la stessa misura e lo stesso allineamento delle altre icone */
+#settings-backdrop .settings-link .settings-avatar, #settings-backdrop .settings-link #settings-avatar{ width:2.5rem; height:2.5rem; min-width:2.5rem; font-size:1.125rem; margin-right:var(--space-xsmall); border-radius:50%; }
+#settings-backdrop .settings-profile{ padding-top:0.75rem; padding-bottom:0.75rem; }
+#settings-backdrop .settings-profile .settings-link-text small{ font-size:var(--text-xsmall); line-height:1.25; }

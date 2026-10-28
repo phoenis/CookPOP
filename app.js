@@ -487,8 +487,8 @@ function resolvePantryItem(ingrediente, spec){
     const groupEntry = Object.entries(state.pantryGroups || {}).find(([id,g]) => (g.matchName||'').trim().toLowerCase() === key);
     const group = groupEntry ? groupEntry[0] : null;
     if(!group) continue;
-    const curatedMembers = (CURATED_PANTRY_GROUPS[group] || {}).members || [];
-    const inGroup = (k, it) => it.group === group || curatedMembers.includes(k); // es. "Dado" copre "Brodo vegetale" anche se non è assegnato al gruppo
+    const memberKeys = groupMemberKeys(group);
+    const inGroup = (k, it) => it.group === group || memberKeys.includes(k); // es. "Dado" copre "Brodo vegetale" anche se non è assegnato al gruppo
     const inStock = Object.entries(state.pantryItems).find(([k, it]) => inGroup(k, it) && typeof it.qty === 'number' && it.qty > 0);
     if(inStock) return inStock[1];
     if(!fallback){
@@ -1985,6 +1985,42 @@ const CURATED_PANTRY_GROUPS = {
   'brodo-carne': { group:{ label:'Brodo di carne', matchName:'brodo di carne', cat:'dispensa' }, members:['dado','dado di carne','dado da brodo','dado per brodo','brodo di carne','brodo granulare'] },
   'carne-macinata': { group:{ label:'Carne macinata', matchName:'carne macinata', cat:'carne' }, members:['carne macinata mista','carne macinata di manzo','macinato','macinato misto','macinato di manzo'] }
 };
+// Gli altri gruppi "X o Y": i nomi che ne fanno parte, uguali per tutte le
+// famiglie. Insieme a CURATED_PANTRY_GROUPS formano l'elenco di partenza dei
+// formati di ogni gruppo (vedi groupMemberKeys): i gruppi sono "pieni" anche
+// con la Dispensa vuota.
+const OTHER_GROUP_MEMBERS = {
+  'riso-carnaroli-vialone': ['riso carnaroli','carnaroli','riso vialone nano','vialone nano'],
+  'provolone-brie': ['provolone','brie'],
+  'zucchero-miele': ['zucchero','miele'],
+  'rosmarino-alloro': ['rosmarino','alloro'],
+  'guanciale-pancetta': ['guanciale','pancetta'],
+  'basilico-menta': ['basilico','menta'],
+  'olio-burro': ['olio evo','burro'],
+  'grana-parmigiano': ['grana','parmigiano']
+};
+function groupBaseMembers(id){
+  return [...new Set([...((CURATED_PANTRY_GROUPS[id] || {}).members || []), ...(OTHER_GROUP_MEMBERS[id] || [])])];
+}
+// I formati di un gruppo, come chiavi minuscole: quelli scelti dalla famiglia
+// (g.members, se l'ha modificato) oppure l'elenco di partenza, più le voci di
+// Dispensa assegnate al gruppo.
+function groupMemberKeys(id){
+  const g = (state.pantryGroups || {})[id] || {};
+  const base = Array.isArray(g.members) ? g.members : groupBaseMembers(id);
+  const fromPantry = Object.entries(state.pantryItems || {}).filter(([, it]) => it.group === id).map(([k]) => k);
+  return [...new Set([...base, ...fromPantry])];
+}
+function groupMemberLabel(key){
+  const it = (state.pantryItems || {})[key];
+  return it && it.nome ? it.nome : key.charAt(0).toUpperCase() + key.slice(1);
+}
+// Un gruppo modificato a mano tiene la sua lista: la si crea dall'elenco di partenza.
+function materializeGroupMembers(id){
+  const g = state.pantryGroups[id];
+  if(g && !Array.isArray(g.members)) g.members = groupMemberKeys(id);
+  return g;
+}
 // Un ingrediente di ricetta che va diviso in più righe: "Limone (scorza e
 // succo)" diventa "Limone (scorza)" + "Limone (succo)". La quantità resta
 // sulla prima riga; il succo è dello stesso limone, quindi "q.b." — altrimenti
@@ -9692,7 +9728,7 @@ function groupMembers(id){
 function groupEditCardHtml(id){
   const g = state.groupDraft || {};
   const isNew = id === 'new';
-  const members = isNew ? [] : groupMembers(id);
+  const members = isNew ? [] : groupMemberKeys(id).map(k => [k, { nome: groupMemberLabel(k) }]).sort((a, b) => IT_COLLATOR.compare(a[1].nome, b[1].nome));
   const q = (state.groupMemberSearch || '').trim().toLowerCase();
   const candidates = !q ? [] : Object.entries(state.pantryItems)
     .filter(([, it]) => it.group !== id && !isNonFoodDept(knownDept(it.cat) || classifyDept(it.nome)) && it.nome.toLowerCase().includes(q))
@@ -9731,7 +9767,7 @@ function renderGroupsPage(){
   const editing = state.groupEditId;
   const rows = Object.entries(state.pantryGroups).sort((a, b) => IT_COLLATOR.compare(a[1].label, b[1].label)).map(([id, g]) => {
     if(editing === id) return groupEditCardHtml(id);
-    const members = groupMembers(id).map(([, it]) => it.nome);
+    const members = groupMemberKeys(id).map(groupMemberLabel).sort((a, b) => IT_COLLATOR.compare(a, b));
     return `
       <button type="button" class="manage-row" data-group-edit="${escapeAttr(id)}">
         <span class="manage-row-icon">${g.cat && DEPT_ICON[g.cat] ? DEPT_ICON[g.cat] : '🗂️'}</span>
@@ -12159,10 +12195,10 @@ function attachHandlers(){
   const groupMemberSearch = document.getElementById('group-member-search');
   if(groupMemberSearch) groupMemberSearch.addEventListener('input', e=>{ state.groupMemberSearch = e.target.value; render(); });
   const addToGroup = key=>{
-    const it = state.pantryItems[key]; const g = state.pantryGroups[state.groupEditId];
-    if(!it || !g) return;
-    it.group = state.groupEditId;
-    if(!it.cat && g.cat) it.cat = g.cat;
+    const it = state.pantryItems[key]; const g = materializeGroupMembers(state.groupEditId);
+    if(!g) return;
+    if(!g.members.includes(key)) g.members.push(key);
+    if(it){ it.group = state.groupEditId; if(!it.cat && g.cat) it.cat = g.cat; }
     state.groupMemberSearch = '';
     persist(); render();
     const inp = document.getElementById('group-member-search'); if(inp) inp.focus();
@@ -12170,13 +12206,14 @@ function attachHandlers(){
   document.querySelectorAll('[data-group-member-add]').forEach(btn=> btn.addEventListener('click', ()=> addToGroup(btn.dataset.groupMemberAdd)));
   document.querySelectorAll('[data-group-member-new]').forEach(btn=> btn.addEventListener('click', ()=>{
     const name = btn.dataset.groupMemberNew;
-    const key = name.trim().toLowerCase();
-    if(!state.pantryItems[key]) upsertPantryItem(name, 'dispensa', 0);
-    addToGroup(key);
+    addToGroup(name.trim().toLowerCase());
   }));
   document.querySelectorAll('[data-group-member-remove]').forEach(btn=> btn.addEventListener('click', ()=>{
-    const it = state.pantryItems[btn.dataset.groupMemberRemove];
-    if(it){ delete it.group; persist(); render(); }
+    const key = btn.dataset.groupMemberRemove, g = materializeGroupMembers(state.groupEditId);
+    const it = state.pantryItems[key];
+    if(g) g.members = g.members.filter(k => k !== key);
+    if(it && it.group === state.groupEditId) delete it.group;
+    persist(); render();
   }));
   document.querySelectorAll('[data-group-delete]').forEach(btn=>{
     btn.addEventListener('click', e=>{
