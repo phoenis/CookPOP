@@ -2399,6 +2399,7 @@ const state = {
   inviteCode: '', // non persistito: ultimo codice invito mostrato in Persone
   onbStep: 0, // non persistito: passo del primo avvio guidato
   genGeneralOpen: false, // non persistito: pagina "Regole generali"
+  genGeneralSheet: null, // non persistito: pannellino aperto sulle Regole generali (grams | diet)
   genTargetEdit: null, // non persistito: categoria degli obiettivi con il fumetto aperto
   genGeneralPage: null, // non persistito: sotto-pagina aperta (diet, targets, grams, avoid)
   membersOpen: false, // non persistito: pagina "Persone"
@@ -5812,9 +5813,10 @@ const MODAL_CHECKS = [
   [()=> !!state.cardsImport, ()=>{ state.cardsImport = null; }],
   [()=> !!state.cardViewId, ()=>{ state.cardViewId = null; }],
   [()=> !!state.backupOpen, ()=>{ state.backupOpen = false; }],
+  [()=> !!state.genGeneralSheet, ()=>{ state.genGeneralSheet = null; }],
   [()=> !!state.genTargetEdit, ()=>{ state.genTargetEdit = null; }],
   [()=> !!state.genGeneralPage, ()=>{ state.genGeneralPage = null; state.genTargetEdit = null; }],
-  [()=> !!state.genGeneralOpen, ()=>{ state.genGeneralOpen = false; state.genGeneralPage = null; }],
+  [()=> !!state.genGeneralOpen, ()=>{ state.genGeneralOpen = false; state.genGeneralPage = null; state.genGeneralSheet = null; }],
   [()=> !!state.membersOpen, ()=>{ state.membersOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
   [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
@@ -10877,6 +10879,13 @@ function attachHandlers(){
       render();
     });
   });
+  document.querySelectorAll('[data-gen-sheet-close]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(!isCloseTap(e, el)) return;
+      state.genGeneralSheet = null;
+      render();
+    });
+  });
   document.querySelectorAll('[data-close-gen-settings]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(!isCloseTap(e, el)) return;
@@ -13573,20 +13582,10 @@ function renderGenGeneralPage(){
   if(!state.genGeneralOpen) return '';
   const sub = state.genGeneralPage || null;
   let title = 'Regole generali', body = '';
-  if(sub === 'diet'){
-    title = 'Alimentazione';
-    body = `<section class="settings-section">
-        <div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
-        <p class="settings-note">Con pescetariano e vegetariano il menù non sceglie piatti con carne (e con pesce, per i vegetariani) e gli obiettivi settimanali si adattano: li ritocchi in Obiettivi a settimana.</p>
-      </section>`;
-  } else if(sub === 'targets'){
+  if(sub === 'targets'){
     title = 'Obiettivi a settimana';
     body = `<p class="settings-note manage-intro">Quante volte a settimana, tra pranzi e cene. Tocca il numero per scegliere il minimo e il massimo. Sono i numeri in cima al Menù.</p>
       <section class="settings-section"><div class="settings-card manage-list">${genTargetRowsHtml()}</div></section>`;
-  } else if(sub === 'grams'){
-    title = 'Grammi a porzione';
-    body = `<p class="settings-note manage-intro">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa, in Spesa, nel dettaglio e in cucina.</p>
-      <section class="settings-section"><div class="settings-card manage-list">${genGramsRowsHtml()}</div></section>`;
   } else if(sub === 'avoid'){
     title = 'Da evitare';
     body = genAvoidPageHtml();
@@ -13619,10 +13618,34 @@ function renderGenGeneralPage(){
         </div>
       </section>`;
   }
-  return managePageHtml({ key: sub ? 'gen-general-' + sub : 'gen-general', title, closeAttr: 'data-gen-general-back', body });
+  return managePageHtml({ key: sub ? 'gen-general-' + sub : 'gen-general', title, closeAttr: 'data-gen-general-back', body }) + genGeneralSheetHtml();
+}
+// "Grammi a porzione" e "Alimentazione": un pannellino dal basso sopra la pagina (DS-RegoleGenerali).
+function genGeneralSheetHtml(){
+  const which = state.genGeneralSheet;
+  if(which !== 'grams' && which !== 'diet') return '';
+  const title = which === 'grams' ? 'Grammi a porzione' : 'Alimentazione';
+  const body = which === 'grams'
+    ? `<p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa, in Spesa, nel dettaglio e in cucina.</p>
+       <div class="manage-list">${genGramsRowsHtml()}</div>`
+    : `<div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
+       <p class="gen-note">Con pescetariano e vegetariano il menù non sceglie piatti con carne (e con pesce, per i vegetariani) e gli obiettivi settimanali si adattano: li ritocchi in Obiettivi a settimana.</p>`;
+  return `
+    <div class="move-backdrop gen-mini-backdrop" data-gen-sheet-close>
+      <div class="move-sheet gen-sheet gen-mini-sheet" role="dialog" aria-label="${escapeAttr(title)}" data-stop-close>
+        <div class="move-handle" aria-hidden="true"></div>
+        <div class="dsh-head">
+          <div class="dsh-head-text"><h2 class="move-title">${escapeHtml(title)}</h2></div>
+          <button type="button" class="btn is-icon dsh-close" data-gen-sheet-close aria-label="Chiudi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="gen-body">${body}</div>
+        <div class="gen-footer"><button type="button" class="btn is-solid gen-go" data-gen-sheet-close>Fatto</button></div>
+      </div>
+    </div>`;
 }
 document.addEventListener('click', e=>{
   const go = e.target.closest('[data-gen-go]');
+  if(go && (go.dataset.genGo === 'grams' || go.dataset.genGo === 'diet')){ state.genGeneralSheet = go.dataset.genGo; render(); return; }
   if(go){ state.genGeneralPage = go.dataset.genGo; state.genTargetEdit = null; render(); return; }
   const back = e.target.closest('[data-gen-general-back]');
   if(back){
