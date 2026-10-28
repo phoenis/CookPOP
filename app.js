@@ -3510,7 +3510,8 @@ async function loadState(){
   const route = getSpaceRoute();
   // Una famiglia nuova parte senza persone: la prima è chi crea/entra (vedi
   // ensureSelfMember), non i due nomi della famiglia originale.
-  if(route.newFamily){ state.members = []; state.userColors = {}; }
+  // Niente scorte né spesa fissa di partenza: quelle di prima sono della famiglia originale.
+  if(route.newFamily){ state.members = []; state.userColors = {}; state.pantrySeeded = true; }
   const personalKey = 'quaderno-state-' + route.id;
   // Cache locale istantanea (utile a schermo pieno offline o a connessione lenta)
   try{
@@ -7677,7 +7678,7 @@ function buildShopFlat(){
     if(state.shopDismissed[n.key]) return;
     flat.push({ key: n.key, ingrediente: n.nome, qta: String(n.need), dove:'', note:'', context: `${n.nome} per i pasti`, contextShort: `${n.nome} per ${n.meals} pasti` });
   });
-  DATA.generalShopping.forEach((it,idx)=>{
+  (activeRoute && activeRoute.newFamily ? [] : DATA.generalShopping).forEach((it,idx)=>{
     const key = `gen_${idx}`;
     if(state.shopDismissed[key]) return;
     if(pantryStatusFor(it.ingrediente, it.qta) === 'in-casa' && state.shopChecked[key] !== false) return;

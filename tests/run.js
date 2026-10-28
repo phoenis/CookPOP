@@ -3853,6 +3853,27 @@ test('famiglie di prima nel sistema nuovo: dati dove sono, io = mara senza nome 
   eq(r.mezzo, 'mamma');
 });
 
+test('famiglia nuova: Dispensa e Spesa partono vuote (niente scorte né spesa fissa della famiglia originale)', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const oldRoute = activeRoute;
+    const out = {};
+    state.pantryItems = {}; state.pantrySeeded = false; state.breadRecurring1 = false; state.recurringItems = {}; state.extraWeeks = []; state.shopExtras = {}; state.shopDismissed = {};
+    activeRoute = familyRouteFor('nuova'); await loadState();
+    runMigrations();
+    out.ricorrenti = Object.keys(state.recurringItems).length;
+    out.dispensa = Object.keys(state.pantryItems).length;
+    out.spesaFissa = buildShopFlat().filter(x => x.context === 'Ogni settimana').length;
+    activeRoute = null; state.pantryItems = {}; state.pantrySeeded = false;
+    runMigrations();
+    out.dispensaPrima = Object.keys(state.pantryItems).length > 0;
+    out.spesaFissaPrima = buildShopFlat().filter(x => x.context === 'Ogni settimana').length;
+    activeRoute = oldRoute;
+    return out;
+  });
+  eq([r.dispensa, r.ricorrenti, r.spesaFissa], [0, 0, 0]);
+  eq([r.dispensaPrima, r.spesaFissaPrima], [true, 1]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
