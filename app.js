@@ -2753,6 +2753,24 @@ document.addEventListener('click', e=>{
   if(t.closest('[data-wl-next]')){ if(welcomeStep >= WELCOME_SLIDES.length) finishWelcome(true); else renderWelcome(welcomeStep + 1); }
 });
 
+// La copia locale dei dati (per partire subito, anche offline) è di chi ha fatto
+// l'accesso: se su questo telefono entra un altro account, la copia dell'altro si
+// butta, così non si vedono le cose di un'altra famiglia. Si rilegge da Firebase.
+const CACHE_OWNER_KEY = 'cookpop-cache-owner';
+function claimLocalCache(uid){
+  if(!uid) return false;
+  let wiped = false;
+  try{
+    if(localStorage.getItem(CACHE_OWNER_KEY) !== uid){
+      Object.keys(localStorage).forEach(k => {
+        if(k.indexOf('quaderno-state-') === 0 || k.indexOf('catalog-state-cache') === 0 || k === 'cookpop-inventory-answers'){ localStorage.removeItem(k); wiped = true; }
+      });
+      localStorage.setItem(CACHE_OWNER_KEY, uid);
+    }
+  }catch(e){}
+  return wiped;
+}
+
 function waitForAuth(){
   return new Promise((resolve)=>{
     if(!window.cookpopAuth){ resolve(); return; }
@@ -2771,6 +2789,7 @@ function waitForAuth(){
       if(typeof refreshProfileLink === 'function') refreshProfileLink();
       gate.style.display = user ? 'none' : 'flex';
       welcomeSync(!!user);
+      if(user) claimLocalCache(user.uid);
       if(logoutBtn) logoutBtn.style.display = user ? 'block' : 'none';
       if(user && !resolved){ resolved = true; resolve(); }
     });
