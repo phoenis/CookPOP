@@ -2787,6 +2787,15 @@ function waitForAuth(){
       errorBox.textContent = '';
     }
     if(toggleBtn) toggleBtn.addEventListener('click', ()=> setSignupMode(!signupMode));
+    // Occhio: mostra/nasconde la password mentre la scrivi.
+    const eyeBtn = document.getElementById('login-eye');
+    if(eyeBtn) eyeBtn.addEventListener('click', ()=>{
+      const show = passInput.type === 'password';
+      passInput.type = show ? 'text' : 'password';
+      eyeBtn.setAttribute('aria-pressed', String(show));
+      eyeBtn.setAttribute('aria-label', show ? 'Nascondi password' : 'Mostra password');
+      eyeBtn.classList.toggle('on', show);
+    });
     window.cookpopSetSignup = setSignupMode;
     async function doLogin(){
       errorBox.textContent = '';
