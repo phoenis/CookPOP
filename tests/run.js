@@ -1814,7 +1814,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq(r.visible, ['Ingredienti e reparti']);
   eq(r.visibleLinks, ['depts']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 5, spesa: 1, menu: 2, prep: 2 });
+  eq(r.menus, { dispensa: 5, spesa: 1, menu: 3, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -1902,7 +1902,7 @@ test('backup in pagina dedicata e "Rigenera menu" rigenera tutte le settimane at
     out.toast = /2 settimane/.test((document.querySelector('.undo-toast') || {}).textContent || '');
     return out;
   });
-  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['Rigenera menu', 'Regole di generazione'], regen: true, toast: true });
+  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['Rigenera menu', 'Generazione menù', 'Preferenze alimentari'], regen: true, toast: true });
 });
 
 test('catalogo: nove dolci dal ricettario, con ingredienti, procedimento e reparti giusti', async ({ page }) => {
@@ -1989,9 +1989,10 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     TAB_MENU_ITEMS.dispensa[4].action(); out.dept = state.deptsModalOpen === true; state.deptsModalOpen = false;
     TAB_MENU_ITEMS.spesa[0].action(); out.aisle = state.aisleOrderOpen === true; state.aisleOrderOpen = false;
     TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genGeneralOpen === true && state.genSettingsOpen === null; state.genGeneralOpen = false;
+    TAB_MENU_ITEMS.menu[2].action(); out.food = state.genFoodOpen === true && state.genGeneralOpen === false; state.genFoodOpen = false;
     return out;
   });
-  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Regole di generazione'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true });
+  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
 });
 
 test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
@@ -3994,7 +3995,7 @@ test('menu ⋮ di Menù: "Regole di generazione" apre la pagina generale; la fin
     state.genGeneralOpen = false; state.genSettingsOpen = null; state.tab = 'menu'; state.extraWeeks = []; generateWeek(0); render();
     const out = {};
     document.getElementById('topbar-menu-btn').click();
-    const voce = [...document.querySelectorAll('.topbar-menu-item')].find(b => /Regole di generazione/.test(b.textContent));
+    const voce = [...document.querySelectorAll('.topbar-menu-item')].find(b => /Generazione menù/.test(b.textContent));
     voce.click();
     out.dalMenu = [state.genGeneralOpen, state.genSettingsOpen, !!document.querySelector('[data-page="gen-general"]'), !!document.querySelector('.gen-sheet')];
     state.genGeneralOpen = false; render();
