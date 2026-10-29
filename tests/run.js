@@ -4362,6 +4362,29 @@ test('accesso dopo "Esci": le schermate di accesso non diventano inerti con una 
   eq([r.dopo, r.campo], [0, true]);
 });
 
+test('account nuovo con un nome di prima nell\'email ma senza famiglia: se lo spazio di prima gli è negato passa da "Entra o crea", mai nell\'app di un\'altra famiglia', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    const oldSync = window.cookpopSync, oldEmail = loggedInEmail, oldUid = loggedInUid, oldRoute = activeRoute, oldGate = window.runFamilyGate;
+    let membro = false;
+    window.cookpopSync = { load: p => p.startsWith('userFamily/') ? Promise.resolve(null) : p.startsWith('families/nuovissima/') ? Promise.resolve(p.endsWith('/meta') ? { name: 'Nuova' } : null) : (membro ? Promise.resolve(null) : Promise.reject(new Error('PERMISSION_DENIED'))), save: () => Promise.resolve(), onChange: () => {}, remove: () => Promise.resolve() };
+    let gate = 0; window.runFamilyGate = async () => { gate++; return 'nuovissima'; };
+    loggedInUid = 'uidNuova';
+    for(const [chiave, email] of [['parola', 'elisa.mara@x.it'], ['dentro', 'elisa.stefani@x.it'], ['mamma', 'mamma@x.it'], ['nessuno', 'elisa@x.it']]){
+      loggedInEmail = email; activeRoute = null; gate = 0;
+      await resolveFamilyRoute();
+      out[chiave] = [gate, activeRoute && activeRoute.famId];
+    }
+    // chi invece è davvero dello spazio di prima (le regole lo lasciano leggere) resta lì
+    membro = true; loggedInEmail = 'mara.rossi@x.it'; activeRoute = null; gate = 0;
+    await resolveFamilyRoute(); out.vecchia = [gate, activeRoute];
+    window.cookpopSync = oldSync; loggedInEmail = oldEmail; loggedInUid = oldUid; activeRoute = oldRoute; window.runFamilyGate = oldGate;
+    return out;
+  });
+  for(const k of ['parola', 'dentro', 'mamma', 'nessuno']) eq(r[k], [1, 'nuovissima'], k);
+  eq(r.vecchia, [0, null]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
