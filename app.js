@@ -2788,6 +2788,7 @@ function waitForAuth(){
       loggedInName = user && user.displayName ? user.displayName : '';
       if(typeof refreshProfileLink === 'function') refreshProfileLink();
       gate.style.display = user ? 'none' : 'flex';
+      if(!user) setBackgroundInert(null); // dopo "Esci" niente deve restare inerte sotto il login
       welcomeSync(!!user);
       if(user) claimLocalCache(user.uid);
       if(logoutBtn) logoutBtn.style.display = user ? 'block' : 'none';
@@ -6065,7 +6066,9 @@ function setBackgroundInert(top){
     const parent = node.parentElement;
     if(!parent) break;
     [...parent.children].forEach(sib=>{
-      if(sib === node || /^(SCRIPT|STYLE|LINK)$/.test(sib.tagName) || sib.classList.contains('undo-toast')) return;
+      // Le schermate di accesso (login, famiglia, benvenuto) non si rendono mai
+      // inerti: dopo "Esci" da una pagina aperta restavano senza poter scrivere.
+      if(sib === node || /^(SCRIPT|STYLE|LINK)$/.test(sib.tagName) || sib.classList.contains('undo-toast') || /^(login-gate|family-gate|welcome-gate)$/.test(sib.id)) return;
       if(sib.contains(top)) return;
       sib.inert = true;
       sib.setAttribute('data-dialog-inert', '');
