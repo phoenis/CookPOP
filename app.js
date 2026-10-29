@@ -2398,7 +2398,8 @@ const state = {
   backupOpen: false, // non persistito: pagina "Backup"
   inviteCode: '', // non persistito: ultimo codice invito mostrato in Persone
   onbStep: 0, // non persistito: passo del primo avvio guidato
-  genGeneralOpen: false, // non persistito: pagina "Regole generali"
+  genGeneralOpen: false, // non persistito: pagina "Generazione menù"
+  genFoodOpen: false, // non persistito: pagina "Preferenze alimentari"
   genGeneralSheet: null, // non persistito: pannellino aperto sulle Regole generali (grams | diet)
   genTargetEdit: null, // non persistito: categoria degli obiettivi con il fumetto aperto
   genGeneralPage: null, // non persistito: sotto-pagina aperta (diet, targets, grams, avoid)
@@ -5834,7 +5835,7 @@ const MODAL_CHECKS = [
   [()=> !!state.genGeneralSheet, ()=>{ state.genGeneralSheet = null; }],
   [()=> !!state.genTargetEdit, ()=>{ state.genTargetEdit = null; }],
   [()=> !!state.genGeneralPage, ()=>{ state.genGeneralPage = null; state.genTargetEdit = null; }],
-  [()=> !!state.genGeneralOpen, ()=>{ state.genGeneralOpen = false; state.genGeneralPage = null; state.genGeneralSheet = null; }],
+  [()=> !!state.genGeneralOpen || !!state.genFoodOpen, ()=>{ state.genGeneralOpen = false; state.genFoodOpen = false; state.genGeneralPage = null; state.genGeneralSheet = null; }],
   [()=> !!state.membersOpen, ()=>{ state.membersOpen = false; }],
   [()=> !!state.appearanceOpen, ()=>{ state.appearanceOpen = false; }],
   [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
@@ -13574,10 +13575,12 @@ function genAvoidPageHtml(){
         <form class="gen-exclude-form" data-gen-exclude-form><input type="text" class="gen-exclude-input" placeholder="es. noci, cipolla" aria-label="Ingrediente che non piace" autocomplete="off"><button type="submit" class="btn is-outline">Aggiungi</button></form>
       </section>`;
 }
+// Due pagine: "Generazione menù" (genGeneralOpen) e "Preferenze alimentari" (genFoodOpen).
 function renderGenGeneralPage(){
-  if(!state.genGeneralOpen) return '';
+  if(!state.genGeneralOpen && !state.genFoodOpen) return '';
+  const food = !!state.genFoodOpen;
   const sub = state.genGeneralPage || null;
-  let title = 'Regole generali', body = '';
+  let title = food ? 'Preferenze alimentari' : 'Generazione menù', body = '';
   if(sub === 'targets'){
     title = 'Obiettivi a settimana';
     body = `<p class="settings-note manage-intro">Quante volte a settimana, tra pranzi e cene. Tocca il numero per scegliere il minimo e il massimo. Sono i numeri in cima al Menù.</p>
@@ -13585,10 +13588,26 @@ function renderGenGeneralPage(){
   } else if(sub === 'avoid'){
     title = 'Da evitare';
     body = genAvoidPageHtml();
-  } else {
+  } else if(food){
     const allergies = (state.allergies || []).join(', '), dislikes = (state.dietExclude || []).join(', ');
     body = `
-      <p class="settings-note manage-intro">Valgono per tutte le settimane. Quelle di una sola settimana si cambiano dal Menù, con l'ingranaggio.</p>
+      <p class="settings-note manage-intro">Valgono per tutta la famiglia e per tutte le settimane: il menù le rispetta.</p>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Cosa si mangia</h3>
+        <div class="settings-card manage-list">
+          ${genGoRow('diet', '🥗', 'Alimentazione', DIET_TYPES[dietTypeNow()], true)}
+        </div>
+      </section>
+      <section class="settings-section">
+        <h3 class="settings-section-title">Da evitare</h3>
+        <div class="settings-card manage-list">
+          ${genGoRow('avoid', '⚠️', 'Allergie e intolleranze', allergies || 'Nessuna')}
+          ${genGoRow('avoid', '🚫', 'Ingredienti che non piacciono', dislikes || 'Nessuno')}
+        </div>
+      </section>`;
+  } else {
+    body = `
+      <p class="settings-note manage-intro">Valgono per tutte le settimane. Quelle di una sola settimana si cambiano dal Menù, con l'ingranaggio. Cosa mangiare e cosa evitare è in Preferenze alimentari.</p>
       <section class="settings-section">
         <h3 class="settings-section-title">La settimana</h3>
         <div class="settings-card manage-list">
@@ -13607,21 +13626,13 @@ function renderGenGeneralPage(){
         </div>
       </section>
       <section class="settings-section">
-        <h3 class="settings-section-title">Cosa si mangia</h3>
+        <h3 class="settings-section-title">Equilibrio</h3>
         <div class="settings-card manage-list">
-          ${genGoRow('diet', '🥗', 'Alimentazione', DIET_TYPES[dietTypeNow()], true)}
           ${genGoRow('targets', '⚖️', 'Obiettivi a settimana', genTargetsSummary())}
-        </div>
-      </section>
-      <section class="settings-section">
-        <h3 class="settings-section-title">Da evitare</h3>
-        <div class="settings-card manage-list">
-          ${genGoRow('avoid', '⚠️', 'Allergie e intolleranze', allergies || 'Nessuna')}
-          ${genGoRow('avoid', '🚫', 'Ingredienti che non piacciono', dislikes || 'Nessuno')}
         </div>
       </section>`;
   }
-  return managePageHtml({ key: sub ? 'gen-general-' + sub : 'gen-general', title, closeAttr: 'data-gen-general-back', body }) + genGeneralSheetHtml();
+  return managePageHtml({ key: sub ? 'gen-general-' + sub : food ? 'gen-food' : 'gen-general', title, closeAttr: 'data-gen-general-back', body }) + genGeneralSheetHtml();
 }
 // "Grammi a porzione" e "Alimentazione": un pannellino dal basso sopra la pagina (DS-RegoleGenerali).
 function genGeneralSheetHtml(){
@@ -13661,7 +13672,7 @@ document.addEventListener('click', e=>{
   if(back){
     if(!isCloseTap(e, back)) return;
     state.genTargetEdit = null;
-    if(state.genGeneralPage) state.genGeneralPage = null; else state.genGeneralOpen = false;
+    if(state.genGeneralPage) state.genGeneralPage = null; else { state.genGeneralOpen = false; state.genFoodOpen = false; }
     render();
   }
 });
@@ -14868,6 +14879,7 @@ document.addEventListener('click', e=>{
   const tabFor = { ingredients:'dispensa', groups:'dispensa', depts:'dispensa', recurring:'dispensa' }[what];
   if(tabFor && state.tab !== tabFor){ if(!state.settingsReturnTab) state.settingsReturnTab = state.tab; state.tab = tabFor; }
   if(what === 'gen'){ state.genGeneralOpen = true; state.genGeneralPage = null; }
+  else if(what === 'food'){ state.genFoodOpen = true; state.genGeneralPage = null; }
   else if(what === 'ingredients') state.ingredientManagerOpen = true;
   else if(what === 'groups') state.pantryGroupsModalOpen = true;
   else if(what === 'depts') state.deptsModalOpen = true;
