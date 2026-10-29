@@ -12672,7 +12672,6 @@ const TAB_MENU_ITEMS = {
     { label: uiIcon('sort') + ' Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
   ],
   menu: [
-    { label: uiIcon('refresh') + ' Rigenera menu', action: ()=>{ regenerateAllWeeks(); } },
     { label: uiIcon('gear') + ' Generazione menù', action: ()=>{ state.genGeneralOpen = true; state.genGeneralPage = null; } },
     { label: uiIcon('tag') + ' Preferenze alimentari', action: ()=>{ state.genFoodOpen = true; state.genGeneralPage = null; } }
   ],
