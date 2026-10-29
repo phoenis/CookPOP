@@ -2877,7 +2877,9 @@ async function createFamily(familyName, code, name){
   if(!ok) throw new Error('codice');
   const famId = randomCode(10).toLowerCase();
   await sync.save(`families/${famId}/meta`, { name: familyName || '', createdBy: loggedInUid, code });
-  await sync.save(`families/${famId}/members/${loggedInUid}`, { name: name || '', creator: true });
+  // Il codice c'è anche qui: le regole lo leggono per capire se è un invito, e
+  // senza (null) l'espressione va in errore e la scrittura viene rifiutata.
+  await sync.save(`families/${famId}/members/${loggedInUid}`, { name: name || '', creator: true, code });
   await sync.save('userFamily/' + loggedInUid, famId);
   try{ await sync.remove('creationCodes/' + code); }catch(e){ /* già consumato */ }
   return famId;
