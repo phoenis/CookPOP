@@ -972,7 +972,7 @@ function renderIngredientsSection(ing, ratio, ctx, persone, titleOverride){
     const scaledQta = scaleQtyText(it.qta, ratio);
     const status = pantryStatusFor(it.ingrediente, scaledQta, it.spec);
     seen.add(status);
-    return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}${it.qual ? `<small class="ing-qual"> · ${escapeHtml(it.qual)}</small>` : ''}</span><span class="ing-qty">${escapeHtml(scaledQta||'')}</span><span class="ing-status ${status}" title="${escapeAttr(STATUS_LABEL[status])}"></span></li>`;
+    return `<li><span class="ing-list-name">${escapeHtml(it.ingrediente)}${it.qual ? `<small class="ing-qual"> · ${escapeHtml(it.qual)}</small>` : ''}${it.note ? `<small class="ing-qual ing-note"> · ${escapeHtml(it.note)}</small>` : ''}</span><span class="ing-qty">${escapeHtml(scaledQta||'')}</span><span class="ing-status ${status}" title="${escapeAttr(STATUS_LABEL[status])}"></span></li>`;
   }).join('');
   const titleHtml = titleOverride !== undefined ? titleOverride : (ctx && ctx.titleHtml !== undefined) ? ctx.titleHtml : `<div class="detail-section-title"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Ingredienti${persone ? ` per ${persone} ${persone === 1 ? 'persona' : 'persone'}` : ''}</div>`;
   const legend = ctx && ctx.legend ? `<div class="rd-legend"><span><i class="ing-status in-casa"></i> in casa</span>${seen.has('poco') ? '<span><i class="ing-status poco"></i> scorta bassa</span>' : ''}<span><i class="ing-status manca"></i> da comprare</span></div>` : '';
@@ -6099,7 +6099,7 @@ function buildQtyFromEdit(num, unit){
   if(!unit || !u) return shown;
   return `${shown} ${isFinite(v) && v === 1 ? u[1] : u[2]}`;
 }
-function editIngRowHtml(ingrediente, qta, qual){
+function editIngRowHtml(ingrediente, qta, qual, note){
   const p = parseQtyForEdit(qta);
   const qtyHtml = p.ok
     ? `<input type="number" inputmode="decimal" min="0" step="any" class="edit-ing-num" placeholder="Qtà" aria-label="Quantità" value="${escapeAttr(p.num)}">
@@ -6115,6 +6115,7 @@ function editIngRowHtml(ingrediente, qta, qual){
         ${qtyHtml}
         ${editIngQualHtml(ingrediente, qual)}
       </div>
+      <input type="text" class="edit-ing-note" placeholder="Nota (es. non trattato)" aria-label="Nota sull'ingrediente" maxlength="60" autocomplete="off" value="${escapeAttr(note || '')}">
     </div>`;
 }
 // La specifica (tuorli, succo…): scelta tra quelle dell'ingrediente, oppure
@@ -6142,7 +6143,8 @@ function readEditIngRow(row){
   const qta = raw ? raw.value.trim() : buildQtyFromEdit(row.querySelector('.edit-ing-num').value, row.querySelector('.edit-ing-unit').value);
   const q = row.querySelector('.edit-ing-qual-new') || row.querySelector('.edit-ing-qual');
   const qual = q && q.value !== '__new' ? q.value.trim() : '';
-  return { ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()), qta, ...(qual ? { qual } : {}) };
+  const note = ((row.querySelector('.edit-ing-note') || {}).value || '').trim();
+  return { ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()), qta, ...(qual ? { qual } : {}), ...(note ? { note } : {}) };
 }
 function editStepRowHtml(text){
   return `
@@ -6166,7 +6168,7 @@ function renderRecipeEditModal(){
   const stagioniSet = new Set(rec.stagioni || []);
 
   const ingRowsHtml = (ingredienti.length ? ingredienti : [{ingrediente:'',qta:''}])
-    .map(it => editIngRowHtml(it.ingrediente, it.qta, it.spec)).join('');
+    .map(it => editIngRowHtml(it.ingrediente, it.qta, it.spec, it.note)).join('');
 
   const editTimeEntries = recipeTimeEntriesWithText(rec, getRecipeDetails(name));
   const editTimeEntriesHtml = (editTimeEntries.length ? editTimeEntries : [{ label: '', min: '' }]).map(t => editTimeEntryHtml(t.label, t.min || '')).join('');
@@ -7871,6 +7873,7 @@ function renderSpesa(){
       } else {
         merged[mergeKey].qtas.push(it.qta);
         merged[mergeKey].keys.push(it.key);
+        if(it.isRecipe && it.note && !(merged[mergeKey].note || '').split(' · ').includes(it.note)) merged[mergeKey].note = [merged[mergeKey].note, it.note].filter(Boolean).join(' · ');
         // Giorno e pasto non si scrivono sotto l'ingrediente: chi li vuole usa "Ordina per Pasto".
       }
     });
