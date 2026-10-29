@@ -5812,6 +5812,7 @@ const MODAL_CHECKS = [
   [()=> !!state.addSheet, ()=>{ state.addSheet = null; }],
   [()=> !!state.moveModal, ()=>{ closeMoveModal(); }],
   [()=> expiryConfirmKeys().length > 0, ()=>{ closeExpiryConfirm(); }],
+  [()=> !!document.querySelector('.edit-ing-backdrop'), ()=>{ closeEditIngSheet(true); }],
   [()=> !!state.recipeEditName, ()=>{ state.recipeEditName = null; }],
   [()=> state.doneModalLeftovers.some(r => r.pickerOpen), ()=>{ state.doneModalLeftovers.forEach(r => { r.pickerOpen = false; }); }],
   [()=> state.doneModalLeftovers.some(r => r.catPickerOpen), ()=>{ state.doneModalLeftovers.forEach(r => { r.catPickerOpen = false; }); }],
@@ -6099,24 +6100,29 @@ function buildQtyFromEdit(num, unit){
   if(!unit || !u) return shown;
   return `${shown} ${isFinite(v) && v === 1 ? u[1] : u[2]}`;
 }
+// Ogni ingrediente è una riga compatta (nome, quantità · parte · nota): i dati
+// stanno negli attributi e si cambiano toccando la riga, nel pannello
+// "Ingrediente n di N" (openEditIngSheet).
+function editIngSubHtml(qta, qual, note){
+  const parts = [qta ? escapeHtml(qta) : '', qual ? escapeHtml(qual) : '', note ? `<em>${escapeHtml(note)}</em>` : ''].filter(Boolean);
+  return parts.join(' · ');
+}
 function editIngRowHtml(ingrediente, qta, qual, note){
+  return `
+    <div class="edit-ing-row" data-ing="${escapeAttr(ingrediente || '')}" data-qta="${escapeAttr(qta || '')}" data-qual="${escapeAttr(qual || '')}" data-note="${escapeAttr(note || '')}">
+      <button type="button" class="edit-ing-summary" data-edit-ing-open aria-label="Modifica ${escapeAttr(ingrediente || 'ingrediente')}">
+        <span class="edit-ing-sum-name">${escapeHtml(ingrediente || 'Nuovo ingrediente')}</span>
+        <span class="edit-ing-sum-sub">${editIngSubHtml(qta, qual, note)}</span>
+      </button>
+      <button type="button" class="btn is-icon edit-row-remove" data-remove-row aria-label="Rimuovi ${escapeAttr(ingrediente || 'riga')}">✕</button>
+    </div>`;
+}
+function editIngQtyHtml(qta){
   const p = parseQtyForEdit(qta);
-  const qtyHtml = p.ok
+  return p.ok
     ? `<input type="number" inputmode="decimal" min="0" step="any" class="edit-ing-num" placeholder="Qtà" aria-label="Quantità" value="${escapeAttr(p.num)}">
        <select class="edit-ing-unit" aria-label="Unità">${QTY_UNIT_OPTIONS.map(u => `<option value="${escapeAttr(u[0])}"${p.unit === u[0] ? ' selected' : ''}>${escapeHtml(u[2])}</option>`).join('')}</select>`
     : `<input type="text" class="edit-ing-qta" placeholder="Quantità" aria-label="Quantità" value="${escapeAttr(qta || '')}">`;
-  return `
-    <div class="edit-ing-row">
-      <div class="edit-ing-main">
-        <input type="text" class="edit-ing-name" placeholder="Ingrediente" value="${escapeAttr(ingrediente||'')}">
-        <button type="button" class="btn is-outline is-icon is-danger edit-row-remove" data-remove-row aria-label="Rimuovi riga">✕</button>
-      </div>
-      <div class="edit-ing-fields">
-        ${qtyHtml}
-        ${editIngQualHtml(ingrediente, qual)}
-      </div>
-      <input type="text" class="edit-ing-note" placeholder="Nota (es. non trattato)" aria-label="Nota sull'ingrediente" maxlength="60" autocomplete="off" value="${escapeAttr(note || '')}">
-    </div>`;
 }
 // La specifica (tuorli, succo…): scelta tra quelle dell'ingrediente, oppure
 // una nuova che scrivi tu (resta poi disponibile per quell'ingrediente).
@@ -6139,12 +6145,83 @@ function switchEditIngQualToNew(sel){
   sel.replaceWith(inp); inp.focus();
 }
 function readEditIngRow(row){
+  if(row.dataset && row.dataset.ing !== undefined){
+    const qual = (row.dataset.qual || '').trim(), note = (row.dataset.note || '').trim();
+    return { ingrediente: canonicalIngredientName((row.dataset.ing || '').trim()), qta: (row.dataset.qta || '').trim(), ...(qual ? { qual } : {}), ...(note ? { note } : {}) };
+  }
   const raw = row.querySelector('.edit-ing-qta');
   const qta = raw ? raw.value.trim() : buildQtyFromEdit(row.querySelector('.edit-ing-num').value, row.querySelector('.edit-ing-unit').value);
   const q = row.querySelector('.edit-ing-qual-new') || row.querySelector('.edit-ing-qual');
   const qual = q && q.value !== '__new' ? q.value.trim() : '';
   const note = ((row.querySelector('.edit-ing-note') || {}).value || '').trim();
   return { ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()), qta, ...(qual ? { qual } : {}), ...(note ? { note } : {}) };
+}
+// Pannello "Ingrediente n di N": nome, quantità, quale parte, nota. Chiuderlo
+// (✕ o fuori) tiene le modifiche; "Togli" toglie l'ingrediente.
+let editIngRowRef = null;
+function closeEditIngSheet(apply){
+  const bd = document.querySelector('.edit-ing-backdrop');
+  const row = editIngRowRef;
+  editIngRowRef = null;
+  if(!bd) return;
+  const sheet = bd.querySelector('.edit-ing-sheet');
+  if(row && row.isConnected && apply){
+    const v = readEditIngRow(sheet);
+    if(!v.ingrediente){ row.remove(); }
+    else {
+      const rawName = sheet.querySelector('.edit-ing-name').value.trim();
+      row.outerHTML = editIngRowHtml(rawName, v.qta, v.qual || '', v.note || '');
+    }
+  }
+  bd.remove();
+}
+function openEditIngSheet(row){
+  closeEditIngSheet(true);
+  const page = document.querySelector('.recipe-edit-page');
+  if(!page || !row) return;
+  const rows = [...document.querySelectorAll('#edit-ing-list .edit-ing-row')];
+  const d = row.dataset;
+  const isNew = !d.ing;
+  const bd = document.createElement('div');
+  bd.className = 'move-backdrop edit-ing-backdrop';
+  bd.innerHTML = `
+    <div class="move-sheet edit-ing-sheet" role="dialog" aria-label="Ingrediente">
+      <div class="move-handle" aria-hidden="true"></div>
+      <div class="dsh-head">
+        <div class="dsh-head-text">
+          <span class="dsh-kicker">Ingrediente ${rows.indexOf(row) + 1} di ${rows.length}</span>
+          <h2 class="move-title">${escapeHtml(d.ing || 'Nuovo ingrediente')}</h2>
+        </div>
+        <button type="button" class="btn is-icon dsh-close" data-edit-ing-close aria-label="Chiudi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="gen-body edit-ing-sheet-body">
+        <div class="edit-ing-field"><label class="edit-ing-lab">Nome</label>
+          <input type="text" class="edit-ing-name" placeholder="Ingrediente" value="${escapeAttr(d.ing || '')}"></div>
+        <div class="edit-ing-field"><label class="edit-ing-lab">Quantità</label>
+          <div class="edit-ing-fields">${editIngQtyHtml(d.qta)}</div></div>
+        <div class="edit-ing-field"><label class="edit-ing-lab">Quale parte</label>
+          <div class="edit-ing-qualbox">${editIngQualHtml(d.ing, d.qual)}</div>
+          <p class="edit-ing-hint">Es. scorza, succo, solo i gambi. Lascia vuoto se serve tutto.</p></div>
+        <div class="edit-ing-field"><label class="edit-ing-lab">Nota <span class="edit-ing-opt">· facoltativa</span></label>
+          <input type="text" class="edit-ing-note" maxlength="60" autocomplete="off" aria-label="Nota sull'ingrediente" value="${escapeAttr(d.note || '')}">
+          <p class="edit-ing-hint">Es. “non trattati”, “bio”, “ben maturi”.</p></div>
+      </div>
+      <div class="edit-ing-footer">
+        <button type="button" class="btn is-text edit-ing-remove" data-edit-ing-remove>Togli</button>
+        <button type="button" class="btn is-solid" data-edit-ing-done>Fatto</button>
+      </div>
+    </div>`;
+  page.appendChild(bd);
+  editIngRowRef = row;
+  const sheet = bd.querySelector('.edit-ing-sheet');
+  sheet.addEventListener('click', e => e.stopPropagation());
+  bd.addEventListener('click', e => { if(e.target === bd) closeEditIngSheet(true); });
+  bd.querySelectorAll('[data-edit-ing-close], [data-edit-ing-done]').forEach(b => b.addEventListener('click', () => closeEditIngSheet(true)));
+  bd.querySelector('[data-edit-ing-remove]').addEventListener('click', () => {
+    const r = editIngRowRef; closeEditIngSheet(false); if(r && r.isConnected) r.remove();
+  });
+  attachIngredientCombobox(sheet.querySelector('.edit-ing-name'));
+  if(isNew) sheet.querySelector('.edit-ing-name').focus();
 }
 function editStepRowHtml(text){
   return `
@@ -6249,8 +6326,8 @@ function renderRecipeEditModal(){
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0m11 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"></path><path d="M17 17H6V3H4"></path><path d="m6 5l14 1l-1 7H6"></path></g></svg> Ingredienti</div>
-            <div id="edit-ing-list">${ingRowsHtml}</div>
-            <button type="button" class="btn is-chip" id="edit-add-ing-row">+ aggiungi ingrediente</button>
+            <div id="edit-ing-list" class="edit-ing-list">${ingRowsHtml}</div>
+            <button type="button" class="btn is-text edit-add-link" id="edit-add-ing-row">+ Aggiungi ingrediente</button>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.918 0 3.52 1.35 3.91 3.151A4 4 0 0 1 18 13.874V21H6v-7.126a4 4 0 1 1 2.092-7.723A4 4 0 0 1 12 3M6.161 17.009L18 17"></path></svg> Procedimento</div>
@@ -10175,7 +10252,7 @@ function attachHandlers(){
   // righe aggiunte dopo, con la modale già aperta, si agganciano da sole nel
   // loro punto di inserimento — vedi #edit-add-ing-row — perché quella parte
   // non passa da un render() completo).
-  document.querySelectorAll('.edit-ing-name, [data-ning], [data-rning]').forEach(el => attachIngredientCombobox(el));
+  document.querySelectorAll('[data-ning], [data-rning]').forEach(el => attachIngredientCombobox(el));
   // Eccezioni delle scadenze stimate: solo ingredienti che esistono già.
   document.querySelectorAll('.expiry-rule-match').forEach(el => attachIngredientCombobox(el, { noCreate: true, pool: allKnownIngredientNames }));
 
@@ -11552,7 +11629,7 @@ function attachHandlers(){
       if(e.target.matches && e.target.matches('.edit-ing-qual') && e.target.value === '__new') switchEditIngQualToNew(e.target);
     });
     ['input', 'change', 'focusout', 'click'].forEach(ev => recipeEditModal.addEventListener(ev, e=>{
-      const row = e.target.closest && e.target.closest('.edit-ing-row');
+      const row = e.target.closest && e.target.closest('.edit-ing-sheet');
       if(row && !e.target.matches('.edit-ing-qual, .edit-ing-qual-new')) refreshEditIngQual(row);
     }));
     recipeEditModal.addEventListener('click', e=>{
@@ -11569,9 +11646,11 @@ function attachHandlers(){
       if(e.target.closest('#edit-add-ing-row')){
         const list = document.getElementById('edit-ing-list');
         list.insertAdjacentHTML('beforeend', editIngRowHtml('', '', ''));
-        attachIngredientCombobox(list.lastElementChild.querySelector('.edit-ing-name'));
+        openEditIngSheet(list.lastElementChild);
         return;
       }
+      const ingOpen = e.target.closest('[data-edit-ing-open]');
+      if(ingOpen){ openEditIngSheet(ingOpen.closest('.edit-ing-row')); return; }
       if(e.target.closest('#edit-add-time-row')){
         const tl = document.getElementById('edit-time-list');
         tl.insertAdjacentHTML('beforeend', editTimeEntryHtml('', ''));

@@ -1702,14 +1702,18 @@ test('modifica ricetta: si aggiungono ingredienti, il campo suggerisce gli esist
   });
   await page.click('#edit-add-ing-row');
   const rows = await page.evaluate(() => document.querySelectorAll('#edit-ing-list .edit-ing-row').length);
-  await page.evaluate(() => render()); // un ri-render non deve rompere il campo
-  const name = page.locator('#edit-ing-list .edit-ing-name').first();
+  await page.evaluate(() => render()); // un ri-render non deve rompere l'elenco
+  const rows2 = await page.evaluate(() => document.querySelectorAll('#edit-ing-list .edit-ing-row').length);
+  await page.locator('#edit-ing-list [data-edit-ing-open]').last().click();
+  const name = page.locator('.edit-ing-sheet .edit-ing-name');
   await name.click(); await page.keyboard.type('pomodor');
   const sugg = await page.evaluate(() => [...document.querySelectorAll('.add-ing-suggestion[data-combo-pick]')].map(e => e.textContent));
   const target = await page.evaluate(() => allKnownIngredientNamesWithGroups().find(n => /pomodor/i.test(n)));
   const canon = await page.evaluate(n => canonicalIngredientName(n.toUpperCase()), target);
-  await page.evaluate(() => { const l = document.querySelectorAll('#edit-ing-list .edit-ing-name'); l[0].value = 'Pomodoro'; l[0].dispatchEvent(new Event('input', { bubbles: true })); });
-  eq({ rows, hasSugg: sugg.length > 0, canon }, { rows: 2, hasSugg: true, canon: target });
+  await page.evaluate(() => { const l = document.querySelector('.edit-ing-sheet .edit-ing-name'); l.value = 'Pomodoro'; l.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.click('[data-edit-ing-done]');
+  const sum = await page.evaluate(() => [...document.querySelectorAll('#edit-ing-list .edit-ing-sum-name')].map(e => e.textContent));
+  eq({ rows, rows2, hasSugg: sugg.length > 0, canon, sheetClosed: !(await page.$('.edit-ing-backdrop')), sum: sum.includes('Pomodoro') }, { rows: 2, rows2: 2, hasSugg: true, canon: target, sheetClosed: true, sum: true });
 });
 
 test('ricette: ingredienti in ordine fisso, olio/aceto/sale/pepe/spezie per ultimi', async ({ page }) => {
@@ -3165,7 +3169,7 @@ test('specifiche tue: la aggiungi all\'ingrediente (pompelmo · succo), la scegl
     state.pantryEditKey = null;
     state.tab = 'prep'; state.recipeEditName = 'Carbonara'; render();
     document.getElementById('edit-add-ing-row').click();
-    const row = [...document.querySelectorAll('#edit-ing-list .edit-ing-row')].pop();
+    const row = document.querySelector('.edit-ing-sheet'); // si apre da sola sull'ingrediente nuovo
     row.querySelector('.edit-ing-name').value = 'Pompelmo';
     row.querySelector('.edit-ing-name').dispatchEvent(new Event('input', { bubbles: true }));
     const opzioni = [...row.querySelectorAll('.edit-ing-qual option')].map(o => o.value);
@@ -3173,6 +3177,7 @@ test('specifiche tue: la aggiungi all\'ingrediente (pompelmo · succo), la scegl
     row.querySelector('.edit-ing-qual').dispatchEvent(new Event('change', { bubbles: true }));
     const nuovo = row.querySelector('.edit-ing-qual-new'); nuovo.value = 'scorza';
     row.querySelector('.edit-ing-num').value = '1';
+    document.querySelector('[data-edit-ing-done]').click();
     document.querySelector('[data-save-recipe-edit]').click();
     const salvata = getIngredientsFor('Carbonara').find(i => i.ingrediente === 'Pompelmo');
     return { prima, dopo, chip, opzioni, salvata, poi: variantOptionsFor('Pompelmo') };
@@ -3193,15 +3198,24 @@ test('Modifica ricetta: quantità con numero e unità, specifica scelta dall\'el
     const nome = 'Carbonara';
     state.tab = 'prep'; state.recipeEditName = nome; render();
     const rows = [...document.querySelectorAll('#edit-ing-list .edit-ing-row')];
-    out.righe = rows.length; out.conNumero = rows.filter(r => r.querySelector('.edit-ing-num')).length;
-    const uova = rows.find(r => /^uova$/i.test(r.querySelector('.edit-ing-name').value)) || rows.find(r => /tuorl|uov/i.test(r.querySelector('.edit-ing-name').value));
+    out.righe = rows.length;
+    const uova = rows.find(r => /^uova$/i.test(r.dataset.ing)) || rows.find(r => /tuorl|uov/i.test(r.dataset.ing));
     out.haUova = !!uova;
-    if(uova){ uova.querySelector('.edit-ing-name').value = 'Uova'; uova.querySelector('.edit-ing-name').dispatchEvent(new Event('input', { bubbles: true })); out.qualVisibile = !!uova.querySelector('.edit-ing-qual'); uova.querySelector('.edit-ing-qual').value = 'tuorli'; out.letta = readEditIngRow(uova); }
+    if(uova){
+      uova.querySelector('[data-edit-ing-open]').click();
+      const sh = document.querySelector('.edit-ing-sheet');
+      out.conNumero = !!sh.querySelector('.edit-ing-num'); // quantità con numero e unità
+      sh.querySelector('.edit-ing-name').value = 'Uova'; sh.querySelector('.edit-ing-name').dispatchEvent(new Event('input', { bubbles: true }));
+      out.qualVisibile = !!sh.querySelector('.edit-ing-qual'); sh.querySelector('.edit-ing-qual').value = 'tuorli'; out.letta = readEditIngRow(sh);
+      document.querySelector('[data-edit-ing-done]').click();
+      out.riga = document.querySelector('#edit-ing-list .edit-ing-row[data-qual="tuorli"] .edit-ing-sum-sub').textContent;
+    }
     return out;
   });
   eq(r.p.map(x => x.ok ? x.num + '|' + x.unit : 'raw'), ['200|g', '0.5|', '2|cucchiaio', '|q.b.', 'raw', '1.5|kg'], 'parse');
   eq(r.b, ['1 cucchiaio', '2 cucchiai', '1,5 kg', 'q.b.', '3'], 'build');
-  assert(r.righe > 0 && r.conNumero > 0, 'righe con numero e unità');
+  assert(r.righe > 0 && r.conNumero, 'righe con numero e unità');
+  assert(/tuorli/.test(r.riga), 'la riga mostra la specifica: ' + r.riga);
   assert(r.haUova && r.qualVisibile && r.letta.qual === 'tuorli', 'specifica: ' + JSON.stringify(r.letta));
 });
 
@@ -4231,21 +4245,20 @@ test('nota sull\'ingrediente di una ricetta: si scrive in Modifica ricetta, si s
     const ing = getIngredientsFor(nome).find(i => /^limon/i.test(i.ingrediente));
     const out = { ing: ing && [ing.ingrediente, ing.note], nessunNomeConNota: !allIngredientNamesForManager().some(n => /non trattat/i.test(n)) };
     out.dettaglio = /ing-note[^>]*> · non trattati/.test(renderIngredientsSection(getIngredientsFor(nome), 1, { noButton: true }));
-    // il campo nella riga di modifica e il salvataggio
+    // la riga compatta e il pannello: la nota si legge, si salva, si può svuotare
     const wrap = document.createElement('div');
     wrap.innerHTML = editIngRowHtml('Limone', '2', '', 'non trattati');
     const row = wrap.firstElementChild;
-    out.campo = row.querySelector('.edit-ing-note').value;
-    row.querySelector('.edit-ing-note').value = '  biologici ';
+    out.riga = row.querySelector('.edit-ing-sum-sub').textContent;
     out.letta = readEditIngRow(row).note;
-    row.querySelector('.edit-ing-note').value = '';
+    row.dataset.note = '';
     out.vuota = 'note' in readEditIngRow(row);
     return out;
   });
   eq(r.ing, ['Limone', 'non trattati']);
   assert(r.nessunNomeConNota, 'niente ingrediente "Limoni (non trattati)"');
   assert(r.dettaglio, 'la nota compare nell\'elenco ingredienti');
-  eq([r.campo, r.letta, r.vuota], ['non trattati', 'biologici', false]);
+  eq([r.riga, r.letta, r.vuota], ['2 · non trattati', 'non trattati', false]);
 });
 
 (async () => {
