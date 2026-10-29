@@ -4300,6 +4300,32 @@ test('benvenuto prima dell\'account: quattro schermate, una volta sola; "Ho già
   eq(r.salta, ['none', true]);
 });
 
+test('accesso: l\'occhio mostra e nasconde la password, "Creane uno" passa alla creazione e torna indietro', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    try{ localStorage.setItem(WELCOME_SEEN_KEY, '1'); }catch(e){}
+    window.cookpopAuth = { onAuthStateChanged(cb){ cb(null); }, signIn: async () => {}, createUser: async () => {}, signOut(){}, updateName: async () => {} };
+    waitForAuth();
+    const gate = document.getElementById('login-gate'), pw = document.getElementById('login-password'), eye = document.getElementById('login-eye');
+    out.gate = gate.style.display;
+    out.tipi = [pw.type];
+    eye.click(); out.tipi.push(pw.type); out.etichetta = eye.getAttribute('aria-label');
+    eye.click(); out.tipi.push(pw.type);
+    const tog = document.getElementById('login-toggle'), btn = document.getElementById('login-submit');
+    out.login = [tog.textContent, btn.textContent];
+    tog.click(); out.crea = [tog.textContent, btn.textContent, gate.querySelector('.login-sub').textContent];
+    tog.click(); out.torna = [tog.textContent, btn.textContent];
+    gate.style.display = 'none';
+    return out;
+  });
+  eq(r.gate, 'flex');
+  eq(r.tipi, ['password', 'text', 'password']);
+  eq(r.etichetta, 'Nascondi password');
+  eq(r.login, ['Non hai un account? Creane uno', 'Accedi']);
+  eq(r.crea, ['Ho già un account', 'Crea account', 'Crea il tuo account']);
+  eq(r.torna, ['Non hai un account? Creane uno', 'Accedi']);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

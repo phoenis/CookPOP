@@ -2791,3 +2791,14 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .onb-footer .btn{ display:block; width:100%; text-align:center; }
 .onb-footer .btn.is-outline{ background:var(--bg); }
 .wl-fridge{ display:inline-block; width:0.7rem; height:1rem; border:1.5px solid var(--ink-light); border-radius:0.2rem; background:linear-gradient(var(--ink-light),var(--ink-light)) 0 35%/100% 1.5px no-repeat; vertical-align:middle; }
+
+/* Accesso: campi arrotondati come nel resto dell'app, occhio per la password. */
+.login-box{ border-radius:var(--radius-modal); }
+.login-box input{ box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); border-radius:var(--form-border-radius); background:var(--form-background); padding:0 var(--space-small); }
+.login-box .btn.is-block{ min-height:2.75rem; }
+.pw-wrap{ position:relative; }
+.pw-wrap input{ padding-right:2.75rem; }
+.pw-eye{ position:absolute; right:0; top:0; width:2.75rem; height:2.75rem; display:inline-flex; align-items:center; justify-content:center; background:none; border:0; color:var(--ink-light); cursor:pointer; }
+.pw-eye .pw-eye-shut{ display:none; }
+.pw-eye.on .pw-eye-open{ display:none; }
+.pw-eye.on .pw-eye-shut{ display:inline; }
