@@ -3737,7 +3737,7 @@ test('famiglie: codice di creazione, codice invito monouso, appartenenza e ricon
     loggedInUid = 'uidAAAA1111'; loggedInEmail = 'anna@x.it';
     try { await createFamily('Rossi', 'SBAGLIATO', 'Anna'); out.sbagliato = 'creata'; } catch(e){ out.sbagliato = e.message; }
     const famId = await createFamily('Rossi', 'mara-2026', 'Anna');
-    out.creata = { meta: get(`families/${famId}/meta`).name, creatore: !!get(`families/${famId}/members/uidAAAA1111`), puntatore: get('userFamily/uidAAAA1111') === famId, codiceConsumato: get('creationCodes/MARA2026') == null };
+    out.creata = { meta: get(`families/${famId}/meta`).name, creatore: !!get(`families/${famId}/members/uidAAAA1111`), haCodice: typeof get(`families/${famId}/members/uidAAAA1111`).code === 'string' && get(`families/${famId}/members/uidAAAA1111`).code.length > 0, puntatore: get('userFamily/uidAAAA1111') === famId, codiceConsumato: get('creationCodes/MARA2026') == null };
     try { await createFamily('Altra', 'MARA2026', 'X'); out.riuso = 'creata'; } catch(e){ out.riuso = e.message; }
     // invito
     activeRoute = familyRouteFor(famId);
@@ -3762,7 +3762,7 @@ test('famiglie: codice di creazione, codice invito monouso, appartenenza e ricon
   });
   eq(r.strict, ['default', null, 'cugina']);
   eq(r.sbagliato, 'codice');
-  eq(r.creata, { meta: 'Rossi', creatore: true, puntatore: true, codiceConsumato: true });
+  eq(r.creata, { meta: 'Rossi', creatore: true, haCodice: true, puntatore: true, codiceConsumato: true });
   eq(r.riuso, 'codice');
   eq(r.codice, { lungo: 8, punta: true });
   eq(r.joinErrato, 'codice');
