@@ -4342,6 +4342,26 @@ test('copia locale: se su questo telefono entra un altro account, i dati dell\'a
   eq(r.senza, [true, null]);
 });
 
+test('accesso dopo "Esci": le schermate di accesso non diventano inerti con una pagina aperta, e uscendo non resta niente di inerte', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    const top = document.createElement('div'); top.className = 'sheet-page'; document.body.appendChild(top);
+    setBackgroundInert(top);
+    out.gate = ['login-gate', 'family-gate', 'welcome-gate'].map(id => document.getElementById(id).inert);
+    out.altrove = document.querySelectorAll('[data-dialog-inert]').length > 0; // il resto sì
+    // uscire con una pagina ancora aperta: il callback "nessun utente" ripulisce
+    window.cookpopAuth = { onAuthStateChanged(cb){ window.__authCb = cb; }, signIn: async () => {}, createUser: async () => {}, signOut(){}, updateName: async () => {} };
+    waitForAuth(); window.__authCb(null);
+    out.dopo = document.querySelectorAll('[data-dialog-inert]').length;
+    out.campo = document.getElementById('login-email').closest('[inert]') === null;
+    top.remove(); document.getElementById('login-gate').style.display = 'none';
+    return out;
+  });
+  eq(r.gate, [false, false, false]);
+  assert(r.altrove, 'il resto della pagina resta inerte sotto una finestra aperta');
+  eq([r.dopo, r.campo], [0, true]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
