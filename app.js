@@ -2503,7 +2503,9 @@ const state = {
   mealOverflowOpen: null, // mealKey del pasto per cui è aperto il foglio "⋯" (azioni rare)
   tempoExceptionAdding: null, // null | 'pickingDay' | {day, meal} — stadio del flusso "+ aggiungi un'eccezione" nelle regole della settimana
   avanzoDiPickerOpenDay: null,
-  prepDay: {}, // { 'AAAA-MM-GG' (sabato d'inizio settimana): 'sab'|'dom' } giorno di prep di quella settimana
+  prepDay: {}, // { 'AAAA-MM-GG' (primo giorno della settimana): 0-6 (Lun=0) } giorno di prep di quella settimana; i vecchi 'sab'|'dom' valgono ancora
+  weekStartDay: 5, // primo giorno della settimana nel Menù (0=Lun ... 6=Dom), di solito il giorno della spesa; default sabato
+  prepDayDefault: null, // giorno di meal prep di default (0-6); null = il primo giorno della settimana
   dishPlan: {}, // { mealKey: [{ name, prep, double, done, frozen }] } meal prep e doppia dose per piatto (vedi renderPrepBox)
   freezerDishes: {}, // { mealKey: [nomi] } piatti presi dal freezer: niente Spesa, porzioni scalate a pasto cucinato
   prepSuggOpen: {}, // ephemeral: settimana -> suggerimenti di prep aperti
@@ -3899,6 +3901,8 @@ function buildPersonalPayload(){
     dietExclude: state.dietExclude,
     allergies: state.allergies,
     leftoverLunchOn: state.leftoverLunchOn,
+    weekStartDay: state.weekStartDay,
+    prepDayDefault: state.prepDayDefault,
     weekLeftoverDays: state.weekLeftoverDays,
     weekTempoExceptions: state.weekTempoExceptions,
     userColors: state.userColors,
@@ -4164,19 +4168,32 @@ function effectiveCategoria(weekIdx, i, meal='cena'){
 const MONTHS_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
 const MONTHS_IT_SHORT = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
 
-// La settimana visualizzata parte dal sabato (giorno della spesa) e finisce
-// al venerdì successivo: DATA.week1 resta indicizzato Lun(0)...Dom(6) come
+// La settimana visualizzata parte dal giorno scelto in Regole generali (di
+// default il sabato, giorno della spesa) e finisce il giorno prima: DATA.week1 resta indicizzato Lun(0)...Dom(6) come
 // prima (weekOverrides/weekBaseline/mealsDone usano ancora questi indici),
 // qui si cambia solo l'ORDINE con cui i 7 giorni vengono mostrati.
 const WEEK_DISPLAY_ORDER = [5,6,0,1,2,3,4];
+// Il primo giorno è un'impostazione (Regole generali): l'array si riscrive sul
+// posto, così chi lo usa vede sempre l'ordine attuale.
+function weekStartIdx(){
+  const n = parseInt(state.weekStartDay, 10);
+  return n >= 0 && n <= 6 ? n : 5;
+}
+function applyWeekStart(){
+  const st = weekStartIdx();
+  WEEK_DISPLAY_ORDER.splice(0, 7, ...[0,1,2,3,4,5,6].map(k => (st + k) % 7));
+}
+function dayNameOf(i){ return DATA.week1[i].giorno; }
 
-// Sabato che apre la settimana "corrente" (quella che contiene oggi): se oggi è
-// sabato è oggi stesso, altrimenti il sabato appena passato — così la settimana 0
-// include sempre la data di oggi ed è possibile evidenziarla nel Menù.
+// Giorno che apre la settimana "corrente" (quella che contiene oggi): se oggi è
+// quel giorno è oggi stesso, altrimenti l'ultima volta che è passato — così la
+// settimana 0 include sempre la data di oggi ed è possibile evidenziarla nel Menù.
+// (Il nome viene da quando era sempre il sabato.)
 function upcomingSaturday(){
+  applyWeekStart();
   const today = new Date();
   const day = today.getDay(); // 0=dom, 1=lun ... 6=sab
-  const daysSinceSaturday = (day + 1) % 7;
+  const daysSinceSaturday = (day - (weekStartIdx() + 1) % 7 + 7) % 7;
   const saturday = new Date(today);
   saturday.setDate(today.getDate() - daysSinceSaturday);
   return saturday;
@@ -4540,9 +4557,9 @@ function recipeProteina(r){ return (r && PROTEINA_ORDER.includes(r.proteina)) ? 
 // Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
 // (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
 // Giorni in cui il pranzo è l'avanzo della cena di ieri (Regole di generazione).
-// Il sabato (5) è il primo giorno della settimana: la sua "cena di ieri" è della
+// Il primo giorno della settimana (di default il sabato): la sua "cena di ieri" è della
 // settimana scorsa, quindi il suo pranzo si cucina sempre.
-const LEFTOVER_LUNCH_ELIGIBLE = [0,1,2,3,4,6];
+function leftoverEligible(){ return [0,1,2,3,4,5,6].filter(d => d !== WEEK_DISPLAY_ORDER[0]); }
 function leftoverPortionsN(){
   const n = parseInt(state.weekLeftoverPortions, 10);
   return n >= 0 && n <= 4 ? n : 1;
@@ -4550,7 +4567,7 @@ function leftoverPortionsN(){
 function leftoverLunchDays(){
   if(!state.leftoverLunchOn) return [];
   const a = state.weekLeftoverDays;
-  return Array.isArray(a) ? a.filter(d => LEFTOVER_LUNCH_ELIGIBLE.includes(d)) : LEFTOVER_LUNCH_ELIGIBLE.slice();
+  return Array.isArray(a) ? a.filter(d => leftoverEligible().includes(d)) : leftoverEligible();
 }
 function weekPlanSlots(){
   const slots = [];
@@ -5656,6 +5673,7 @@ function syncMenuStickyTop(){
 }
 window.addEventListener('resize', syncMenuStickyTop);
 function render(){
+  applyWeekStart();
   requestAnimationFrame(syncMenuStickyTop);
   applyCustomDepts();
   if(personalSynced || !window.cookpopSync) rolloverWeeksIfNeeded();
@@ -6830,9 +6848,16 @@ function renderDishPickerScreen(){
 // (non un oggetto per nome) perché i nomi delle ricette possono contenere
 // caratteri non ammessi nelle chiavi di Firebase ("/", ".").
 // state.freezerDishes[mealKey] = [nomi dei piatti presi dal freezer].
-const PREP_DAYS = { sab: 5, dom: 6 };
 function weekStartIso(weekIdx){ return isoLocalDate(weekDatesFor(weekIdx)[0]); }
-function prepDayOf(weekIdx){ return (state.prepDay && state.prepDay[weekStartIso(weekIdx)]) || 'sab'; }
+// Giorno (0=Lun ... 6=Dom) in cui si fa il meal prep di quella settimana: quello
+// scelto per la settimana, se no quello di default, se no il primo giorno.
+function prepDayOf(weekIdx){
+  const v = state.prepDay && state.prepDay[weekStartIso(weekIdx)];
+  const n = v === 'sab' ? 5 : v === 'dom' ? 6 : parseInt(v, 10);
+  if(n >= 0 && n <= 6) return n;
+  const d = parseInt(state.prepDayDefault, 10);
+  return d >= 0 && d <= 6 ? d : WEEK_DISPLAY_ORDER[0];
+}
 function dishPlanList(mk){ return (state.dishPlan && state.dishPlan[mk]) || []; }
 function getDishPlan(mk, name){ return dishPlanList(mk).find(p => p.name === name) || {}; }
 function setDishPlan(mk, name, patch){
@@ -6917,7 +6942,7 @@ function freezeDoubleIfReady(weekIdx, i, meal, name){
 // Piatti che si possono preparare nel giorno di prep: quelli dei giorni
 // dopo, fino a venerdì. chosen = già in lista; gli altri sono suggerimenti.
 function prepCandidates(weekIdx){
-  const startPos = WEEK_DISPLAY_ORDER.indexOf(PREP_DAYS[prepDayOf(weekIdx)]);
+  const startPos = WEEK_DISPLAY_ORDER.indexOf(prepDayOf(weekIdx));
   const out = [];
   WEEK_DISPLAY_ORDER.forEach((i, pos) => {
     if(pos <= startPos) return;
@@ -6937,9 +6962,11 @@ function prepCandidates(weekIdx){
 }
 function renderPrepBox(weekIdx, i){
   const day = prepDayOf(weekIdx);
-  if(PREP_DAYS[day] !== parseInt(i, 10)) return '';
+  if(day !== parseInt(i, 10)) return '';
   const cands = prepCandidates(weekIdx);
-  if(!cands.length) return '';
+  // Senza piatti da preparare il riquadro sparisce, ma se il giorno l'hai scelto
+  // tu resta, per poterlo cambiare.
+  if(!cands.length && !(state.prepDay && state.prepDay[weekStartIso(weekIdx)])) return '';
   const iso = weekStartIso(weekIdx);
   const forLabel = c => `${DATA.week1[c.i].giorno.slice(0, 3).toLowerCase()} ${MEAL_LABEL[c.meal].toLowerCase()}`;
   const chosen = cands.filter(c => c.chosen), others = cands.filter(c => !c.chosen);
@@ -6965,7 +6992,7 @@ function renderPrepBox(weekIdx, i){
         <div class="prep-head">
           <span class="prep-title">🔪 Prep${chosen.length ? ` <span class="prep-count">${doneCount}/${chosen.length}</span>` : ''}</span>
           <span class="prep-day-chips" role="group" aria-label="Giorno di prep">
-            ${Object.keys(PREP_DAYS).map(d => `<button type="button" class="btn is-chip${day === d ? ' active' : ''}" data-prep-day="${d}" data-prep-week="${iso}" aria-pressed="${day === d}">${d === 'sab' ? 'Sab' : 'Dom'}</button>`).join('')}
+            ${WEEK_DISPLAY_ORDER.map(d => `<button type="button" class="btn is-chip${day === d ? ' active' : ''}" data-prep-day="${d}" data-prep-week="${iso}" aria-pressed="${day === d}" aria-label="${escapeAttr(dayNameOf(d))}">${escapeHtml(dayNameOf(d).slice(0, 3))}</button>`).join('')}
           </span>
         </div>
         ${chosen.length ? `<div class="prep-list">${chosenHtml}</div>` : '<div class="prep-empty">Niente in lista: aggiungi qui sotto cosa preparare.</div>'}
@@ -7521,10 +7548,10 @@ function renderMenu(){
           <div class="gen-group">
             <div class="gen-label">Pranzo con l'avanzo della sera prima</div>
             <div class="gen-days gen-leftover-days">${[0,1,2,3,4,5,6].map(d => {
-              const eligible = LEFTOVER_LUNCH_ELIGIBLE.includes(d), on = leftoverLunchDays().includes(d);
-              return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ' disabled title="Il sabato, primo giorno della settimana, il pranzo si cucina sempre"'} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
+              const eligible = leftoverEligible().includes(d), on = leftoverLunchDays().includes(d);
+              return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ` disabled title="${escapeAttr(dayNameOf(d))}, primo giorno della settimana, il pranzo si cucina sempre"`} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
             }).join('')}</div>
-            <p class="gen-note">Il sabato non c'è: è il primo giorno della settimana, il pranzo si cucina sempre.</p>
+            <p class="gen-note">${escapeHtml(dayNameOf(WEEK_DISPLAY_ORDER[0]))} non c'è: è il primo giorno della settimana, il pranzo si cucina sempre.</p>
           </div>
           <div class="gen-group gen-row">
             <div class="gen-label">Porzioni per ogni avanzo</div>
@@ -10858,6 +10885,12 @@ function attachHandlers(){
       persist(); render();
     });
   });
+  document.querySelectorAll('[data-gen-weekstart]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ setWeekStartDay(parseInt(btn.dataset.genWeekstart, 10)); render(); });
+  });
+  document.querySelectorAll('[data-gen-prepday]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.prepDayDefault = parseInt(btn.dataset.genPrepday, 10); persist(); render(); });
+  });
   document.querySelectorAll('[data-gen-diet]').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.dietType = btn.dataset.genDiet; state.dietTargets = {}; persist(); render(); });
   });
@@ -13039,7 +13072,7 @@ document.addEventListener('click', e=>{
   const prepDayEl = e.target.closest('[data-prep-day]');
   if(prepDayEl){
     if(!state.prepDay) state.prepDay = {};
-    state.prepDay[prepDayEl.dataset.prepWeek] = prepDayEl.dataset.prepDay;
+    state.prepDay[prepDayEl.dataset.prepWeek] = parseInt(prepDayEl.dataset.prepDay, 10);
     persist(); render();
     return;
   }
@@ -13505,6 +13538,22 @@ function genGramsRowsHtml(){
     return `<div class="manage-row gen-inline-row"><span class="manage-row-icon">${k === 'pasta' ? '🍝' : '🍚'}</span><span class="manage-row-main">${k === 'pasta' ? 'Pasta' : 'Riso'}</span><span class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></span></div>`;
   }).join('');
 }
+function prepDefaultIdx(){
+  const d = parseInt(state.prepDayDefault, 10);
+  return d >= 0 && d <= 6 ? d : WEEK_DISPLAY_ORDER[0];
+}
+// Nuovo primo giorno della settimana. I piatti restano ai giorni della
+// settimana (lunedì resta lunedì): cambia da dove parte la settimana, quindi
+// i giorni ai bordi possono cambiare data. La settimana 0 riparte da oggi.
+function setWeekStartDay(idx){
+  if(idx === weekStartIdx()) return;
+  state.weekStartDay = idx;
+  applyWeekStart();
+  state.week0Start = isoLocalDate(upcomingSaturday());
+  state.expandedDay = null;
+  state.swapOpenDay = null;
+  persist();
+}
 function genGoRow(go, icon, label, value, side){
   return `<button type="button" class="manage-row" data-gen-go="${go}"><span class="manage-row-icon">${icon}</span><span class="manage-row-main">${escapeHtml(label)}${!side && value ? `<span class="manage-row-sub">${escapeHtml(value.charAt(0).toUpperCase() + value.slice(1))}</span>` : ''}</span>${side ? `<span class="manage-row-side">${escapeHtml(value)}</span>` : ''}<span class="manage-row-chevron" aria-hidden="true">›</span></button>`;
 }
@@ -13541,6 +13590,13 @@ function renderGenGeneralPage(){
     body = `
       <p class="settings-note manage-intro">Valgono per tutte le settimane. Quelle di una sola settimana si cambiano dal Menù, con l'ingranaggio.</p>
       <section class="settings-section">
+        <h3 class="settings-section-title">La settimana</h3>
+        <div class="settings-card manage-list">
+          ${genGoRow('weekstart', '📅', 'Inizio settimana', dayNameOf(WEEK_DISPLAY_ORDER[0]) + ' · di solito il giorno della spesa')}
+          ${genGoRow('prepday', '🔪', 'Giorno di meal prep', dayNameOf(prepDefaultIdx()))}
+        </div>
+      </section>
+      <section class="settings-section">
         <h3 class="settings-section-title">Quanto si cucina</h3>
         <div class="settings-card manage-list">
           <div class="manage-row gen-inline-row"><span class="manage-row-icon">👥</span><span class="manage-row-main">Porzioni</span>
@@ -13570,9 +13626,16 @@ function renderGenGeneralPage(){
 // "Grammi a porzione" e "Alimentazione": un pannellino dal basso sopra la pagina (DS-RegoleGenerali).
 function genGeneralSheetHtml(){
   const which = state.genGeneralSheet;
-  if(which !== 'grams' && which !== 'diet') return '';
-  const title = which === 'grams' ? 'Grammi a porzione' : 'Alimentazione';
-  const body = which === 'grams'
+  if(which !== 'grams' && which !== 'diet' && which !== 'weekstart' && which !== 'prepday') return '';
+  const title = { grams: 'Grammi a porzione', diet: 'Alimentazione', weekstart: 'Inizio settimana', prepday: 'Giorno di meal prep' }[which];
+  const dayBtns = (attr, cur) => `<div class="gen-days gen-week-days">${WEEK_DISPLAY_ORDER.map(d => `<button type="button" class="gen-day${cur === d ? ' active' : ''}" ${attr}="${d}" aria-pressed="${cur === d}" aria-label="${escapeAttr(dayNameOf(d))}">${escapeHtml(dayNameOf(d).slice(0, 3))}</button>`).join('')}</div>`;
+  const body = which === 'weekstart'
+    ? `${dayBtns('data-gen-weekstart', WEEK_DISPLAY_ORDER[0])}
+       <p class="gen-note">Il giorno da cui parte il Menù: scegli quello in cui fai la spesa. Il menù già fatto resta ai giorni della settimana, quindi i giorni ai bordi possono cambiare data: conviene cambiarlo quando generi la settimana nuova.</p>`
+    : which === 'prepday'
+    ? `${dayBtns('data-gen-prepday', prepDefaultIdx())}
+       <p class="gen-note">Il giorno in cui prepari in anticipo i piatti della settimana. Ogni settimana lo puoi spostare dal riquadro Prep nel Menù.</p>`
+    : which === 'grams'
     ? `<p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa, in Spesa, nel dettaglio e in cucina.</p>
        <div class="manage-list">${genGramsRowsHtml()}</div>`
     : `<div class="gen-days gen-diet-types">${Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('')}</div>
@@ -13592,7 +13655,7 @@ function genGeneralSheetHtml(){
 }
 document.addEventListener('click', e=>{
   const go = e.target.closest('[data-gen-go]');
-  if(go && (go.dataset.genGo === 'grams' || go.dataset.genGo === 'diet')){ state.genGeneralSheet = go.dataset.genGo; render(); return; }
+  if(go && ['grams', 'diet', 'weekstart', 'prepday'].includes(go.dataset.genGo)){ state.genGeneralSheet = go.dataset.genGo; render(); return; }
   if(go){ state.genGeneralPage = go.dataset.genGo; state.genTargetEdit = null; render(); return; }
   const back = e.target.closest('[data-gen-general-back]');
   if(back){

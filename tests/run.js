@@ -937,7 +937,7 @@ test('meal prep: lista nel giorno di prep (sabato di default), doppia dose in Sp
     const thu = document.querySelector('.day-card[data-week-idx="1"][data-day-index="3"] .soak-note');
     out.thuNote = thu ? thu.textContent.replace(/\s+/g, ' ') : '';
     // sabato: prep spostato
-    document.querySelector('[data-prep-day="dom"][data-prep-week]').click();
+    document.querySelector('[data-prep-day="6"][data-prep-week]').click();
     out.movedToSun = !!document.querySelector('.day-card[data-week-idx="1"][data-day-index="6"] .prep-box');
     return out;
   });
@@ -3938,7 +3938,7 @@ test('Regole generali: pagina con righe e sotto-pagine; la finestra della settim
     state.genSettingsOpen = null; state.dietType = 'onnivoro'; state.allergies = []; state.dietExclude = []; state.portionGrams = { pasta: 0, riso: 0 }; render();
     return out;
   });
-  eq(r.righe, ['grams', 'diet', 'targets', 'avoid', 'avoid']);
+  eq(r.righe, ['weekstart', 'prepday', 'grams', 'diet', 'targets', 'avoid', 'avoid']);
   eq([r.porzioni, r.toggle], [true, true]);
   assert(/Pasta 70 g · Riso 50 g/.test(r.testo) && /Vegetariano/.test(r.testo) && /glutine/i.test(r.testo) && /funghi/i.test(r.testo), 'riepiloghi: ' + r.testo.slice(0, 300));
   eq(r.sotto.targets.target, true);
@@ -4154,6 +4154,48 @@ test('pasto di un giorno futuro: "Da mangiare" diventa "Mangiata" e resta; i vec
   });
   if(!r) return;
   eq([r.prima, r.dopo, r.dopoRender, r.valore, r.annullato, r.vecchioTrue], ['Da mangiare', 'Mangiata', 'Mangiata', 'anticipato', 'Da mangiare', false]);
+});
+
+test('Inizio settimana: si sceglie in Regole generali, la settimana parte da quel giorno e contiene oggi; il pranzo avanzo non c\'è il primo giorno', async ({ page }) => {
+  await page.evaluate(() => { state.tab = 'menu'; state.genGeneralOpen = true; state.genGeneralPage = null; render(); });
+  await page.click('[data-gen-go="weekstart"]');
+  const nBtns = await page.evaluate(() => document.querySelectorAll('.gen-mini-sheet [data-gen-weekstart]').length);
+  eq(nBtns, 7, 'sette giorni da scegliere');
+  await page.click('.gen-mini-sheet [data-gen-weekstart="0"]');
+  const r = await page.evaluate(() => {
+    const d0 = weekDatesFor(0);
+    const out = {
+      order: WEEK_DISPLAY_ORDER.slice(), startDow: d0[0].getDay(), todayIn: findTodayPos() !== null,
+      startNotFuture: d0[0] <= new Date(), saved: state.weekStartDay, week0: state.week0Start === isoLocalDate(d0[0]),
+      elig: leftoverEligible(), label: document.querySelector('.manage-row[data-gen-go="weekstart"] .manage-row-sub').textContent
+    };
+    state.weekStartDay = 5; applyWeekStart(); state.week0Start = isoLocalDate(upcomingSaturday());
+    return out;
+  });
+  eq(r.order, [0,1,2,3,4,5,6], 'ordine da lunedì');
+  assert(r.startDow === 1 && r.todayIn && r.startNotFuture && r.week0 && r.saved === 0, 'la settimana 0 parte da lunedì e contiene oggi: ' + JSON.stringify(r));
+  eq(r.elig, [1,2,3,4,5,6], 'il primo giorno non ha il pranzo avanzo');
+  assert(/^Lunedì/.test(r.label), 'la riga mostra il giorno scelto: ' + r.label);
+});
+
+test('Meal prep: il giorno si sceglie come impostazione e per settimana, qualunque giorno; i vecchi sab/dom valgono ancora', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    state.prepDay = {}; state.prepDayDefault = null;
+    out.def = prepDayOf(0);                       // il primo giorno (sabato)
+    state.prepDayDefault = 2;
+    out.set = prepDayOf(0);
+    state.prepDay[weekStartIso(0)] = 'dom';
+    out.legacy = prepDayOf(0);
+    state.prepDay[weekStartIso(0)] = 1;
+    out.week = prepDayOf(0);
+    const pos = WEEK_DISPLAY_ORDER.indexOf(1);
+    out.onlyAfter = prepCandidates(0).every(c => WEEK_DISPLAY_ORDER.indexOf(c.i) > pos);
+    state.prepDay = {}; state.prepDayDefault = null;
+    return out;
+  });
+  eq([r.def, r.set, r.legacy, r.week], [5, 2, 6, 1], 'giorno di prep: default, impostazione, vecchio dom, scelto');
+  assert(r.onlyAfter, 'si preparano solo i piatti dei giorni dopo');
 });
 
 (async () => {
