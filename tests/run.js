@@ -3802,7 +3802,7 @@ test('famiglie: la schermata "La tua famiglia" cambia scheda, segnala un codice 
   eq(r.chiusa, true);
 });
 
-test('primo avvio guidato: solo per le famiglie nuove, 3 passi con gli stessi controlli delle Regole, poi genera il menù', async ({ page }) => {
+test('primo avvio guidato: solo per le famiglie nuove, tre domande e poi "Pronti", con gli stessi controlli delle Regole, poi genera il menù', async ({ page }) => {
   const r = await page.evaluate(async () => {
     const oldRoute = activeRoute, oldSynced = personalSynced;
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
@@ -3815,9 +3815,11 @@ test('primo avvio guidato: solo per le famiglie nuove, 3 passi con gli stessi co
     document.querySelector('[data-gen-diet="vegetariano"]').click();
     document.querySelector('[data-gen-allergy="glutine"]').click();
     out.scelte = [state.dietType, state.allergies.slice()];
-    document.querySelector('[data-onb-next]').click();
     document.querySelector('[data-gen-portions-inc]').click(); document.querySelector('[data-gen-portions-inc]').click();
     out.porzioni = state.weekPortionsBase;
+    out.nessunaSpenta = !document.querySelector('[data-onb-allergy-none].active');
+    document.querySelector('[data-onb-allergy-none]').click();
+    out.nessuna = [state.allergies.length, !!document.querySelector('[data-onb-allergy-none].active')];
     document.querySelector('[data-onb-next]').click();
     out.finale = !!document.querySelector('[data-onb-finish="generate"]');
     document.querySelector('[data-onb-finish="generate"]').click();
@@ -3830,6 +3832,7 @@ test('primo avvio guidato: solo per le famiglie nuove, 3 passi con gli stessi co
   eq(r.passo1, true);
   eq(r.scelte, ['vegetariano', ['glutine']]);
   eq(r.porzioni, 4);
+  eq([r.nessunaSpenta, r.nessuna], [true, [0, true]]);
   eq(r.finale, true);
   eq(r.fatto, [true, true, 'menu', true]);
   eq(r.payload, true);
@@ -4259,6 +4262,42 @@ test('nota sull\'ingrediente di una ricetta: si scrive in Modifica ricetta, si s
   assert(r.nessunNomeConNota, 'niente ingrediente "Limoni (non trattati)"');
   assert(r.dettaglio, 'la nota compare nell\'elenco ingredienti');
   eq([r.riga, r.letta, r.vuota], ['2 · non trattati', 'non trattati', false]);
+});
+
+test('benvenuto prima dell\'account: quattro schermate, una volta sola; "Ho già un account" e "Salta" portano al login', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    try{ localStorage.removeItem(WELCOME_SEEN_KEY); }catch(e){}
+    const gate = document.getElementById('welcome-gate');
+    let modo = null; window.cookpopSetSignup = on => { modo = on; };
+    welcomeSync(false);
+    out.mostrato = gate.style.display === 'flex' && !!gate.querySelector('[data-wl-start]') && /CookPOP/.test(gate.textContent);
+    welcomeSync(true); out.conAccount = gate.style.display === 'none'; // già dentro: niente benvenuto
+    welcomeSync(false);
+    gate.querySelector('[data-wl-start]').click();
+    const titoli = [];
+    for(let i = 0; i < 3; i++){
+      titoli.push(gate.querySelector('.wl-title').textContent + '|' + gate.querySelector('.wl-kicker').textContent + '|' + gate.querySelector('[data-wl-next]').textContent);
+      gate.querySelector('[data-wl-next]').click();
+    }
+    out.titoli = titoli;
+    out.finito = [gate.style.display, modo, localStorage.getItem(WELCOME_SEEN_KEY)];
+    welcomeSync(false); out.giaVisto = gate.style.display === 'none';
+    // "Ho già un account"
+    localStorage.removeItem(WELCOME_SEEN_KEY); modo = null; gate.innerHTML = ''; welcomeSync(false);
+    gate.querySelector('[data-wl-login]').click(); out.login = [gate.style.display, modo];
+    // "Salta"
+    localStorage.removeItem(WELCOME_SEEN_KEY); modo = null; gate.innerHTML = ''; welcomeSync(false);
+    gate.querySelector('[data-wl-start]').click(); gate.querySelector('[data-wl-skip]').click(); out.salta = [gate.style.display, modo];
+    localStorage.setItem(WELCOME_SEEN_KEY, '1'); gate.style.display = 'none'; gate.innerHTML = '';
+    return out;
+  });
+  assert(r.mostrato && r.conAccount, 'benvenuto mostrato solo senza account');
+  eq(r.titoli, ['Il menù si fa da solo|1 di 3|Avanti', 'La spesa si scrive da sola|2 di 3|Avanti', 'La dispensa sa cosa hai|3 di 3|Iniziamo']);
+  eq(r.finito, ['none', true, '1']);
+  assert(r.giaVisto, 'una volta sola');
+  eq(r.login, ['none', false]);
+  eq(r.salta, ['none', true]);
 });
 
 (async () => {
