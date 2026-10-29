@@ -3562,7 +3562,7 @@ test('alimentazione: vegetariano senza carne né pesce, obiettivi modificabili, 
 });
 
 test('alimentazione: tipo e ingredienti che non piacciono si cambiano nelle pagine delle Regole generali', async ({ page }) => {
-  await page.evaluate(() => { state.dietType = 'onnivoro'; state.dietExclude = []; state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.tab = 'menu'; state.genGeneralOpen = true; state.genGeneralPage = null; render(); });
+  await page.evaluate(() => { state.dietType = 'onnivoro'; state.dietExclude = []; state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.tab = 'menu'; state.genFoodOpen = true; state.genGeneralPage = null; render(); });
   await page.click('[data-gen-go="diet"]');
   await page.click('[data-gen-diet="vegetariano"]');
   await page.click('.gen-mini-sheet [data-gen-sheet-close].gen-go');
@@ -3609,7 +3609,7 @@ test('allergie: il menu le evita, le ricette che le contengono hanno l\'avviso, 
 });
 
 test('allergie: sezione nelle Regole e avviso nella scheda ricetta', async ({ page }) => {
-  await page.evaluate(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.allergies = []; state.tab = 'menu'; state.genGeneralOpen = true; state.genGeneralPage = 'avoid'; render(); });
+  await page.evaluate(() => { state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version}); state.allergies = []; state.tab = 'menu'; state.genFoodOpen = true; state.genGeneralPage = 'avoid'; render(); });
   await page.click('[data-gen-allergy="uova"]');
   await page.fill('[data-gen-allergy-form] input', 'fragole');
   await page.click('[data-gen-allergy-form] button');
@@ -3917,30 +3917,37 @@ test('Gruppi: pieni di formati anche con la Dispensa vuota; si aggiunge e si tog
   eq([r.conPenne, r.senzaPenne], ['in-casa', 'manca']);
 });
 
-test('Regole generali: pagina con righe e sotto-pagine; la finestra della settimana non ha niente di generale', async ({ page }) => {
+test('Generazione menù e Preferenze alimentari: due pagine con righe e sotto-pagine; la finestra della settimana non ha niente di generale', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.dietType = 'vegetariano'; state.allergies = ['glutine']; state.dietExclude = ['funghi']; state.portionGrams = { pasta: 70, riso: 50 }; state.tab = 'menu';
     state.genGeneralOpen = true; state.genGeneralPage = null; render();
     const has = sel => !!document.querySelector(sel);
-    const testo = () => (document.querySelector('[data-page^="gen-general"]') || document.body).textContent.replace(/\s+/g, ' ');
-    const out = { righe: [...document.querySelectorAll('[data-gen-go]')].map(b => b.dataset.genGo), porzioni: has('[data-gen-portions-inc]'), toggle: has('[data-toggle-gen-leftover]'), testo: testo() };
+    const testo = () => (document.querySelector('[data-page^="gen-"]') || document.body).textContent.replace(/\s+/g, ' ');
+    const out = { righe: [...document.querySelectorAll('[data-gen-go]')].map(b => b.dataset.genGo), porzioni: has('[data-gen-portions-inc]'), toggle: has('[data-toggle-gen-leftover]'), testo: testo(), titolo: document.querySelector('[data-page="gen-general"] .manage-title, [data-page="gen-general"] h2') && document.querySelector('[data-page="gen-general"] .manage-title, [data-page="gen-general"] h2').textContent };
+    state.genGeneralOpen = false; state.genFoodOpen = true; render();
+    out.righeCibo = [...document.querySelectorAll('[data-gen-go]')].map(b => b.dataset.genGo); out.testoCibo = testo(); out.cibo = { porzioni: has('[data-gen-portions-inc]'), toggle: has('[data-toggle-gen-leftover]') };
+    state.genFoodOpen = false; state.genGeneralOpen = true; render();
     const sotto = {};
-    ['targets', 'avoid'].forEach(p => { state.genGeneralPage = p; render(); sotto[p] = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), allergie: has('[data-gen-allergy-form]'), non: has('[data-gen-exclude-form]') }; });
+    ['targets', 'avoid'].forEach(p => { state.genGeneralOpen = p === 'targets'; state.genFoodOpen = p === 'avoid'; state.genGeneralPage = p; render(); sotto[p] = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), allergie: has('[data-gen-allergy-form]'), non: has('[data-gen-exclude-form]') }; });
     out.sotto = sotto;
-    state.genGeneralPage = null; state.genGeneralSheet = 'diet'; render();
-    const pannelli = { diet: has('.gen-mini-sheet [data-gen-diet]') && !!document.querySelector('[data-page="gen-general"]') };
+    state.genGeneralPage = null; state.genGeneralOpen = false; state.genFoodOpen = true; state.genGeneralSheet = 'diet'; render();
+    const pannelli = { diet: has('.gen-mini-sheet [data-gen-diet]') && !!document.querySelector('[data-page="gen-food"]') };
+    state.genFoodOpen = false; state.genGeneralOpen = true; render();
     state.genGeneralSheet = 'grams'; render(); pannelli.grams = has('.gen-mini-sheet [data-gen-grams]');
     document.querySelector('.gen-mini-sheet .gen-go').click(); pannelli.chiuso = !has('.gen-mini-sheet');
     out.pannelli = pannelli;
-    state.genGeneralOpen = false; state.genGeneralPage = null; state.genSettingsOpen = 0; render();
+    state.genGeneralOpen = false; state.genFoodOpen = false; state.genGeneralPage = null; state.genSettingsOpen = 0; render();
     out.settimana = { diet: has('[data-gen-diet]'), target: has('[data-gen-target-open]'), grams: has('[data-gen-grams]'), porzioni: has('[data-gen-portions-inc]'), titolo: document.querySelector('.gen-sheet .move-title').textContent };
     state.genSettingsOpen = null; state.dietType = 'onnivoro'; state.allergies = []; state.dietExclude = []; state.portionGrams = { pasta: 0, riso: 0 }; render();
     return out;
   });
-  eq(r.righe, ['weekstart', 'prepday', 'grams', 'diet', 'targets', 'avoid', 'avoid']);
+  eq(r.righe, ['weekstart', 'prepday', 'grams', 'targets']);
+  eq(r.righeCibo, ['diet', 'avoid', 'avoid']);
+  eq([r.cibo.porzioni, r.cibo.toggle], [false, false]);
   eq([r.porzioni, r.toggle], [true, true]);
-  assert(/Pasta 70 g · Riso 50 g/.test(r.testo) && /Vegetariano/.test(r.testo) && /glutine/i.test(r.testo) && /funghi/i.test(r.testo), 'riepiloghi: ' + r.testo.slice(0, 300));
+  assert(/Pasta 70 g · Riso 50 g/.test(r.testo) && !/glutine/i.test(r.testo), 'riepiloghi generazione: ' + r.testo.slice(0, 300));
+  assert(/Vegetariano/.test(r.testoCibo) && /glutine/i.test(r.testoCibo) && /funghi/i.test(r.testoCibo), 'riepiloghi cibo: ' + r.testoCibo.slice(0, 300));
   eq(r.sotto.targets.target, true);
   eq([r.pannelli.diet, r.pannelli.grams, r.pannelli.chiuso], [true, true, true]);
   eq([r.sotto.avoid.allergie, r.sotto.avoid.non], [true, true]);
@@ -4196,6 +4203,25 @@ test('Meal prep: il giorno si sceglie come impostazione e per settimana, qualunq
   });
   eq([r.def, r.set, r.legacy, r.week], [5, 2, 6, 1], 'giorno di prep: default, impostazione, vecchio dom, scelto');
   assert(r.onlyAfter, 'si preparano solo i piatti dei giorni dopo');
+});
+
+test('Impostazioni: due voci, Generazione menù e Preferenze alimentari, ognuna apre la sua pagina e il tasto indietro chiude', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = { voci: [...document.querySelectorAll('[data-settings-go="gen"], [data-settings-go="food"]')].map(b => b.querySelector('.settings-link-text').firstChild.textContent) };
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    document.querySelector('[data-settings-go="food"]').click();
+    out.cibo = [state.genFoodOpen, state.genGeneralOpen, !!document.querySelector('[data-page="gen-food"]')];
+    document.querySelector('[data-gen-general-back]').click();
+    out.chiuso = [state.genFoodOpen, state.genGeneralOpen];
+    document.querySelector('[data-settings-go="gen"]').click();
+    out.gen = [state.genFoodOpen, state.genGeneralOpen, !!document.querySelector('[data-page="gen-general"]')];
+    state.genGeneralOpen = false; render();
+    return out;
+  });
+  eq(r.voci, ['Generazione menù', 'Preferenze alimentari']);
+  eq(r.cibo, [true, false, true]);
+  eq(r.chiuso, [false, false]);
+  eq(r.gen, [false, true, true]);
 });
 
 (async () => {
