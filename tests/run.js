@@ -4326,6 +4326,22 @@ test('accesso: l\'occhio mostra e nasconde la password, "Creane uno" passa alla 
   eq(r.torna, ['Non hai un account? Creane uno', 'Accedi']);
 });
 
+test('copia locale: se su questo telefono entra un altro account, i dati dell\'altro si buttano; lo stesso account li tiene', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    localStorage.setItem('quaderno-state-default', '{"x":1}'); localStorage.setItem('catalog-state-cache', '{"y":1}'); localStorage.setItem(CACHE_OWNER_KEY, 'uid-mara');
+    out.stessa = [claimLocalCache('uid-mara'), localStorage.getItem('quaderno-state-default') !== null];
+    out.altra = [claimLocalCache('uid-elisa'), localStorage.getItem('quaderno-state-default'), localStorage.getItem('catalog-state-cache'), localStorage.getItem(CACHE_OWNER_KEY)];
+    // senza proprietario noto (telefono già in uso prima di questa versione): per prudenza si butta
+    localStorage.setItem('quaderno-state-cugina', '{"z":1}'); localStorage.removeItem(CACHE_OWNER_KEY);
+    out.senza = [claimLocalCache('uid-elisa'), localStorage.getItem('quaderno-state-cugina')];
+    return out;
+  });
+  eq(r.stessa, [false, true]);
+  eq(r.altra, [true, null, null, 'uid-elisa']);
+  eq(r.senza, [true, null]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
