@@ -4225,6 +4225,29 @@ test('Impostazioni: due voci, Generazione menù e Preferenze alimentari, ognuna 
   eq(r.gen, [false, true, true]);
 });
 
+test('nota sull\'ingrediente di una ricetta: si scrive in Modifica ricetta, si salva, compare nell\'elenco ingredienti; il limone non trattato non è un ingrediente a parte', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const nome = 'Scaloppine di tacchino al limone';
+    const ing = getIngredientsFor(nome).find(i => /^limon/i.test(i.ingrediente));
+    const out = { ing: ing && [ing.ingrediente, ing.note], nessunNomeConNota: !allIngredientNamesForManager().some(n => /non trattat/i.test(n)) };
+    out.dettaglio = /ing-note[^>]*> · non trattati/.test(renderIngredientsSection(getIngredientsFor(nome), 1, { noButton: true }));
+    // il campo nella riga di modifica e il salvataggio
+    const wrap = document.createElement('div');
+    wrap.innerHTML = editIngRowHtml('Limone', '2', '', 'non trattati');
+    const row = wrap.firstElementChild;
+    out.campo = row.querySelector('.edit-ing-note').value;
+    row.querySelector('.edit-ing-note').value = '  biologici ';
+    out.letta = readEditIngRow(row).note;
+    row.querySelector('.edit-ing-note').value = '';
+    out.vuota = 'note' in readEditIngRow(row);
+    return out;
+  });
+  eq(r.ing, ['Limone', 'non trattati']);
+  assert(r.nessunNomeConNota, 'niente ingrediente "Limoni (non trattati)"');
+  assert(r.dettaglio, 'la nota compare nell\'elenco ingredienti');
+  eq([r.campo, r.letta, r.vuota], ['non trattati', 'biologici', false]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
