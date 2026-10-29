@@ -2658,6 +2658,101 @@ function decodeKeysFromFirebase(obj){
 let loggedInEmail = null;
 let loggedInUid = null;
 let loggedInName = ''; // nome del profilo (Firebase Auth displayName), se impostato
+// Schermate di benvenuto (prima dell'account): presentazione in 4 schermate, una
+// volta sola per dispositivo. "Ho già un account" e "Salta" portano al login.
+const WELCOME_SEEN_KEY = 'cookpop-welcome-seen';
+function welcomeSeen(){
+  try{ return localStorage.getItem(WELCOME_SEEN_KEY) === '1'; }catch(e){ return true; }
+}
+function wlImg(name){ return `<img class="wl-hamster wl-hamster-${name}" src="assets/welcome/${name}.webp" alt="" onerror="this.style.visibility='hidden'">`; }
+const WELCOME_SLIDES = [
+  { title: 'Il menù si fa da solo', img: 'menu', btn: 'Avanti',
+    text: 'Ogni settimana CookPOP propone pranzi e cene con le tue ricette, tenendo conto di tempo, stagione e di quello che hai in casa. Se un piatto non ti va, lo cambi con un tocco.',
+    card: `<div class="wl-pill" aria-hidden="true"><span>🫘 3</span><span>·</span><span>🐟 2</span><span>·</span><span>🥚 1</span></div>
+      <div class="wl-card" aria-hidden="true"><div class="wl-card-k">Ven 23 · Pranzo · ≤20 min</div>
+        <div class="wl-dish"><span class="wl-dish-ic">🍗</span><span class="wl-dish-t"><b>Secondo</b>Platessa alla mugnaia</span></div>
+        <div class="wl-dish"><span class="wl-dish-ic">🥕</span><span class="wl-dish-t"><b>Contorno</b>Rucola e grana</span></div></div>` },
+  { title: 'La spesa si scrive da sola', img: 'spesa', btn: 'Avanti',
+    text: 'Gli ingredienti del menù finiscono nella lista, già divisi per reparto e senza quello che hai già. Al supermercato spunti e vai: a casa li metti in dispensa con un tocco.',
+    card: `<div class="wl-card" aria-hidden="true">
+        <div class="wl-group">🥦 Frutta e verdura</div>
+        <div class="wl-row is-done"><span class="wl-check on">✓</span><span class="wl-row-n">Limoni</span><span class="wl-row-q">2</span></div>
+        <div class="wl-row"><span class="wl-check"></span><span class="wl-row-n">Rucola</span><span class="wl-row-q">100 g</span></div>
+        <div class="wl-row"><span class="wl-check"></span><span class="wl-row-n">Zucchine</span><span class="wl-row-q">3</span></div>
+        <div class="wl-group">🐟 Pesce</div>
+        <div class="wl-row"><span class="wl-check"></span><span class="wl-row-n">Filetti di platessa</span><span class="wl-row-q">400 g</span></div></div>` },
+  { title: 'La dispensa sa cosa hai', img: 'dispensa', btn: 'Iniziamo',
+    text: 'Vedi cosa c’è in frigo, in freezer e in dispensa, e cosa sta per scadere. Con “Cosa cucino” trovi subito una ricetta per usarlo.',
+    card: `<div class="wl-card" aria-hidden="true">
+        <div class="wl-group">⏰ In scadenza</div>
+        <div class="wl-row"><span class="wl-ico"><i class="wl-fridge"></i></span><span class="wl-row-n">Latte</span><span class="wl-badge is-warn">tra 2 gg</span></div>
+        <div class="wl-row"><span class="wl-ico"><i class="wl-fridge"></i></span><span class="wl-row-n">Panna da cucina</span><span class="wl-badge is-warn">tra 3 gg</span></div>
+        <div class="wl-group">🧀 Latticini e uova</div>
+        <div class="wl-row"><span class="wl-ico"><i class="wl-fridge"></i></span><span class="wl-row-n">Uova</span><span class="wl-badge">4 nov</span></div>
+        <div class="wl-row"><span class="wl-ico">❄️</span><span class="wl-row-n">Sugo</span><span class="wl-badge is-freeze">dal 23 ott</span></div></div>` }
+];
+function welcomeHtml(step){
+  if(step <= 0){
+    return `
+    <div class="wl-screen">
+      <div class="wl-hero is-tall">${wlImg('ciao')}
+        <h1 class="wl-logo">CookPOP</h1>
+        <p class="wl-sub">Il menù della settimana, la spesa e la dispensa, in un posto solo.</p>
+      </div>
+      <div class="wl-actions">
+        <button type="button" class="btn is-solid is-block" data-wl-start>Inizia</button>
+        <button type="button" class="login-link wl-link" data-wl-login>Ho già un account</button>
+      </div>
+    </div>`;
+  }
+  const i = Math.min(WELCOME_SLIDES.length, step) - 1, sl = WELCOME_SLIDES[i];
+  return `
+    <div class="wl-screen">
+      <div class="wl-hero">${sl.card}${wlImg(sl.img)}</div>
+      <div class="wl-panel">
+        <span class="wl-kicker">${i + 1} di ${WELCOME_SLIDES.length}</span>
+        <h2 class="wl-title">${escapeHtml(sl.title)}</h2>
+        <p class="wl-text">${escapeHtml(sl.text)}</p>
+      </div>
+      <div class="wl-nav">
+        <button type="button" class="wl-skip" data-wl-skip>Salta</button>
+        <span class="wl-dots" aria-hidden="true">${WELCOME_SLIDES.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</span>
+        <button type="button" class="btn is-solid wl-next" data-wl-next>${escapeHtml(sl.btn)}</button>
+      </div>
+    </div>`;
+}
+let welcomeStep = 0;
+function renderWelcome(step){
+  const el = document.getElementById('welcome-gate');
+  if(!el) return;
+  welcomeStep = step;
+  el.innerHTML = welcomeHtml(step);
+  el.querySelectorAll('img').forEach(im => { im.addEventListener('error', () => { im.style.visibility = 'hidden'; }); });
+}
+// Dopo il benvenuto si va al login: "Ho già un account" sul form di accesso,
+// "Salta" / "Iniziamo" sulla creazione dell'account.
+function finishWelcome(createAccount){
+  try{ localStorage.setItem(WELCOME_SEEN_KEY, '1'); }catch(e){}
+  const el = document.getElementById('welcome-gate');
+  if(el) el.style.display = 'none';
+  if(window.cookpopSetSignup) window.cookpopSetSignup(!!createAccount);
+}
+function welcomeSync(loggedIn){
+  const el = document.getElementById('welcome-gate');
+  if(!el) return;
+  const show = !loggedIn && !welcomeSeen();
+  el.style.display = show ? 'flex' : 'none';
+  if(show && !el.firstElementChild) renderWelcome(0);
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  if(!t.closest || !t.closest('#welcome-gate')) return;
+  if(t.closest('[data-wl-start]')){ renderWelcome(1); return; }
+  if(t.closest('[data-wl-login]')){ finishWelcome(false); return; }
+  if(t.closest('[data-wl-skip]')){ finishWelcome(true); return; }
+  if(t.closest('[data-wl-next]')){ if(welcomeStep >= WELCOME_SLIDES.length) finishWelcome(true); else renderWelcome(welcomeStep + 1); }
+});
+
 function waitForAuth(){
   return new Promise((resolve)=>{
     if(!window.cookpopAuth){ resolve(); return; }
@@ -2675,6 +2770,7 @@ function waitForAuth(){
       loggedInName = user && user.displayName ? user.displayName : '';
       if(typeof refreshProfileLink === 'function') refreshProfileLink();
       gate.style.display = user ? 'none' : 'flex';
+      welcomeSync(!!user);
       if(logoutBtn) logoutBtn.style.display = user ? 'block' : 'none';
       if(user && !resolved){ resolved = true; resolve(); }
     });
@@ -2691,6 +2787,7 @@ function waitForAuth(){
       errorBox.textContent = '';
     }
     if(toggleBtn) toggleBtn.addEventListener('click', ()=> setSignupMode(!signupMode));
+    window.cookpopSetSignup = setSignupMode;
     async function doLogin(){
       errorBox.textContent = '';
       submitBtn.disabled = true;
@@ -13552,38 +13649,52 @@ document.addEventListener('change', async e=>{
 function onboardingActive(){ return !!(activeRoute && activeRoute.newFamily && personalSynced && !state.onboardingDone); }
 function renderOnboardingPage(){
   if(!onboardingActive()) return '';
-  const step = Math.min(2, Math.max(0, state.onbStep || 0));
-  const pills = Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-day gen-diet-btn${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('');
-  const allergies = Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${(state.allergies || []).includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${(state.allergies || []).includes(k)}">${escapeHtml(k)}</button>`).join('');
-  const grams = ['pasta', 'riso'].map(k => { const g = parseInt((state.portionGrams || {})[k], 10) || 0; return `<div class="gen-row gen-grams-row"><span>${k === 'pasta' ? 'Pasta' : 'Riso'}</span><div class="gen-stepper"><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="-10" aria-label="Meno grammi di ${k}" ${g <= 0 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${g > 0 ? g + ' g' : 'come nella ricetta'}</span><button type="button" class="qty-btn" data-gen-grams="${k}" data-gen-grams-step="10" aria-label="Più grammi di ${k}" ${g >= 150 ? 'disabled' : ''}>+</button></div></div>`; }).join('');
-  const steps = [
-    { title: 'Come mangiate?', body: `
-        <div class="gen-group"><div class="gen-label">Alimentazione</div><div class="gen-days gen-diet-types">${pills}</div></div>
-        <div class="gen-group"><div class="gen-label">Allergie e intolleranze</div><div class="gen-exclude-chips">${allergies}</div>
-          <p class="gen-note">Il menu le evita. Controlla sempre le etichette: non è una garanzia. Altro (ingredienti da evitare, obiettivi settimanali) lo trovi in Impostazioni → Regole di generazione.</p></div>` },
-    { title: 'Quanti siete?', body: `
-        <div class="gen-group gen-row"><div class="gen-label">Porzioni di partenza</div>
-          <div class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></div></div>
-        <div class="gen-group"><div class="gen-label">Grammi a porzione</div>${grams}<p class="gen-note">Le quantità di pasta e riso nelle ricette si portano a questi grammi a testa. Tutto si cambia dopo.</p></div>` },
-    { title: 'Tutto pronto', body: `
-        <p class="settings-card-text">Ora puoi generare il primo menù della settimana. Si aggiusta come vuoi: cambi un piatto, lo blocchi, lo rigeneri. La spesa si compila da sola.</p>
-        <p class="settings-note">Altre persone entrano dal tuo codice invito (Impostazioni → Persone).</p>` }
-  ];
-  const cur = steps[step];
-  const footer = step < 2
-    ? `<button type="button" class="btn is-solid is-block" data-onb-next>Avanti</button><button type="button" class="login-link" data-onb-skip>Salta, lo faccio dopo</button>`
-    : `<button type="button" class="btn is-solid is-block" data-onb-finish="generate">Genera il primo menù</button><button type="button" class="login-link" data-onb-finish="">Più tardi</button>`;
-  return managePageHtml({ key: 'onboarding', title: `${cur.title} <span class="onb-count">${step + 1}/3</span>`, closeAttr: step > 0 ? 'data-onb-back' : 'data-onb-skip', body: `<section class="settings-section">${cur.body}</section>`, footer });
+  const step = Math.min(1, Math.max(0, state.onbStep || 0));
+  const hamster = name => `<img class="onb-hamster" src="assets/welcome/${name}.webp" alt="" onerror="this.style.visibility='hidden'">`;
+  if(step === 0){
+    const diets = Object.entries(DIET_TYPES).map(([k, l]) => `<button type="button" class="gen-chip${dietTypeNow() === k ? ' active' : ''}" data-gen-diet="${k}" aria-pressed="${dietTypeNow() === k}">${l}</button>`).join('');
+    const al = state.allergies || [];
+    const allergies = `<button type="button" class="gen-chip${al.length ? '' : ' active'}" data-onb-allergy-none aria-pressed="${!al.length}">Nessuna</button>` + Object.keys(ALLERGEN_PRESETS).map(k => `<button type="button" class="gen-chip${al.includes(k) ? ' active' : ''}" data-gen-allergy="${escapeAttr(k)}" aria-pressed="${al.includes(k)}">${escapeHtml(k)}</button>`).join('');
+    return `
+  <div class="sheet-page onb-screen" data-page="onboarding">
+    <div class="onb-body">
+      <div class="onb-top"><button type="button" class="onb-skip" data-onb-skip>Salta</button></div>
+      ${hamster('domande')}
+      <h1 class="onb-title">Tre domande veloci</h1>
+      <p class="onb-text">Servono per il primo menù. Puoi cambiarle quando vuoi in Impostazioni.</p>
+      <div class="onb-field"><div class="onb-lab">Quanti siete</div>
+        <div class="onb-row"><span>Di solito cucini per</span>
+          <span class="gen-stepper"><button type="button" class="qty-btn" data-gen-portions-dec aria-label="Diminuisci porzioni" ${defaultPortions() <= 1 ? 'disabled' : ''}>−</button><span class="gen-stepper-val">${defaultPortions()} ${defaultPortions() === 1 ? 'persona' : 'persone'}</span><button type="button" class="qty-btn" data-gen-portions-inc aria-label="Aumenta porzioni" ${defaultPortions() >= 12 ? 'disabled' : ''}>+</button></span></div></div>
+      <div class="onb-field"><div class="onb-lab">Come mangiate</div><div class="onb-chips">${diets}</div></div>
+      <div class="onb-field"><div class="onb-lab">Allergie o intolleranze</div><div class="onb-chips">${allergies}</div>
+        <p class="onb-note">Il menù le evita, ma controlla sempre le etichette. Le altre le aggiungi dopo, in Preferenze alimentari.</p></div>
+    </div>
+    <div class="onb-footer"><button type="button" class="btn is-solid is-block" data-onb-next>Avanti</button></div>
+  </div>`;
+  }
+  return `
+  <div class="sheet-page onb-screen is-final" data-page="onboarding">
+    <div class="onb-hero">${hamster('pronti')}</div>
+    <div class="onb-body">
+      <h1 class="onb-title">Pronti per la prima settimana</h1>
+      <p class="onb-text">Il menù si costruisce con le tue ricette. Puoi aggiungerle da zero, da un reel, da un sito o da un testo, anche con calma.</p>
+    </div>
+    <div class="onb-footer">
+      <button type="button" class="btn is-solid is-block" data-onb-finish="generate">Genera il primo menù</button>
+      <button type="button" class="btn is-outline is-block" data-onb-finish="recipes">Prima aggiungo le mie ricette</button>
+    </div>
+  </div>`;
 }
 document.addEventListener('click', e=>{
   const t = e.target;
-  if(t.closest('[data-onb-next]')){ state.onbStep = Math.min(2, (state.onbStep || 0) + 1); render(); return; }
-  if(t.closest('[data-onb-back]')){ state.onbStep = Math.max(0, (state.onbStep || 0) - 1); render(); return; }
+  if(t.closest('[data-onb-next]')){ state.onbStep = 1; render(); return; }
+  if(t.closest('[data-onb-allergy-none]')){ state.allergies = []; persist(); render(); return; }
   if(t.closest('[data-onb-skip]')){ state.onboardingDone = true; persist(); render(); return; }
   const fin = t.closest('[data-onb-finish]');
   if(fin){
     state.onboardingDone = true;
     if(fin.dataset.onbFinish === 'generate'){ state.tab = 'menu'; generateWeek(0); }
+    else if(fin.dataset.onbFinish === 'recipes'){ state.tab = 'prep'; }
     persist(); render();
   }
 });
