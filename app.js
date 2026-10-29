@@ -2904,12 +2904,13 @@ async function resolveFamilyRoute(){
     if(!famId){ activeRoute = legacyRouteStrict(loggedInEmail) === null && loggedInEmail ? { id: 'sola-lettura', path: 'senza-rete/state', catalogPath: 'senza-rete/catalog', newFamily: true } : legacyRouteFor(loggedInEmail); return; }
   }
   if(!famId){
-    if(legacyRouteStrict(loggedInEmail)){ activeRoute = null; return; }
-    // Un nome contenuto in una parola più lunga (es. "stefano"): si prova a
-    // leggere lo spazio di prima; se le regole lo negano, non è di quella famiglia.
-    const loose = legacyRouteFor(loggedInEmail);
-    if(loose && loggedInEmail){
-      try{ await sync.load(loose.path + '/week0Start'); activeRoute = null; return; }catch(e){ /* non è dei loro */ }
+    // Un account senza famiglia assegnata che ha nell'email un nome di prima
+    // (anche dentro una parola, es. "stefano"): si prova a leggere lo spazio di
+    // prima; se le regole lo negano non è di quella famiglia e passa da "Entra o
+    // crea". Il nome nell'email, da solo, non basta mai.
+    const legacy = legacyRouteStrict(loggedInEmail) || legacyRouteFor(loggedInEmail);
+    if(legacy && loggedInEmail){
+      try{ await sync.load(legacy.path + '/week0Start'); activeRoute = null; return; }catch(e){ /* non è dei loro */ }
     }
     famId = await runFamilyGate();
   }
