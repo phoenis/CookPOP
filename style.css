@@ -2703,3 +2703,30 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Nota sull'ingrediente di una ricetta (es. "non trattato"): campo sotto quantità e specifica. */
 .edit-ing-note{ box-sizing:border-box; width:100%; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
 .rd .ing-note{ font-style:italic; }
+
+/* Modifica ricetta: ingredienti in un elenco compatto; si cambiano toccando la riga (DS-ModificaRicetta). */
+.edit-ing-list{ border:1px solid var(--line); border-radius:var(--radius-modal); background:var(--surface); overflow:hidden; margin-bottom:var(--s2); }
+.edit-ing-list:empty{ display:none; }
+.edit-ing-list .edit-ing-row{ display:flex; flex-direction:row; align-items:center; gap:0; margin:0; border-top:1px solid var(--line); }
+.edit-ing-list .edit-ing-row:first-child{ border-top:0; }
+.edit-ing-summary{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:var(--s3); min-height:3rem; text-align:left; background:none; border:0; color:var(--ink); font:inherit; cursor:pointer; }
+.edit-ing-sum-name{ font-weight:var(--weight-bold); overflow-wrap:anywhere; }
+.edit-ing-sum-sub{ font-size:var(--text-small); color:var(--ink-light); overflow-wrap:anywhere; }
+.edit-ing-sum-sub:empty{ display:none; }
+.edit-ing-list .edit-row-remove{ flex:none; background:none; border:0; color:var(--ink-light); min-width:2.75rem; min-height:2.75rem; }
+.edit-add-link{ color:var(--accent-text); font-weight:var(--weight-bold); padding-left:0; }
+.edit-ing-backdrop{ z-index:60; }
+.edit-ing-sheet-body{ gap:var(--s4); }
+.edit-ing-field{ display:flex; flex-direction:column; gap:var(--s1, 0.25rem); }
+.edit-ing-lab{ font-size:var(--text-xsmall); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-light); }
+.edit-ing-opt{ text-transform:none; letter-spacing:0; font-weight:var(--weight-normal); }
+.edit-ing-hint{ margin:0; font-size:var(--text-small); color:var(--ink-light); }
+.edit-ing-sheet .edit-ing-name, .edit-ing-sheet .edit-ing-note{ box-sizing:border-box; width:100%; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
+.edit-ing-sheet .edit-ing-fields{ display:flex; gap:var(--s2); }
+.edit-ing-sheet .edit-ing-fields .edit-ing-num{ flex:0 0 6rem; width:6rem; min-width:0; }
+.edit-ing-sheet .edit-ing-fields .edit-ing-qta{ flex:1; }
+.edit-ing-sheet .edit-ing-qualbox select, .edit-ing-sheet .edit-ing-qual-new{ box-sizing:border-box; width:100%; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
+.edit-ing-footer{ flex:none; display:flex; align-items:center; justify-content:space-between; gap:var(--s3); padding:var(--s3) 0 calc(var(--s3) + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:var(--bg); }
+.edit-ing-footer .btn.is-solid{ flex:1; max-width:14rem; }
+.edit-ing-remove{ color:var(--accent-text); font-weight:var(--weight-bold); }
+.edit-add-link{ justify-content:flex-start; align-self:flex-start; }
