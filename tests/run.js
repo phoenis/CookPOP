@@ -1814,7 +1814,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq(r.visible, ['Ingredienti e reparti']);
   eq(r.visibleLinks, ['depts']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 5, spesa: 1, menu: 3, prep: 2 });
+  eq(r.menus, { dispensa: 5, spesa: 1, menu: 2, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -1874,7 +1874,7 @@ test('impostazioni: uscendo da una pagina si torna all\'elenco, e chiuse le Impo
   eq(r, { during: true, pageAbove: true, backToList: true, restoredTab: true });
 });
 
-test('backup in pagina dedicata e "Rigenera menu" rigenera tutte le settimane attive', async ({ page }) => {
+test('backup in pagina dedicata e rigenerare tutte le settimane attive', async ({ page }) => {
   const r = await page.evaluate(async () => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.tab = 'spesa'; render();
@@ -1897,12 +1897,12 @@ test('backup in pagina dedicata e "Rigenera menu" rigenera tutte le settimane at
     state.extraWeeks = []; generateWeek(0); generateWeek(1);
     const b0 = state.weekBaseline, b1 = state.extraWeeks[0].baseline;
     out.menuItems = TAB_MENU_ITEMS.menu.map(i => i.label.replace(/<[^>]*>/g, '').trim());
-    TAB_MENU_ITEMS.menu[0].action();
+    regenerateAllWeeks();
     out.regen = state.weekBaseline !== b0 && state.extraWeeks[0].baseline !== b1;
     out.toast = /2 settimane/.test((document.querySelector('.undo-toast') || {}).textContent || '');
     return out;
   });
-  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['Rigenera menu', 'Generazione menù', 'Preferenze alimentari'], regen: true, toast: true });
+  eq(r, { noInline: true, page: true, list: true, off: true, on: true, closed: true, menuItems: ['Generazione menù', 'Preferenze alimentari'], regen: true, toast: true });
 });
 
 test('catalogo: nove dolci dal ricettario, con ingredienti, procedimento e reparti giusti', async ({ page }) => {
@@ -1988,11 +1988,11 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     TAB_MENU_ITEMS.dispensa[3].action(); out.grp = state.pantryGroupsModalOpen === true; state.pantryGroupsModalOpen = false;
     TAB_MENU_ITEMS.dispensa[4].action(); out.dept = state.deptsModalOpen === true; state.deptsModalOpen = false;
     TAB_MENU_ITEMS.spesa[0].action(); out.aisle = state.aisleOrderOpen === true; state.aisleOrderOpen = false;
-    TAB_MENU_ITEMS.menu[1].action(); out.gen = state.genGeneralOpen === true && state.genSettingsOpen === null; state.genGeneralOpen = false;
-    TAB_MENU_ITEMS.menu[2].action(); out.food = state.genFoodOpen === true && state.genGeneralOpen === false; state.genFoodOpen = false;
+    TAB_MENU_ITEMS.menu[0].action(); out.gen = state.genGeneralOpen === true && state.genSettingsOpen === null; state.genGeneralOpen = false;
+    TAB_MENU_ITEMS.menu[1].action(); out.food = state.genFoodOpen === true && state.genGeneralOpen === false; state.genFoodOpen = false;
     return out;
   });
-  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Rigenera menu', 'Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
+  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
 });
 
 test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
