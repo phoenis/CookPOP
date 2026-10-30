@@ -3435,8 +3435,9 @@ test('Spesa con più settimane: il fresco della prossima si compra nella lista n
     const fresco = w => tutte.filter(x => x.weekIdx === w && SHOP_LATER_DEPTS.includes(dept(x)));
     state.tab = 'spesa'; state.shopView = 'reparto'; state.shopSearch = ''; render();
     const gruppo = document.querySelector('.shop-later-group');
-    const principali = [...document.querySelectorAll('.shop-item-row .item-name')].filter(e => !e.closest('.shop-later-group')).map(e => e.textContent.trim().toLowerCase());
-    const piuAvanti = gruppo ? [...gruppo.querySelectorAll('.item-name')].map(e => e.textContent.trim().toLowerCase()) : [];
+    // nome esatto dell'ingrediente (data-shop-name): il testo della riga può avere anche la specifica ("Uova · tuorli")
+    const principali = [...document.querySelectorAll('.shop-item input[data-shop-name]')].filter(e => !e.closest('.shop-later-group')).map(e => e.dataset.shopName.trim().toLowerCase());
+    const piuAvanti = gruppo ? [...gruppo.querySelectorAll('.shop-item input[data-shop-name]')].map(e => e.dataset.shopName.trim().toLowerCase()) : [];
     const settimane = gruppo ? [...gruppo.querySelectorAll('.shop-later-week')].map(e => e.textContent.trim()) : [];
     // il fresco di una settimana, per un nome che nelle altre non c'è
     const solo = w => fresco(w).map(x => x.ingrediente.toLowerCase()).filter(n => !tutte.some(y => y.weekIdx !== w && y.ingrediente.toLowerCase() === n));
