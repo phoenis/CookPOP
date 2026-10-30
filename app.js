@@ -4687,32 +4687,51 @@ function recipeProteina(r){ return (r && PROTEINA_ORDER.includes(r.proteina)) ? 
 // Ritorna un array di 7 { cena:{principale,contorni[]}, pranzo:{...}|null }
 // (metadati completi del catalogo, non ancora nomi — li estrae generateWeek).
 // Giorni in cui il pranzo è l'avanzo della cena di ieri (Regole di generazione).
-// Il primo giorno della settimana (di default il sabato): la sua "cena di ieri" è della
-// settimana scorsa, quindi il suo pranzo si cucina sempre.
-function leftoverEligible(){ return [0,1,2,3,4,5,6].filter(d => d !== WEEK_DISPLAY_ORDER[0]); }
+// Il primo giorno della settimana (di default il sabato): la sua "cena di ieri" è
+// l'ultima della settimana prima. Nella settimana in corso quella non c'è più
+// (la settimana finita si scarta), quindi il suo pranzo si cucina sempre; dalle
+// settimane dopo c'è ancora, e il pranzo può esserne l'avanzo.
+function firstDayLeftoverSource(weekIdx){
+  if(!(weekIdx >= 1)) return null;
+  const last = WEEK_DISPLAY_ORDER[WEEK_DISPLAY_ORDER.length - 1];
+  return effectiveMeal(weekIdx - 1, last, 'cena').principale ? mealKey(weekIdx - 1, last, 'cena') : null;
+}
+function leftoverEligible(weekIdx){
+  const first = WEEK_DISPLAY_ORDER[0];
+  return [0,1,2,3,4,5,6].filter(d => d !== first || !!firstDayLeftoverSource(weekIdx));
+}
 function leftoverPortionsN(){
   const n = parseInt(state.weekLeftoverPortions, 10);
   return n >= 0 && n <= 4 ? n : 1;
 }
-function leftoverLunchDays(){
-  if(!state.leftoverLunchOn) return [];
+// I giorni scelti (una scelta sola per tutte le settimane): in una settimana
+// valgono solo quelli che hanno davvero una cena di ieri.
+function leftoverDaysRaw(){
   const a = state.weekLeftoverDays;
-  return Array.isArray(a) ? a.filter(d => leftoverEligible().includes(d)) : leftoverEligible();
+  return Array.isArray(a) ? a.slice() : [0,1,2,3,4,5,6];
 }
-function weekPlanSlots(){
+function leftoverLunchDays(weekIdx){
+  if(!state.leftoverLunchOn) return [];
+  const ok = leftoverEligible(weekIdx);
+  return leftoverDaysRaw().filter(d => ok.includes(d));
+}
+function weekPlanSlots(weekIdx){
   const slots = [];
   for(let day = 0; day < 7; day++){
-    if(!leftoverLunchDays().includes(day)) slots.push({ day, meal:'pranzo' });
+    if(!leftoverLunchDays(weekIdx).includes(day)) slots.push({ day, meal:'pranzo' });
     slots.push({ day, meal:'cena' });
   }
   return slots; // nell'ordine in cui si mangia (pranzi lun-gio a parte: sono avanzi)
 }
 // Sequenza dei 14 pasti mangiati: indice nello slots + se è un avanzo.
-function weekEatenSequence(slots){
+function weekEatenSequence(slots, weekIdx){
   const idx = (day, meal) => slots.findIndex(s => s.day === day && s.meal === meal);
   const seq = [];
   for(let day = 0; day < 7; day++){
-    if(leftoverLunchDays().includes(day)) seq.push({ slot: idx((day + 6) % 7, 'cena'), leftover: true });
+    if(leftoverLunchDays(weekIdx).includes(day)){
+      // L'avanzo del primo giorno viene dalla settimana prima: qui non conta.
+      if(day !== WEEK_DISPLAY_ORDER[0]) seq.push({ slot: idx((day + 6) % 7, 'cena'), leftover: true });
+    }
     else seq.push({ slot: idx(day, 'pranzo'), leftover: false });
     seq.push({ slot: idx(day, 'cena'), leftover: false });
   }
@@ -4855,8 +4874,8 @@ function pickWeekRecipes(fixed, weekIdx){
     return limited.length ? limited : list; // rispetta il tetto se possibile
   };
 
-  const slots = weekPlanSlots();
-  const seq = weekEatenSequence(slots);
+  const slots = weekPlanSlots(weekIdx);
+  const seq = weekEatenSequence(slots, weekIdx);
   const pantryCtx = buildPantryPlanContext(weekIdx, slots);
   const fixedAt = slots.map(s => fixed[`${s.day}_${s.meal}`] || null);
   const fixedNames = new Set(fixedAt.filter(Boolean).map(r => r.nome));
@@ -5436,7 +5455,7 @@ function generateWeek(weekIdx){
   const fixed = {};
   lockedMeals.forEach(({i, meal, data, link, past, lockedNames})=>{
     const meta = !link && data.principale && (past || lockedNames.includes(data.principale)) ? getRecipeMeta(data.principale) : null;
-    if(meta && (meal === 'cena' || !leftoverLunchDays().includes(i))) fixed[`${i}_${meal}`] = meta;
+    if(meta && (meal === 'cena' || !leftoverLunchDays(weekIdx).includes(i))) fixed[`${i}_${meal}`] = meta;
   });
   const days = pickWeekRecipes(fixed, weekIdx);
   const baseline = {};
@@ -5465,18 +5484,30 @@ function generateWeek(weekIdx){
   // Dom(6)cena->Lun(0)pranzo, Lun(0)cena->Mar(1)pranzo, Mar(1)cena->Mer(2)pranzo,
   // Mer(2)cena->Gio(3)pranzo. È un link come uno scelto a mano con "è avanzo
   // di": sostituibile/rimuovibile allo stesso identico modo.
-  leftoverLunchDays().forEach(i => {
+  leftoverLunchDays(weekIdx).forEach(i => {
+    if(i === WEEK_DISPLAY_ORDER[0]){
+      // Primo giorno: avanzo dell'ultima cena della settimana prima (che deve
+      // coprire anche questo pranzo: porzioni in più, una volta sola).
+      const src = firstDayLeftoverSource(weekIdx);
+      if(!src) return;
+      state.dayLinks[`${weekIdx}_${i}_pranzo`] = src;
+      const want = defaultPortions() + leftoverPortionsN();
+      const { weekIdx: sw, i: si, meal: sm } = parseMealKey(src);
+      const m = effectiveMeal(sw, si, sm);
+      if(m && m.principale && mealPortions(src, m.principale) < want) state.dayPortions[src] = want;
+      return;
+    }
     const sourceDay = (i - 1 + 7) % 7;
     state.dayLinks[`${weekIdx}_${i}_pranzo`] = `${weekIdx}_${sourceDay}_cena`;
   });
   // Porzioni di base: 2, tranne le cene "apripista" di Dom/Lun/Mar/Mer (indici
   // 6,0,1,2 — quelle da cui Lun-Gio pranzo prende l'avanzo), che partono a 3
   // per coprire anche il pranzo del giorno dopo.
-  const sourceDays = leftoverLunchDays().map(d => (d + 6) % 7);
+  const sourceDays = leftoverLunchDays(weekIdx).filter(d => d !== WEEK_DISPLAY_ORDER[0]).map(d => (d + 6) % 7);
   for(let i = 0; i < 7; i++){
     const basePor = defaultPortions();
     state.dayPortions[`${weekIdx}_${i}_cena`] = sourceDays.includes(i) ? basePor + leftoverPortionsN() : basePor;
-    if(!leftoverLunchDays().includes(i)) state.dayPortions[`${weekIdx}_${i}_pranzo`] = basePor;
+    if(!leftoverLunchDays(weekIdx).includes(i)) state.dayPortions[`${weekIdx}_${i}_pranzo`] = basePor;
   }
   // Ripristino i pasti bloccati: stessa ricetta/contorni di prima nella
   // baseline appena generata, ed eventuale link avanzo preservato al posto
@@ -7722,7 +7753,7 @@ function renderMenu(){
       let lockedCount = 0, pastCount = 0, totalMeals = 0;
       for(let d = 0; d < 7; d++){
         ['pranzo','cena'].forEach(m=>{
-          if(m === 'pranzo' && leftoverLunchDays().includes(d)) return;
+          if(m === 'pranzo' && leftoverLunchDays(genSettingsTargetWeek).includes(d)) return;
           totalMeals++;
           if(isMealPast(genSettingsTargetWeek, d, m)) pastCount++;
           else if(state.mealLocked[`${genSettingsTargetWeek}_${d}_${m}`]) lockedCount++;
@@ -7734,7 +7765,8 @@ function renderMenu(){
     }
     const tempoChipLabel = { express:'≤20 min', veloce:'30 min', normale:'30–45 min', lunga:'1 h', progetto:'oltre 1 h' };
     const dayInitial = d => DATA.week1[d].giorno.slice(0, 1);
-    const cookedLunches = 7 - leftoverLunchDays().length;
+    const lw = genSettingsTargetWeek !== null ? genSettingsTargetWeek : 0;
+    const cookedLunches = 7 - leftoverLunchDays(lw).length;
     const hintText = genSettingsTargetWeek === 0
       ? `${state.genTwoWeeks ? 'Per ciascuna settimana: ' : ''}${7 + cookedLunches} ricette di stagione: 7 cene${cookedLunches ? ` e ${cookedLunches} ${cookedLunches === 1 ? 'pranzo' : 'pranzi'}` : ''}.`
       : '';
@@ -7759,10 +7791,10 @@ function renderMenu(){
           <div class="gen-group">
             <div class="gen-label">Pranzo con l'avanzo della sera prima</div>
             <div class="gen-days gen-leftover-days">${[0,1,2,3,4,5,6].map(d => {
-              const eligible = leftoverEligible().includes(d), on = leftoverLunchDays().includes(d);
+              const eligible = leftoverEligible(lw).includes(d), on = leftoverLunchDays(lw).includes(d);
               return `<button type="button" class="gen-day${on ? ' active' : ''}"${eligible ? ` data-gen-leftover-day="${d}" aria-pressed="${on}"` : ` disabled title="${escapeAttr(dayNameOf(d))}, primo giorno della settimana, il pranzo si cucina sempre"`} aria-label="${escapeAttr(DATA.week1[d].giorno)}">${escapeHtml(dayInitial(d))}</button>`;
             }).join('')}</div>
-            <p class="gen-note">${escapeHtml(dayNameOf(WEEK_DISPLAY_ORDER[0]))} non c'è: è il primo giorno della settimana, il pranzo si cucina sempre.</p>
+            <p class="gen-note">${leftoverEligible(lw).includes(WEEK_DISPLAY_ORDER[0]) ? `${escapeHtml(dayNameOf(WEEK_DISPLAY_ORDER[0]))} usa l'avanzo dell'ultima cena della settimana prima.` : `${escapeHtml(dayNameOf(WEEK_DISPLAY_ORDER[0]))} non c'è: è il primo giorno della settimana, il pranzo si cucina sempre.`}</p>
           </div>
           <div class="gen-group gen-row">
             <div class="gen-label">Porzioni per ogni avanzo</div>
@@ -11170,7 +11202,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-gen-leftover-day]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const d = parseInt(btn.dataset.genLeftoverDay, 10);
-      const cur = leftoverLunchDays();
+      const cur = leftoverDaysRaw();
       state.weekLeftoverDays = (cur.includes(d) ? cur.filter(x => x !== d) : cur.concat(d)).sort((a, b) => a - b);
       persist(); render();
     });
