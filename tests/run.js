@@ -4512,6 +4512,29 @@ test('Lomo saltado: ricetta del catalogo (piatto unico, carne) con fonte, e fini
   eq(r.doppio, 1);
 });
 
+test('Modifica ricetta: una quantità a parole ("2 grandi", "500 g di polpa") si divide in numero + unità e nota; il Lomo saltado ha quantità vere', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    out.split = ['2 grandi', '500 g di polpa', '3 tazze, già cotto', 'q.b.', '1/2 cucchiaino', 'mezzo bicchiere', '4 spicchi', '1, tagliata a tocchetti'].map(t => { const x = splitQtyForEdit(t); return x.qta + '|' + x.extra; });
+    out.lomo = getIngredientsFor('Lomo saltado').filter(i => ['Pomodori', 'Cipolla rossa', 'Patate', 'Riso'].includes(i.ingrediente)).map(i => i.ingrediente + ':' + i.qta + ':' + (i.note || ''));
+    // pannello: numero + unità sempre (non il testo libero), nota già compilata
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.customRecipes['Prova qta'] = { nome: 'Prova qta' }; state.recipeEdits['Prova qta'] = { ingredienti: [{ ingrediente: 'Pomodori', qta: '2 grandi' }] };
+    state.tab = 'prep'; state.recipeEditName = 'Prova qta'; render();
+    document.querySelector('[data-edit-ing-open]').click();
+    const sh = document.querySelector('.edit-ing-sheet');
+    out.pannello = [!!sh.querySelector('.edit-ing-num'), !!sh.querySelector('.edit-ing-unit'), !sh.querySelector('.edit-ing-qta'), sh.querySelector('.edit-ing-num').value, sh.querySelector('.edit-ing-note').value];
+    document.querySelector('[data-edit-ing-done]').click();
+    out.riga = document.querySelector('#edit-ing-list .edit-ing-row').dataset.qta + '|' + document.querySelector('#edit-ing-list .edit-ing-row').dataset.note;
+    state.recipeEditName = null; delete state.recipeEdits['Prova qta']; delete state.customRecipes['Prova qta']; render();
+    return out;
+  });
+  eq(r.split, ['2|grandi', '500 g|di polpa', '3|tazze, già cotto', 'q.b.|', '1/2 cucchiaino|', 'mezzo bicchiere|', '4 spicchi|', '1|tagliata a tocchetti']);
+  eq(r.lomo.sort(), ['Cipolla rossa:1:grande', 'Patate:4:grandi', 'Pomodori:2:grandi', 'Riso:160 g:3 tazze di riso già cotto']);
+  eq(r.pannello, [true, true, true, '2', 'grandi']);
+  eq(r.riga, '2|grandi');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

@@ -6267,6 +6267,22 @@ function parseQtyForEdit(text){
   const hit = QTY_UNIT_OPTIONS.find(u => u[0] && (u[1] === rest || u[2] === rest));
   return hit ? { ok: true, num: String(n), unit: hit[0] } : { ok: false };
 }
+// Una quantità scritta a parole ("2 grandi", "500 g di polpa") si divide in
+// quantità vera (numero + unità, che combacia con Dispensa e Spesa) e il resto,
+// che diventa nota. Senza un numero in testa resta com'è.
+function splitQtyForEdit(text){
+  const t = String(text || '').trim();
+  if(!t || parseQtyForEdit(t).ok) return { qta: t, extra: '' };
+  const m = t.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)\s*(.*)$/);
+  if(!m) return { qta: t, extra: '' };
+  const rest = m[2].trim(), low = rest.toLowerCase();
+  const names = [];
+  QTY_UNIT_OPTIONS.forEach(u => { if(u[0]){ names.push(u[1]); names.push(u[2]); } });
+  names.sort((a, b) => b.length - a.length);
+  const hit = names.find(n => low.startsWith(n) && !/[a-zàèéìòù]/.test(low.charAt(n.length) || ' '));
+  if(hit) return { qta: `${m[1]} ${rest.slice(0, hit.length)}`, extra: rest.slice(hit.length).replace(/^[\s,;:\-–]+/, '').trim() };
+  return { qta: m[1], extra: rest.replace(/^[\s,;:\-–]+/, '').trim() };
+}
 function buildQtyFromEdit(num, unit){
   const n = String(num || '').trim();
   if(unit === 'q.b.') return 'q.b.';
@@ -6359,6 +6375,8 @@ function openEditIngSheet(row){
   const rows = [...document.querySelectorAll('#edit-ing-list .edit-ing-row')];
   const d = row.dataset;
   const isNew = !d.ing;
+  const sq = splitQtyForEdit(d.qta);
+  const noteStart = d.note || sq.extra;
   const bd = document.createElement('div');
   bd.className = 'move-backdrop edit-ing-backdrop';
   bd.innerHTML = `
@@ -6375,12 +6393,12 @@ function openEditIngSheet(row){
         <div class="edit-ing-field"><label class="edit-ing-lab">Nome</label>
           <input type="text" class="edit-ing-name" placeholder="Ingrediente" value="${escapeAttr(d.ing || '')}"></div>
         <div class="edit-ing-field"><label class="edit-ing-lab">Quantità</label>
-          <div class="edit-ing-fields">${editIngQtyHtml(d.qta)}</div></div>
+          <div class="edit-ing-fields">${editIngQtyHtml(sq.qta)}</div></div>
         <div class="edit-ing-field"><label class="edit-ing-lab">Quale parte</label>
           <div class="edit-ing-qualbox">${editIngQualHtml(d.ing, d.qual)}</div>
           <p class="edit-ing-hint">Es. scorza, succo, solo i gambi. Lascia vuoto se serve tutto.</p></div>
         <div class="edit-ing-field"><label class="edit-ing-lab">Nota <span class="edit-ing-opt">· facoltativa</span></label>
-          <input type="text" class="edit-ing-note" maxlength="60" autocomplete="off" aria-label="Nota sull'ingrediente" value="${escapeAttr(d.note || '')}">
+          <input type="text" class="edit-ing-note" maxlength="60" autocomplete="off" aria-label="Nota sull'ingrediente" value="${escapeAttr(noteStart)}">
           <p class="edit-ing-hint">Es. “non trattati”, “bio”, “ben maturi”.</p></div>
       </div>
       <div class="edit-ing-footer">
