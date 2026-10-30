@@ -1518,6 +1518,8 @@ function renameStringsInTree(node, from, to){
 function renameRecipeRefs(from, to){
   ['weekBaseline','weekOverrides','weekOverridePicked','extraWeeks','dishPlan','freezerDishes'].forEach(f=>{ if(state[f]) renameStringsInTree(state[f], from, to); });
   (state.cookbooks || []).forEach(cb=>{ if(Array.isArray(cb.recipes)) cb.recipes = cb.recipes.map(n => n === from ? to : n); });
+  Object.values(state.recipeEdits || {}).forEach(e => { if(e && Array.isArray(e.ripieni)) e.ripieni = e.ripieni.map(n => n === from ? to : n); });
+  Object.values(state.customRecipes || {}).forEach(c => { if(c && Array.isArray(c.ripieni)) c.ripieni = c.ripieni.map(n => n === from ? to : n); });
   if(state.expandedRecipe === from) state.expandedRecipe = to;
 }
 function moveRecipeKeys(from, to){
@@ -6487,6 +6489,29 @@ function editStepRowHtml(text){
 // Pagina "Modifica ricetta" (non più una modale), condivisa da Menù e Prep (stessa pagina,
 // stesso state.recipeEdits): qualsiasi modifica è quindi automaticamente
 // visibile in entrambe le tab, non serve tenerle sincronizzate a mano.
+// Impasti e ripieni (es. empanadas): l'impasto elenca i ripieni possibili
+// (campo "ripieni"), e un pasto con l'impasto ha sempre almeno un ripieno. Dal
+// modulo si gestisce da entrambe le parti: sull'impasto "Ripieni possibili",
+// sul ripieno "Si usa con". I due gruppi si alternano secondo la portata.
+function recipeImpasti(){ return allRecipeMetas().filter(r => Array.isArray(r.ripieni) && r.ripieni.length).map(r => r.nome); }
+function editRipieniGroupsHtml(name, rec){
+  const isRip = (rec.tipologia || 'primo') === 'ripieno';
+  const ripieni = allRecipeMetas().filter(r => r.tipologia === 'ripieno' && r.nome !== name).map(r => r.nome).sort(IT_COLLATOR.compare);
+  const impasti = recipeImpasti().filter(n => n !== name).sort(IT_COLLATOR.compare);
+  const mine = new Set(Array.isArray(rec.ripieni) ? rec.ripieni : []);
+  const row = (attr, n, on) => `<label class="edit-fixed-qty"><input type="checkbox" ${attr}="${escapeAttr(n)}"${on ? ' checked' : ''}><span>${escapeHtml(n)}</span></label>`;
+  return `
+          <div class="filter-group" id="edit-ripieni-group"${isRip ? ' hidden' : ''}>
+            <div class="filter-group-label">🥟 Ripieni possibili</div>
+            <p class="settings-note">Per un impasto: sceglie i ripieni che si abbinano. Con almeno uno, questa ricetta va nel menù sempre con un ripieno.</p>
+            ${ripieni.length ? ripieni.map(n => row('data-ripieno-opt', n, mine.has(n))).join('') : '<p class="settings-note">Nessuna ricetta con portata "Ripieno" per ora: creane una e scegli la portata "Ripieno".</p>'}
+          </div>
+          <div class="filter-group" id="edit-siusacon-group"${isRip ? '' : ' hidden'}>
+            <div class="filter-group-label">🥟 Si usa con</div>
+            <p class="settings-note">Gli impasti a cui questo ripieno si abbina.</p>
+            ${impasti.length ? impasti.map(n => row('data-impasto-opt', n, recipeRipieni(n).includes(name) || (getRecipeMeta(n).ripieni || []).includes(name))).join('') : '<p class="settings-note">Nessun impasto ancora: apri la ricetta di un impasto e scegli i suoi ripieni.</p>'}
+          </div>`;
+}
 function renderRecipeEditModal(){
   if(!state.recipeEditName) return '';
   const name = state.recipeEditName;
@@ -6539,6 +6564,7 @@ function renderRecipeEditModal(){
               ${TIPO_ORDER.map(t=>`<option value="${t}" ${(rec.tipologia||'primo')===t?'selected':''}>${tipoIcon(t)} ${escapeHtml(TIPO_LABEL[t])}</option>`).join('')}
             </select>
           </div>
+          ${editRipieniGroupsHtml(name, rec)}
           <div class="filter-group">
             <div class="filter-group-label">${uiIcon('heart')} Gradimento</div>
             <select id="edit-gradimento">
@@ -11895,6 +11921,12 @@ function attachHandlers(){
     // si sta scrivendo negli altri campi (a differenza del resto dell'app, che
     // ri-renderizza tutto a ogni modifica).
     recipeEditModal.addEventListener('change', e=>{
+      if(e.target.id === 'edit-tipologia'){
+        const rip = e.target.value === 'ripieno';
+        const a = document.getElementById('edit-ripieni-group'), b = document.getElementById('edit-siusacon-group');
+        if(a) a.hidden = rip;
+        if(b) b.hidden = !rip;
+      }
       if(e.target.matches && e.target.matches('.edit-ing-qual') && e.target.value === '__new') switchEditIngQualToNew(e.target);
     });
     ['input', 'change', 'focusout', 'click'].forEach(ev => recipeEditModal.addEventListener(ev, e=>{
@@ -11969,6 +12001,18 @@ function attachHandlers(){
         freezer: document.getElementById('edit-freezer-note').value.trim(),
         link: document.getElementById('edit-link').value.trim()
       };
+      // Impasti e ripieni: dal modulo di un impasto i suoi ripieni, da quello di un ripieno gli impasti.
+      if(document.getElementById('edit-tipologia').value === 'ripieno'){
+        state.recipeEdits[name].ripieni = [];
+        document.querySelectorAll('[data-impasto-opt]').forEach(cb => {
+          const imp = cb.dataset.impastoOpt;
+          const cur = (getRecipeMeta(imp) || {}).ripieni || [];
+          const next = cb.checked ? cur.concat(cur.includes(name) ? [] : [name]) : cur.filter(n => n !== name);
+          if(next.length !== cur.length || next.some((n, k) => n !== cur[k])) state.recipeEdits[imp] = Object.assign({}, state.recipeEdits[imp] || {}, { ripieni: next });
+        });
+      } else {
+        state.recipeEdits[name].ripieni = [...document.querySelectorAll('[data-ripieno-opt]')].filter(cb => cb.checked).map(cb => cb.dataset.ripienoOpt);
+      }
       state.recipeEditName = null;
       persist(); render();
     });

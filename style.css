@@ -2806,3 +2806,5 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Modifica ricetta: spunta "quantità fisse" sotto le porzioni. */
 .edit-fixed-qty{ display:flex; align-items:flex-start; gap:var(--s2); margin-top:var(--s2); font-size:var(--text-small); color:var(--ink-light); cursor:pointer; }
 .edit-fixed-qty input{ flex:none; width:1.25rem; height:1.25rem; margin:0.05rem 0 0; accent-color:var(--accent); }
+
+.filter-group[hidden]{ display:none; }
