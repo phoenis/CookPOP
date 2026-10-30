@@ -26,14 +26,14 @@ const CAT_ORDER = ['pasta','riso','carne','pesce','legumi','uova','verdure','for
 // "carne" come categoria ma "secondo" come tipologia, e da sola non basta —
 // serve un contorno abbinato. Le due classificazioni convivono, non si
 // sovrappongono.
-const TIPO_LABEL = { antipasto:'Antipasto', primo:'Primo', secondo:'Secondo', contorno:'Contorno', unico:'Piatto unico', dolce:'Dolce' };
-const TIPO_ICON = { antipasto:'🥗', primo:'🍜', secondo:'🍖', contorno:'🥕', unico:'🍽️', dolce:'🍰' };
+const TIPO_LABEL = { antipasto:'Antipasto', ripieno:'Ripieno', primo:'Primo', secondo:'Secondo', contorno:'Contorno', unico:'Piatto unico', dolce:'Dolce' };
+const TIPO_ICON = { antipasto:'🥗', ripieno:'🥟', primo:'🍜', secondo:'🍖', contorno:'🥕', unico:'🍽️', dolce:'🍰' };
 function tipoIcon(t){ return TIPO_ICON[t] || '🍴'; }
 // "dolce" è un valore di tipologia valido come gli altri (compare nei filtri,
 // nell'editor ricetta) ma pickWeekRecipes lo esclude a monte dal pool di
 // candidati per il principale di un pasto — un dolce non deve mai poter
 // finire scelto come piatto forte di pranzo/cena dal generatore automatico.
-const TIPO_ORDER = ['antipasto','primo','secondo','contorno','unico','dolce'];
+const TIPO_ORDER = ['antipasto','ripieno','primo','secondo','contorno','unico','dolce'];
 
 const MEAL_LABEL = { pranzo:'Pranzo', cena:'Cena' };
 
@@ -5034,7 +5034,7 @@ function restoreMealLinks(snap){
 // resta l'ordine in cui sono stati aggiunti. Il piatto unico sta tra primo e
 // secondo; una ricetta fuori catalogo (senza portata) va in fondo.
 const ICON_SWAP = '<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 256 256"><path fill="currentColor" d="M228 48v48a12 12 0 0 1-12 12h-48a12 12 0 0 1 0-24h19l-7.8-7.8a75.55 75.55 0 0 0-53.32-22.26h-.43a75.5 75.5 0 0 0-53.06 21.63a12 12 0 1 1-16.78-17.16a99.38 99.38 0 0 1 69.87-28.47h.52a99.42 99.42 0 0 1 70.2 29.29L204 67V48a12 12 0 0 1 24 0m-44.39 132.43a75.5 75.5 0 0 1-53.09 21.63h-.43a75.55 75.55 0 0 1-53.32-22.26L69 172h19a12 12 0 0 0 0-24H40a12 12 0 0 0-12 12v48a12 12 0 0 0 24 0v-19l7.8 7.8a99.42 99.42 0 0 0 70.2 29.26h.56a99.38 99.38 0 0 0 69.87-28.47a12 12 0 0 0-16.78-17.16Z"></path></svg>';
-const COURSE_ORDER = ['antipasto','primo','unico','secondo','contorno','dolce'];
+const COURSE_ORDER = ['antipasto','ripieno','primo','unico','secondo','contorno','dolce'];
 function dishCourse(name){
   const r = getRecipeMeta(name);
   return (r && r.tipologia) || '';
@@ -5107,7 +5107,45 @@ function forgetDish(weekIdx, i, meal, name){
   dropDishPlan(key, name);
   setFreezerDish(key, name, false);
 }
+// Ricette che vogliono un ripieno (campo "ripieni" della ricetta, es. l'impasto
+// delle empanadas): il pasto che le contiene deve avere almeno uno dei loro
+// ripieni. Con una sola scelta si aggiunge da sé; con più scelte si sceglie
+// (vedi dishPicker.require); se manca, il pasto lo dice.
+function recipeRipieni(name){
+  const r = getRecipeMeta(name);
+  return r && Array.isArray(r.ripieni) ? r.ripieni.filter(n => getRecipeMeta(n)) : [];
+}
+function mealMissingRipieno(weekIdx, i, meal){
+  const names = mealDishes(weekIdx, i, meal).map(d => d.name);
+  return names.map(n => ({ name: n, options: recipeRipieni(n) })).filter(x => x.options.length && !x.options.some(o => names.includes(o)));
+}
+function autoFillRipieni(weekIdx, i, meal){
+  for(let g = 0; g < 6; g++){
+    const one = mealMissingRipieno(weekIdx, i, meal).find(x => x.options.length === 1);
+    if(!one) break;
+    addMealDishRaw(weekIdx, i, meal, one.options[0]);
+  }
+  return mealMissingRipieno(weekIdx, i, meal);
+}
+// Un ripieno che nessun altro piatto del pasto richiede più (tolto l'impasto) se ne va con lui.
+function dropOrphanRipieni(weekIdx, i, meal, oldName){
+  recipeRipieni(oldName).forEach(o => {
+    const names = mealDishes(weekIdx, i, meal).map(d => d.name);
+    if(!names.includes(o)) return;
+    if(names.some(n => n !== o && recipeRipieni(n).includes(o))) return;
+    removeMealDishRaw(weekIdx, i, meal, o, true);
+  });
+}
+// Il ripieno che regge un impasto del pasto non si toglie da solo.
+function lastRipienoOf(weekIdx, i, meal, name){
+  const names = mealDishes(weekIdx, i, meal).map(d => d.name);
+  return names.find(n => n !== name && recipeRipieni(n).includes(name) && !recipeRipieni(n).some(o => o !== name && names.includes(o))) || null;
+}
 function addMealDish(weekIdx, i, meal, name){
+  addMealDishRaw(weekIdx, i, meal, name);
+  return autoFillRipieni(weekIdx, i, meal);
+}
+function addMealDishRaw(weekIdx, i, meal, name){
   const m = effectiveMeal(weekIdx, i, meal);
   if(!m.principale){ writeMealDishes(weekIdx, i, meal, name, []); return; }
   if(m.principale === name || m.contorni.includes(name)) return;
@@ -5116,6 +5154,11 @@ function addMealDish(weekIdx, i, meal, name){
 }
 // Sostituisce un solo piatto, lasciando gli altri come sono.
 function replaceMealDish(weekIdx, i, meal, oldName, newName){
+  replaceMealDishRaw(weekIdx, i, meal, oldName, newName);
+  dropOrphanRipieni(weekIdx, i, meal, oldName);
+  return autoFillRipieni(weekIdx, i, meal);
+}
+function replaceMealDishRaw(weekIdx, i, meal, oldName, newName){
   const m = effectiveMeal(weekIdx, i, meal);
   if(oldName === newName) return;
   if(m.principale === oldName && linkedSourceMealKey(weekIdx, i, meal)) return; // l'avanzo segue la sua fonte
@@ -5139,6 +5182,17 @@ function replaceMealDish(weekIdx, i, meal, oldName, newName){
 // Toglie un piatto. Se era il principale, il primo degli altri ne prende il
 // posto; se era l'unico piatto, il pasto si svuota (come "Svuota il pasto").
 function removeMealDish(weekIdx, i, meal, name){
+  const holder = lastRipienoOf(weekIdx, i, meal, name);
+  if(holder){ showNotice(`Serve almeno un ripieno per «${holder}»: per toglierlo, togli prima l'impasto.`); return; }
+  const snap0 = snapshotMealDishes(weekIdx, i, meal);
+  const hadOrphans = recipeRipieni(name).some(o => mealDishes(weekIdx, i, meal).some(d => d.name === o));
+  removeMealDishRaw(weekIdx, i, meal, name, hadOrphans);
+  if(!hadOrphans) return;
+  dropOrphanRipieni(weekIdx, i, meal, name);
+  persist(); render();
+  showUndoToast('Piatto tolto', ()=>{ restoreMealDishes(weekIdx, i, meal, snap0); persist(); render(); });
+}
+function removeMealDishRaw(weekIdx, i, meal, name, quiet){
   const key = mealKey(weekIdx, i, meal);
   const m = effectiveMeal(weekIdx, i, meal);
   if(m.principale === name){
@@ -5147,6 +5201,7 @@ function removeMealDish(weekIdx, i, meal, name){
     const snap = snapshotMealDishes(weekIdx, i, meal);
     forgetDish(weekIdx, i, meal, name);
     writeMealDishes(weekIdx, i, meal, m.contorni[0], m.contorni.slice(1));
+    if(quiet) return;
     persist(); render();
     showUndoToast('Piatto tolto', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
     return;
@@ -5156,6 +5211,7 @@ function removeMealDish(weekIdx, i, meal, name){
   const snap = snapshotMealDishes(weekIdx, i, meal);
   forgetDish(weekIdx, i, meal, name);
   setMealContorni(weekIdx, i, meal, (linked ? m.ownExtras : m.contorni).filter(c => c !== name));
+  if(quiet) return;
   persist(); render();
   showUndoToast('Piatto tolto', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
 }
@@ -6031,7 +6087,7 @@ const MODAL_CHECKS = [
   [()=> !!state.swapOpenDay, ()=>{ state.swapOpenDay = null; }],
   [()=> !!state.linkPickerOpenDay, ()=>{ state.linkPickerOpenDay = null; }],
   [()=> !!state.avanzoDiPickerOpenDay, ()=>{ state.avanzoDiPickerOpenDay = null; }],
-  [()=> !!state.dishPicker, ()=>{ state.dishPicker = null; }],
+  [()=> !!state.dishPicker, ()=>{ closeDishPicker(); }],
   [()=> !!state.expandedRecipe && !!state.recipeMenuOpen, ()=>{ state.recipeMenuOpen = false; }],
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
   [()=> !!state.cookbookMenuOpen, ()=>{ state.cookbookMenuOpen = false; }],
@@ -6233,12 +6289,14 @@ function showUndoToast(message, undoFn){
   render();
   undoToastTimer = setTimeout(()=>{ state.undoToast = null; render(); }, TOAST_MS);
 }
+// Un avviso senza "Annulla".
+function showNotice(message){ showUndoToast(message, null); }
 function renderUndoToast(){
   if(!state.undoToast) return '';
   return `
   <div class="undo-toast">
     <span class="undo-toast-message">${escapeHtml(state.undoToast.message)}</span>
-    <button type="button" class="btn is-text undo-toast-btn" data-undo-toast>Annulla</button>
+    ${state.undoToast.undoFn ? '<button type="button" class="btn is-text undo-toast-btn" data-undo-toast>Annulla</button>' : ''}
   </div>`;
 }
 
@@ -6607,6 +6665,7 @@ function reuseNotesFor(weekIdx, i, meal){
 }
 function mealNotesHtml(weekIdx, i, meal, dishes){
   const notes = reuseNotesFor(weekIdx, i, meal).map(t => ({ t, hot: true }));
+  mealMissingRipieno(weekIdx, i, meal).forEach(x => notes.unshift({ t: `Manca il ripieno per «${x.name}»: aggiungilo con + piatto.`, hot: true }));
   // Un avanzo è già cucinato: i promemoria di preparazione (ammollo, marinatura…) non servono.
   const isLeftover = !!linkedSourceMealKey(weekIdx, i, meal);
   if(!isLeftover) dishes.forEach(dsh=>{
@@ -7027,6 +7086,17 @@ function defaultDishCourse(dishes){
   if(have.has('primo') || have.has('secondo')) return have.has('contorno') ? (have.has('antipasto') ? 'dolce' : 'antipasto') : 'contorno';
   return have.has('contorno') ? 'secondo' : 'contorno';
 }
+// Chiudere la scelta del ripieno obbligatorio annulla anche l'impasto appena aggiunto.
+function closeDishPicker(){
+  const dp = state.dishPicker;
+  if(!dp) return;
+  if(dp.require){
+    const { weekIdx, i, meal } = parseMealKey(dp.key);
+    removeMealDishRaw(weekIdx, i, meal, dp.require, true);
+    persist();
+  }
+  state.dishPicker = null;
+}
 function renderDishPickerScreen(){
   const dp = state.dishPicker;
   const { weekIdx, i, meal } = parseMealKey(dp.key);
@@ -7060,6 +7130,7 @@ function renderDishPickerScreen(){
   } else if(dp.tipo === 'freezer') results = results.filter(r => frozenNames.has(r.nome));
   else if(dp.tipo !== 'all') results = results.filter(r => r.tipologia === dp.tipo);
   if(search) results = results.filter(r => r.nome.toLowerCase().includes(search.toLowerCase()));
+  if(dp.require){ const ok = recipeRipieni(dp.require); results = results.filter(r => ok.includes(r.nome)); }
   // "Con quello che ho": prima chi ha tutto in casa, poi a cui manca poco
   // (almeno metà degli ingredienti), dal meno al più mancante.
   const pantryMatches = {};
@@ -7085,18 +7156,18 @@ function renderDishPickerScreen(){
   const curHtml = dp.replace ? `<div class="dsh-cur"><span class="dsh-cur-ic" aria-hidden="true">${tipoIcon(replaced ? replaced.tipo : dishCourse(dp.replace))}</span><span>Al posto di <b>${escapeHtml(dp.replace)}</b></span></div>` : '';
   return `
   <div class="move-backdrop" data-dish-picker-backdrop>
-    <div class="move-sheet dish-sheet" role="dialog" aria-label="${dp.replace ? 'Cambia piatto' : 'Aggiungi piatto'}">
+    <div class="move-sheet dish-sheet" role="dialog" aria-label="${dp.require ? 'Scegli il ripieno' : dp.replace ? 'Cambia piatto' : 'Aggiungi piatto'}">
       <div class="move-handle" aria-hidden="true"></div>
       <div class="dsh-head">
         <div class="dsh-head-text">
           <span class="dsh-kicker">${escapeHtml(MEAL_LABEL[meal])} · ${escapeHtml(d.giorno.slice(0,3).toLowerCase())} ${escapeHtml(dateLabel.toLowerCase())} · max ${escapeHtml(tempoShortLabel(getTempoCap(i, meal)).replace(/^circa\s+/, ''))}</span>
-          <h2 class="move-title">${dp.replace ? 'Cambia piatto' : 'Aggiungi piatto'}</h2>
+          <h2 class="move-title">${dp.require ? 'Scegli il ripieno' : dp.replace ? 'Cambia piatto' : 'Aggiungi piatto'}</h2>
         </div>
         <button type="button" class="btn is-icon dsh-close" data-close-dish-picker aria-label="Chiudi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
       ${curHtml}
       <label class="dsh-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></svg><input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-dish-search="${mk}" value="${escapeAttr(search)}" autocomplete="off"></label>
-      <div class="dsh-chips dish-course-chips" role="group" aria-label="Portata">${chips}</div>
+      ${dp.require ? `<p class="gen-note dsh-require">«${escapeHtml(dp.require)}» ha bisogno di un ripieno: scegline uno. Se chiudi, anche l'impasto viene tolto.</p>` : `<div class="dsh-chips dish-course-chips" role="group" aria-label="Portata">${chips}</div>`}
       <div class="swap-results dsh-results">
         ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
         ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
@@ -13292,7 +13363,7 @@ document.addEventListener('click', e=>{
     render();
     return;
   }
-  if(e.target.closest('[data-close-dish-picker]') || (e.target.matches && e.target.matches('[data-dish-picker-backdrop]'))){ state.dishPicker = null; render(); return; }
+  if(e.target.closest('[data-close-dish-picker]') || (e.target.matches && e.target.matches('[data-dish-picker-backdrop]'))){ closeDishPicker(); render(); return; }
   if(e.target.closest('[data-dish-pantry]') && state.dishPicker){ state.dishPicker.pantry = !state.dishPicker.pantry; render(); return; }
   const courseEl = e.target.closest('[data-dish-course]');
   if(courseEl && state.dishPicker){ state.dishPicker.tipo = courseEl.dataset.dishCourse; state.dishPicker.suggestNow = null; render(); return; }
@@ -13303,10 +13374,15 @@ document.addEventListener('click', e=>{
     const name = pickEl.dataset.dishPick;
     const oldName = state.dishPicker.replace;
     const snap = snapshotMealDishes(weekIdx, i, meal);
-    if(oldName) replaceMealDish(weekIdx, i, meal, oldName, name);
-    else addMealDish(weekIdx, i, meal, name);
+    if(oldName){
+      const holder = lastRipienoOf(weekIdx, i, meal, oldName);
+      if(holder && !recipeRipieni(holder).includes(name)){ showNotice(`Serve almeno un ripieno per «${holder}»: scegline un altro tra quelli indicati.`); return; }
+      replaceMealDish(weekIdx, i, meal, oldName, name);
+    } else addMealDish(weekIdx, i, meal, name);
     if(state.dishPicker.tipo === 'freezer') setFreezerDish(mealKey(weekIdx, i, meal), name, true);
-    state.dishPicker = null;
+    // Un impasto con più ripieni possibili: si sceglie subito, senza non si chiude.
+    const stillMissing = mealMissingRipieno(weekIdx, i, meal);
+    state.dishPicker = stillMissing.length ? { key: mealKey(weekIdx, i, meal), replace: null, tipo: 'ripieno', search: '', require: stillMissing[0].name } : null;
     persist(); render();
     if(oldName) showUndoToast('Piatto cambiato', ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
     return;
@@ -14503,6 +14579,7 @@ document.addEventListener('click', e=>{
     if(!principale) return;
     const snap = snapshotMealDishes(weekIdx, i, meal);
     writeMealDishes(weekIdx, i, meal, principale, contorni);
+    autoFillRipieni(weekIdx, i, meal);
     state.cookbookUseOpen = false;
     persist(); render();
     const slot = allMealSlots().find(m => m.key === useSlot.dataset.cookbookUseSlot);

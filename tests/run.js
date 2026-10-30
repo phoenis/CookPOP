@@ -4540,6 +4540,74 @@ test('Modifica ricetta: una quantità a parole ("2 grandi", "500 g di polpa") si
   eq(r.riga, '2|grandi');
 });
 
+test('empanadas: impasto con le tre farine in grammi e un ripieno obbligatorio nel pasto (si aggiunge, non si toglie da solo, se ne va con l\'impasto)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    const IMP = 'Impasto per empanadas', RIP = 'Ripieno di carne per empanadas';
+    const mi = getRecipeMeta(IMP), mr = getRecipeMeta(RIP), di = getRecipeDetails(IMP);
+    out.meta = [mi.tipologia, mi.ripieni, mr.tipologia, /^https:\/\/jameaperu/.test(di.link)];
+    out.farine = getIngredientsFor(IMP).filter(i => /^Farina/.test(i.ingrediente)).map(i => i.ingrediente + ':' + i.qta);
+    state.extraWeeks = []; generateWeek(0); generateWeek(1);
+    const slot = allMealSlots().filter(m => m.weekIdx === 1 && m.meal === 'cena')[3];
+    const names = () => mealDishes(1, slot.i, 'cena').map(d => d.name);
+    // pasto vuoto + impasto: arriva da solo anche l'unico ripieno
+    performClearMeal(mealKey(1, slot.i, 'cena')); render();
+    addMealDish(1, slot.i, 'cena', IMP);
+    out.coppia = names();
+    // il ripieno non si toglie da solo
+    removeMealDish(1, slot.i, 'cena', RIP);
+    out.dopoToglieRipieno = names();
+    out.avviso = (state.undoToast || {}).message || '';
+    // l'impasto se ne va con il suo ripieno
+    removeMealDish(1, slot.i, 'cena', IMP);
+    out.dopoToglieImpasto = names();
+    // Con più ripieni la scelta è obbligata: si apre il foglio, chiuderlo toglie anche l'impasto
+    const extra = Object.assign({}, getRecipeMeta(RIP), { nome: 'Ripieno prova di verdure' });
+    state.customRecipes[extra.nome] = extra;
+    DATA.recipes.find(x => x.nome === IMP).ripieni = [RIP, extra.nome];
+    state.tab = 'menu'; render();
+    const miss = addMealDish(1, slot.i, 'cena', IMP);
+    out.scelta = [names(), miss.length];
+    state.dishPicker = { key: mealKey(1, slot.i, 'cena'), replace: null, tipo: 'ripieno', search: '', require: IMP }; render();
+    const voci = [...document.querySelectorAll('.dish-sheet .swap-result-name')].map(e => e.textContent.trim());
+    out.foglio = [voci.sort(), !!document.querySelector('.dish-sheet .dsh-require'), !document.querySelector('.dish-sheet .dish-course-chips')];
+    closeDishPicker(); render();
+    out.annullato = names();
+    // scegliendo un ripieno resta tutto
+    addMealDish(1, slot.i, 'cena', IMP);
+    state.dishPicker = { key: mealKey(1, slot.i, 'cena'), replace: null, tipo: 'ripieno', search: '', require: IMP }; render();
+    document.querySelector('.dish-sheet [data-dish-pick="Ripieno prova di verdure"]').click();
+    out.scelto = [names(), state.dishPicker];
+    // con due ripieni, uno si può cambiare con l'altro ma non con un piatto qualunque
+    state.dishPicker = { key: mealKey(1, slot.i, 'cena'), replace: 'Ripieno prova di verdure', tipo: null, search: '' }; render();
+    const altro = allRecipeMetas().find(x => x.tipologia === 'secondo').nome;
+    const pick = nome => { const el = document.createElement('div'); el.setAttribute('data-dish-pick', nome); el.setAttribute('data-dish-key', mealKey(1, slot.i, 'cena')); document.body.appendChild(el); el.click(); el.remove(); };
+    pick(altro);
+    out.cambioSbagliato = names().includes('Ripieno prova di verdure');
+    state.dishPicker = { key: mealKey(1, slot.i, 'cena'), replace: 'Ripieno prova di verdure', tipo: null, search: '' }; render();
+    pick(RIP);
+    out.cambioGiusto = names();
+    // pulizia
+    delete state.customRecipes[extra.nome];
+    DATA.recipes.find(x => x.nome === IMP).ripieni = [RIP];
+    performClearMeal(mealKey(1, slot.i, 'cena')); state.dishPicker = null; state.extraWeeks = []; render();
+    return out;
+  });
+  eq(r.meta, ['antipasto', ['Ripieno di carne per empanadas'], 'ripieno', true]);
+  eq(r.farine, ['Farina 00:625 g', 'Farina integrale:190 g', 'Farina di quinoa:190 g']);
+  eq(r.coppia, ['Impasto per empanadas', 'Ripieno di carne per empanadas']);
+  eq(r.dopoToglieRipieno, r.coppia);
+  assert(/almeno un ripieno/.test(r.avviso), 'avviso: ' + r.avviso);
+  eq(r.dopoToglieImpasto, []);
+  eq(r.scelta, [['Impasto per empanadas'], 1]);
+  eq(r.foglio[1], true); eq(r.foglio[2], true);
+  eq(r.foglio[0], ['Ripieno di carne per empanadas', 'Ripieno prova di verdure']);
+  eq(r.annullato, []);
+  eq(r.scelto[0], ['Impasto per empanadas', 'Ripieno prova di verdure']); eq(r.scelto[1], null);
+  assert(r.cambioSbagliato, 'il ripieno non si cambia con un piatto qualunque');
+  eq(r.cambioGiusto, ['Impasto per empanadas', 'Ripieno di carne per empanadas']);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
