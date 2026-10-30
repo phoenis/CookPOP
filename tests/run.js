@@ -4608,6 +4608,48 @@ test('empanadas: impasto con le tre farine in grammi e un ripieno obbligatorio n
   eq(r.cambioGiusto, ['Impasto per empanadas', 'Ripieno di carne per empanadas']);
 });
 
+test('Modifica ricetta: "Ripieni possibili" sull\'impasto e "Si usa con" sul ripieno si gestiscono da entrambe le parti', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    const IMP = 'Impasto per empanadas', RIP = 'Ripieno di carne per empanadas', NEW = 'Ripieno prova di verdure';
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.customRecipes[NEW] = Object.assign({}, getRecipeMeta(RIP), { nome: NEW });
+    state.tab = 'prep';
+    const apri = n => { state.recipeEditName = n; render(); };
+    const vis = id => { const e = document.getElementById(id); return !!e && !e.hidden; };
+    // impasto: gruppo "Ripieni possibili", con il ripieno di carne già spuntato
+    apri(IMP);
+    out.impasto = [vis('edit-ripieni-group'), vis('edit-siusacon-group'), [...document.querySelectorAll('[data-ripieno-opt]')].map(c => c.dataset.ripienoOpt + (c.checked ? '+' : '-')).sort()];
+    document.querySelector('[data-ripieno-opt="' + NEW + '"]').checked = true;
+    document.querySelector('[data-save-recipe-edit]').click();
+    out.dopoImpasto = recipeRipieni(IMP).sort();
+    // ripieno: gruppo "Si usa con", con l'impasto spuntato; si toglie da qui
+    apri(NEW);
+    out.ripieno = [vis('edit-ripieni-group'), vis('edit-siusacon-group'), [...document.querySelectorAll('[data-impasto-opt]')].map(c => c.dataset.impastoOpt + (c.checked ? '+' : '-'))];
+    document.querySelector('[data-impasto-opt="' + IMP + '"]').checked = false;
+    document.querySelector('[data-save-recipe-edit]').click();
+    out.dopoRipieno = recipeRipieni(IMP);
+    // e da qui si rimette
+    apri(NEW);
+    document.querySelector('[data-impasto-opt="' + IMP + '"]').checked = true;
+    document.querySelector('[data-save-recipe-edit]').click();
+    out.rimesso = recipeRipieni(IMP).sort();
+    // cambiando la portata i gruppi si scambiano
+    apri(IMP);
+    const sel = document.getElementById('edit-tipologia'); sel.value = 'ripieno'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+    out.scambio = [vis('edit-ripieni-group'), vis('edit-siusacon-group')];
+    state.recipeEditName = null;
+    delete state.customRecipes[NEW]; delete state.recipeEdits[NEW]; delete state.recipeEdits[IMP]; render();
+    return out;
+  });
+  eq(r.impasto, [true, false, ['Ripieno di carne per empanadas+', 'Ripieno prova di verdure-']]);
+  eq(r.dopoImpasto, ['Ripieno di carne per empanadas', 'Ripieno prova di verdure']);
+  eq(r.ripieno, [false, true, ['Impasto per empanadas+']]);
+  eq(r.dopoRipieno, ['Ripieno di carne per empanadas']);
+  eq(r.rimesso, ['Ripieno di carne per empanadas', 'Ripieno prova di verdure']);
+  eq(r.scambio, [false, true]);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
