@@ -3427,25 +3427,31 @@ test('porzioni di partenza: 3 messo a mano torna a 2 una volta sola; l\'avanzo c
   eq([r.dopo3, r.dopo4, r.def, r.cenaConAvanzo, r.cenaSenza], [2, 4, 2, 3, 2]);
 });
 
-test('Spesa con due settimane: frutta, verdura e latticini della seconda vanno in "Più avanti"; il resto si compra insieme', async ({ page }) => {
+test('Spesa con più settimane: il fresco della prossima si compra nella lista normale, quello di tra due settimane va in "Più avanti"; il resto si compra insieme', async ({ page }) => {
   const r = await page.evaluate(() => {
-    state.pantryItems = {}; state.extraWeeks = []; generateWeek(0); generateWeek(1);
+    state.pantryItems = {}; state.extraWeeks = []; generateWeek(0); generateWeek(1); generateWeek(2);
     const tutte = buildShopFlat().filter(x => x.isRecipe);
     const dept = it => knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente);
-    const freschiSett1 = tutte.filter(x => x.weekIdx === 1 && SHOP_LATER_DEPTS.includes(dept(x)));
-    const altroSett1 = tutte.filter(x => x.weekIdx === 1 && !SHOP_LATER_DEPTS.includes(dept(x)));
+    const fresco = w => tutte.filter(x => x.weekIdx === w && SHOP_LATER_DEPTS.includes(dept(x)));
     state.tab = 'spesa'; state.shopView = 'reparto'; state.shopSearch = ''; render();
     const gruppo = document.querySelector('.shop-later-group');
     const principali = [...document.querySelectorAll('.shop-item-row .item-name')].filter(e => !e.closest('.shop-later-group')).map(e => e.textContent.trim().toLowerCase());
     const piuAvanti = gruppo ? [...gruppo.querySelectorAll('.item-name')].map(e => e.textContent.trim().toLowerCase()) : [];
-    const fuori = principali.filter(n => !piuAvanti.includes(n));
-    return { n1: freschiSett1.length, n2: altroSett1.length, haGruppo: !!gruppo, titolo: gruppo ? gruppo.querySelector('.shop-day-title').textContent.replace(/\s+/g, ' ').trim() : '', piuAvanti: piuAvanti.length,
-      freschiFuori: freschiSett1.filter(x => principali.includes(x.ingrediente.toLowerCase()) && !tutte.some(y => y.weekIdx === 0 && y.ingrediente === x.ingrediente) && !buildShopFlat().some(y => !y.isRecipe && y.ingrediente.toLowerCase() === x.ingrediente.toLowerCase())).length,
+    const settimane = gruppo ? [...gruppo.querySelectorAll('.shop-later-week')].map(e => e.textContent.trim()) : [];
+    // il fresco di una settimana, per un nome che nelle altre non c'è
+    const solo = w => fresco(w).map(x => x.ingrediente.toLowerCase()).filter(n => !tutte.some(y => y.weekIdx !== w && y.ingrediente.toLowerCase() === n));
+    const prossimaSolo = solo(1), dueSolo = solo(2);
+    return { n1: fresco(1).length, n2: fresco(2).length, haGruppo: !!gruppo, titolo: gruppo ? gruppo.querySelector('.shop-day-title').textContent.replace(/\s+/g, ' ').trim() : '', nSett: settimane.length,
+      prossimaInLista: prossimaSolo.every(n => principali.includes(n)) && prossimaSolo.every(n => !piuAvanti.includes(n)),
+      dueInPiuAvanti: dueSolo.every(n => piuAvanti.includes(n) && !principali.includes(n)),
+      nP: prossimaSolo.length, nD: dueSolo.length,
       chiusoDiDefault: gruppo ? gruppo.querySelector('.accordion-body').classList.contains('is-collapsed') : null };
   });
-  assert(r.n1 > 0 && r.n2 > 0, 'la settimana 2 ha sia fresco sia il resto: ' + JSON.stringify([r.n1, r.n2]));
+  assert(r.n1 > 0 && r.n2 > 0, 'la settimana prossima e quella dopo hanno fresco: ' + JSON.stringify([r.n1, r.n2]));
   assert(r.haGruppo && /^Più avanti \(\d+\)/.test(r.titolo), 'accordion: ' + r.titolo);
-  assert(r.piuAvanti > 0 && r.freschiFuori === 0, 'il fresco della seconda settimana non è nella lista principale: ' + JSON.stringify(r));
+  eq(r.nSett, 1, 'in "Più avanti" solo la settimana di tra due settimane');
+  assert(r.nP > 0 && r.prossimaInLista, 'il fresco della settimana prossima è nella lista normale: ' + JSON.stringify(r));
+  assert(r.nD > 0 && r.dueInPiuAvanti, 'il fresco di tra due settimane è in "Più avanti": ' + JSON.stringify(r));
   eq(r.chiusoDiDefault, true, 'chiuso di default');
 });
 

@@ -7974,7 +7974,8 @@ function renderSpesa(){
   // Con più settimane pianificate si compra insieme tutto ciò che si conserva
   // (pasta, pane e carne che si congelano…), ma frutta, verdura e latticini
   // freschi della settimana dopo si comprano più avanti: stanno a parte.
-  const isLaterRow = it => it.isRecipe && it.weekIdx > 0 && SHOP_LATER_DEPTS.includes(knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
+  // Il fresco della settimana prossima si compra insieme al resto: "Più avanti" è per quello di tra due settimane o più.
+  const isLaterRow = it => it.isRecipe && it.weekIdx >= 2 && SHOP_LATER_DEPTS.includes(knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
   const laterFlat = allShopFlat.filter(isLaterRow);
   const mainFlat = allShopFlat.filter(it => !isLaterRow(it));
 
@@ -8290,7 +8291,7 @@ function renderSpesa(){
     }
   }
 
-  // "Più avanti": il fresco delle settimane dopo, chiuso di default.
+  // "Più avanti": il fresco di tra due settimane o più, chiuso di default.
   const laterRows = laterFlat.filter(it => !state.shopChecked[it.key]);
   if(laterRows.length){
     const byWeek = {};
@@ -8302,7 +8303,7 @@ function renderSpesa(){
           <svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"/></svg>
         </div>
         <div class="accordion-body${state.shopLaterOpen ? '' : ' is-collapsed'}">
-          <p class="section-sub shop-later-note">Frutta, verdura e latticini freschi delle settimane dopo: si comprano più avanti.</p>
+          <p class="section-sub shop-later-note">Frutta, verdura e latticini freschi di tra due settimane o più: si comprano più avanti.</p>
           ${Object.keys(byWeek).sort().map(w => `<div class="shop-later-week">Settimana del ${escapeHtml(weekLabelFor(parseInt(w, 10)))}</div>${Object.values(byWeek[w]).sort((a, b) => IT_COLLATOR.compare(a.ingrediente, b.ingrediente)).map(r => itemRow(r.keys, r.ingrediente, combineQtyTexts(r.qtas), '', '', undefined, undefined, r.spec)).join('')}`).join('')}
         </div>
       </div>`;
