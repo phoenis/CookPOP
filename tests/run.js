@@ -4650,6 +4650,39 @@ test('Modifica ricetta: "Ripieni possibili" sull\'impasto e "Si usa con" sul rip
   eq(r.scambio, [false, true]);
 });
 
+test('Modifica ricetta: note, consigli e passaggi sono aree di testo che crescono col contenuto, così si vede tutto', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'prep'; state.recipeEditName = 'Carbonara'; render();
+    const ids = ['edit-ricordare', 'edit-consigli', 'edit-avanzi-note', 'edit-freezer-note'];
+    out.tipi = ids.map(id => document.getElementById(id).tagName);
+    const lungo = 'Una nota molto lunga che prima non si vedeva tutta in un campo a una riga e adesso deve andare a capo e crescere. '.repeat(4);
+    const el = document.getElementById('edit-ricordare');
+    const prima = el.offsetHeight;
+    el.value = lungo; el.dispatchEvent(new Event('input', { bubbles: true }));
+    out.cresce = el.offsetHeight > prima + 20;
+    out.tuttoVisibile = el.scrollHeight <= el.offsetHeight + 2;
+    document.querySelector('[data-save-recipe-edit]').click();
+    out.salvata = getRecipeDetails('Carbonara').ricordare === lungo.trim();
+    // nota dell'ingrediente nel pannello: stessa cosa, e a una riga sola nel riepilogo
+    state.recipeEditName = 'Carbonara'; render();
+    document.querySelector('[data-edit-ing-open]').click();
+    const n = document.querySelector('.edit-ing-sheet .edit-ing-note');
+    out.notaTipo = n.tagName;
+    n.value = 'prima riga\nseconda riga con piu\' testo'; n.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-edit-ing-done]').click();
+    out.riepilogo = document.querySelector('#edit-ing-list .edit-ing-row').dataset.note;
+    state.recipeEditName = null; delete state.recipeEdits['Carbonara']; render();
+    return out;
+  });
+  eq(r.tipi, ['TEXTAREA', 'TEXTAREA', 'TEXTAREA', 'TEXTAREA']);
+  assert(r.cresce && r.tuttoVisibile, 'il campo cresce col testo: ' + JSON.stringify([r.cresce, r.tuttoVisibile]));
+  assert(r.salvata, 'il testo lungo si salva intero');
+  eq(r.notaTipo, 'TEXTAREA');
+  eq(r.riepilogo, "prima riga seconda riga con piu' testo");
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

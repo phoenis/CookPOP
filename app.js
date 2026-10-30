@@ -6406,7 +6406,7 @@ function readEditIngRow(row){
   const qta = raw ? raw.value.trim() : buildQtyFromEdit(row.querySelector('.edit-ing-num').value, row.querySelector('.edit-ing-unit').value);
   const q = row.querySelector('.edit-ing-qual-new') || row.querySelector('.edit-ing-qual');
   const qual = q && q.value !== '__new' ? q.value.trim() : '';
-  const note = ((row.querySelector('.edit-ing-note') || {}).value || '').trim();
+  const note = ((row.querySelector('.edit-ing-note') || {}).value || '').replace(/\s+/g, ' ').trim();
   return { ingrediente: canonicalIngredientName(row.querySelector('.edit-ing-name').value.trim()), qta, ...(qual ? { qual } : {}), ...(note ? { note } : {}) };
 }
 // Pannello "Ingrediente n di N": nome, quantità, quale parte, nota. Chiuderlo
@@ -6427,6 +6427,15 @@ function closeEditIngSheet(apply){
     }
   }
   bd.remove();
+}
+// I campi di testo lungo della ricetta crescono col testo: si vede sempre tutto.
+function autosizeEditField(el){
+  if(!el) return;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight ? (el.scrollHeight + 2) + 'px' : '';
+}
+function autosizeEditFields(root){
+  (root || document).querySelectorAll('.edit-autosize').forEach(autosizeEditField);
 }
 function openEditIngSheet(row){
   closeEditIngSheet(true);
@@ -6458,7 +6467,7 @@ function openEditIngSheet(row){
           <div class="edit-ing-qualbox">${editIngQualHtml(d.ing, d.qual)}</div>
           <p class="edit-ing-hint">Es. scorza, succo, solo i gambi. Lascia vuoto se serve tutto.</p></div>
         <div class="edit-ing-field"><label class="edit-ing-lab">Nota <span class="edit-ing-opt">· facoltativa</span></label>
-          <input type="text" class="edit-ing-note" maxlength="60" autocomplete="off" aria-label="Nota sull'ingrediente" value="${escapeAttr(noteStart)}">
+          <textarea class="edit-ing-note edit-autosize" rows="1" maxlength="200" aria-label="Nota sull'ingrediente">${escapeHtml(noteStart)}</textarea>
           <p class="edit-ing-hint">Es. “non trattati”, “bio”, “ben maturi”.</p></div>
       </div>
       <div class="edit-ing-footer">
@@ -6476,12 +6485,13 @@ function openEditIngSheet(row){
     const r = editIngRowRef; closeEditIngSheet(false); if(r && r.isConnected) r.remove();
   });
   attachIngredientCombobox(sheet.querySelector('.edit-ing-name'));
+  autosizeEditFields(sheet);
   if(isNew) sheet.querySelector('.edit-ing-name').focus();
 }
 function editStepRowHtml(text){
   return `
     <div class="edit-step-row">
-      <textarea class="edit-step-text" rows="2" placeholder="Passaggio">${escapeHtml(text||'')}</textarea>
+      <textarea class="edit-step-text edit-autosize" rows="2" placeholder="Passaggio">${escapeHtml(text||'')}</textarea>
       <button type="button" class="btn is-outline is-icon is-danger edit-row-remove" data-remove-row aria-label="Rimuovi passaggio">✕</button>
     </div>`;
 }
@@ -6616,19 +6626,19 @@ function renderRecipeEditModal(){
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M88 96a8 8 0 0 1 8-8h64a8 8 0 0 1 0 16H96a8 8 0 0 1-8-8m8 40h64a8 8 0 0 0 0-16H96a8 8 0 0 0 0 16m32 16H96a8 8 0 0 0 0 16h32a8 8 0 0 0 0-16m96-104v108.69a15.86 15.86 0 0 1-4.69 11.31L168 219.31a15.86 15.86 0 0 1-11.31 4.69H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16h160a16 16 0 0 1 16 16M48 208h104v-48a8 8 0 0 1 8-8h48V48H48Zm120-40v28.7l28.69-28.7Z"></path></svg> Da ricordare</div>
-            <input type="text" id="edit-ricordare" value="${escapeAttr((det && det.ricordare) || '')}">
+            <textarea id="edit-ricordare" class="edit-autosize" rows="2">${escapeHtml((det && det.ricordare) || '')}</textarea>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">${uiIcon('pencil')} Consigli</div>
-            <textarea id="edit-consigli" rows="3" placeholder="Es. Puoi aggiungere al pangrattato della curcuma, che darà colore e aroma">${escapeHtml((det && det.consigli) || '')}</textarea>
+            <textarea id="edit-consigli" class="edit-autosize" rows="3" placeholder="Es. Puoi aggiungere al pangrattato della curcuma, che darà colore e aroma">${escapeHtml((det && det.consigli) || '')}</textarea>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--tabler" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m13.62 8.382l1.966-1.967A2 2 0 1 1 19 5a2 2 0 1 1-1.413 3.414l-1.82 1.821m-9.863 8.361c2.733 2.734 5.9 4 7.07 2.829c1.172-1.172-.094-4.338-2.828-7.071c-2.733-2.734-5.9-4-7.07-2.829c-1.172 1.172.094 4.338 2.828 7.071M7.5 16l1 1"></path><path d="M12.975 21.425c3.905-3.906 4.855-9.288 2.121-12.021c-2.733-2.734-8.115-1.784-12.02 2.121"></path></g></svg> Nota avanzi</div>
-            <input type="text" id="edit-avanzi-note" value="${escapeAttr((det && det.avanzi) || '')}">
+            <textarea id="edit-avanzi-note" class="edit-autosize" rows="2">${escapeHtml((det && det.avanzi) || '')}</textarea>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M227.65 149.14a12 12 0 0 1-8.79 14.51l-20.67 5.08l5.4 20.16a12 12 0 0 1-23.18 6.22l-7.29-27.2L140 148.78V187l20.48 20.48a12 12 0 0 1-17 17L128 209l-15.51 15.52a12 12 0 0 1-17-17L116 187v-38.22l-33.12 19.13l-7.29 27.2a12 12 0 0 1-23.18-6.22l5.4-20.16l-20.67-5.08a12 12 0 1 1 5.72-23.3l27.89 6.85L104 128l-33.25-19.2l-27.89 6.85A11.8 11.8 0 0 1 40 116a12 12 0 0 1-2.85-23.65l20.67-5.08l-5.4-20.16a12 12 0 0 1 23.18-6.22l7.29 27.2L116 107.21V69L95.52 48.48a12 12 0 0 1 17-17L128 47l15.51-15.52a12 12 0 1 1 17 17L140 69v38.24l33.12-19.12l7.29-27.2a12 12 0 0 1 23.18 6.22l-5.4 20.16l20.67 5.08A12 12 0 0 1 216 116a11.8 11.8 0 0 1-2.87-.35l-27.89-6.85L152 128l33.25 19.2l27.89-6.85a12 12 0 0 1 14.51 8.79"></path></svg> Nota freezer</div>
-            <input type="text" id="edit-freezer-note" value="${escapeAttr((det && det.freezer) || '')}">
+            <textarea id="edit-freezer-note" class="edit-autosize" rows="2">${escapeHtml((det && det.freezer) || '')}</textarea>
           </div>
           <div class="filter-group">
             <div class="filter-group-label">${uiIcon('link')} Link fonte</div>
@@ -11929,6 +11939,8 @@ function attachHandlers(){
       }
       if(e.target.matches && e.target.matches('.edit-ing-qual') && e.target.value === '__new') switchEditIngQualToNew(e.target);
     });
+    recipeEditModal.addEventListener('input', e=>{ if(e.target.matches && e.target.matches('.edit-autosize')) autosizeEditField(e.target); });
+    autosizeEditFields(recipeEditModal);
     ['input', 'change', 'focusout', 'click'].forEach(ev => recipeEditModal.addEventListener(ev, e=>{
       const row = e.target.closest && e.target.closest('.edit-ing-sheet');
       if(row && !e.target.matches('.edit-ing-qual, .edit-ing-qual-new')) refreshEditIngQual(row);
