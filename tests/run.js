@@ -4426,6 +4426,68 @@ test('pranzo avanzo del primo giorno: dalla settimana dopo usa l\'ultima cena de
   eq(r.spento, null);
 });
 
+test('Spesa: con una nota l\'ingrediente ha la matita accanto alla nota, e toccandola si modifica o si svuota', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' } }; state.pantryItems = {};
+    state.ingredientNotes = { zucchine: 'quelle piccole' };
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    const out = {};
+    const row = () => [...document.querySelectorAll('.shop-item-row')].find(e => /Zucchine/.test(e.textContent));
+    out.testo = row().querySelector('.ing-note-text').textContent;
+    out.matitaAccantoNota = !!row().querySelector('.ing-note-row .ing-note-pencil');
+    row().querySelector('.ing-note-row .ing-note-pencil').click();
+    out.campo = row().querySelector('.ing-note-input') ? row().querySelector('.ing-note-input').value : null;
+    const inp = row().querySelector('.ing-note-input'); inp.value = 'solo le chiare'; inp.blur();
+    out.salvata = state.ingredientNotes.zucchine;
+    row().querySelector('.ing-note-row .ing-note-pencil').click();
+    const i2 = row().querySelector('.ing-note-input'); i2.value = ''; i2.blur();
+    out.tolta = [state.ingredientNotes.zucchine, !!row().querySelector('.ing-note-text')];
+    state.ingredientNotes = {}; state.shopExtras = {}; render();
+    return out;
+  });
+  eq([r.testo, r.matitaAccantoNota, r.campo, r.salvata], ['quelle piccole', true, 'quelle piccole', 'solo le chiare']);
+  eq(r.tolta, [undefined, false]);
+});
+
+test('quantità fisse: la spunta in Modifica ricetta toglie il proporzionamento in ricetta, Spesa, cucina e conferma; senza spunta tutto scala come prima', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const nome = 'Tiramisù';
+    state.extraWeeks = []; generateWeek(0); generateWeek(1);
+    const slot = allMealSlots().filter(m => m.weekIdx === 1 && m.meal === 'cena')[2];
+    writeMealDishes(slot.weekIdx, slot.i, 'cena', nome, []); const mk = mealKey(slot.weekIdx, slot.i, 'cena');
+    state.dayPortions[mk] = 8; // il doppio delle 4 della ricetta
+    const mascarpone = () => (buildShopFlat().find(x => x.ingrediente === 'Mascarpone' && x.key.indexOf(String(slot.i)) >= 0) || {}).qta;
+    const cook = () => (cookStepIngredients(nome, 'Aggiungi il mascarpone', 2).find(i => /mascarpone/i.test(i.nome)) || {}).qta;
+    const dettaglio = () => (renderIngredientsSection(getIngredientsFor(nome), qtyRatio(nome, 2), { noButton: true, titleHtml: '' }).match(/Mascarpone[\s\S]*?ing-qty">([^<]*)</) || [])[1];
+    out.senza = [mascarpone(), cook(), dettaglio(), qtyRatio(nome, 2)];
+    state.recipeEdits[nome] = Object.assign({}, state.recipeEdits[nome], { quantitaFisse: true });
+    out.con = [mascarpone(), cook(), dettaglio(), qtyRatio(nome, 2), fixedQtyRecipe(nome)];
+    state.recipeEdits[nome].quantitaFisse = false;
+    // la spunta nel modulo: c'è, riflette il valore e si salva
+    state.tab = 'prep'; state.recipeEditName = nome; render();
+    const box = document.getElementById('edit-quantita-fisse');
+    out.spunta = [!!box, box && box.checked];
+    box.checked = true;
+    document.querySelector('[data-save-recipe-edit]').click();
+    out.salvata = getRecipeDetails(nome).quantitaFisse === true;
+    state.recipeEditName = nome; render();
+    out.riaperta = document.getElementById('edit-quantita-fisse').checked;
+    document.getElementById('edit-quantita-fisse').checked = false;
+    document.querySelector('[data-save-recipe-edit]').click();
+    out.tolta = getRecipeDetails(nome).quantitaFisse === false;
+    delete state.recipeEdits[nome]; state.dayPortions = {}; state.extraWeeks = []; state.recipeEditName = null; render();
+    return out;
+  });
+  eq(r.senza[3], 2);
+  assert(r.senza[0] !== '500 g' && r.senza[1] !== '500 g' && r.senza[2] !== '500 g', 'senza spunta scala: ' + JSON.stringify(r.senza));
+  eq(r.con, ['500 g', '500 g', '500 g', 1, true]);
+  eq(r.spunta, [true, false]);
+  assert(r.salvata && r.riaperta && r.tolta, 'la spunta si salva, si ritrova e si toglie: ' + JSON.stringify([r.salvata, r.riaperta, r.tolta]));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

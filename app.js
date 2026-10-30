@@ -628,6 +628,13 @@ function parsePortionsBase(porzioniText){
 // (q.b., facoltativo, unità di misura, parentesi...). I numeri piccoli e interi
 // (es. spicchi, uova — fino a 12) si arrotondano a step di 0.5 per restare
 // realistici; il resto (grammi, ml...) si arrotonda all'intero più vicino.
+// Ricette con quantità fisse (es. una torta: gli ingredienti non cambiano con le
+// porzioni): la spunta in Modifica ricetta le salva come quantitaFisse.
+function fixedQtyRecipe(name){
+  const d = getRecipeDetails(name);
+  return !!((d && d.quantitaFisse) || (state.fixedPortionRecipes || {})[name]);
+}
+function qtyRatio(name, ratio){ return fixedQtyRecipe(name) ? 1 : (ratio || 1); }
 function scaleQtyText(text, ratio){
   if(!text || !ratio || ratio === 1) return text;
   return text.replace(/\d+(?:[.,]\d+)?/g, numStr=>{
@@ -760,6 +767,7 @@ function personeRowHtml(n, mk, recipeName){
 // nel testo del passo. Euristica semplice: nessun abbinamento = nessun elenco.
 const COOK_SKIP_WORDS = new Set(['fresco','fresca','freschi','fresche','tritato','tritata','grattugiato','grattugiata','polvere','intero','intera','medio','media','grande','piccolo','piccola','circa','sodo','maturo','matura','extra','vergine','extravergine']);
 function cookStepIngredients(name, stepText, ratio){
+  ratio = qtyRatio(name, ratio);
   const text = (stepText || '').toLowerCase();
   return getIngredientsFor(name).filter(it=>{
     // Anche la specifica (tuorli, succo…) conta; "uova" → "uov" regge "l'uovo".
@@ -1203,7 +1211,7 @@ function renderDishAccordion(dsh, ratio, ctx, isOpen, fixed, asPanel){
   const ing = getIngredientsFor(name);
   const paneKey = mk + '|' + name;
   const pane = state.dishPane[paneKey] || 'ing';
-  const ingHtml = renderIngredientsSection(ing, ratio, Object.assign({ noButton: true, titleHtml: '' }, ctx));
+  const ingHtml = renderIngredientsSection(ing, qtyRatio(name, ratio), Object.assign({ noButton: true, titleHtml: '' }, ctx));
   const personeHtml = recipePersoneHtml(personeRowHtml(ctx.persone, ctx.canPortions ? mk : ''));
   const tagsHtml = recipeTagsHtml(name);
   const stepsHtml = det && det.procedimento && det.procedimento.length
@@ -5804,7 +5812,7 @@ document.addEventListener('visibilitychange', syncCardWakeLock);
 function captureRecipeEditForm(){
   const form = document.getElementById('edit-recipe-form');
   if(!form || !state.recipeEditName) return null;
-  form.querySelectorAll('input').forEach(i=>{ if(i.type === 'file') return; i.setAttribute('value', i.value); });
+  form.querySelectorAll('input').forEach(i=>{ if(i.type === 'file') return; if(i.type === 'checkbox'){ if(i.checked) i.setAttribute('checked', ''); else i.removeAttribute('checked'); return; } i.setAttribute('value', i.value); });
   form.querySelectorAll('textarea').forEach(t=>{ t.textContent = t.value; });
   form.querySelectorAll('select option').forEach(o=>{ if(o.selected) o.setAttribute('selected', ''); else o.removeAttribute('selected'); });
   return { name: state.recipeEditName, html: form.innerHTML };
@@ -6434,6 +6442,7 @@ function renderRecipeEditModal(){
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Porzioni</div>
             <input type="text" id="edit-porzioni" value="${escapeAttr((det && det.porzioni) || '')}">
+            <label class="edit-fixed-qty"><input type="checkbox" id="edit-quantita-fisse"${det && det.quantitaFisse ? ' checked' : ''}><span>Quantità fisse: non cambiano con le porzioni (es. una torta)</span></label>
           </div>
           <div class="filter-group">
             <div class="filter-group-label"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--bx" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M12 10h-2V3H8v7H6V3H4v8c0 1.654 1.346 3 3 3h1v7h2v-7h1c1.654 0 3-1.346 3-3V3h-2zm7-7h-1c-1.159 0-2 1.262-2 3v8h2v7h2V4a1 1 0 0 0-1-1"></path></svg> Categoria</div>
@@ -6847,7 +6856,7 @@ function renderMealDetailScreen(weekIdx, i, meal){
     const dBase = baseOf(dsh.name);
     const ratio = (dBase && currentPortions) ? currentPortions / dBase : 1;
     const ctx = { weekIdx, i, meal, role: dsh.role, persone: currentPortions || 0, canPortions: !!basePortions };
-    if(dishCookFactor(mk, dsh.name)) missing.push(...missingIngredients(getIngredientsFor(dsh.name), ratio, ctx)); // dal freezer: niente da comprare
+    if(dishCookFactor(mk, dsh.name)) missing.push(...missingIngredients(getIngredientsFor(dsh.name), qtyRatio(dsh.name, ratio), ctx)); // dal freezer: niente da comprare
     return { dsh, ratio, ctx };
   });
   const mancantiHtml = mancantiButtonHtml(missing);
@@ -7136,7 +7145,7 @@ function mealCookIngredients(mk, mealData){
   const out = [];
   names.forEach(n => {
     const factor = dishCookFactor(mk, n);
-    if(factor) getIngredientsFor(n).forEach(it => out.push(Object.assign({}, it, { factor })));
+    if(factor) getIngredientsFor(n).forEach(it => out.push(Object.assign({}, it, { factor, fixed: fixedQtyRecipe(n) })));
   });
   return out;
 }
@@ -7502,7 +7511,7 @@ function openRecipeDone(name, ratio){
   const qtyMap = {};
   getIngredientsFor(name).forEach(it=>{
     const pantryIt = resolvePantryItem(it.ingrediente);
-    if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.unit !== 'none') qtyMap[it.ingrediente] = (qtyMap[it.ingrediente] || 0) + usedQtyForPantry(pantryIt.unit, it.qta, ratio || 1);
+    if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.unit !== 'none') qtyMap[it.ingrediente] = (qtyMap[it.ingrediente] || 0) + usedQtyForPantry(pantryIt.unit, it.qta, qtyRatio(name, ratio));
   });
   state.doneModalRecipe = { name, ratio: ratio || 1 };
   state.doneModalDay = 'recipe';
@@ -7923,7 +7932,7 @@ function buildShopFlat(){
         if(state.shopDismissed[key]) return;
         // Le quantità scalate valgono solo finché non è già stato spuntato:
         // quello già preso non deve cambiare retroattivamente se poi si aggiustano le porzioni.
-        const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, ratio * factor);
+        const qta = state.shopChecked[key] ? it.qta : scaleQtyText(it.qta, qtyRatio(name, ratio) * factor);
         // Se in Dispensa ce n'è già abbastanza, non compare proprio in Spesa
         // (niente riga da vedere/spuntare) — a meno che non l'avessi già
         // esplicitamente de-spuntato in passato per dire "mi serve comunque".
@@ -8046,7 +8055,7 @@ function renderSpesa(){
     const editingIngNote = state.ingNoteEditingKey === ingNoteKey;
     const ingNoteHtml = editingIngNote
       ? `<span class="ing-note-row"><input type="text" class="ing-note-input" placeholder="Nota per questo ingrediente…" value="${escapeAttr(ingNote)}" data-ing-note="${escapeAttr(ingNoteKey)}"></span>`
-      : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">${escapeHtml(ingNote)}</span>` : ''}</span>`;
+      : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">${escapeHtml(ingNote)}</span><button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Modifica la nota">${PENCIL_ICON_SVG}</button>` : ''}</span>`;
     return `
     <div class="swipe-wrap" data-swipe-id="shop:${escapeAttr(rowKey)}" data-swipe-shop="${escapeAttr(rowKey)}" data-swipe-label="${escapeAttr(ingrediente)}">
     <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(ingrediente)}">${TRASH_ICON_SVG}</button>
@@ -8448,7 +8457,7 @@ function renderRecipeDetailScreen(name){
   const tagsHtml = recipeTagsHtml(name);
   const basePers = det ? parsePortionsBase(det.porzioni) : null;
   const nPers = basePers ? (state.recipePortions[name] || basePers) : 0;
-  const rRatio = basePers ? nPers / basePers : 1;
+  const rRatio = basePers && !fixedQtyRecipe(name) ? nPers / basePers : 1;
   const recPane = state.dishPane['r|' + name] || 'ing';
   const ingHtml = renderIngredientsSection(ing, rRatio, { noButton: true, titleHtml: '' }, nPers);
   const personeHtml = recipePersoneHtml(personeRowHtml(nPers, '', name));
@@ -11376,7 +11385,7 @@ function attachHandlers(){
           // o parte di un gruppo va risolto come ovunque in Dispensa/Spesa.
           const pantryIt = resolvePantryItem(it.ingrediente);
           if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.unit !== 'none'){
-            qtyMap[it.ingrediente] = (qtyMap[it.ingrediente] || 0) + usedQtyForPantry(pantryIt.unit, it.qta, ratio * it.factor);
+            qtyMap[it.ingrediente] = (qtyMap[it.ingrediente] || 0) + usedQtyForPantry(pantryIt.unit, it.qta, (it.fixed ? 1 : ratio) * it.factor);
           }
         });
         state.doneModalDay = key;
@@ -11847,6 +11856,7 @@ function attachHandlers(){
       state.recipeEdits[name] = {
         ...editTimeFromForm(getRecipeMeta(name) || {}),
         porzioni: document.getElementById('edit-porzioni').value.trim(),
+        quantitaFisse: !!(document.getElementById('edit-quantita-fisse') || {}).checked,
         categoriaNew: document.getElementById('edit-categoria').value,
         tipologia: document.getElementById('edit-tipologia').value,
         gradimento: document.getElementById('edit-gradimento').value,
