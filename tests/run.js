@@ -4496,6 +4496,9 @@ test('Lomo saltado: ricetta del catalogo (piatto unico, carne) con fonte, e fini
     out.meta = [meta.categoriaNew, meta.tipologia, meta.proteina, meta.base];
     out.det = [det.porzioni, getIngredientsFor('Lomo saltado').length, det.procedimento.length, /^https:\/\//.test(det.link)];
     out.senzaOstriche = !getIngredientsFor('Lomo saltado').some(i => /ostri|ostion/i.test(i.ingrediente));
+    const pr = det.procedimento;
+    out.aglioPrima = /aglio/i.test(pr[5]) && !/aglio/i.test(pr[8]) && pr.findIndex(x => /aglio/i.test(x)) < pr.findIndex(x => /Unisci i pomodori/.test(x));
+    out.succo = /succo che ha rilasciato/.test(pr[4]) && /succo della carne/.test(pr[7]);
     // migrazione: solo gli album con "compleanni" nel nome
     state.lomoSaltadoAlbum1 = false;
     state.cookbooks = [{ id: 'a', name: 'Compleanni', recipes: ['Tiramisù'] }, { id: 'b', name: 'Estate', recipes: [] }, { id: 'c', name: 'Compleanni 2', recipes: ['Lomo saltado'] }];
@@ -4508,6 +4511,7 @@ test('Lomo saltado: ricetta del catalogo (piatto unico, carne) con fonte, e fini
   });
   eq(r.meta, ['carne', 'unico', 'carne-rossa', 'riso']);
   eq(r.det, ['4 porzioni', 15, 10, true]);
+  assert(r.aglioPrima && r.succo, 'aglio con cipolla e aji prima dei pomodori, succo della carne nella salsa: ' + JSON.stringify([r.aglioPrima, r.succo]));
   assert(r.senzaOstriche, 'senza salsa di ostriche');
   eq(r.album, ['Tiramisù|Lomo saltado', '', 'Lomo saltado']);
   eq(r.doppio, 1);
