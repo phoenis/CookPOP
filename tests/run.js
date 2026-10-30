@@ -448,15 +448,18 @@ test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finchÃ
 
 test('generatore: usa gli ingredienti in scadenza in tempo, senza perdere equilibrio', async ({ page }) => {
   const r = await page.evaluate(() => {
-    const slots = weekPlanSlots(), seq = weekEatenSequence(slots);
+    // La settimana prossima: sempre davanti (l'ultimo giorno della corrente restano pochi pasti), con la scadenza al suo quarto giorno.
+    const W = 1;
+    state.extraWeeks = [];
+    const slots = weekPlanSlots(W), seq = weekEatenSequence(slots, W);
     const run = withExpiry => {
       state.pantryItems = {};
       upsertPantryItem('Mozzarella', 'frigo', 2);
-      if(withExpiry) state.pantryItems['mozzarella'].scadenza = addDaysIso(3);
+      if(withExpiry) state.pantryItems['mozzarella'].scadenza = isoLocalDate(weekDatesFor(W)[3]);
       let inTime = 0, balanced = 0;
       const t0 = performance.now();
       for(let n = 0; n < 15; n++){
-        const days = pickWeekRecipes({}, 0);
+        const days = pickWeekRecipes({}, W);
         const picks = slots.map(s => days[s.day][s.meal].principale);
         if(weekPlanScore(picks, slots, seq) === 0) balanced++;
         if((days.expiringUsed || []).includes('Mozzarella')) inTime++;
