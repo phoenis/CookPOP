@@ -2350,6 +2350,7 @@ const state = {
   pantryItems: {},
   pantrySeeded: false,
   generalShoppingRecurring1: false,
+  lomoSaltadoAlbum1: false,
   familyDefaults1: false,
   pantryQtyMigrated: false,
   pantryUtilityLuogoMigrated: false,
@@ -3436,6 +3437,12 @@ const MIGRATIONS = [
     const d = Object.assign({}, fallback, r.defaults || {});
     state.leftoverLunchOn = !!d.leftoverLunch;
     if(Number.isFinite(d.portionsBase) && d.portionsBase >= 1) state.weekPortionsBase = Math.min(12, Math.round(d.portionsBase));
+  } },
+  // "Lomo saltado" (nuova nel catalogo): chi ha un album "Compleanni" la trova già dentro.
+  { flag: 'lomoSaltadoAlbum1', run(){
+    (state.cookbooks || []).forEach(cb => {
+      if(cb && /compleann/i.test(cb.name || '') && Array.isArray(cb.recipes) && !cb.recipes.includes('Lomo saltado')) cb.recipes.push('Lomo saltado');
+    });
   } },
   { flag: 'userColorsLight1', run(){
     Object.keys(state.userColors || {}).forEach(u=>{
