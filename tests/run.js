@@ -778,7 +778,8 @@ test('generatore: evita le ricette delle ultime settimane e delle altre settiman
   const r = await page.evaluate(() => {
     state.extraWeeks = [];
     generateWeek(0);
-    const names = w => { const out = new Set(); WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => { const n = effectiveMeal(w, i, meal).principale; if(n) out.add(n); })); return out; };
+    // (un pranzo avanzo ripete per forza la cena da cui viene: non conta come ripetizione)
+    const names = w => { const out = new Set(); WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => { if(linkedSourceMealKey(w, i, meal)) return; const n = effectiveMeal(w, i, meal).principale; if(n) out.add(n); })); return out; };
     const week0 = names(0);
     // Il passaggio di settimana ricorda i piatti della settimana finita.
     rememberWeekRecipes(isoLocalDate(weekDatesFor(0)[0]));
@@ -3139,8 +3140,9 @@ test('variazioni: solo per le parti di uno stesso prodotto (uova, limone, arance
     state.recipeEdits['Prova vecchia'] = { ingredienti: [{ ingrediente: 'Prosciutto', qta: '100 g', qual: 'cotto' }] };
     out.legacy = (getIngredientsFor('Prova vecchia')[0] || {}).ingrediente;
     // due ricette in menù: una con tuorli, una con uova intere → due righe in Spesa
-    state.pantryItems = {}; generateWeek(0);
-    const sl = allPlannedShoppingMeals().slice(-4);
+    // la settimana prossima: sempre davanti, qualunque giorno sia oggi
+    state.pantryItems = {}; state.extraWeeks = []; generateWeek(0); generateWeek(1);
+    const sl = allPlannedShoppingMeals().filter(m => m.weekIdx === 1).slice(-4);
     writeMealDishes(sl[0].weekIdx, sl[0].i, sl[0].meal, out.tuorli.ricetta, []);
     const intere = allRecipeMetas().find(m => getIngredientsFor(m.nome).some(i => i.ingrediente === 'Uova' && !i.spec));
     writeMealDishes(sl[1].weekIdx, sl[1].i, sl[1].meal, intere.nome, []);
@@ -4383,6 +4385,36 @@ test('account nuovo con un nome di prima nell\'email ma senza famiglia: se lo sp
   });
   for(const k of ['parola', 'dentro', 'mamma', 'nessuno']) eq(r[k], [1, 'nuovissima'], k);
   eq(r.vecchia, [0, null]);
+});
+
+test('pranzo avanzo del primo giorno: dalla settimana dopo usa l\'ultima cena della settimana prima, nella corrente si cucina; porzioni una volta sola', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    const old = { on: state.leftoverLunchOn, days: state.weekLeftoverDays, n: state.weekLeftoverPortions, port: state.weekPortionsBase };
+    state.leftoverLunchOn = true; state.weekLeftoverDays = null; state.weekLeftoverPortions = 1; state.weekPortionsBase = 2;
+    state.extraWeeks = []; generateWeek(0); generateWeek(1);
+    const first = WEEK_DISPLAY_ORDER[0], last = WEEK_DISPLAY_ORDER[6];
+    out.eleg = [leftoverEligible(0).includes(first), leftoverEligible(1).includes(first)];
+    out.w0 = state.dayLinks[`0_${first}_pranzo`] || null;
+    out.w1 = state.dayLinks[`1_${first}_pranzo`] === `0_${last}_cena`;
+    out.nome = effectiveMeal(1, first, 'pranzo').principale === effectiveMeal(0, last, 'cena').principale;
+    out.porz = state.dayPortions[`0_${last}_cena`];
+    generateWeek(1); generateWeek(1);
+    out.porzDopo = state.dayPortions[`0_${last}_cena`]; // non cresce a ogni rigenerazione
+    // se l'ultima cena della settimana prima è vuota non c'è avanzo
+    out.sceltaPranzo = leftoverLunchDays(1).includes(first);
+    state.weekLeftoverDays = [1, 2, 3, 4, 5, 6].filter(d => d !== first); generateWeek(1);
+    out.spento = state.dayLinks[`1_${first}_pranzo`] || null;
+    state.leftoverLunchOn = old.on; state.weekLeftoverDays = old.days; state.weekLeftoverPortions = old.n; state.weekPortionsBase = old.port; state.extraWeeks = [];
+    return out;
+  });
+  eq(r.eleg, [false, true]);
+  eq(r.w0, null);
+  assert(r.w1 && r.nome, 'il pranzo del primo giorno della settimana dopo è l\'avanzo dell\'ultima cena della settimana prima');
+  eq(r.porz, 3);
+  eq(r.porzDopo, 3);
+  assert(r.sceltaPranzo, 'giorno attivo nella scelta');
+  eq(r.spento, null);
 });
 
 (async () => {
