@@ -4488,6 +4488,30 @@ test('quantità fisse: la spunta in Modifica ricetta toglie il proporzionamento 
   assert(r.salvata && r.riaperta && r.tolta, 'la spunta si salva, si ritrova e si toglie: ' + JSON.stringify([r.salvata, r.riaperta, r.tolta]));
 });
 
+test('Lomo saltado: ricetta del catalogo (piatto unico, carne) con fonte, e finisce nell\'album Compleanni di chi ce l\'ha, una volta sola', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    const meta = getRecipeMeta('Lomo saltado'), det = getRecipeDetails('Lomo saltado');
+    out.meta = [meta.categoriaNew, meta.tipologia, meta.proteina, meta.base];
+    out.det = [det.porzioni, getIngredientsFor('Lomo saltado').length, det.procedimento.length, /^https:\/\//.test(det.link)];
+    out.senzaOstriche = !getIngredientsFor('Lomo saltado').some(i => /ostri|ostion/i.test(i.ingrediente));
+    // migrazione: solo gli album con "compleanni" nel nome
+    state.lomoSaltadoAlbum1 = false;
+    state.cookbooks = [{ id: 'a', name: 'Compleanni', recipes: ['Tiramisù'] }, { id: 'b', name: 'Estate', recipes: [] }, { id: 'c', name: 'Compleanni 2', recipes: ['Lomo saltado'] }];
+    runMigrations();
+    out.album = state.cookbooks.map(c => c.recipes.join('|'));
+    state.lomoSaltadoAlbum1 = false; runMigrations(); // già dentro: niente doppioni
+    out.doppio = state.cookbooks[0].recipes.filter(n => n === 'Lomo saltado').length;
+    state.cookbooks = [];
+    return out;
+  });
+  eq(r.meta, ['carne', 'unico', 'carne-rossa', 'riso']);
+  eq(r.det, ['4 porzioni', 15, 10, true]);
+  assert(r.senzaOstriche, 'senza salsa di ostriche');
+  eq(r.album, ['Tiramisù|Lomo saltado', '', 'Lomo saltado']);
+  eq(r.doppio, 1);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
