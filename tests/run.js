@@ -448,8 +448,8 @@ test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finch�
 
 test('generatore: usa gli ingredienti in scadenza in tempo, senza perdere equilibrio', async ({ page }) => {
   const r = await page.evaluate(() => {
-    // La settimana prossima: sempre davanti (l'ultimo giorno della corrente restano pochi pasti), con la scadenza al suo quarto giorno.
-    const W = 1;
+    // La scadenza guida la scelta solo entro 7 giorni: nei primi giorni della settimana si usa la corrente, poi la prossima (scadenza al suo quarto giorno, che rientra nei 7 giorni).
+    const W = WEEK_DISPLAY_ORDER.indexOf(new Date().getDay()) >= 3 ? 1 : 0;
     state.extraWeeks = [];
     const slots = weekPlanSlots(W), seq = weekEatenSequence(slots, W);
     const run = withExpiry => {
@@ -1191,7 +1191,7 @@ test('spesa: le righe spuntate vanno in Completati in fondo, togliendo la spunta
   const r1 = await page.evaluate(() => ({
     completed: [...document.querySelectorAll('.shop-completed .item-name')].map(e => e.textContent.trim()),
     last: document.querySelector('.shop-list').lastElementChild.classList.contains('shop-completed'),
-    move: !!document.querySelector('.buttons-fixed.is-checked #move-checked-to-pantry'),
+    move: !!document.querySelector('.shop-move-end #move-checked-to-pantry'),
     mode: !!document.getElementById('shop-mode-toggle')
   }));
   await page.click('.shop-completed input[data-shop-keys="a"]');
@@ -3088,7 +3088,7 @@ test('avanzo: niente promemoria di preparazione (ammollo) né nel pasto né la s
     writeMealDishes(next.weekIdx, next.i, altro, 'Insalata mista', []);
     delete state.dayLinks[next.key];
     state.showPastDays = true; state.tab = 'menu'; render();
-    const blk = () => document.querySelector(`.meal-block[data-day-index="${next.i}"][data-meal="${next.meal}"]`);
+    const blk = () => document.querySelector(`.meal-block[data-week-idx="${next.weekIdx}"][data-day-index="${next.i}"][data-meal="${next.meal}"]`);
     const pos = WEEK_DISPLAY_ORDER.indexOf(cena.i);
     const before = { note: !!(blk() && blk().querySelector('.meal-notes')), soak: /Pasta e ceci/.test(soakReminderHtml(1, pos)) };
     state.dayLinks[next.key] = cena.key; render();
@@ -4681,6 +4681,48 @@ test('Modifica ricetta: note, consigli e passaggi sono aree di testo che crescon
   assert(r.salvata, 'il testo lungo si salva intero');
   eq(r.notaTipo, 'TEXTAREA');
   eq(r.riepilogo, "prima riga seconda riga con piu' testo");
+});
+
+test('Spesa: il bottone codice a barre spunta la riga giusta, mette quantità e scadenza; se non c\'è, aggiunge già spuntato; "Metti in dispensa" è in fondo', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const out = {};
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopChecked = {}; state.shopQty = {}; state.shopUnit = {}; state.shopExpiry = {}; state.shopExtras = {}; state.barcodes = {};
+    state.shopExtras.ex1 = { ingrediente: 'Panna da cucina', qta: '' };
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    out.btn = !!document.getElementById('spesa-scan');
+    window.fetch = async () => ({ ok: true, json: async () => ({ status: 1, product: { product_name_it: 'Panna da cucina Parmalat', quantity: '200 ml' } }) });
+    document.getElementById('spesa-scan').click();
+    document.getElementById('scan-code').value = '8001234567890';
+    document.getElementById('scan-go').click();
+    await new Promise(res => setTimeout(res, 1300));
+    out.sheet = !!document.querySelector('.shop-scan-sheet');
+    out.pick = state.shopScan && state.shopScan.pick;
+    state.shopScan.scad = '2026-12-31';
+    document.querySelector('[data-scan-done]').click();
+    out.checked = !!state.shopChecked.ex1;
+    out.qty = [state.shopQty.ex1, state.shopUnit.ex1, state.shopExpiry.ex1];
+    // prodotto che non c'è in lista
+    window.fetch = async () => ({ ok: true, json: async () => ({ status: 1, product: { product_name_it: 'Ceci', quantity: '400 g' } }) });
+    document.getElementById('spesa-scan').click();
+    document.getElementById('scan-code').value = '8009999999999';
+    document.getElementById('scan-go').click();
+    await new Promise(res => setTimeout(res, 1300));
+    out.pick2 = state.shopScan && state.shopScan.pick;
+    state.shopScan.scad = '2027-01-15';
+    document.querySelector('[data-scan-done]').click();
+    const ex = Object.entries(state.shopExtras).find(([k, v]) => v.ingrediente === 'Ceci');
+    out.extra = !!ex && !!state.shopChecked[ex[0]] && state.shopExpiry[ex[0]] === '2027-01-15' && state.shopQty[ex[0]] === 400;
+    out.end = !!document.querySelector('.shop-move-end #move-checked-to-pantry');
+    return out;
+  });
+  assert(r.btn, 'bottone scansione mancante');
+  assert(r.sheet && r.pick === 'ex1', 'abbinamento sbagliato: ' + JSON.stringify(r));
+  assert(r.checked, 'riga non spuntata');
+  eq(r.qty, [200, 'ml', '2026-12-31'], 'quantità/scadenza');
+  eq(r.pick2, 'new', 'ceci non in lista');
+  assert(r.extra, 'extra non aggiunto spuntato con scadenza');
+  assert(r.end, 'Metti in dispensa non in fondo');
 });
 
 (async () => {
