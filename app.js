@@ -2444,6 +2444,7 @@ const state = {
   groupMemberSearch: '', // non persistito: ricerca "Aggiungi un formato" nel gruppo in modifica
   sheetFull: false, // non persistito: i fogli dal basso (Aggiungi, Metti in dispensa) tirati su a tutto schermo
   addSheet: null, // non persistito: finestra "Aggiungi" unica ({mode:'spesa'|'casa', d: bozza come newPantryDraft, per, perNew, detailsOpen, suggestOpen, luogoUser})
+  shopScan: null, // non persistito: foglio "Prodotto scansionato" in Spesa ({code, name, pack, rows, pick, newName, qty, unit, scad})
   moveModal: null, // non persistito: finestra "Metti in dispensa" ({rows:[{rowKey,name,unit,per,qtyDefault,qtyLabel,luogo,scad,userScad}], open})
   expiryConfirm: [], // non persistito: chiavi di Dispensa con scadenza stimata da confermare (renderExpiryConfirmModal)
   balanceDetailsOpen: false, // non persistito: spiegazione sotto la riga dell'equilibrio nel Menù
@@ -6089,6 +6090,7 @@ const MODAL_CHECKS = [
   [()=> !!state.swapOpenDay, ()=>{ state.swapOpenDay = null; }],
   [()=> !!state.linkPickerOpenDay, ()=>{ state.linkPickerOpenDay = null; }],
   [()=> !!state.avanzoDiPickerOpenDay, ()=>{ state.avanzoDiPickerOpenDay = null; }],
+  [()=> !!state.shopScan, ()=>{ state.shopScan = null; }],
   [()=> !!state.dishPicker, ()=>{ closeDishPicker(); }],
   [()=> !!state.expandedRecipe && !!state.recipeMenuOpen, ()=>{ state.recipeMenuOpen = false; }],
   [()=> !!state.expandedRecipe, ()=>{ state.expandedRecipe = null; }],
@@ -8566,11 +8568,12 @@ function renderSpesa(){
       </label>
     </div>
     <div class="shop-list">${body}</div>
-          
+    ${displayDoneShoppable ? `<div class="shop-move-end"><button type="button" class="btn is-solid shop-move-btn" id="move-checked-to-pantry">Metti in dispensa (${displayDoneShoppable})</button></div>` : ''}
     
   ${renderExpiryConfirmModal()}
   ${renderMoveModal()}
-    ${displayDoneShoppable ? `<div class="buttons-fixed is-checked"><button type="button" class="btn is-solid is-total shop-move-btn" id="move-checked-to-pantry">Metti in dispensa (${displayDoneShoppable})</button></div>` : ''}
+  ${renderShopScanSheet()}
+    <div class="buttons-fixed is-center"><button class="btn is-fixed" id="spesa-scan" type="button" data-shop-scan-open aria-label="Scansiona il codice a barre">${uiIcon('barcode')}</button></div>
     <div class="buttons-fixed">
       ${`<button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
     </div>
@@ -9187,6 +9190,124 @@ function movePopStyle(pop){
   const above = pop.top > h + 8;
   return above ? `left:${Math.round(left)}px; bottom:${Math.round(vh - pop.top + 6)}px;` : `left:${Math.round(left)}px; top:${Math.round(pop.bottom + 6)}px;`;
 }
+// --- Scansione in Spesa --------------------------------------------------------
+// Il bottone al centro legge il codice a barre di quello che hai comprato e lo
+// abbina a una riga della lista: la spunta, sistema la quantità e segna la
+// scadenza (che resta sulla riga finché non premi "Metti in dispensa").
+function shopScanRows(){
+  const out = [];
+  document.querySelectorAll('.shop-item input[type=checkbox][data-shop-keys]').forEach(cb => {
+    if(cb.closest('.shop-later-group')) return;
+    const info = shopRowInfo(cb);
+    if(info.per) return;
+    out.push({ rowKey: info.rowKey, name: info.name, spec: info.spec, unit: info.unit, qtyLabel: info.qtyLabel, qtyDefault: info.qtyDefault, checked: !!cb.checked });
+  });
+  return out;
+}
+function scanWords(k){ return k.split(/[^a-z0-9]+/).filter(w => w.length >= 3); }
+// Righe della lista che sembrano il prodotto: il nome dell'ingrediente come frase
+// intera dentro il nome del prodotto, o tutte le sue parole (anche al plurale).
+function shopScanMatches(productName, rows){
+  const pk = ingMatchKey(productName), pw = scanWords(pk);
+  const scored = [];
+  rows.forEach(r => {
+    const rk = ingMatchKey(String(r.name || '').replace(/\([^)]*\)/g, ' ')).trim();
+    const rw = scanWords(rk);
+    if(!rk || !rw.length) return;
+    let score = 0;
+    if(pk === rk) score = 100;
+    else if((' ' + pk.replace(/[^a-z0-9]+/g, ' ') + ' ').includes(' ' + rk.replace(/[^a-z0-9]+/g, ' ') + ' ')) score = 80;
+    else if(rw.every(w => { const st = ingMatchStem(w); return pw.some(x => x.startsWith(st) || st.startsWith(ingMatchStem(x))); })) score = 60;
+    if(score) scored.push({ r, score });
+  });
+  return scored.sort((a, b) => (b.score - a.score) || (Number(a.r.checked) - Number(b.r.checked)) || (a.r.name.length - b.r.name.length)).map(x => x.r);
+}
+function handleShopScan(code, product){
+  const prod = product && !product.failed ? product : null;
+  const rows = shopScanRows();
+  const matches = prod ? shopScanMatches(prod.nome, rows) : [];
+  const pack = prod && prod.qty > 0 && UNIT_ORDER.includes(prod.unit || '') ? { qty: prod.qty, unit: prod.unit || '' } : null;
+  const first = matches[0] || null;
+  state.shopScan = {
+    code, name: prod ? prod.nome : '', failed: !!(product && product.failed), pack,
+    rows, matches: matches.map(m => m.rowKey), pick: first ? first.rowKey : 'new', newName: prod ? prod.nome : '',
+    qty: pack ? pack.qty : (first && first.qtyDefault > 0 ? first.qtyDefault : 1), unit: pack ? pack.unit : (first ? first.unit || '' : ''), scad: ''
+  };
+  render();
+}
+function shopScanScadOptions(name){
+  const est = shopExpiryEstimate(name);
+  return [...new Set((est ? [est] : []).concat([3, 7, 30].map(d => addDaysIso(d))))].sort();
+}
+function renderShopScanSheet(){
+  const sc = state.shopScan;
+  if(!sc) return '';
+  const matchRows = sc.matches.map(k => sc.rows.find(r => r.rowKey === k)).filter(Boolean);
+  const others = sc.rows.filter(r => !sc.matches.includes(r.rowKey) && !r.checked);
+  const pickedRow = sc.pick !== 'new' ? sc.rows.find(r => r.rowKey === sc.pick) : null;
+  const ingName = pickedRow ? pickedRow.name : (sc.newName || sc.name || '');
+  const radio = (key, label, sub) => `<button type="button" class="shop-scan-opt${sc.pick === key ? ' active' : ''}" data-scan-pick="${escapeAttr(key)}" aria-pressed="${sc.pick === key}"><span>${escapeHtml(label)}</span>${sub ? `<small>${escapeHtml(sub)}</small>` : ''}</button>`;
+  const scadChips = shopScanScadOptions(ingName).map(iso => `<button type="button" class="move-chip${sc.scad === iso ? ' is-edited' : ''}" data-scan-scad="${iso}">${escapeHtml(moveDateLabel(iso))} <small>${escapeHtml(moveDateHint(iso))}</small></button>`).join('');
+  const title = sc.name || 'Prodotto non riconosciuto';
+  const note = sc.failed ? 'Non riesco a cercare il prodotto (internet?): scegli tu a che riga corrisponde.' : (!sc.name ? 'Non conosco questo codice: scegli la riga o scrivi il nome, lo ricorderò.' : (matchRows.length ? '' : 'Non c\'è in lista: lo aggiungo già spuntato.'));
+  return `
+  <div class="move-backdrop" data-scan-back>
+    <div class="move-sheet shop-scan-sheet" role="dialog" aria-label="Prodotto scansionato" data-stop-close>
+      <div class="move-handle" aria-hidden="true"></div>
+      <div class="dsh-head"><div class="dsh-head-text"><span class="dsh-kicker">Prodotto scansionato</span><h2 class="move-title">${escapeHtml(title)}</h2></div></div>
+      <div class="gen-body shop-scan-body">
+        ${note ? `<p class="gen-note">${escapeHtml(note)}</p>` : ''}
+        <div class="edit-ing-field"><span class="edit-ing-lab">In lista</span>
+          <div class="shop-scan-opts">
+            ${matchRows.map(r => radio(r.rowKey, r.name + (r.spec ? ' · ' + r.spec : ''), r.checked ? 'già spuntato' : r.qtyLabel)).join('')}
+            ${radio('new', matchRows.length ? 'Un altro: aggiungi nuovo' : 'Aggiungi alla lista', '')}
+          </div>
+          ${sc.pick === 'new' ? `<input type="text" id="scan-new-name" class="edit-ing-name" placeholder="Nome dell'ingrediente" value="${escapeAttr(sc.newName || '')}" autocomplete="off">` : ''}
+          ${others.length && sc.pick === 'new' ? `<select id="scan-row-select" aria-label="Oppure scegli dalla lista"><option value="">Oppure scegli dalla lista…</option>${others.map(r => `<option value="${escapeAttr(r.rowKey)}">${escapeHtml(r.name)}</option>`).join('')}</select>` : ''}
+        </div>
+        <div class="edit-ing-field"><span class="edit-ing-lab">Quantità</span>
+          <div class="edit-ing-fields"><input type="number" inputmode="decimal" min="0" step="any" id="scan-qty" class="edit-ing-num" value="${escapeAttr(String(sc.qty || ''))}" aria-label="Quantità">
+            <select id="scan-unit" aria-label="Unità">${UNIT_ORDER.filter(u => u !== 'none').map(u => `<option value="${u}"${(sc.unit || '') === u ? ' selected' : ''}>${escapeHtml(UNIT_SHORT[u] || u)}</option>`).join('')}</select></div>
+        </div>
+        <div class="edit-ing-field"><span class="edit-ing-lab">Scadenza</span>
+          <div class="shop-scan-scad">${scadChips}
+            <label class="move-chip${sc.scad && sc.scad !== 'none' && !shopScanScadOptions(ingName).includes(sc.scad) ? ' is-edited' : ''}">Altra data<input type="date" id="scan-date" value="${escapeAttr(sc.scad && sc.scad !== 'none' ? sc.scad : '')}"></label>
+            <button type="button" class="move-chip${sc.scad === 'none' ? ' is-edited' : ''}" data-scan-scad="none">Nessuna</button></div>
+          <p class="edit-ing-hint">Si ricorda sulla riga e passa in Dispensa quando premi "Metti in dispensa".</p>
+        </div>
+      </div>
+      <div class="edit-ing-footer"><button type="button" class="btn is-text" data-scan-cancel>Annulla</button><button type="button" class="btn is-solid" data-scan-done>Fatto</button></div>
+    </div>
+  </div>`;
+}
+function applyShopScan(){
+  const sc = state.shopScan;
+  if(!sc) return;
+  const snap = JSON.parse(JSON.stringify({ c: state.shopChecked, q: state.shopQty, u: state.shopUnit, x: state.shopExpiry || {}, e: state.shopExtras, b: state.barcodes || {} }));
+  let rowKey, name;
+  if(sc.pick === 'new'){
+    name = (sc.newName || '').trim();
+    if(!name){ showNotice('Scrivi il nome dell\'ingrediente o scegli una riga.'); return; }
+    rowKey = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    state.shopExtras[rowKey] = { ingrediente: name, qta: '' };
+  } else {
+    const r = sc.rows.find(x => x.rowKey === sc.pick);
+    if(!r) return;
+    rowKey = r.rowKey; name = r.name;
+  }
+  rowKey.split(',').forEach(k => { state.shopChecked[k] = true; });
+  if(sc.qty > 0){ state.shopQty[rowKey] = sc.qty; state.shopUnit[rowKey] = sc.unit || ''; }
+  if(sc.scad){ if(!state.shopExpiry) state.shopExpiry = {}; state.shopExpiry[rowKey] = sc.scad; }
+  // Si ricorda: il prossimo scatto di questo codice trova subito la stessa riga.
+  if(sc.code){ if(!state.barcodes) state.barcodes = {}; state.barcodes[sc.code] = { nome: name, cat: '', unit: sc.pack ? sc.pack.unit : (sc.unit || ''), qty: sc.pack ? sc.pack.qty : (sc.qty || 0) }; }
+  state.shopScan = null;
+  persist(); render();
+  const when = sc.scad && sc.scad !== 'none' ? ` · scade ${moveDateLabel(sc.scad)}` : '';
+  showUndoToast(`«${name}» spuntato${when}`, ()=>{
+    state.shopChecked = snap.c; state.shopQty = snap.q; state.shopUnit = snap.u; state.shopExpiry = snap.x; state.shopExtras = snap.e; state.barcodes = snap.b;
+    persist(); render();
+  });
+}
 function renderMoveModal(){
   const m = state.moveModal;
   if(!m) return '';
@@ -9769,7 +9890,7 @@ function closeBarcodeScanner(){
   const ov = document.getElementById('scan-overlay'); if(ov) ov.remove();
   state.scannerOpen = false;
 }
-function openBarcodeScanner(){
+function openBarcodeScanner(opts){
   closeBarcodeScanner();
   state.scannerOpen = true;
   const ov = document.createElement('div');
@@ -9803,6 +9924,8 @@ function openBarcodeScanner(){
       await new Promise(res => setTimeout(res, 1600));
     }
     closeBarcodeScanner();
+    // Da Spesa: il risultato va al foglio "Prodotto scansionato", non a una scheda Aggiungi.
+    if(opts && opts.onResult){ opts.onResult(code, product); return; }
     const scanDraft = state.addSheet ? state.addSheet.d : state.pantryDraft;
     if(scanDraft) applyScannedProduct(code, product);
     if(state.addSheet) state.addSheet.suggestOpen = false;
@@ -12972,6 +13095,26 @@ function attachHandlers(){
   document.querySelectorAll('[data-shop-exp-date]').forEach(inp=> inp.addEventListener('change', e=> setShopExpiry(inp.dataset.shopExpDate, e.target.value || 'none')));
   document.querySelectorAll('[data-shop-exp-clear]').forEach(btn=> btn.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); setShopExpiry(btn.dataset.shopExpClear, 'none'); }));
   document.querySelectorAll('[data-scan-barcode]').forEach(btn=> btn.addEventListener('click', ()=> openBarcodeScanner()));
+  document.querySelectorAll('[data-shop-scan-open]').forEach(btn=> btn.addEventListener('click', ()=> openBarcodeScanner({ onResult: handleShopScan })));
+  if(state.shopScan){
+    const sc = state.shopScan;
+    const back = document.querySelector('[data-scan-back]');
+    if(back) back.addEventListener('click', e=>{ if(e.target === back){ state.shopScan = null; render(); } });
+    document.querySelectorAll('[data-scan-cancel]').forEach(b=> b.addEventListener('click', ()=>{ state.shopScan = null; render(); }));
+    document.querySelectorAll('[data-scan-done]').forEach(b=> b.addEventListener('click', applyShopScan));
+    document.querySelectorAll('[data-scan-pick]').forEach(b=> b.addEventListener('click', ()=>{
+      sc.pick = b.dataset.scanPick;
+      const r = sc.rows.find(x => x.rowKey === sc.pick);
+      if(r && !sc.pack){ sc.qty = r.qtyDefault > 0 ? r.qtyDefault : sc.qty; sc.unit = r.unit || ''; }
+      render();
+    }));
+    document.querySelectorAll('[data-scan-scad]').forEach(b=> b.addEventListener('click', ()=>{ sc.scad = sc.scad === b.dataset.scanScad ? '' : b.dataset.scanScad; render(); }));
+    const dt = document.getElementById('scan-date'); if(dt) dt.addEventListener('change', e=>{ sc.scad = e.target.value || ''; render(); });
+    const q = document.getElementById('scan-qty'); if(q) q.addEventListener('input', e=>{ sc.qty = parseFloat(String(e.target.value).replace(',', '.')) || 0; });
+    const u = document.getElementById('scan-unit'); if(u) u.addEventListener('change', e=>{ sc.unit = e.target.value; });
+    const nn = document.getElementById('scan-new-name'); if(nn) nn.addEventListener('input', e=>{ sc.newName = e.target.value; });
+    const rs = document.getElementById('scan-row-select'); if(rs) rs.addEventListener('change', e=>{ if(e.target.value){ sc.pick = e.target.value; render(); } });
+  }
   const pantryAddBtn = document.getElementById('pantry-add-btn');
   if(pantryAddBtn) pantryAddBtn.addEventListener('click', ()=>{
     const d = state.pantryDraft; if(!d) return;

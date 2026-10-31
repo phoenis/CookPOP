@@ -2813,3 +2813,20 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .edit-autosize{ box-sizing:border-box; width:100%; min-height:2.75rem; font-family:var(--font-family); font-size:var(--text-body); line-height:1.4; color:var(--ink); background:var(--form-background, var(--surface)); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:var(--space-xsmall) var(--space-small); resize:none; overflow:hidden; display:block; }
 .recipe-edit-page .filter-group > textarea.edit-autosize{ flex:none; }
 .edit-step-row .edit-step-text.edit-autosize{ width:auto; flex:1; min-width:0; }
+
+/* Spesa: "Metti in dispensa" in fondo alla lista; al centro il bottone del codice a barre. */
+.shop-move-end{ display:flex; justify-content:center; padding:var(--s5) 0 calc(var(--s7, 4.5rem) + 3rem); }
+.shop-move-end .shop-move-btn{ min-height:56px; padding:0 var(--s5); border-radius:var(--r-full); box-shadow:var(--shadow-2); }
+.buttons-fixed.is-center{ left:50%; right:auto; transform:translateX(-50%); bottom:calc(4.5rem + env(safe-area-inset-bottom)); align-items:center; }
+#spesa-scan{ width:56px; height:56px; box-shadow:var(--shadow-2); }
+#spesa-scan svg{ width:1.5rem; height:1.5rem; }
+.shop-scan-opts{ display:flex; flex-direction:column; gap:var(--s2); }
+.shop-scan-opt{ display:flex; justify-content:space-between; align-items:center; gap:var(--s3); text-align:left; padding:var(--s3); border:1px solid var(--line); border-radius:var(--form-border-radius); background:var(--bg); color:var(--ink); font:inherit; cursor:pointer; min-height:2.75rem; }
+.shop-scan-opt.active{ border-color:var(--accent); background:var(--accent-soft); font-weight:var(--weight-bold); }
+.shop-scan-opt small{ color:var(--ink-light); font-weight:var(--weight-normal); }
+.shop-scan-scad{ display:flex; flex-wrap:wrap; gap:var(--s2); }
+.shop-scan-scad .move-chip small{ color:var(--ink-light); }
+.shop-scan-scad input[type=date]{ border:0; background:none; font:inherit; color:inherit; margin-left:var(--s1, 0.25rem); max-width:9rem; }
+.shop-scan-sheet #scan-row-select{ box-sizing:border-box; width:100%; min-height:2.75rem; margin-top:var(--s2); font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
+.shop-scan-sheet #scan-unit{ flex:1; min-width:0; box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
+.shop-scan-sheet .edit-ing-fields .edit-ing-num{ flex:0 0 6rem; width:6rem; min-width:0; box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
