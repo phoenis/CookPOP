@@ -4725,6 +4725,18 @@ test('Spesa: il bottone codice a barre spunta la riga giusta, mette quantità e 
   assert(r.end, 'Metti in dispensa non in fondo');
 });
 
+test('Spesa: la scorta in Dispensa si sottrae sul totale di tutte le ricette (8 uova servono, 2 in casa: ne mancano 6)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {};
+    upsertPantryItem('Uova', 'frigo', 2);
+    const used = new Map();
+    const st = ['2', '2', '2', '2'].map(q => pantryStatusFor('Uova', q, '', used));
+    return { st, solo: pantryStatusFor('Uova', '2', '') };
+  });
+  eq(r.st, ['in-casa', 'poco', 'poco', 'poco'], 'prima riga coperta, le altre no');
+  eq(r.solo, 'in-casa', 'una sola ricetta resta coperta');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
