@@ -2844,3 +2844,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .store-dept-list{ display:flex; flex-direction:column; min-height:2.75rem; border-radius:var(--form-border-radius); }
 .store-dept-list:empty{ border:1px dashed var(--line); }
 .store-dept-row.is-dragging{ opacity:.6; }
+
+/* Spesa con i negozi: un titolo per blocco. */
+.shop-store-head{ margin:var(--s5) 0 var(--s2); padding:var(--s2) var(--s3); border-radius:var(--form-border-radius); background:var(--accent-soft); color:var(--ink); font-weight:var(--weight-bold); font-size:var(--text-body); }
+.shop-store-head:first-child{ margin-top:0; }
