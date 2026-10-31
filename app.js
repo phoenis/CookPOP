@@ -8069,6 +8069,7 @@ function shopStoreOfDept(dept){
   const rest = stores.find(st => st.rest);
   return rest ? rest.id : '';
 }
+const SHOP_CHEVRON_SVG = '<svg class="finished-chevron" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" viewBox="0 0 256 256"><path fill="currentColor" d="m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32"></path></svg>';
 function buildShopFlat(){
   const flat = [];
   const pantryUsed = new Map();
@@ -8350,15 +8351,20 @@ function renderSpesa(){
       const dept = deptKey.startsWith('__az@') ? '__az' : deptKey;
       const isFinitiDept = dept === 'finiti';
       const items = byDept[deptKey];
-      let storeHead = '';
-      if(useStores && !isFinitiDept){
-        const sid = storeOfKey(deptKey);
-        if(sid !== lastStoreShown){
-          lastStoreShown = sid;
-          const st = stores.find(x => x.id === sid);
-          storeHead = `<div class="shop-store-head">${escapeHtml(st ? st.label : 'Senza negozio')}</div>`;
-        }
-      }
+      // Con i negozi ogni blocco è una sezione come quelle dei reparti (stessa intestazione, si apre e si chiude).
+      const storeWrap = inner => {
+        if(!deptKey.startsWith('__az@')) return inner;
+        const sid = deptKey.slice(5), st = stores.find(x => x.id === sid);
+        const secId = `negozio_${sid || 'nessuno'}`, open = !state.shopSectionCollapsed[secId];
+        return `
+      <div class="shop-day-group">
+        <div class="dept-title finished-toggle${open ? ' open' : ''}" data-toggle-shop-section="${escapeAttr(secId)}">
+          <span class="dept-icon">🏪</span>${escapeHtml(st ? st.label : 'Senza negozio')}
+          ${SHOP_CHEVRON_SVG}
+        </div>
+        <div class="accordion-body${open ? '' : ' is-collapsed'}">${inner}</div>
+      </div>`;
+      };
       const finitiCheckedCount = isFinitiDept ? items.filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
       const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per, it.spec)).join('');
       const finishedActions = finitiCheckedCount ? `
@@ -8378,12 +8384,12 @@ function renderSpesa(){
         </div>`;
       }
       if(dept === '__az' && state.shopView === 'ordine'){
-        return storeHead + `<div class="shop-day-group shop-az shop-order-list">${items.map(it => `<div class="shop-order-row" data-order-row="${escapeAttr(shopOrderKey(it))}"><span class="aisle-handle" data-order-handle aria-label="Trascina per spostare" role="button">⠿</span><div class="shop-order-item">${itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per)}</div></div>`).join('')}</div>`;
+        return storeWrap(`<div class="shop-day-group shop-az shop-order-list">${items.map(it => `<div class="shop-order-row" data-order-row="${escapeAttr(shopOrderKey(it))}"><span class="aisle-handle" data-order-handle aria-label="Trascina per spostare" role="button">⠿</span><div class="shop-order-item">${itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per)}</div></div>`).join('')}</div>`);
       }
-      if(dept === '__az') return storeHead + `<div class="shop-day-group shop-az">${rowsHtml}</div>`;
+      if(dept === '__az') return storeWrap(`<div class="shop-day-group shop-az">${rowsHtml}</div>`);
       const sectionId = `reparto_${dept}`;
       const isOpen = !state.shopSectionCollapsed[sectionId];
-      return storeHead + `
+      return `
       <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
           <span class="dept-icon">${DEPT_ICON[dept] || ''}</span>${escapeHtml(DEPT_LABEL[dept])}
@@ -8626,7 +8632,7 @@ function renderSpesa(){
     ${missingBanner}
     ${listSearchHtml('shop-search', state.shopSearch, 'Cerca nella lista…')}
     <div class="shop-head">
-      ${(total && ['reparto','categoria','giorno'].includes(state.shopView)) ? `<button type="button" class="btn is-text shop-toggle-all" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? 'Apri tutti' : 'Chiudi tutti'}</button>` : '<span></span>'}
+      ${(total && (['reparto','categoria','giorno'].includes(state.shopView) || (stores.length && state.shopView === 'ordine'))) ? `<button type="button" class="btn is-text shop-toggle-all" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'ordine' ? 'negozio_' : (state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_')))) ? 'Apri tutti' : 'Chiudi tutti'}</button>` : '<span></span>'}
       <label class="shop-group-by"><span>Ordina per</span>
         <select data-shop-group aria-label="Ordina per">
           ${[['reparto','Corsie'],['categoria','Categoria'],['ordine','Spesa'],['giorno','Pasto'],['az','Dalla A alla Z']].map(([v,l]) => `<option value="${v}" ${state.shopView === v ? 'selected' : ''}>${l}</option>`).join('')}
