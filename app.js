@@ -14493,16 +14493,27 @@ function renderStoresPage(){
   if(!state.storesOpen) return '';
   const stores = shopStoresList();
   const depts = DEPT_ORDER.filter(d => d !== 'finiti' && d !== 'avanzi' && DEPT_LABEL[d]);
+  const owner = {};
+  depts.forEach(d => { owner[d] = shopStoreOfDept(d); });
+  const rows = list => list.map(d => `<div class="manage-row aisle-row store-dept-row" data-store-dept-row="${escapeAttr(d)}"><span class="aisle-handle" data-store-handle aria-label="Trascina in un altro negozio">⠿</span><span class="manage-row-icon">${DEPT_ICON[d] || ''}</span><span class="manage-row-main">${escapeHtml(DEPT_LABEL[d])}</span></div>`).join('');
   const cards = stores.map(st => `
-      <section class="settings-section" data-store-card="${escapeAttr(st.id)}"><div class="settings-card store-card">
+      <section class="settings-section store-block" data-store-card="${escapeAttr(st.id)}"><div class="settings-card store-card">
         <div class="store-card-head"><input type="text" class="store-name" data-store-name="${escapeAttr(st.id)}" value="${escapeAttr(st.label)}" aria-label="Nome del negozio" autocomplete="off">
           <button type="button" class="btn is-icon" data-store-del="${escapeAttr(st.id)}" aria-label="Elimina ${escapeAttr(st.label)}">${TRASH_ICON_SVG}</button></div>
-        <label class="store-rest"><input type="checkbox" data-store-rest="${escapeAttr(st.id)}" ${st.rest ? 'checked' : ''}> Tutto il resto (reparti che non scegli altrove, in ordine di corsia)</label>
-        <div class="store-depts">${depts.map(d => `<button type="button" class="move-chip${(st.depts || []).includes(d) ? ' is-edited' : ''}" data-store-dept="${escapeAttr(st.id)}" data-dept="${escapeAttr(d)}" aria-pressed="${(st.depts || []).includes(d)}">${DEPT_ICON[d] || ''} ${escapeHtml(DEPT_LABEL[d])}</button>`).join('')}</div>
+        <label class="store-rest"><input type="checkbox" data-store-rest="${escapeAttr(st.id)}" ${st.rest ? 'checked' : ''}> Tutto il resto (anche i reparti nuovi)</label>
+        <div class="store-dept-list" data-store-list="${escapeAttr(st.id)}">${rows(depts.filter(d => owner[d] === st.id))}</div>
       </div></section>`).join('');
+  const loose = depts.filter(d => !owner[d]);
+  const looseBlock = stores.length && (loose.length || !stores.some(st => st.rest)) ? `
+      <section class="settings-section store-block" data-store-card=""><div class="settings-card store-card">
+        <div class="store-card-head"><strong>Senza negozio</strong></div>
+        <p class="settings-note">Si vedono solo in "Tutti".</p>
+        <div class="store-dept-list" data-store-list="">${rows(loose)}</div>
+      </div></section>` : '';
   const body = `
-      <p class="settings-note manage-intro">Dividi la spesa per negozio: in Spesa compaiono delle schede (Tutti, e una per negozio). Ogni reparto va in un solo negozio; "Tutto il resto" prende quelli non scelti.</p>
+      <p class="settings-note manage-intro">Ogni negozio ha i suoi reparti: trascinali dalla maniglia ⠿ da un negozio all'altro. In Spesa compaiono le schede Tutti e una per negozio. "Tutto il resto" prende i reparti non scelti.</p>
       ${cards || '<p class="settings-note">Ancora nessun negozio.</p>'}
+      ${looseBlock}
       <button type="button" class="btn is-outline is-block" data-store-add>+ Aggiungi negozio</button>
       ${stores.length ? '' : '<button type="button" class="btn is-solid is-block" data-store-seed>Crea Fruttarolo, Rossetto e Farmacia</button>'}`;
   return managePageHtml({ key: 'stores', title: 'Negozi', closeAttr: 'data-close-stores', body });
@@ -14527,13 +14538,6 @@ document.addEventListener('click', e=>{
   if(t.closest('[data-store-add]')){ state.shopStores = list.concat([{ id: newId(), label: 'Nuovo negozio', depts: [], rest: false }]); persist(); render(); return; }
   const del = t.closest('[data-store-del]');
   if(del){ state.shopStores = list.filter(st => st.id !== del.dataset.storeDel); if(state.shopStore === del.dataset.storeDel) state.shopStore = ''; persist(); render(); return; }
-  const dp = t.closest('[data-store-dept]');
-  if(dp){
-    const id = dp.dataset.storeDept, d = dp.dataset.dept;
-    const had = (list.find(st => st.id === id).depts || []).includes(d);
-    list.forEach(st => { st.depts = (st.depts || []).filter(x => x !== d); if(st.id === id && !had) st.depts.push(d); });
-    state.shopStores = list; persist(); render(); return;
-  }
 });
 document.addEventListener('change', e=>{
   const r = e.target.closest && e.target.closest('[data-store-rest]');
@@ -14549,6 +14553,54 @@ document.addEventListener('input', e=>{
   const st = shopStoresList().find(x => x.id === n.dataset.storeName);
   if(st){ st.label = n.value.trim() || 'Negozio'; persist(); }
 });
+// Trascinamento dei reparti tra i negozi (maniglia ⠿), come in "Ordine corsie".
+(function(){
+  let drag = null;
+  const lists = () => [...document.querySelectorAll('[data-store-list]')];
+  const move = () => {
+    // lista sotto il dito: la prima il cui riquadro contiene la y, altrimenti la più vicina
+    const ls = lists();
+    let target = ls.find(l => { const b = l.closest('.store-block').getBoundingClientRect(); return drag.lastY >= b.top && drag.lastY <= b.bottom; });
+    if(!target) target = ls.reduce((best, l) => { const b = l.getBoundingClientRect(), d = Math.min(Math.abs(drag.lastY - b.top), Math.abs(drag.lastY - b.bottom)); return !best || d < best.d ? { l, d } : best; }, null).l;
+    const rows = [...target.querySelectorAll('[data-store-dept-row]')].filter(r => r !== drag.row);
+    const next = rows.find(r => { const b = r.getBoundingClientRect(); return drag.lastY < b.top + b.height / 2; });
+    if(next) target.insertBefore(drag.row, next); else target.appendChild(drag.row);
+  };
+  const autoScroll = () => {
+    if(!drag) return;
+    const r = drag.scroller.getBoundingClientRect(), edge = 48;
+    const dy = drag.lastY < r.top + edge ? -8 : drag.lastY > r.bottom - edge ? 8 : 0;
+    if(dy){ drag.scroller.scrollTop += dy; move(); }
+    drag.raf = requestAnimationFrame(autoScroll);
+  };
+  document.addEventListener('pointerdown', e=>{
+    const h = e.target.closest && e.target.closest('[data-store-handle]');
+    if(!h) return;
+    const row = h.closest('[data-store-dept-row]');
+    e.preventDefault();
+    drag = { row, scroller: row.closest('.sheet-body') || document.scrollingElement, pointerId: e.pointerId, lastY: e.clientY };
+    row.classList.add('is-dragging');
+    drag.raf = requestAnimationFrame(autoScroll);
+  });
+  document.addEventListener('pointermove', e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    e.preventDefault();
+    drag.lastY = e.clientY;
+    move();
+  }, { passive: false });
+  const end = e=>{
+    if(!drag || e.pointerId !== drag.pointerId) return;
+    cancelAnimationFrame(drag.raf);
+    drag.row.classList.remove('is-dragging');
+    drag = null;
+    const list = shopStoresList();
+    list.forEach(st => { const l = document.querySelector(`[data-store-list="${CSS.escape(st.id)}"]`); if(l) st.depts = [...l.querySelectorAll('[data-store-dept-row]')].map(r => r.dataset.storeDeptRow); });
+    state.shopStores = list;
+    persist(); render();
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
 function renderAislesPage(){
   if(!state.aisleOrderOpen) return '';
   const list = shopAisles();
