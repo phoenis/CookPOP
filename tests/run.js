@@ -4737,6 +4737,17 @@ test('Spesa: la scorta in Dispensa si sottrae sul totale di tutte le ricette (8 
   eq(r.solo, 'in-casa', 'una sola ricetta resta coperta');
 });
 
+test('Spesa: la nota di un ingrediente per un\'altra persona è separata da quella per noi (pane fresco / pane in busta)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = { a: { ingrediente: 'Pane', qta: '' }, b: { ingrediente: 'Pane', qta: '', per: 'Papà' } };
+    state.ingredientNotes = { 'pane': 'fresco', 'pane – per papà': 'in busta per l\'insalata' };
+    state.pantryItems = {}; state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    return [...document.querySelectorAll('.ing-note-text')].map(e => e.textContent.trim()).sort();
+  });
+  eq(r, ['fresco', 'in busta per l\'insalata'], 'due note distinte');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

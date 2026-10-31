@@ -8199,7 +8199,9 @@ function renderSpesa(){
     // Nota personale legata al nome dell'ingrediente (non al pasto/occorrenza):
     // stessa nota su ogni riga in cui compare, persiste da una settimana
     // all'altra — stesso schema tocca-per-modificare della "Variante" avanzo.
-    const ingNoteKey = (ingrediente||'').trim().toLowerCase();
+    // La nota è dell'ingrediente, ma per un'altra persona è separata: il pane per noi
+    // ("fresco") e quello per il papà ("in busta") hanno ciascuno la sua.
+    const ingNoteKey = (ingrediente||'').trim().toLowerCase() + (per ? ' – per ' + String(per).trim().toLowerCase() : '');
     const ingNote = state.ingredientNotes[ingNoteKey] || '';
     const editingIngNote = state.ingNoteEditingKey === ingNoteKey;
     const ingNoteHtml = editingIngNote
