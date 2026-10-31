@@ -4748,7 +4748,7 @@ test('Spesa: la nota di un ingrediente per un\'altra persona è separata da quel
   eq(r, ['fresco', 'in busta per l\'insalata'], 'due note distinte');
 });
 
-test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — una lista sola divisa in blocchi, uno per negozio, con i suoi reparti; "Tutto il resto" prende gli altri', async ({ page }) => {
+test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — modalità Spesa divisa in blocchi, uno per negozio (le altre modalità restano per reparto); "Tutto il resto" prende gli altri', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Latte', qta: '1' }, c: { ingrediente: 'Shampoo', qta: '1' } };
@@ -4765,7 +4765,7 @@ test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — una lista sola divisa i
   });
   assert(r.senza, 'titoli senza negozi');
   const want = ['Fruttarolo', 'Zucchine', 'Rossetto', 'Latte', 'Farmacia', 'Shampoo'];
-  eq(r.reparto, want); eq(r.az, want); eq(r.ordine, want);
+  eq(r.ordine, want); assert(!r.reparto.includes('Rossetto') && !r.az.includes('Fruttarolo'), 'negozi solo nella modalità Spesa');
 });
 
 test('Negozi: i reparti si trascinano dalla maniglia da un negozio all\'altro', async ({ page }) => {
