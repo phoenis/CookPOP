@@ -1822,7 +1822,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq(r.visible, ['Ingredienti e reparti']);
   eq(r.visibleLinks, ['depts']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 5, spesa: 1, menu: 2, prep: 2 });
+  eq(r.menus, { dispensa: 5, spesa: 2, menu: 2, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -2000,7 +2000,7 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     TAB_MENU_ITEMS.menu[1].action(); out.food = state.genFoodOpen === true && state.genGeneralOpen === false; state.genFoodOpen = false;
     return out;
   });
-  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie'], menu: ['Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
+  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie', 'Negozi'], menu: ['Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
 });
 
 test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
@@ -4746,6 +4746,28 @@ test('Spesa: la nota di un ingrediente per un\'altra persona è separata da quel
     return [...document.querySelectorAll('.ing-note-text')].map(e => e.textContent.trim()).sort();
   });
   eq(r, ['fresco', 'in busta per l\'insalata'], 'due note distinte');
+});
+
+test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — una scheda per negozio con i suoi reparti; "Tutto il resto" prende gli altri', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Latte', qta: '1' }, c: { ingrediente: 'Shampoo', qta: '1' } };
+    state.pantryItems = {}; state.shopStores = []; state.shopStore = ''; state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    const out = { senza: !document.querySelector('.shop-stores') };
+    state.storesOpen = true; render();
+    document.querySelector('[data-store-seed]').click();
+    state.storesOpen = false; render();
+    out.tabs = [...document.querySelectorAll('.shop-store-tab')].map(b => b.firstChild.textContent.trim());
+    const names = () => [...document.querySelectorAll('.shop-list .item-name')].map(e => e.textContent.trim()).sort();
+    out.tutti = names();
+    const go = label => { [...document.querySelectorAll('.shop-store-tab')].find(b => b.firstChild.textContent.trim() === label).click(); return names(); };
+    out.frutt = go('Fruttarolo'); out.ross = go('Rossetto'); out.farm = go('Farmacia');
+    return out;
+  });
+  assert(r.senza, 'schede senza negozi');
+  eq(r.tabs, ['Tutti', 'Fruttarolo', 'Rossetto', 'Farmacia']);
+  eq(r.tutti, ['Latte', 'Shampoo', 'Zucchine']);
+  eq(r.frutt, ['Zucchine']); eq(r.ross, ['Latte']); eq(r.farm, ['Shampoo']);
 });
 
 (async () => {
