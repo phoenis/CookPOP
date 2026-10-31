@@ -2848,3 +2848,8 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Spesa con i negozi: un titolo per blocco. */
 .shop-store-head{ margin:var(--s5) 0 var(--s2); padding:var(--s2) var(--s3); border-radius:var(--form-border-radius); background:var(--accent-soft); color:var(--ink); font-weight:var(--weight-bold); font-size:var(--text-body); }
 .shop-store-head:first-child{ margin-top:0; }
+
+/* Spesa (negozi): la maniglia ⠿ sta nel margine a sinistra della riga, così le spunte restano allineate come negli altri ordinamenti. */
+.accordion-body > .shop-az{ padding-left:0; padding-right:0; }
+.accordion-body .shop-order-row{ position:relative; }
+.accordion-body .shop-order-row .aisle-handle{ position:absolute; left:-1rem; top:0; bottom:0; width:1rem; display:flex; align-items:center; justify-content:center; padding:0; z-index:1; }
