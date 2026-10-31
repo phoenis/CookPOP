@@ -2830,3 +2830,15 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .shop-scan-sheet #scan-row-select{ box-sizing:border-box; width:100%; min-height:2.75rem; margin-top:var(--s2); font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
 .shop-scan-sheet #scan-unit{ flex:1; min-width:0; box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
 .shop-scan-sheet .edit-ing-fields .edit-ing-num{ flex:0 0 6rem; width:6rem; min-width:0; box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
+
+/* Spesa: schede per negozio e pagina "Negozi". */
+.shop-stores{ display:flex; gap:var(--s2); overflow-x:auto; padding:var(--s2) 0; scrollbar-width:none; }
+.shop-stores::-webkit-scrollbar{ display:none; }
+.shop-store-tab{ flex:0 0 auto; min-height:2.5rem; padding:0 var(--s4); border:1px solid var(--line); border-radius:var(--r-full); background:var(--bg); color:var(--ink); font:inherit; cursor:pointer; }
+.shop-store-tab.active{ background:var(--accent); border-color:var(--accent); color:var(--on-accent, #fff); font-weight:var(--weight-bold); }
+.shop-store-n{ opacity:.75; font-size:.85em; margin-left:.25rem; }
+.store-card{ display:flex; flex-direction:column; gap:var(--s3); }
+.store-card-head{ display:flex; align-items:center; gap:var(--s2); }
+.store-name{ flex:1; min-width:0; box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
+.store-rest{ display:flex; gap:var(--s2); align-items:flex-start; font-size:var(--text-small, .875rem); }
+.store-depts{ display:flex; flex-wrap:wrap; gap:var(--s2); }

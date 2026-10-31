@@ -2417,6 +2417,9 @@ const state = {
   cookbooks: [], // Libro di cucina: album di ricette [{ id, name, recipes:[nomi] }] (vedi renderCookbooksView)
   prepView: 'ricette', // non persistito: 'ricette' | 'libro' (interruttore in basso in Ricette)
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
+  shopStores: [], // negozi della Spesa: [{id, label, depts:[reparti], rest:true se prende tutto il resto}]; vuoto = una lista sola
+  shopStore: '', // non persistito: scheda negozio aperta in Spesa ('' = Tutti)
+  storesOpen: false, // non persistito: pagina "Negozi"
   shopOrderCustom: [], // ordine "Ordine spesa" scelto a mano: nomi (minuscoli) degli ingredienti, anche di quelli non più in lista (vedi shopOrderApply)
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
   settingsReturnTab: null, // ephemeral: scheda da ripristinare quando si chiudono le Impostazioni
@@ -4095,6 +4098,7 @@ function buildPersonalPayload(){
     cardsSort: state.cardsSort,
     shopAisleCustom: state.shopAisleCustom,
     shopOrderCustom: state.shopOrderCustom,
+    shopStores: state.shopStores,
     cookbooks: state.cookbooks
   };
   MIGRATIONS.forEach(m=>{ payload[m.flag] = !!state[m.flag]; });
@@ -5947,7 +5951,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderGenGeneralPage() + renderMembersPage() + renderOnboardingPage() + renderProfilePage() + renderAislesPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderGenGeneralPage() + renderMembersPage() + renderOnboardingPage() + renderProfilePage() + renderAislesPage() + renderStoresPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -6090,6 +6094,7 @@ const MODAL_CHECKS = [
   [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
   [()=> !!state.profileOpen, ()=>{ state.profileOpen = false; }],
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
+  [()=> !!state.storesOpen, ()=>{ state.storesOpen = false; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
   [()=> !!state.expiryEstOpen, ()=>{ state.expiryEstOpen = false; }],
@@ -8051,6 +8056,19 @@ function isMealDoneAt(weekIdx, i, meal){
   const done = weekMealsDoneRef(weekIdx);
   return !!(done && done[i] && done[i][meal]);
 }
+// --- Negozi --------------------------------------------------------------------
+function shopStoresList(){ return Array.isArray(state.shopStores) ? state.shopStores.filter(st => st && st.id && st.label) : []; }
+function shopFlatDept(it){
+  return (it.context === 'Finiti in Dispensa' && !it.confirmed) ? 'finiti' : (knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
+}
+// Il negozio di un reparto: quello che lo ha scelto, altrimenti "tutto il resto"; '' se nessuno.
+function shopStoreOfDept(dept){
+  const stores = shopStoresList();
+  const own = stores.find(st => (st.depts || []).includes(dept));
+  if(own) return own.id;
+  const rest = stores.find(st => st.rest);
+  return rest ? rest.id : '';
+}
 function buildShopFlat(){
   const flat = [];
   const pantryUsed = new Map();
@@ -8134,8 +8152,13 @@ function renderSpesa(){
   // freschi della settimana dopo si comprano più avanti: stanno a parte.
   // Il fresco della settimana prossima si compra insieme al resto: "Più avanti" è per quello di tra due settimane o più.
   const isLaterRow = it => it.isRecipe && it.weekIdx >= 2 && SHOP_LATER_DEPTS.includes(knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
-  const laterFlat = allShopFlat.filter(isLaterRow);
-  const mainFlat = allShopFlat.filter(it => !isLaterRow(it));
+  // Negozi (Menù ⋮ della Spesa → Negozi): una scheda per negozio mostra solo i suoi reparti.
+  const stores = shopStoresList();
+  if(state.shopStore && !stores.some(st => st.id === state.shopStore)) state.shopStore = '';
+  const inStore = it => !state.shopStore || shopStoreOfDept(shopFlatDept(it)) === state.shopStore;
+  const laterFlat = allShopFlat.filter(isLaterRow).filter(inStore);
+  const mainAll = allShopFlat.filter(it => !isLaterRow(it));
+  const mainFlat = mainAll.filter(inStore);
 
   // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
   // quantità testuale) in Per reparto: se ne hai spuntata una qualsiasi in
@@ -8576,6 +8599,7 @@ function renderSpesa(){
   return `
     ${missingBanner}
     ${listSearchHtml('shop-search', state.shopSearch, 'Cerca nella lista…')}
+    ${stores.length ? `<div class="shop-stores" role="tablist">${[{ id: '', label: 'Tutti' }].concat(stores).map(st => { const n = mainAll.filter(it => (!st.id || shopStoreOfDept(shopFlatDept(it)) === st.id) && !isItemChecked([it.key]) && shopFlatDept(it) !== 'finiti').length; return `<button type="button" class="shop-store-tab${state.shopStore === st.id ? ' active' : ''}" role="tab" aria-selected="${state.shopStore === st.id}" data-shop-store="${escapeAttr(st.id)}">${escapeHtml(st.label)}${n ? ` <span class="shop-store-n">${n}</span>` : ''}</button>`; }).join('')}</div>` : ''}
     <div class="shop-head">
       ${(total && ['reparto','categoria','giorno'].includes(state.shopView)) ? `<button type="button" class="btn is-text shop-toggle-all" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? 'Apri tutti' : 'Chiudi tutti'}</button>` : '<span></span>'}
       <label class="shop-group-by"><span>Ordina per</span>
@@ -13237,7 +13261,8 @@ const TAB_MENU_ITEMS = {
     { label: uiIcon('tag') + ' Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
   ],
   spesa: [
-    { label: uiIcon('sort') + ' Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } }
+    { label: uiIcon('sort') + ' Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } },
+    { label: uiIcon('category') + ' Negozi', action: ()=>{ state.storesOpen = true; } }
   ],
   menu: [
     { label: uiIcon('gear') + ' Generazione menù', action: ()=>{ state.genGeneralOpen = true; state.genGeneralPage = null; } },
@@ -14463,6 +14488,66 @@ document.addEventListener('change', e=>{
   const exact = expiryIngredientNames().find(n => n.toLowerCase() === typed.toLowerCase());
   r.nome = exact || typed;
   persist(); render();
+});
+function renderStoresPage(){
+  if(!state.storesOpen) return '';
+  const stores = shopStoresList();
+  const depts = DEPT_ORDER.filter(d => d !== 'finiti' && d !== 'avanzi' && DEPT_LABEL[d]);
+  const cards = stores.map(st => `
+      <section class="settings-section" data-store-card="${escapeAttr(st.id)}"><div class="settings-card store-card">
+        <div class="store-card-head"><input type="text" class="store-name" data-store-name="${escapeAttr(st.id)}" value="${escapeAttr(st.label)}" aria-label="Nome del negozio" autocomplete="off">
+          <button type="button" class="btn is-icon" data-store-del="${escapeAttr(st.id)}" aria-label="Elimina ${escapeAttr(st.label)}">${TRASH_ICON_SVG}</button></div>
+        <label class="store-rest"><input type="checkbox" data-store-rest="${escapeAttr(st.id)}" ${st.rest ? 'checked' : ''}> Tutto il resto (reparti che non scegli altrove, in ordine di corsia)</label>
+        <div class="store-depts">${depts.map(d => `<button type="button" class="move-chip${(st.depts || []).includes(d) ? ' is-edited' : ''}" data-store-dept="${escapeAttr(st.id)}" data-dept="${escapeAttr(d)}" aria-pressed="${(st.depts || []).includes(d)}">${DEPT_ICON[d] || ''} ${escapeHtml(DEPT_LABEL[d])}</button>`).join('')}</div>
+      </div></section>`).join('');
+  const body = `
+      <p class="settings-note manage-intro">Dividi la spesa per negozio: in Spesa compaiono delle schede (Tutti, e una per negozio). Ogni reparto va in un solo negozio; "Tutto il resto" prende quelli non scelti.</p>
+      ${cards || '<p class="settings-note">Ancora nessun negozio.</p>'}
+      <button type="button" class="btn is-outline is-block" data-store-add>+ Aggiungi negozio</button>
+      ${stores.length ? '' : '<button type="button" class="btn is-solid is-block" data-store-seed>Crea Fruttarolo, Rossetto e Farmacia</button>'}`;
+  return managePageHtml({ key: 'stores', title: 'Negozi', closeAttr: 'data-close-stores', body });
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  const closeEl = t.closest('[data-close-stores]');
+  if(closeEl){ if(!isCloseTap(e, closeEl)) return; state.storesOpen = false; render(); return; }
+  const tab = t.closest('[data-shop-store]');
+  if(tab){ state.shopStore = tab.dataset.shopStore; render(); return; }
+  if(!state.storesOpen) return;
+  const list = shopStoresList();
+  const newId = () => 'st_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  if(t.closest('[data-store-seed]')){
+    state.shopStores = [
+      { id: newId() + 'a', label: 'Fruttarolo', depts: ['verdura'], rest: false },
+      { id: newId() + 'b', label: 'Rossetto', depts: [], rest: true },
+      { id: newId() + 'c', label: 'Farmacia', depts: ['igiene'], rest: false }
+    ];
+    persist(); render(); return;
+  }
+  if(t.closest('[data-store-add]')){ state.shopStores = list.concat([{ id: newId(), label: 'Nuovo negozio', depts: [], rest: false }]); persist(); render(); return; }
+  const del = t.closest('[data-store-del]');
+  if(del){ state.shopStores = list.filter(st => st.id !== del.dataset.storeDel); if(state.shopStore === del.dataset.storeDel) state.shopStore = ''; persist(); render(); return; }
+  const dp = t.closest('[data-store-dept]');
+  if(dp){
+    const id = dp.dataset.storeDept, d = dp.dataset.dept;
+    const had = (list.find(st => st.id === id).depts || []).includes(d);
+    list.forEach(st => { st.depts = (st.depts || []).filter(x => x !== d); if(st.id === id && !had) st.depts.push(d); });
+    state.shopStores = list; persist(); render(); return;
+  }
+});
+document.addEventListener('change', e=>{
+  const r = e.target.closest && e.target.closest('[data-store-rest]');
+  if(r){
+    const list = shopStoresList();
+    list.forEach(st => { st.rest = st.id === r.dataset.storeRest ? r.checked : false; });
+    state.shopStores = list; persist(); render();
+  }
+});
+document.addEventListener('input', e=>{
+  const n = e.target.closest && e.target.closest('[data-store-name]');
+  if(!n) return;
+  const st = shopStoresList().find(x => x.id === n.dataset.storeName);
+  if(st){ st.label = n.value.trim() || 'Negozio'; persist(); }
 });
 function renderAislesPage(){
   if(!state.aisleOrderOpen) return '';
