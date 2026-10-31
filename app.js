@@ -8327,7 +8327,9 @@ function renderSpesa(){
     }
     hasFinitiThisView = deptsPresent.includes('finiti');
     // Con i negozi la lista unica (A-Z, Spesa) si divide in una per negozio.
-    if(stores.length && byDept.__az){
+    // I negozi valgono solo per la modalità "Spesa": le altre restano per reparto, per pasto o A-Z.
+    const useStores = stores.length && state.shopView === 'ordine';
+    if(useStores && byDept.__az){
       const parts = {};
       byDept.__az.forEach(it => { const sid = shopStoreOfDept(it.dept) || ''; (parts[sid] = parts[sid] || []).push(it); });
       delete byDept.__az;
@@ -8337,7 +8339,7 @@ function renderSpesa(){
     }
     const storeOfKey = d => d.startsWith('__az@') ? d.slice(5) : (d === 'finiti' ? null : shopStoreOfDept(d));
     // Con i negozi: i reparti si riordinano per negozio, e prima del primo di ognuno c'è il titolo.
-    if(stores.length){
+    if(useStores){
       const rank = id => { const n = stores.findIndex(st => st.id === id); return n < 0 ? 999 : n; };
       const fin = sortedDepts.filter(d => d === 'finiti'), rest = sortedDepts.filter(d => d !== 'finiti');
       sortedDepts = rest.map((d, n) => ({ d, n })).sort((a, b) => (rank(storeOfKey(a.d)) - rank(storeOfKey(b.d))) || (a.n - b.n)).map(x => x.d).concat(fin);
@@ -8349,7 +8351,7 @@ function renderSpesa(){
       const isFinitiDept = dept === 'finiti';
       const items = byDept[deptKey];
       let storeHead = '';
-      if(stores.length && !isFinitiDept){
+      if(useStores && !isFinitiDept){
         const sid = storeOfKey(deptKey);
         if(sid !== lastStoreShown){
           lastStoreShown = sid;
@@ -14530,11 +14532,11 @@ function renderStoresPage(){
   const looseBlock = stores.length && (loose.length || !stores.some(st => st.rest)) ? `
       <section class="settings-section store-block" data-store-card=""><div class="settings-card store-card">
         <div class="store-card-head"><strong>Senza negozio</strong></div>
-        <p class="settings-note">Si vedono solo in "Tutti".</p>
+        <p class="settings-note">Compaiono in fondo alla lista, senza titolo di negozio.</p>
         <div class="store-dept-list" data-store-list="">${rows(loose)}</div>
       </div></section>` : '';
   const body = `
-      <p class="settings-note manage-intro">Ogni negozio ha i suoi reparti: trascinali dalla maniglia ⠿ da un negozio all'altro. In Spesa compaiono le schede Tutti e una per negozio. "Tutto il resto" prende i reparti non scelti.</p>
+      <p class="settings-note manage-intro">Ogni negozio ha i suoi reparti: trascinali dalla maniglia ⠿ da un negozio all'altro. Nella modalità "Spesa" la lista è divisa per negozio, invece che per reparto. "Tutto il resto" prende i reparti non scelti.</p>
       ${cards || '<p class="settings-note">Ancora nessun negozio.</p>'}
       ${looseBlock}
       <button type="button" class="btn is-outline is-block" data-store-add>+ Aggiungi negozio</button>
