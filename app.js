@@ -605,15 +605,29 @@ function combineQtyTexts(qtaTexts){
 // (solo quando entrambe le quantità sono in un'unità di peso/volume
 // riconosciuta e tracciata sulla voce di Dispensa — vedi UNIT_ORDER);
 // altrimenti 'in-casa' (semplice presenza, come prima di avere le unità).
-function pantryStatusFor(ingrediente, neededQtaText, spec){
+// used (opzionale, una Map): la scorta già "prenotata" dalle righe precedenti,
+// così più ricette che usano lo stesso ingrediente (8 uova in tutto, 2 in
+// Dispensa) non sono ciascuna coperta dalla stessa scorta.
+function pantryStatusFor(ingrediente, neededQtaText, spec, used){
   const it = resolvePantryItem(ingrediente, spec);
   if(!it || typeof it.qty !== 'number' || it.qty <= 0) return 'manca';
-  if(!it.unit) return 'in-casa';
-  const have = toComparableUnit(it.qty, it.unit);
   const need = neededQtaText ? parseQtyValue(neededQtaText) : null;
+  if(!it.unit){
+    // Scorta a pezzi (es. uova): conta solo se la ricetta chiede un numero di pezzi.
+    if(!need || toComparableUnit(need.value, need.unit)) return 'in-casa';
+    const usedPcs = used && used.get(it) || 0;
+    if(it.qty - usedPcs >= need.value){ if(used) used.set(it, usedPcs + need.value); return 'in-casa'; }
+    return 'poco';
+  }
+  const have = toComparableUnit(it.qty, it.unit);
   const needComparable = need ? toComparableUnit(need.value, need.unit) : null;
   if(!have || !needComparable || have.base !== needComparable.base) return 'in-casa';
-  return have.value >= needComparable.value ? 'in-casa' : 'poco';
+  const already = used && used.get(it) || 0;
+  if(have.value - already >= needComparable.value){
+    if(used) used.set(it, already + needComparable.value);
+    return 'in-casa';
+  }
+  return 'poco';
 }
 
 
@@ -8039,6 +8053,7 @@ function isMealDoneAt(weekIdx, i, meal){
 }
 function buildShopFlat(){
   const flat = [];
+  const pantryUsed = new Map();
   allPlannedShoppingMeals().forEach(({weekIdx,i,meal,key:mk,giorno,dateLabel,isPast,principale,contorni,dishLabel})=>{
     if(isMealDoneAt(weekIdx, i, meal)) return;
     // Le porzioni sono per pasto (non per singola ricetta): il rapporto si
@@ -8070,7 +8085,7 @@ function buildShopFlat(){
         // Se in Dispensa ce n'è già abbastanza, non compare proprio in Spesa
         // (niente riga da vedere/spuntare) — a meno che non l'avessi già
         // esplicitamente de-spuntato in passato per dire "mi serve comunque".
-        if(pantryStatusFor(it.ingrediente, qta, it.spec) === 'in-casa' && state.shopChecked[key] !== false) return;
+        if(pantryStatusFor(it.ingrediente, qta, it.spec, pantryUsed) === 'in-casa' && state.shopChecked[key] !== false) return;
         flat.push({ key, ingrediente:it.ingrediente, qta, dove:it.dove, note:it.note, spec:it.spec || '', context, contextShort, isRecipe: true, weekIdx });
       });
     });
@@ -8184,7 +8199,9 @@ function renderSpesa(){
     // Nota personale legata al nome dell'ingrediente (non al pasto/occorrenza):
     // stessa nota su ogni riga in cui compare, persiste da una settimana
     // all'altra — stesso schema tocca-per-modificare della "Variante" avanzo.
-    const ingNoteKey = (ingrediente||'').trim().toLowerCase();
+    // La nota è dell'ingrediente, ma per un'altra persona è separata: il pane per noi
+    // ("fresco") e quello per il papà ("in busta") hanno ciascuno la sua.
+    const ingNoteKey = (ingrediente||'').trim().toLowerCase() + (per ? ' – per ' + String(per).trim().toLowerCase() : '');
     const ingNote = state.ingredientNotes[ingNoteKey] || '';
     const editingIngNote = state.ingNoteEditingKey === ingNoteKey;
     const ingNoteHtml = editingIngNote

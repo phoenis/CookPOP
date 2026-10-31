@@ -4725,6 +4725,29 @@ test('Spesa: il bottone codice a barre spunta la riga giusta, mette quantità e 
   assert(r.end, 'Metti in dispensa non in fondo');
 });
 
+test('Spesa: la scorta in Dispensa si sottrae sul totale di tutte le ricette (8 uova servono, 2 in casa: ne mancano 6)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.pantryItems = {};
+    upsertPantryItem('Uova', 'frigo', 2);
+    const used = new Map();
+    const st = ['2', '2', '2', '2'].map(q => pantryStatusFor('Uova', q, '', used));
+    return { st, solo: pantryStatusFor('Uova', '2', '') };
+  });
+  eq(r.st, ['in-casa', 'poco', 'poco', 'poco'], 'prima riga coperta, le altre no');
+  eq(r.solo, 'in-casa', 'una sola ricetta resta coperta');
+});
+
+test('Spesa: la nota di un ingrediente per un\'altra persona è separata da quella per noi (pane fresco / pane in busta)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = { a: { ingrediente: 'Pane', qta: '' }, b: { ingrediente: 'Pane', qta: '', per: 'Papà' } };
+    state.ingredientNotes = { 'pane': 'fresco', 'pane – per papà': 'in busta per l\'insalata' };
+    state.pantryItems = {}; state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    return [...document.querySelectorAll('.ing-note-text')].map(e => e.textContent.trim()).sort();
+  });
+  eq(r, ['fresco', 'in busta per l\'insalata'], 'due note distinte');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
