@@ -2841,4 +2841,6 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .store-card-head{ display:flex; align-items:center; gap:var(--s2); }
 .store-name{ flex:1; min-width:0; box-sizing:border-box; min-height:2.75rem; font-size:var(--text-body); font-family:var(--font-family); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
 .store-rest{ display:flex; gap:var(--s2); align-items:flex-start; font-size:var(--text-small, .875rem); }
-.store-depts{ display:flex; flex-wrap:wrap; gap:var(--s2); }
+.store-dept-list{ display:flex; flex-direction:column; min-height:2.75rem; border-radius:var(--form-border-radius); }
+.store-dept-list:empty{ border:1px dashed var(--line); }
+.store-dept-row.is-dragging{ opacity:.6; }

@@ -4770,6 +4770,23 @@ test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — una scheda per negozio 
   eq(r.frutt, ['Zucchine']); eq(r.ross, ['Latte']); eq(r.farm, ['Shampoo']);
 });
 
+test('Negozi: i reparti si trascinano dalla maniglia da un negozio all\'altro', async ({ page }) => {
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopStores = [{ id: 'f', label: 'Fruttarolo', depts: ['verdura'], rest: false }, { id: 'r', label: 'Rossetto', depts: [], rest: true }];
+    state.tab = 'spesa'; state.storesOpen = true; render();
+  });
+  const h = page.locator('[data-store-list="f"] [data-store-handle]').first();
+  const hb = await h.boundingBox();
+  const target = await page.locator('[data-store-list="r"] [data-store-dept-row="latticini"]').boundingBox();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  for(let i = 1; i <= 10; i++) await page.mouse.move(hb.x + 5, hb.y + (target.y - hb.y + 5) * i / 10);
+  await page.mouse.up();
+  const r = await page.evaluate(() => ({ f: state.shopStores[0].depts, r: state.shopStores[1].depts.includes('verdura'), owner: shopStoreOfDept('verdura') }));
+  eq(r.f, [], 'tolto dal Fruttarolo'); assert(r.r, 'finito in Rossetto'); eq(r.owner, 'r');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
