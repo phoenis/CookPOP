@@ -4757,15 +4757,17 @@ test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — modalità Spesa divisa 
     state.storesOpen = true; render();
     document.querySelector('[data-store-seed]').click();
     state.storesOpen = false; render();
-    const seq = () => [...document.querySelectorAll('.shop-list .shop-store-head, .shop-list .item-name')].map(e => e.textContent.trim());
+    const seq = () => [...document.querySelectorAll('.shop-list .dept-title, .shop-list .item-name')].map(e => e.textContent.trim());
     out.reparto = seq();
     state.shopView = 'az'; render(); out.az = seq();
     state.shopView = 'ordine'; render(); out.ordine = seq();
+    const tg = () => document.getElementById('shop-toggle-all-sections').textContent.trim();
+    out.toggle = [tg()]; document.getElementById('shop-toggle-all-sections').click(); out.toggle.push(tg()); document.getElementById('shop-toggle-all-sections').click(); out.toggle.push(tg());
     return out;
   });
   assert(r.senza, 'titoli senza negozi');
-  const want = ['Fruttarolo', 'Zucchine', 'Rossetto', 'Latte', 'Farmacia', 'Shampoo'];
-  eq(r.ordine, want); assert(!r.reparto.includes('Rossetto') && !r.az.includes('Fruttarolo'), 'negozi solo nella modalità Spesa');
+  const want = ['🏪Fruttarolo', 'Zucchine', '🏪Rossetto', 'Latte', '🏪Farmacia', 'Shampoo'];
+  eq(r.ordine, want); eq(r.toggle, ['Chiudi tutti', 'Apri tutti', 'Chiudi tutti']); assert(!r.reparto.some(x => /Rossetto/.test(x)) && !r.az.some(x => /Fruttarolo/.test(x)), 'negozi solo nella modalità Spesa');
 });
 
 test('Negozi: i reparti si trascinano dalla maniglia da un negozio all\'altro', async ({ page }) => {
