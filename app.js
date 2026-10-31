@@ -8152,13 +8152,10 @@ function renderSpesa(){
   // freschi della settimana dopo si comprano più avanti: stanno a parte.
   // Il fresco della settimana prossima si compra insieme al resto: "Più avanti" è per quello di tra due settimane o più.
   const isLaterRow = it => it.isRecipe && it.weekIdx >= 2 && SHOP_LATER_DEPTS.includes(knownDept(it.cat) || pantryCatFor(it.ingrediente) || classifyDept(it.ingrediente));
-  // Negozi (Menù ⋮ della Spesa → Negozi): una scheda per negozio mostra solo i suoi reparti.
+  // Negozi (Menù ⋮ della Spesa → Negozi): la lista è divisa in blocchi, uno per negozio.
   const stores = shopStoresList();
-  if(state.shopStore && !stores.some(st => st.id === state.shopStore)) state.shopStore = '';
-  const inStore = it => !state.shopStore || shopStoreOfDept(shopFlatDept(it)) === state.shopStore;
-  const laterFlat = allShopFlat.filter(isLaterRow).filter(inStore);
-  const mainAll = allShopFlat.filter(it => !isLaterRow(it));
-  const mainFlat = mainAll.filter(inStore);
+  const laterFlat = allShopFlat.filter(isLaterRow);
+  const mainFlat = allShopFlat.filter(it => !isLaterRow(it));
 
   // Una riga può avere più chiavi quando più occorrenze si uniscono (stessa
   // quantità testuale) in Per reparto: se ne hai spuntata una qualsiasi in
@@ -8329,10 +8326,37 @@ function renderSpesa(){
       sortedDepts = (byDept.__az.length ? ['__az'] : []).concat(deptsPresent.includes('finiti') ? ['finiti'] : []);
     }
     hasFinitiThisView = deptsPresent.includes('finiti');
+    // Con i negozi la lista unica (A-Z, Spesa) si divide in una per negozio.
+    if(stores.length && byDept.__az){
+      const parts = {};
+      byDept.__az.forEach(it => { const sid = shopStoreOfDept(it.dept) || ''; (parts[sid] = parts[sid] || []).push(it); });
+      delete byDept.__az;
+      const ids = stores.map(st => st.id).concat(['']).filter(id => parts[id]);
+      ids.forEach(id => { byDept['__az@' + id] = parts[id]; });
+      sortedDepts = ids.map(id => '__az@' + id).concat(sortedDepts.filter(d => d === 'finiti'));
+    }
+    const storeOfKey = d => d.startsWith('__az@') ? d.slice(5) : (d === 'finiti' ? null : shopStoreOfDept(d));
+    // Con i negozi: i reparti si riordinano per negozio, e prima del primo di ognuno c'è il titolo.
+    if(stores.length){
+      const rank = id => { const n = stores.findIndex(st => st.id === id); return n < 0 ? 999 : n; };
+      const fin = sortedDepts.filter(d => d === 'finiti'), rest = sortedDepts.filter(d => d !== 'finiti');
+      sortedDepts = rest.map((d, n) => ({ d, n })).sort((a, b) => (rank(storeOfKey(a.d)) - rank(storeOfKey(b.d))) || (a.n - b.n)).map(x => x.d).concat(fin);
+    }
+    let lastStoreShown = null;
 
-    body = sortedDepts.map(dept => {
+    body = sortedDepts.map(deptKey => {
+      const dept = deptKey.startsWith('__az@') ? '__az' : deptKey;
       const isFinitiDept = dept === 'finiti';
-      const items = byDept[dept];
+      const items = byDept[deptKey];
+      let storeHead = '';
+      if(stores.length && !isFinitiDept){
+        const sid = storeOfKey(deptKey);
+        if(sid !== lastStoreShown){
+          lastStoreShown = sid;
+          const st = stores.find(x => x.id === sid);
+          storeHead = `<div class="shop-store-head">${escapeHtml(st ? st.label : 'Senza negozio')}</div>`;
+        }
+      }
       const finitiCheckedCount = isFinitiDept ? items.filter(it=>isItemChecked(it.keys, it.ingrediente)).length : 0;
       const rowsHtml = items.map(it=>itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per, it.spec)).join('');
       const finishedActions = finitiCheckedCount ? `
@@ -8352,12 +8376,12 @@ function renderSpesa(){
         </div>`;
       }
       if(dept === '__az' && state.shopView === 'ordine'){
-        return `<div class="shop-day-group shop-az shop-order-list">${items.map(it => `<div class="shop-order-row" data-order-row="${escapeAttr(shopOrderKey(it))}"><span class="aisle-handle" data-order-handle aria-label="Trascina per spostare" role="button">⠿</span><div class="shop-order-item">${itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per)}</div></div>`).join('')}</div>`;
+        return storeHead + `<div class="shop-day-group shop-az shop-order-list">${items.map(it => `<div class="shop-order-row" data-order-row="${escapeAttr(shopOrderKey(it))}"><span class="aisle-handle" data-order-handle aria-label="Trascina per spostare" role="button">⠿</span><div class="shop-order-item">${itemRow(it.keys, it.ingrediente, it.qta, it.note, it.contexts.join(' + '), undefined, it.per)}</div></div>`).join('')}</div>`;
       }
-      if(dept === '__az') return `<div class="shop-day-group shop-az">${rowsHtml}</div>`;
+      if(dept === '__az') return storeHead + `<div class="shop-day-group shop-az">${rowsHtml}</div>`;
       const sectionId = `reparto_${dept}`;
       const isOpen = !state.shopSectionCollapsed[sectionId];
-      return `
+      return storeHead + `
       <div class="shop-day-group">
         <div class="dept-title finished-toggle${isOpen ? ' open' : ''}" data-toggle-shop-section="${sectionId}">
           <span class="dept-icon">${DEPT_ICON[dept] || ''}</span>${escapeHtml(DEPT_LABEL[dept])}
@@ -8599,7 +8623,6 @@ function renderSpesa(){
   return `
     ${missingBanner}
     ${listSearchHtml('shop-search', state.shopSearch, 'Cerca nella lista…')}
-    ${stores.length ? `<div class="shop-stores" role="tablist">${[{ id: '', label: 'Tutti' }].concat(stores).map(st => { const n = mainAll.filter(it => (!st.id || shopStoreOfDept(shopFlatDept(it)) === st.id) && !isItemChecked([it.key]) && shopFlatDept(it) !== 'finiti').length; return `<button type="button" class="shop-store-tab${state.shopStore === st.id ? ' active' : ''}" role="tab" aria-selected="${state.shopStore === st.id}" data-shop-store="${escapeAttr(st.id)}">${escapeHtml(st.label)}${n ? ` <span class="shop-store-n">${n}</span>` : ''}</button>`; }).join('')}</div>` : ''}
     <div class="shop-head">
       ${(total && ['reparto','categoria','giorno'].includes(state.shopView)) ? `<button type="button" class="btn is-text shop-toggle-all" id="shop-toggle-all-sections">${(Object.entries(state.shopSectionCollapsed).some(([id,val]) => val && id.startsWith(state.shopView === 'reparto' || state.shopView === 'categoria' ? 'reparto_' : 'giorno_'))) ? 'Apri tutti' : 'Chiudi tutti'}</button>` : '<span></span>'}
       <label class="shop-group-by"><span>Ordina per</span>

@@ -4748,26 +4748,24 @@ test('Spesa: la nota di un ingrediente per un\'altra persona è separata da quel
   eq(r, ['fresco', 'in busta per l\'insalata'], 'due note distinte');
 });
 
-test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — una scheda per negozio con i suoi reparti; "Tutto il resto" prende gli altri', async ({ page }) => {
+test('Spesa: negozi (Fruttarolo, Rossetto, Farmacia) — una lista sola divisa in blocchi, uno per negozio, con i suoi reparti; "Tutto il resto" prende gli altri', async ({ page }) => {
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Latte', qta: '1' }, c: { ingrediente: 'Shampoo', qta: '1' } };
-    state.pantryItems = {}; state.shopStores = []; state.shopStore = ''; state.tab = 'spesa'; state.shopView = 'reparto'; render();
-    const out = { senza: !document.querySelector('.shop-stores') };
+    state.pantryItems = {}; state.shopStores = []; state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    const out = { senza: !document.querySelector('.shop-store-head') };
     state.storesOpen = true; render();
     document.querySelector('[data-store-seed]').click();
     state.storesOpen = false; render();
-    out.tabs = [...document.querySelectorAll('.shop-store-tab')].map(b => b.firstChild.textContent.trim());
-    const names = () => [...document.querySelectorAll('.shop-list .item-name')].map(e => e.textContent.trim()).sort();
-    out.tutti = names();
-    const go = label => { [...document.querySelectorAll('.shop-store-tab')].find(b => b.firstChild.textContent.trim() === label).click(); return names(); };
-    out.frutt = go('Fruttarolo'); out.ross = go('Rossetto'); out.farm = go('Farmacia');
+    const seq = () => [...document.querySelectorAll('.shop-list .shop-store-head, .shop-list .item-name')].map(e => e.textContent.trim());
+    out.reparto = seq();
+    state.shopView = 'az'; render(); out.az = seq();
+    state.shopView = 'ordine'; render(); out.ordine = seq();
     return out;
   });
-  assert(r.senza, 'schede senza negozi');
-  eq(r.tabs, ['Tutti', 'Fruttarolo', 'Rossetto', 'Farmacia']);
-  eq(r.tutti, ['Latte', 'Shampoo', 'Zucchine']);
-  eq(r.frutt, ['Zucchine']); eq(r.ross, ['Latte']); eq(r.farm, ['Shampoo']);
+  assert(r.senza, 'titoli senza negozi');
+  const want = ['Fruttarolo', 'Zucchine', 'Rossetto', 'Latte', 'Farmacia', 'Shampoo'];
+  eq(r.reparto, want); eq(r.az, want); eq(r.ordine, want);
 });
 
 test('Negozi: i reparti si trascinano dalla maniglia da un negozio all\'altro', async ({ page }) => {
