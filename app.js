@@ -9345,6 +9345,7 @@ function renderShopScanSheet(){
           <div class="shop-scan-scad">${scadChips}
             <label class="move-chip${sc.scad && sc.scad !== 'none' && !shopScanScadOptions(ingName).includes(sc.scad) ? ' is-edited' : ''}">Altra data<input type="date" id="scan-date" value="${escapeAttr(sc.scad && sc.scad !== 'none' ? sc.scad : '')}"></label>
             <button type="button" class="move-chip${sc.scad === 'none' ? ' is-edited' : ''}" data-scan-scad="none">Nessuna</button></div>
+          <button type="button" class="btn is-outline" data-scan-read-expiry>${uiIcon('camera')} Leggi la data con la fotocamera</button>
           <p class="edit-ing-hint">Si ricorda sulla riga e passa in Dispensa quando premi "Metti in dispensa".</p>
         </div>
       </div>
@@ -10026,6 +10027,123 @@ function openBarcodeScanner(opts){
       busy = false;
     }, 250);
   }).catch(()=> msg('Non riesco ad aprire la fotocamera: scrivi il numero.'));
+}
+// --- Scadenza dalla fotocamera -------------------------------------------------
+// Legge il testo della confezione (OCR) e ne ricava la data di scadenza. La lettura
+// vera è fatta da Tesseract (scaricato la prima volta, serve internet); qui sotto
+// c'è solo la parte che capisce le date nel testo, provata a parte nei test.
+const EXPIRY_MONTHS = { GEN:1, JAN:1, FEB:2, MAR:3, APR:4, MAG:5, MAY:5, GIU:6, JUN:6, LUG:7, JUL:7, AGO:8, AUG:8, SET:9, SEP:9, OTT:10, OCT:10, NOV:11, DIC:12, DEC:12 };
+function parseExpiryFromText(text, today){
+  const t0 = today ? new Date(today) : new Date();
+  const base = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate());
+  const limit = new Date(base.getFullYear() + 10, base.getMonth(), base.getDate());
+  const src = String(text || '').toUpperCase().replace(/[\n\r]+/g, ' ').replace(/[|]/g, '1');
+  const cands = [];
+  const add = (idx, y, m, d, raw) => {
+    if(y < 100) y += 2000;
+    if(m < 1 || m > 12) return;
+    if(d === 0){ d = new Date(y, m, 0).getDate(); } // solo mese/anno: ultimo giorno del mese
+    if(d < 1 || d > 31) return;
+    const dt = new Date(y, m - 1, d);
+    if(dt.getMonth() !== m - 1) return;
+    if(dt < base || dt > limit) return;
+    const near = src.slice(Math.max(0, idx - 40), idx);
+    const key = /(SCAD|TMC|ENTRO|EXP|BEST|CONSUM|USE BY|BBE|DA CONS|PREF)/.test(near);
+    const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cands.push({ iso, raw: raw.trim(), key, idx, mm: d === new Date(y, m, 0).getDate() && /^\d{1,2}\s*[\/.\-]\s*\d{2,4}$/.test(raw.trim()) });
+  };
+  let m;
+  const full = /(\d{1,2})\s*[\/.\-\s]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{4}|\d{2})(?!\d)/g;
+  while((m = full.exec(src))) add(m.index, +m[3], +m[2], +m[1], m[0]);
+  const named = /(\d{1,2})\s*[\/.\-\s]?\s*(GEN|FEB|MAR|APR|MAG|GIU|LUG|AGO|SET|OTT|NOV|DIC|JAN|MAY|JUN|JUL|AUG|SEP|OCT|DEC)[A-Z]*\.?\s*[\/.\-\s]?\s*(\d{4}|\d{2})(?!\d)/g;
+  while((m = named.exec(src))) add(m.index, +m[3], EXPIRY_MONTHS[m[2]], +m[1], m[0]);
+  const my = /(?:^|[^\d\/.\-])(\d{1,2})\s*[\/.\-]\s*(\d{4})(?!\d)/g;
+  while((m = my.exec(src))) add(m.index, +m[2], +m[1], 0, `${m[1]}/${m[2]}`);
+  if(!cands.length) return null;
+  cands.sort((a, b) => (Number(b.key) - Number(a.key)) || (a.idx - b.idx));
+  const best = cands[0];
+  return { iso: best.iso, raw: best.raw };
+}
+function expiryLongLabel(iso){ return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day:'numeric', month:'long', year:'numeric' }); }
+let tesseractLoading = null;
+function loadTesseract(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(tesseractLoading) return tesseractLoading;
+  tesseractLoading = new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    sc.onload = () => resolve(window.Tesseract);
+    sc.onerror = () => { tesseractLoading = null; reject(new Error('load')); };
+    document.head.appendChild(sc);
+  });
+  return tesseractLoading;
+}
+async function ocrImage(canvas){
+  if('TextDetector' in window){
+    try{
+      const det = new window.TextDetector();
+      const blocks = await det.detect(canvas);
+      const txt = blocks.map(b => b.rawValue).join(' ');
+      if(txt.trim()) return txt;
+    }catch(e){}
+  }
+  const T = await loadTesseract();
+  const res = await T.recognize(canvas, 'eng');
+  return (res && res.data && res.data.text) || '';
+}
+function openExpiryScanner(onResult){
+  closeBarcodeScanner();
+  state.scannerOpen = true;
+  const ov = document.createElement('div');
+  ov.className = 'scan-overlay'; ov.id = 'scan-overlay';
+  ov.innerHTML = `
+    <div class="scan-head"><button type="button" class="btn is-icon" id="scan-close" aria-label="Chiudi">✕</button><span>Inquadra la data di scadenza</span></div>
+    <div class="scan-view"><video id="scan-video" playsinline muted></video><div class="scan-frame"></div></div>
+    <p class="scan-msg" id="scan-msg">Avvicina la data e premi "Leggi".</p>
+    <div class="scan-manual" id="scan-actions"><button type="button" class="btn is-solid" id="scan-snap" style="flex:1">Leggi la data</button></div>`;
+  document.body.appendChild(ov);
+  const msg = t => { const el = document.getElementById('scan-msg'); if(el) el.textContent = t; };
+  document.getElementById('scan-close').addEventListener('click', ()=>{ closeBarcodeScanner(); render(); });
+  render();
+  const video = document.getElementById('scan-video');
+  const actions = document.getElementById('scan-actions');
+  const snapBtn = document.getElementById('scan-snap');
+  const showSnap = () => { actions.innerHTML = '<button type="button" class="btn is-solid" id="scan-snap" style="flex:1">Leggi la data</button>'; document.getElementById('scan-snap').addEventListener('click', snap); try{ video.play(); }catch(e){} };
+  const snap = async () => {
+    if(!video.videoWidth){ msg('La fotocamera non è pronta.'); return; }
+    // Si taglia la parte dentro il riquadro, in scala di grigi e più contrastata: l'OCR legge meglio.
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const cw = Math.round(vw * 0.8), ch = Math.round(vh * 0.34);
+    const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+    const cx = cv.getContext('2d');
+    cx.filter = 'grayscale(1) contrast(1.6)';
+    cx.drawImage(video, Math.round(vw * 0.1), Math.round((vh - ch) / 2), cw, ch, 0, 0, cw, ch);
+    video.pause();
+    actions.innerHTML = '';
+    msg('Leggo… la prima volta può servire qualche secondo (serve internet).');
+    let text = '';
+    try{ text = await ocrImage(cv); }
+    catch(e){ msg('Non riesco a leggere: controlla internet, oppure scrivi la data a mano.'); actions.innerHTML = '<button type="button" class="btn is-outline" id="scan-retry" style="flex:1">Riprova</button>'; document.getElementById('scan-retry').addEventListener('click', showSnap); return; }
+    const hit = parseExpiryFromText(text);
+    if(!hit){
+      msg('Non trovo una data' + (text.trim() ? ` (ho letto: «${text.replace(/\s+/g, ' ').trim().slice(0, 60)}»)` : '') + '. Riprova avvicinandoti.');
+      actions.innerHTML = '<button type="button" class="btn is-outline" id="scan-retry" style="flex:1">Riprova</button>';
+      document.getElementById('scan-retry').addEventListener('click', showSnap);
+      return;
+    }
+    ov.classList.add('is-found');
+    msg(`Ho letto: ${expiryLongLabel(hit.iso)}`);
+    actions.innerHTML = '<button type="button" class="btn is-outline" id="scan-retry">Riprova</button><button type="button" class="btn is-solid" id="scan-use" style="flex:1">Usa questa data</button>';
+    document.getElementById('scan-retry').addEventListener('click', ()=>{ ov.classList.remove('is-found'); showSnap(); });
+    document.getElementById('scan-use').addEventListener('click', ()=>{ closeBarcodeScanner(); onResult(hit.iso); });
+  };
+  snapBtn.addEventListener('click', snap);
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ msg('La fotocamera non è disponibile: scrivi la data a mano.'); actions.innerHTML = ''; return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }).then(stream=>{
+    if(!state.scannerOpen){ stream.getTracks().forEach(t => t.stop()); return; }
+    scannerStream = stream;
+    video.srcObject = stream; video.play().catch(()=>{});
+  }).catch(()=>{ msg('Non riesco ad aprire la fotocamera: scrivi la data a mano.'); actions.innerHTML = ''; });
 }
 function pantryAddSuggestions(q){
   q = (q || '').trim().toLowerCase();
@@ -13181,6 +13299,7 @@ function attachHandlers(){
       render();
     }));
     document.querySelectorAll('[data-scan-scad]').forEach(b=> b.addEventListener('click', ()=>{ sc.scad = sc.scad === b.dataset.scanScad ? '' : b.dataset.scanScad; render(); }));
+    document.querySelectorAll('[data-scan-read-expiry]').forEach(b=> b.addEventListener('click', ()=> openExpiryScanner(iso => { sc.scad = iso; render(); })));
     const dt = document.getElementById('scan-date'); if(dt) dt.addEventListener('change', e=>{ sc.scad = e.target.value || ''; render(); });
     const q = document.getElementById('scan-qty'); if(q) q.addEventListener('input', e=>{ sc.qty = parseFloat(String(e.target.value).replace(',', '.')) || 0; });
     const u = document.getElementById('scan-unit'); if(u) u.addEventListener('change', e=>{ sc.unit = e.target.value; });

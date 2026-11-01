@@ -4787,6 +4787,37 @@ test('Negozi: i reparti si trascinano dalla maniglia da un negozio all\'altro', 
   eq(r.f, [], 'tolto dal Fruttarolo'); assert(r.r, 'finito in Rossetto'); eq(r.owner, 'r');
 });
 
+test('scadenza dalla fotocamera: dal testo della confezione si ricava la data (con parole chiave, mesi a lettere, mese/anno); il bottone apre la fotocamera dal foglio Prodotto scansionato', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const T = new Date(2026, 9, 31); // 31 ottobre 2026
+    const p = txt => { const h = parseExpiryFromText(txt, T); return h && h.iso; };
+    const out = {
+      scad: p('LOTTO L123 SCAD 12/03/2027 conservare in frigo'),
+      tmc: p('TMC: 05.11.2026'),
+      lettere: p('Da consumarsi entro 15 MAR 2027'),
+      meseAnno: p('Preferibilmente entro fine 03/2028'),
+      anno2: p('EXP 01-02-28'),
+      passata: p('SCAD 10/10/2025'),
+      nessuna: p('niente di utile qui 123456'),
+      // tra più date vince quella dopo la parola chiave
+      chiave: p('PROD 01/09/2026 ... LOTTO 77 ... SCAD 20/01/2027')
+    };
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = { a: { ingrediente: 'Panna', qta: '1' } }; state.pantryItems = {};
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    handleShopScan('8001234567890', { nome: 'Panna', qty: 200, unit: 'ml' });
+    out.bottone = !!document.querySelector('[data-scan-read-expiry]');
+    document.querySelector('[data-scan-read-expiry]').click();
+    out.overlay = !!document.getElementById('scan-overlay') && !!document.getElementById('scan-snap');
+    closeBarcodeScanner();
+    return out;
+  });
+  eq(r.scad, '2027-03-12'); eq(r.tmc, '2026-11-05'); eq(r.lettere, '2027-03-15');
+  eq(r.meseAnno, '2028-03-31'); eq(r.anno2, '2028-02-01');
+  eq(r.passata, null); eq(r.nessuna, null); eq(r.chiave, '2027-01-20');
+  assert(r.bottone && r.overlay, 'bottone fotocamera: ' + JSON.stringify(r));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
