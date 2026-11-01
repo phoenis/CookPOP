@@ -4594,7 +4594,7 @@ test('empanadas: impasto con le tre farine in grammi e un ripieno obbligatorio n
     return out;
   });
   eq(r.meta, ['antipasto', ['Ripieno di carne per empanadas'], 'ripieno', true]);
-  eq(r.farine, ['Farina 00:625 g', 'Farina integrale:190 g', 'Farina di quinoa:190 g']);
+  eq(r.farine, ['Farina 00:240 g', 'Farina integrale:60 g', 'Farina di quinoa:60 g']);
   eq(r.coppia, ['Impasto per empanadas', 'Ripieno di carne per empanadas']);
   eq(r.dopoToglieRipieno, r.coppia);
   assert(/almeno un ripieno/.test(r.avviso), 'avviso: ' + r.avviso);
