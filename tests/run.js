@@ -1182,7 +1182,7 @@ test('lista spesa leggera: tendina Raggruppa per (Corsia, Giorno, A-Z), sezioni 
   eq(page.errors, [], 'errori JS');
 });
 
-test('spesa: le righe spuntate vanno in Completati in fondo, togliendo la spunta tornano al loro posto; niente più Modalità spesa', async ({ page }) => {
+test('spesa: le righe spuntate vanno in "Nel carrello" in fondo, togliendo la spunta tornano al loro posto; niente più Modalità spesa', async ({ page }) => {
   await page.evaluate(() => {
     state.shopExtras = { a: { ingrediente: 'Zucchine', qta: '2' }, b: { ingrediente: 'Detersivo piatti', qta: '' } };
     state.shopChecked = {}; state.tab = 'spesa'; state.shopView = 'reparto'; render();
@@ -4702,6 +4702,18 @@ test('Spesa: il bottone codice a barre spunta la riga giusta, mette quantità e 
     document.querySelector('[data-scan-done]').click();
     out.checked = !!state.shopChecked.ex1;
     out.qty = [state.shopQty.ex1, state.shopUnit.ex1, state.shopExpiry.ex1];
+    // riga di "Finiti in Dispensa": dopo la scansione passa nel carrello
+    state.pantryItems = { latte: { nome: 'Latte', qty: 0, unit: 'ml', luogo: 'frigo', cat: 'latticini' } };
+    state.shopChecked = {}; state.shopDismissed = {}; state.pantryConfirmedShop = {}; state.shopExtras = {}; render();
+    window.fetch = async () => ({ ok: true, json: async () => ({ status: 1, product: { product_name_it: 'Latte intero', quantity: '1 l' } }) });
+    document.getElementById('spesa-scan').click();
+    document.getElementById('scan-code').value = '8005555555555';
+    document.getElementById('scan-go').click();
+    await new Promise(res => setTimeout(res, 1300));
+    out.pickOos = state.shopScan && state.shopScan.pick;
+    document.querySelector('[data-scan-done]').click();
+    out.carrello = [...document.querySelectorAll('.shop-completed .item-name')].map(e => e.textContent.trim());
+    out.finitiRimasti = !!document.querySelector('.finished-shop-group .item-name');
     // prodotto che non c'è in lista
     window.fetch = async () => ({ ok: true, json: async () => ({ status: 1, product: { product_name_it: 'Ceci', quantity: '400 g' } }) });
     document.getElementById('spesa-scan').click();
@@ -4723,6 +4735,7 @@ test('Spesa: il bottone codice a barre spunta la riga giusta, mette quantità e 
   eq(r.pick2, 'new', 'ceci non in lista');
   assert(r.extra, 'extra non aggiunto spuntato con scadenza');
   assert(r.end, 'Metti in dispensa non in fondo');
+  eq(r.pickOos, 'oos_latte'); eq(r.carrello, ['Latte']); assert(!r.finitiRimasti, 'è rimasto in Finiti');
 });
 
 test('Spesa: la scorta in Dispensa si sottrae sul totale di tutte le ricette (8 uova servono, 2 in casa: ne mancano 6)', async ({ page }) => {
