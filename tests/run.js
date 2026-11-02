@@ -449,13 +449,14 @@ test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finchÃ
 test('generatore: usa gli ingredienti in scadenza in tempo, senza perdere equilibrio', async ({ page }) => {
   const r = await page.evaluate(() => {
     // La scadenza guida la scelta solo entro 7 giorni: nei primi giorni della settimana si usa la corrente, poi la prossima (scadenza al suo quarto giorno, che rientra nei 7 giorni).
-    const W = WEEK_DISPLAY_ORDER.indexOf(new Date().getDay()) >= 3 ? 1 : 0;
+    const pos0 = WEEK_DISPLAY_ORDER.indexOf(new Date().getDay());
+    const W = pos0 + 3 <= 6 ? 0 : 1, expPos = (pos0 + 3) % 7; // scade fra 3 giorni, dentro la settimana W
     state.extraWeeks = [];
     const slots = weekPlanSlots(W), seq = weekEatenSequence(slots, W);
     const run = withExpiry => {
       state.pantryItems = {};
       upsertPantryItem('Mozzarella', 'frigo', 2);
-      if(withExpiry) state.pantryItems['mozzarella'].scadenza = isoLocalDate(weekDatesFor(W)[3]);
+      if(withExpiry) state.pantryItems['mozzarella'].scadenza = isoLocalDate(weekDatesFor(W)[expPos]);
       let inTime = 0, balanced = 0;
       const t0 = performance.now();
       for(let n = 0; n < 15; n++){
