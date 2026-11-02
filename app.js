@@ -8261,7 +8261,7 @@ function renderSpesa(){
 
   let body = '';
   let hasFinitiThisView = false;
-  // Le righe spuntate escono dalle loro sezioni e finiscono in "Completati",
+  // Le righe spuntate escono dalle loro sezioni e finiscono in "Nel carrello",
   // in fondo a tutto, con "Sposta in dispensa": togliere la spunta le
   // rimette al loro posto, così un errore si corregge al volo (ha preso il
   // posto della vecchia "Modalità spesa", che spostava subito in Dispensa).
@@ -8528,7 +8528,7 @@ function renderSpesa(){
   if(completedList.length){
     body += `
       <div class="shop-day-group shop-completed">
-        <div class="dept-title">Completati</div>
+        <div class="dept-title">Nel carrello</div>
         <div class="accordion-body">${completedList.map(it => itemRow(it.keys, it.ingrediente, combineQtyTexts(it.qtas), '', it.per ? `Per ${it.per}` : '', true, it.per, it.spec)).join('')}</div>
         <div class="shop-completed-actions">
           <button type="button" class="btn is-text" id="reset-shop">Togli le spunte</button>
@@ -9356,7 +9356,7 @@ function renderShopScanSheet(){
 function applyShopScan(){
   const sc = state.shopScan;
   if(!sc) return;
-  const snap = JSON.parse(JSON.stringify({ c: state.shopChecked, q: state.shopQty, u: state.shopUnit, x: state.shopExpiry || {}, e: state.shopExtras, b: state.barcodes || {} }));
+  const snap = JSON.parse(JSON.stringify({ c: state.shopChecked, q: state.shopQty, u: state.shopUnit, x: state.shopExpiry || {}, e: state.shopExtras, b: state.barcodes || {}, p: state.pantryConfirmedShop || {} }));
   let rowKey, name;
   if(sc.pick === 'new'){
     name = (sc.newName || '').trim();
@@ -9368,7 +9368,8 @@ function applyShopScan(){
     if(!r) return;
     rowKey = r.rowKey; name = r.name;
   }
-  rowKey.split(',').forEach(k => { state.shopChecked[k] = true; });
+  // Una riga di "Finiti in Dispensa" prima diventa "da comprare" (come "Segna da comprare"), poi si spunta: così va nel carrello.
+  rowKey.split(',').forEach(k => { if(k.startsWith('oos_')){ if(!state.pantryConfirmedShop) state.pantryConfirmedShop = {}; state.pantryConfirmedShop[k.slice(4)] = state.pantryConfirmedShop[k.slice(4)] || true; delete state.shopDismissed[k]; } state.shopChecked[k] = true; });
   if(sc.qty > 0){ state.shopQty[rowKey] = sc.qty; state.shopUnit[rowKey] = sc.unit || ''; }
   if(sc.scad){ if(!state.shopExpiry) state.shopExpiry = {}; state.shopExpiry[rowKey] = sc.scad; }
   // Si ricorda: il prossimo scatto di questo codice trova subito la stessa riga.
@@ -9377,7 +9378,7 @@ function applyShopScan(){
   persist(); render();
   const when = sc.scad && sc.scad !== 'none' ? ` · scade ${moveDateLabel(sc.scad)}` : '';
   showUndoToast(`«${name}» spuntato${when}`, ()=>{
-    state.shopChecked = snap.c; state.shopQty = snap.q; state.shopUnit = snap.u; state.shopExpiry = snap.x; state.shopExtras = snap.e; state.barcodes = snap.b;
+    state.shopChecked = snap.c; state.shopQty = snap.q; state.shopUnit = snap.u; state.shopExpiry = snap.x; state.shopExtras = snap.e; state.barcodes = snap.b; state.pantryConfirmedShop = snap.p;
     persist(); render();
   });
 }
@@ -10886,7 +10887,7 @@ function attachHandlers(){
 
   document.querySelectorAll('.shop-item input[type=checkbox]').forEach(cb=>{
     cb.addEventListener('change', e=>{
-      // La spunta segna solo "preso": la riga passa in "Completati" e la
+      // La spunta segna solo "preso": la riga passa in "Nel carrello" e la
       // Dispensa si aggiorna con "Sposta in dispensa" (vedi renderSpesa).
       e.target.dataset.shopKeys.split(',').forEach(k=>{ state.shopChecked[k] = e.target.checked; });
       persist(); render();
