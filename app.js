@@ -10038,7 +10038,9 @@ function parseExpiryFromText(text, today){
   const t0 = today ? new Date(today) : new Date();
   const base = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate());
   const limit = new Date(base.getFullYear() + 10, base.getMonth(), base.getDate());
-  const src = String(text || '').toUpperCase().replace(/[\n\r]+/g, ' ').replace(/[|]/g, '1');
+  let src = String(text || '').toUpperCase().replace(/[\n\r]+/g, ' ');
+  // Errori tipici dell'OCR tra le cifre: O→0, I/L/|→1.
+  src = src.replace(/(?<=\d)[OQ]|(?<![A-Z])[OQ](?=\d)/g, '0').replace(/(?<=\d)[IL|](?=\d)/g, '1').replace(/[|]/g, '1');
   const cands = [];
   const add = (idx, y, m, d, raw) => {
     if(y < 100) y += 2000;
@@ -10056,6 +10058,11 @@ function parseExpiryFromText(text, today){
   let m;
   const full = /(\d{1,2})\s*[\/.\-\s]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{4}|\d{2})(?!\d)/g;
   while((m = full.exec(src))) add(m.index, +m[3], +m[2], +m[1], m[0]);
+  // Gli "/" letti come "1" ("16/12/2026" → "1611212026") e le date senza separatori ("16122026").
+  const tight = /(?<!\d)([0-3]\d)[1\/.\-]([01]\d)[1\/.\-](20\d{2})(?!\d)/g;
+  while((m = tight.exec(src))) add(m.index, +m[3], +m[2], +m[1], m[0]);
+  const compact = /(?<!\d)([0-3]\d)([01]\d)(20\d{2})(?!\d)/g;
+  while((m = compact.exec(src))) add(m.index, +m[3], +m[2], +m[1], m[0]);
   const named = /(\d{1,2})\s*[\/.\-\s]?\s*(GEN|FEB|MAR|APR|MAG|GIU|LUG|AGO|SET|OTT|NOV|DIC|JAN|MAY|JUN|JUL|AUG|SEP|OCT|DEC)[A-Z]*\.?\s*[\/.\-\s]?\s*(\d{4}|\d{2})(?!\d)/g;
   while((m = named.exec(src))) add(m.index, +m[3], EXPIRY_MONTHS[m[2]], +m[1], m[0]);
   const my = /(?:^|[^\d\/.\-])(\d{1,2})\s*[\/.\-]\s*(\d{4})(?!\d)/g;
@@ -10089,8 +10096,32 @@ async function ocrImage(canvas){
     }catch(e){}
   }
   const T = await loadTesseract();
-  const res = await T.recognize(canvas, 'eng');
+  if(!ocrWorker){
+    ocrWorker = await T.createWorker('eng');
+    // Solo cifre, separatori e lettere dei mesi/parole chiave: meno errori e niente "rumore".
+    await ocrWorker.setParameters({ tessedit_char_whitelist: '0123456789/.:- ABCDEFGHILMNOPRSTUVZ', tessedit_pageseg_mode: '6', user_defined_dpi: '300' });
+  }
+  const res = await ocrWorker.recognize(canvas);
   return (res && res.data && res.data.text) || '';
+}
+let ocrWorker = null;
+// Ingrandisce e rende bianco/nero (soglia di Otsu): la stampa a inchiostro si legge molto meglio.
+function prepareOcrCanvas(src){
+  const k = Math.max(1, 1600 / src.width);
+  const cv = document.createElement('canvas'); cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k);
+  const cx = cv.getContext('2d', { willReadFrequently: true });
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(src, 0, 0, cv.width, cv.height);
+  const img = cx.getImageData(0, 0, cv.width, cv.height), d = img.data;
+  const hist = new Array(256).fill(0);
+  for(let i = 0; i < d.length; i += 4){ const g = Math.round(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114); d[i] = g; hist[g]++; }
+  const total = d.length / 4;
+  let sum = 0; for(let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0, wB = 0, best = 0, thr = 128;
+  for(let i = 0; i < 256; i++){ wB += hist[i]; if(!wB) continue; const wF = total - wB; if(!wF) break; sumB += i * hist[i]; const mB = sumB / wB, mF = (sum - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if(v > best){ best = v; thr = i; } }
+  for(let i = 0; i < d.length; i += 4){ const v = d[i] > thr ? 255 : 0; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+  cx.putImageData(img, 0, 0);
+  return cv;
 }
 function openExpiryScanner(onResult){
   closeBarcodeScanner();
@@ -10117,19 +10148,20 @@ function openExpiryScanner(onResult){
     const cw = Math.round(vw * 0.8), ch = Math.round(vh * 0.34);
     const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
     const cx = cv.getContext('2d');
-    cx.filter = 'grayscale(1) contrast(1.6)';
     cx.drawImage(video, Math.round(vw * 0.1), Math.round((vh - ch) / 2), cw, ch, 0, 0, cw, ch);
     video.pause();
     actions.innerHTML = '';
     msg('Leggo… la prima volta può servire qualche secondo (serve internet).');
     let text = '';
-    try{ text = await ocrImage(cv); }
+    try{ text = await ocrImage(prepareOcrCanvas(cv)); }
     catch(e){ msg('Non riesco a leggere: controlla internet, oppure scrivi la data a mano.'); actions.innerHTML = '<button type="button" class="btn is-outline" id="scan-retry" style="flex:1">Riprova</button>'; document.getElementById('scan-retry').addEventListener('click', showSnap); return; }
     const hit = parseExpiryFromText(text);
     if(!hit){
       msg('Non trovo una data' + (text.trim() ? ` (ho letto: «${text.replace(/\s+/g, ' ').trim().slice(0, 60)}»)` : '') + '. Riprova avvicinandoti.');
-      actions.innerHTML = '<button type="button" class="btn is-outline" id="scan-retry" style="flex:1">Riprova</button>';
+      // Se la lettura non basta, la data si scrive qui, senza chiudere la fotocamera.
+      actions.innerHTML = '<button type="button" class="btn is-outline" id="scan-retry">Riprova</button><input type="date" id="scan-manual-date" aria-label="Scrivi la data"><button type="button" class="btn is-solid" id="scan-use-manual">Usa</button>';
       document.getElementById('scan-retry').addEventListener('click', showSnap);
+      document.getElementById('scan-use-manual').addEventListener('click', ()=>{ const v = document.getElementById('scan-manual-date').value; if(v){ closeBarcodeScanner(); onResult(v); } });
       return;
     }
     ov.classList.add('is-found');
