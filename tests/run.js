@@ -4812,6 +4812,8 @@ test('scadenza dalla fotocamera: dal testo della confezione si ricava la data (c
       meseAnno: p('Preferibilmente entro fine 03/2028'),
       anno2: p('EXP 01-02-28'),
       passata: p('SCAD 10/10/2025'),
+      meseLettere: p('TMC MAR 2027'), meseAnno2: p('SCAD 03/27'), soloAnno: p('Da consumarsi entro il 2027'), annoSenzaParola: p('LOTTO 2027 AB'),
+      febbraioBisestile: p('SCAD 02/2028'),
       slashComeUno: p('DA CONSUMARSI PREFERIBILMENTE ENTRO IL 1611212026 9 E'),
       compatta: p('ENTRO 16122026 L110076866'),
       lettereSbagliate: p('SCAD 1O/12/2O26'),
@@ -4832,6 +4834,7 @@ test('scadenza dalla fotocamera: dal testo della confezione si ricava la data (c
   eq(r.scad, '2027-03-12'); eq(r.tmc, '2026-11-05'); eq(r.lettere, '2027-03-15');
   eq(r.meseAnno, '2028-03-31'); eq(r.anno2, '2028-02-01');
   eq(r.slashComeUno, '2026-12-16'); eq(r.compatta, '2026-12-16'); eq(r.lettereSbagliate, '2026-12-10');
+  eq(r.meseLettere, '2027-03-31'); eq(r.meseAnno2, '2027-03-31'); eq(r.soloAnno, '2027-12-31'); eq(r.annoSenzaParola, null); eq(r.febbraioBisestile, '2028-02-29');
   eq(r.passata, null); eq(r.nessuna, null); eq(r.chiave, '2027-01-20');
   assert(r.bottone && r.overlay, 'bottone fotocamera: ' + JSON.stringify(r));
 });

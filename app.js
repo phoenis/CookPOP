@@ -10042,10 +10042,14 @@ function parseExpiryFromText(text, today){
   // Errori tipici dell'OCR tra le cifre: O→0, I/L/|→1.
   src = src.replace(/(?<=\d)[OQ]|(?<![A-Z])[OQ](?=\d)/g, '0').replace(/(?<=\d)[IL|](?=\d)/g, '1').replace(/[|]/g, '1');
   const cands = [];
-  const add = (idx, y, m, d, raw) => {
+  // Scadenza solo con mese/anno → ultimo giorno del mese; solo con l'anno → 31 dicembre.
+  // precisione: 0 giorno intero, 1 mese/anno, 2 solo anno (a parità di parola chiave vince la più precisa).
+  const add = (idx, y, m, d, raw, onlyYear) => {
     if(y < 100) y += 2000;
+    if(onlyYear){ m = 12; d = 31; }
     if(m < 1 || m > 12) return;
-    if(d === 0){ d = new Date(y, m, 0).getDate(); } // solo mese/anno: ultimo giorno del mese
+    const partial = d === 0;
+    if(partial){ d = new Date(y, m, 0).getDate(); }
     if(d < 1 || d > 31) return;
     const dt = new Date(y, m - 1, d);
     if(dt.getMonth() !== m - 1) return;
@@ -10053,7 +10057,7 @@ function parseExpiryFromText(text, today){
     const near = src.slice(Math.max(0, idx - 40), idx);
     const key = /(SCAD|TMC|ENTRO|EXP|BEST|CONSUM|USE BY|BBE|DA CONS|PREF)/.test(near);
     const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    cands.push({ iso, raw: raw.trim(), key, idx, mm: d === new Date(y, m, 0).getDate() && /^\d{1,2}\s*[\/.\-]\s*\d{2,4}$/.test(raw.trim()) });
+    cands.push({ iso, raw: raw.trim(), key, idx, prec: onlyYear ? 2 : (partial ? 1 : 0) });
   };
   let m;
   const full = /(\d{1,2})\s*[\/.\-\s]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{4}|\d{2})(?!\d)/g;
@@ -10067,8 +10071,18 @@ function parseExpiryFromText(text, today){
   while((m = named.exec(src))) add(m.index, +m[3], EXPIRY_MONTHS[m[2]], +m[1], m[0]);
   const my = /(?:^|[^\d\/.\-])(\d{1,2})\s*[\/.\-]\s*(\d{4})(?!\d)/g;
   while((m = my.exec(src))) add(m.index, +m[2], +m[1], 0, `${m[1]}/${m[2]}`);
+  // Mese e anno a due cifre ("03/27"): solo se l'anno è plausibile (da quest'anno in poi).
+  const yy = base.getFullYear() % 100;
+  const my2 = /(?<![\d\/.\-])(\d{1,2})\s*[\/.\-]\s*(\d{2})(?![\d\/.\-])/g;
+  while((m = my2.exec(src))){ if(+m[2] >= yy && +m[2] <= yy + 10) add(m.index, +m[2], +m[1], 0, m[0]); }
+  // Mese a lettere e anno, senza giorno ("MAR 2027", "MARZO 27").
+  const namedMy = /(?<![A-Z\d])(GEN|FEB|MAR|APR|MAG|GIU|LUG|AGO|SET|OTT|NOV|DIC|JAN|MAY|JUN|JUL|AUG|SEP|OCT|DEC)[A-Z]*\.?\s*[\/.\-\s]?\s*(20\d{2}|\d{2})(?!\d)/g;
+  while((m = namedMy.exec(src))){ if(m[2].length === 4 || (+m[2] >= yy && +m[2] <= yy + 10)) add(m.index, +m[2], EXPIRY_MONTHS[m[1]], 0, m[0]); }
+  // Solo l'anno: vale solo vicino a una parola come SCAD/TMC/ENTRO (altrimenti sarebbe un numero di lotto).
+  const yearOnly = /(?<![\d\/.\-])(20\d{2})(?![\d\/.\-]|\d)/g;
+  while((m = yearOnly.exec(src))){ if(/(SCAD|TMC|ENTRO|EXP|BEST|CONSUM|USE BY|BBE|PREF)/.test(src.slice(Math.max(0, m.index - 40), m.index))) add(m.index, +m[1], 12, 31, m[0], true); }
   if(!cands.length) return null;
-  cands.sort((a, b) => (Number(b.key) - Number(a.key)) || (a.idx - b.idx));
+  cands.sort((a, b) => (Number(b.key) - Number(a.key)) || (a.prec - b.prec) || (a.idx - b.idx));
   const best = cands[0];
   return { iso: best.iso, raw: best.raw };
 }
