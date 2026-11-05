@@ -4905,6 +4905,16 @@ test('Spesa: se un ingrediente già in lista (quantità ritoccata) viene anche s
   eq(r.prima, '5', 'prima: 5 (ritoccata)'); eq(r.dopo, '5', 'dopo il finito: ancora 5 · ' + JSON.stringify(r));
 });
 
+test('Biscotti al limone: ricetta del catalogo (dolce) con ingredienti, passaggi e fonte', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const m = getRecipeMeta('Biscotti al limone'), d = getRecipeDetails('Biscotti al limone');
+    return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.map(i => i.ingrediente + ':' + i.qta), passi: d.procedimento.length, link: d.link };
+  });
+  eq(r.cat, ['dolci', 'dolce']); eq(r.passi, 6);
+  eq(r.ing.slice(0, 5), ['Limone:1', 'Zucchero di canna:70 g', "Olio extravergine d'oliva:50 ml", 'Farina:200 g', 'Lievito per dolci:2 cucchiaini']);
+  assert(/^https:\/\/www\.instagram\.com\/reel\/DfWucQ6IQoy/.test(r.link), 'fonte');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
