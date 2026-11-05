@@ -1823,7 +1823,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq(r.visible, ['Ingredienti e reparti']);
   eq(r.visibleLinks, ['depts']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 5, spesa: 2, menu: 2, prep: 2 });
+  eq(r.menus, { dispensa: 6, spesa: 2, menu: 2, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -2001,7 +2001,7 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     TAB_MENU_ITEMS.menu[1].action(); out.food = state.genFoodOpen === true && state.genGeneralOpen === false; state.genFoodOpen = false;
     return out;
   });
-  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie', 'Negozi'], menu: ['Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
+  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie', '❄️ Preparazione pronta in freezer'], spesa: ['Ordine corsie', 'Negozi'], menu: ['Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
 });
 
 test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
