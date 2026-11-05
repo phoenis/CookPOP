@@ -8301,6 +8301,25 @@ function renderSpesa(){
         // Giorno e pasto non si scrivono sotto l'ingrediente: chi li vuole usa "Ordina per Pasto".
       }
     });
+    // Una riga unita ha come chiave l'elenco delle sue voci: se se ne aggiunge una (es. lo stesso ingrediente
+    // segnato "finito" in Dispensa) la chiave cambia e la quantità ritoccata a mano con + / − andrebbe persa.
+    // Qui la si porta sulla nuova chiave, sommando le voci non ritoccate.
+    Object.values(merged).forEach(m => {
+      if(m.keys.length < 2) return;
+      const rk = m.keys.join(',');
+      if(typeof state.shopQty[rk] === 'number') return;
+      const ov = m.keys.filter(k => typeof state.shopQty[k] === 'number');
+      if(!ov.length) return;
+      const unit = typeof state.shopUnit[ov[0]] === 'string' ? state.shopUnit[ov[0]] : null;
+      let total = 0;
+      m.keys.forEach((k, i) => {
+        if(typeof state.shopQty[k] === 'number'){ total += state.shopQty[k]; return; }
+        const pv = parseQtyValue(m.qtas[i]);
+        if(pv && pv.unit !== 'none' && (unit === null || (pv.unit || '') === unit)) total += pv.value;
+      });
+      state.shopQty[rk] = Math.round(total * 100) / 100;
+      if(unit !== null) state.shopUnit[rk] = unit;
+    });
     const mergedList = groupRowsByName(Object.values(merged).map(it => ({ ...it, qta: combineQtyTexts(it.qtas) })));
     displayTotal = mergedList.length;
     displayDone = mergedList.filter(it=>isItemChecked(it.keys, it.ingrediente)).length;
