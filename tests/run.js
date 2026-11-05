@@ -4889,6 +4889,22 @@ test('Spesa: aggiungere un ingrediente già in lista ne somma la quantità (anch
   eq(r.uova, '6', 'finito già da comprare: si somma');
 });
 
+test('Spesa: se un ingrediente già in lista (quantità ritoccata) viene anche segnato finito in Dispensa, la quantità non si azzera', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = { e1: { ingrediente: 'Latte', qta: '2' } }; state.shopQty = { e1: 5 }; state.shopUnit = { e1: '' };
+    state.shopChecked = {}; state.shopDismissed = {}; state.pantryConfirmedShop = {};
+    state.pantryItems = { latte: { nome: 'Latte', qty: 5, luogo: 'frigo', cat: 'latticini' } };
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    const num = () => { const el = [...document.querySelectorAll('.qty-num')].find(e => /Latte/.test((e.closest('.shop-item') || e.closest('.shop-item-row') || document.body).textContent)); return el ? el.textContent : null; };
+    const prima = num();
+    state.pantryItems.latte.qty = 0; render(); // finito in Dispensa → compare anche come "finito"
+    const keys = [...document.querySelectorAll('.shop-item input[type=checkbox]')].map(c => c.dataset.shopKeys);
+    return { prima: String(prima).trim(), dopo: String(num()).trim(), keys, q: Object.values(state.shopQty) };
+  });
+  eq(r.prima, '5', 'prima: 5 (ritoccata)'); eq(r.dopo, '5', 'dopo il finito: ancora 5 · ' + JSON.stringify(r));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
