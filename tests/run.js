@@ -1823,7 +1823,7 @@ test('impostazioni: sezioni riordinate, voci che aprono le pagine, ricerca, back
   eq(r.visible, ['Ingredienti e reparti']);
   eq(r.visibleLinks, ['depts']);
   eq({ aisles: r.aisles, ingr: r.ingr }, { aisles: true, ingr: true });
-  eq(r.menus, { dispensa: 5, spesa: 2, menu: 2, prep: 2 });
+  eq(r.menus, { dispensa: 6, spesa: 2, menu: 2, prep: 2 });
   eq({ first: r.first, second: r.second, saved: r.saved, restored: r.restored, off: r.off }, { first: true, second: false, saved: true, restored: null, off: false });
 });
 
@@ -2001,7 +2001,7 @@ test('⋯ di ogni scheda: scorciatoie alle voci di Impostazioni che la riguardan
     TAB_MENU_ITEMS.menu[1].action(); out.food = state.genFoodOpen === true && state.genGeneralOpen === false; state.genFoodOpen = false;
     return out;
   });
-  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie'], spesa: ['Ordine corsie', 'Negozi'], menu: ['Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
+  eq(r, { dispensa: ['Inventario veloce', 'Consumi ricorrenti', 'Gestisci ingredienti', 'Gruppi', 'Gestisci categorie', '❄️ Preparazione pronta in freezer'], spesa: ['Ordine corsie', 'Negozi'], menu: ['Generazione menù', 'Preferenze alimentari'], prep: ['Aggiungi ricetta', 'Importa ricetta'], newPage: true, imp: true, ing: true, grp: true, dept: true, aisle: true, gen: true, food: true });
 });
 
 test('catalogo: dieci ricette dal ricettario (casatiello, impasto pizza, paste, stracciatella, gnocchi, besciamella...)', async ({ page }) => {
@@ -4837,6 +4837,29 @@ test('scadenza dalla fotocamera: dal testo della confezione si ricava la data (c
   eq(r.meseLettere, '2027-03-31'); eq(r.meseAnno2, '2027-03-31'); eq(r.soloAnno, '2027-12-31'); eq(r.annoSenzaParola, null); eq(r.febbraioBisestile, '2028-02-29');
   eq(r.passata, null); eq(r.nessuna, null); eq(r.chiave, '2027-01-20');
   assert(r.bottone && r.overlay, 'bottone fotocamera: ' + JSON.stringify(r));
+});
+
+test('Dispensa: "Preparazione pronta in freezer" registra le porzioni di una ricetta con la data, e il menù le usa ("Dal freezer")', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.pantryItems = {}; state.tab = 'dispensa';
+    state.freezerPrep = { search: '', name: '', portions: 0, date: '2026-10-20' }; render();
+    const out = { sheet: !!document.querySelector('[data-fp-add]'), disabled: document.querySelector('[data-fp-add]').disabled };
+    const s = document.getElementById('fp-search'); s.value = 'carbonara'; s.dispatchEvent(new Event('input', { bubbles: true }));
+    const pick = document.querySelector('[data-fp-pick]'); out.trovata = !!pick;
+    pick.click();
+    out.nome = state.freezerPrep.name; out.porz = state.freezerPrep.portions > 0;
+    document.getElementById('fp-portions').value = '3'; document.getElementById('fp-portions').dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-fp-add]').click();
+    const it = state.pantryItems[out.nome.trim().toLowerCase()];
+    out.voce = it ? [it.luogo, it.qty, it.frozenMeal === true, it.frozenOn, !!it.scadenza] : null;
+    out.freezerMeals = freezerMeals().map(x => x.nome);
+    out.chiuso = !state.freezerPrep;
+    return out;
+  });
+  assert(r.sheet && r.disabled, 'foglio con Aggiungi disattivato'); assert(r.trovata, 'ricerca ricetta');
+  eq(r.voce, ['freezer', 3, true, '2026-10-20', true]);
+  eq(r.freezerMeals, [r.nome]); assert(r.chiuso, 'foglio chiuso');
 });
 
 (async () => {
