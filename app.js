@@ -9719,16 +9719,35 @@ function addSheetCommit(){
   if(a.per === '__new' && !per){ const p = document.querySelector('[data-add-per-new]'); if(p) p.focus(); return; }
   const unit = d.unit && d.unit !== 'none' ? d.unit : '';
   const qta = d.qty > 0 ? `${d.qty}${unit ? ' ' + unit : ''}` : '';
-  const snap = JSON.parse(JSON.stringify({ e: state.shopExtras, d: state.shopDismissed, p: state.pantryConfirmedShop, i: state.pantryItems }));
+  const snap = JSON.parse(JSON.stringify({ e: state.shopExtras, d: state.shopDismissed, p: state.pantryConfirmedShop, i: state.pantryItems, q: state.shopQty, u: state.shopUnit, c: state.shopChecked }));
   const pantryKey = nome.toLowerCase();
+  // Già in lista (stesso nome, stessa persona)? La quantità si somma a quella che c'è, non la sostituisce.
+  const sameLine = Object.keys(state.shopExtras).find(id => {
+    const e = state.shopExtras[id];
+    return !state.shopDismissed[id] && (e.ingrediente || '').trim().toLowerCase() === pantryKey && (e.per || '') === (per || '');
+  });
   const pantryIt = state.pantryItems[pantryKey];
   const catChoice = d.cat || '';
-  if(per){
+  if(sameLine){
+    const e = state.shopExtras[sameLine];
+    const shown = typeof state.shopQty[sameLine] === 'number';
+    if(shown && d.qty > 0){
+      // La quantità era già stata ritoccata a mano con + / −: ci si aggiunge sopra.
+      const u = typeof state.shopUnit[sameLine] === 'string' ? state.shopUnit[sameLine] : ((parseQtyValue(e.qta) || {}).unit || '');
+      state.shopQty[sameLine] = Math.round((state.shopQty[sameLine] + d.qty) * 100) / 100;
+      state.shopUnit[sameLine] = u;
+    } else {
+      e.qta = combineQtyTexts([e.qta, qta]);
+    }
+    state.shopChecked[sameLine] = false; // se era già nel carrello, ora ne serve ancora
+  } else if(per){
     const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
     state.shopExtras[id] = Object.assign({ ingrediente: nome, qta, per }, catChoice ? { cat: catChoice } : {});
   } else if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
     // Finito in Dispensa: si riattiva quella voce (resta un unico record).
-    state.pantryConfirmedShop[pantryKey] = qta || true;
+    // Se è già segnato da comprare con una quantità, si somma.
+    const prevQ = state.pantryConfirmedShop[pantryKey];
+    state.pantryConfirmedShop[pantryKey] = (typeof prevQ === 'string' && prevQ && qta) ? combineQtyTexts([prevQ, qta]) : (qta || prevQ || true);
     delete state.shopDismissed[`oos_${pantryKey}`];
     if(catChoice) pantryIt.cat = catChoice;
   } else {
@@ -9748,7 +9767,7 @@ function addSheetCommit(){
   state.addSheet = null;
   persist(); render();
   showUndoToast(`${nome} aggiunto alla lista`, ()=>{
-    state.shopExtras = snap.e; state.shopDismissed = snap.d; state.pantryConfirmedShop = snap.p; state.pantryItems = snap.i;
+    state.shopExtras = snap.e; state.shopDismissed = snap.d; state.pantryConfirmedShop = snap.p; state.pantryItems = snap.i; state.shopQty = snap.q; state.shopUnit = snap.u; state.shopChecked = snap.c;
     persist(); render();
   });
 }

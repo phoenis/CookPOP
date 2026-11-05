@@ -4862,6 +4862,33 @@ test('Dispensa: "Preparazione pronta in freezer" registra le porzioni di una ric
   eq(r.freezerMeals, [r.nome]); assert(r.chiuso, 'foglio chiuso');
 });
 
+test('Spesa: aggiungere un ingrediente già in lista ne somma la quantità (anche se l\'avevi ritoccata con +/−, anche se era già nel carrello), senza duplicati; per un\'altra persona resta separato', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = {}; state.shopQty = {}; state.shopUnit = {}; state.shopChecked = {}; state.shopDismissed = {}; state.pantryItems = {}; state.pantryConfirmedShop = {};
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    const add = (n, q, per) => { openAddSheet('spesa'); const a = state.addSheet; a.d.nome = n; a.d.qty = q; a.d.unit = ''; if(per){ a.per = '__new'; a.perNew = per; } addSheetCommit(); };
+    const out = {};
+    add('Latte', 2); add('Latte', 1);
+    out.uno = Object.values(state.shopExtras).map(e => [e.ingrediente, e.qta]);
+    const id = Object.keys(state.shopExtras)[0];
+    state.shopQty[id] = 5; state.shopUnit[id] = ''; state.shopChecked[id] = true;
+    add('Latte', 2);
+    out.ritoccata = [state.shopQty[id], state.shopChecked[id], Object.keys(state.shopExtras).length];
+    add('Latte', 1, 'Papà');
+    out.papa = Object.values(state.shopExtras).filter(e => e.per === 'Papà').length + '/' + Object.keys(state.shopExtras).length;
+    // finito in Dispensa e già segnato da comprare con una quantità
+    state.pantryItems = { uova: { nome: 'Uova', qty: 0, luogo: 'frigo' } }; state.pantryConfirmedShop = { uova: '4' }; state.shopExtras = {};
+    add('Uova', 2);
+    out.uova = state.pantryConfirmedShop.uova;
+    return out;
+  });
+  eq(r.uno, [['Latte', '3']], 'due aggiunte = 3, una riga');
+  eq(r.ritoccata, [7, false, 1], '5 ritoccato + 2 = 7, di nuovo da comprare');
+  eq(r.papa, '1/2', 'per il papà resta una riga a sé');
+  eq(r.uova, '6', 'finito già da comprare: si somma');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
