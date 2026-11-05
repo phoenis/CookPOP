@@ -4915,6 +4915,16 @@ test('Biscotti al limone: ricetta del catalogo (dolce) con ingredienti, passaggi
   assert(/^https:\/\/www\.instagram\.com\/reel\/DfWucQ6IQoy/.test(r.link), 'fonte');
 });
 
+test('Zuppa peruviana di quinoa: ricetta del catalogo (primo) con ingredienti, passaggi e fonte', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const m = getRecipeMeta('Zuppa peruviana di quinoa'), d = getRecipeDetails('Zuppa peruviana di quinoa');
+    return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.map(i => i.ingrediente + ':' + i.qta), passi: d.procedimento.length, link: d.link };
+  });
+  eq(r.cat, ['riso', 'primo']); eq(r.passi, 4);
+  eq(r.ing.slice(0, 4), ['Quinoa:85 g', 'Carota:1', 'Porro:1', 'Sedano:2']);
+  assert(/^https:\/\/peruvianimport\.com\//.test(r.link), 'fonte');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
