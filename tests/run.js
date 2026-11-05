@@ -4839,6 +4839,29 @@ test('scadenza dalla fotocamera: dal testo della confezione si ricava la data (c
   assert(r.bottone && r.overlay, 'bottone fotocamera: ' + JSON.stringify(r));
 });
 
+test('Dispensa: "Preparazione pronta in freezer" registra le porzioni di una ricetta con la data, e il menù le usa ("Dal freezer")', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.pantryItems = {}; state.tab = 'dispensa';
+    state.freezerPrep = { search: '', name: '', portions: 0, date: '2026-10-20' }; render();
+    const out = { sheet: !!document.querySelector('[data-fp-add]'), disabled: document.querySelector('[data-fp-add]').disabled };
+    const s = document.getElementById('fp-search'); s.value = 'carbonara'; s.dispatchEvent(new Event('input', { bubbles: true }));
+    const pick = document.querySelector('[data-fp-pick]'); out.trovata = !!pick;
+    pick.click();
+    out.nome = state.freezerPrep.name; out.porz = state.freezerPrep.portions > 0;
+    document.getElementById('fp-portions').value = '3'; document.getElementById('fp-portions').dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-fp-add]').click();
+    const it = state.pantryItems[out.nome.trim().toLowerCase()];
+    out.voce = it ? [it.luogo, it.qty, it.frozenMeal === true, it.frozenOn, !!it.scadenza] : null;
+    out.freezerMeals = freezerMeals().map(x => x.nome);
+    out.chiuso = !state.freezerPrep;
+    return out;
+  });
+  assert(r.sheet && r.disabled, 'foglio con Aggiungi disattivato'); assert(r.trovata, 'ricerca ricetta');
+  eq(r.voce, ['freezer', 3, true, '2026-10-20', true]);
+  eq(r.freezerMeals, [r.nome]); assert(r.chiuso, 'foglio chiuso');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

@@ -2419,6 +2419,7 @@ const state = {
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopStores: [], // negozi della Spesa: [{id, label, depts:[reparti], rest:true se prende tutto il resto}]; vuoto = una lista sola
   shopStore: '', // non persistito: scheda negozio aperta in Spesa ('' = Tutti)
+  freezerPrep: null, // non persistito: foglio "Preparazione pronta in freezer" ({search, name, portions, date})
   storesOpen: false, // non persistito: pagina "Negozi"
   shopOrderCustom: [], // ordine "Ordine spesa" scelto a mano: nomi (minuscoli) degli ingredienti, anche di quelli non più in lista (vedi shopOrderApply)
   shopAisleCustom: [], // ordine corsie della Spesa scelto a mano (vedi shopAisles)
@@ -5951,7 +5952,7 @@ function render(){
   if(state.tab === 'dispensa') html = renderDispensa();
   // Una sola scrittura: con "innerHTML +=" il browser riserializzava e
   // riparsava l'intero pannello per ogni pezzo aggiunto (3 volte a render).
-  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderGenGeneralPage() + renderMembersPage() + renderOnboardingPage() + renderProfilePage() + renderAislesPage() + renderStoresPage() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
+  panel.innerHTML = html + renderNewRecipePage() + renderBackupPage() + renderAppearancePage() + renderGenGeneralPage() + renderMembersPage() + renderOnboardingPage() + renderProfilePage() + renderAislesPage() + renderStoresPage() + renderFreezerPrepSheet() + renderExpiryEstimatesPage() + renderRecipeImportPage() + renderCookbookModals() + renderCardsPages() + renderCookModePage() + renderAddSheet() + renderUndoToast() + renderWhatsNewModal();
   restoreRecipeEditForm(editSnap);
   endPageRender();
   attachHandlers();
@@ -6095,6 +6096,7 @@ const MODAL_CHECKS = [
   [()=> !!state.profileOpen, ()=>{ state.profileOpen = false; }],
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> !!state.storesOpen, ()=>{ state.storesOpen = false; }],
+  [()=> !!state.freezerPrep, ()=>{ state.freezerPrep = null; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
   [()=> !!state.expiryEstOpen, ()=>{ state.expiryEstOpen = false; }],
@@ -13455,7 +13457,8 @@ const TAB_MENU_ITEMS = {
     { label: uiIcon('refresh') + ' Consumi ricorrenti', action: ()=>{ state.recurringOpen = true; state.recurringEditId = null; state.recurringDraft = null; } },
     { label: uiIcon('list-details') + ' Gestisci ingredienti', action: ()=>{ state.ingredientManagerOpen = true; } },
     { label: uiIcon('category') + ' Gruppi', action: ()=>{ state.pantryGroupsModalOpen = true; } },
-    { label: uiIcon('tag') + ' Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } }
+    { label: uiIcon('tag') + ' Gestisci categorie', action: ()=>{ state.deptsModalOpen = true; } },
+    { label: '❄️ Preparazione pronta in freezer', action: ()=>{ state.freezerPrep = { search: '', name: '', portions: 0, date: isoLocalDate(new Date()) }; } }
   ],
   spesa: [
     { label: uiIcon('sort') + ' Ordine corsie', action: ()=>{ state.aisleOrderOpen = true; } },
@@ -14685,6 +14688,76 @@ document.addEventListener('change', e=>{
   const exact = expiryIngredientNames().find(n => n.toLowerCase() === typed.toLowerCase());
   r.nome = exact || typed;
   persist(); render();
+});
+// --- Preparazione pronta in freezer ---------------------------------------------
+// Una ricetta che hai già cucinato e congelato (buste, cubetti, sughi): entra in Dispensa
+// come porzioni nel Freezer, con la data di congelamento. Il menù la usa da solo ("Dal freezer").
+function renderFreezerPrepSheet(){
+  const fp = state.freezerPrep;
+  if(!fp) return '';
+  const q = (fp.search || '').trim().toLowerCase();
+  const matches = !fp.name && q ? allRecipeMetas().filter(r => r.nome.toLowerCase().includes(q)).slice(0, 8) : [];
+  const have = fp.name ? freezerPortionsOf(fp.name) : 0;
+  return `
+  <div class="move-backdrop" data-fp-back>
+    <div class="move-sheet" role="dialog" aria-label="Preparazione pronta in freezer" data-stop-close>
+      <div class="move-handle" aria-hidden="true"></div>
+      <div class="dsh-head"><div class="dsh-head-text"><span class="dsh-kicker">❄️ Freezer</span><h2 class="move-title">Preparazione pronta</h2></div></div>
+      <div class="gen-body">
+        <p class="gen-note">Una ricetta che hai già cucinato e congelato. Il menù la mette da solo in una cena, senza ingredienti in Spesa, partendo dalle più vecchie.</p>
+        <div class="edit-ing-field"><span class="edit-ing-lab">Ricetta</span>
+          ${fp.name ? `<div class="shop-scan-opt active"><span>${escapeHtml(fp.name)}</span><button type="button" class="btn is-text" data-fp-clear>Cambia</button></div>${have ? `<p class="edit-ing-hint">Ne hai già ${have} ${have === 1 ? 'porzione' : 'porzioni'} in freezer: queste si aggiungono.</p>` : ''}`
+            : `<input type="text" id="fp-search" class="edit-ing-name" placeholder="Cerca la ricetta…" value="${escapeAttr(fp.search || '')}" autocomplete="off">
+               <div class="shop-scan-opts">${matches.map(r => `<button type="button" class="shop-scan-opt" data-fp-pick="${escapeAttr(r.nome)}"><span>${escapeHtml(r.nome)}</span></button>`).join('')}${q && !matches.length ? '<p class="edit-ing-hint">Nessuna ricetta con questo nome.</p>' : ''}</div>`}
+        </div>
+        <div class="edit-ing-field"><span class="edit-ing-lab">Porzioni</span>
+          <div class="edit-ing-fields"><input type="number" inputmode="numeric" min="1" step="1" id="fp-portions" class="edit-ing-num" value="${escapeAttr(String(fp.portions || ''))}" aria-label="Porzioni"></div>
+        </div>
+        <div class="edit-ing-field"><span class="edit-ing-lab">Congelata il</span>
+          <div class="edit-ing-fields"><input type="date" id="fp-date" class="edit-ing-num" style="flex:1;width:auto" value="${escapeAttr(fp.date || '')}" aria-label="Data di congelamento"></div>
+          <p class="edit-ing-hint">Scade dopo circa 90 giorni; la stima si corregge dalla scheda in Dispensa.</p>
+        </div>
+      </div>
+      <div class="edit-ing-footer"><button type="button" class="btn is-text" data-fp-cancel>Annulla</button><button type="button" class="btn is-solid" data-fp-add ${fp.name && fp.portions > 0 ? '' : 'disabled'}>Aggiungi al freezer</button></div>
+    </div>
+  </div>`;
+}
+document.addEventListener('click', e=>{
+  const fp = state.freezerPrep;
+  if(!fp) return;
+  const t = e.target;
+  const back = t.closest('[data-fp-back]');
+  if(back && !t.closest('[data-stop-close]')){ state.freezerPrep = null; render(); return; }
+  if(t.closest('[data-fp-cancel]')){ state.freezerPrep = null; render(); return; }
+  const pick = t.closest('[data-fp-pick]');
+  if(pick){
+    fp.name = pick.dataset.fpPick;
+    const det = getRecipeDetails(fp.name);
+    fp.portions = (det && parsePortionsBase(det.porzioni)) || defaultPortions();
+    render(); return;
+  }
+  if(t.closest('[data-fp-clear]')){ fp.name = ''; fp.portions = 0; render(); return; }
+  if(t.closest('[data-fp-add]')){
+    if(!fp.name || !(fp.portions > 0)) return;
+    const snap = JSON.parse(JSON.stringify(state.pantryItems));
+    addFreezerPortions(fp.name, fp.portions);
+    const it = state.pantryItems[fp.name.trim().toLowerCase()];
+    if(it){ it.frozenOn = fp.date || isoLocalDate(new Date()); applyFreezerExpiry(it); }
+    const name = fp.name, n = fp.portions;
+    state.freezerPrep = null;
+    persist(); render();
+    showUndoToast(`${name}: ${n} ${n === 1 ? 'porzione' : 'porzioni'} in freezer`, ()=>{ state.pantryItems = snap; persist(); render(); });
+  }
+}, true);
+document.addEventListener('input', e=>{
+  const fp = state.freezerPrep;
+  if(!fp || !e.target.closest) return;
+  const s = e.target.closest('#fp-search');
+  if(s){ fp.search = s.value; render(); const el = document.getElementById('fp-search'); if(el){ el.focus(); try{ el.setSelectionRange(el.value.length, el.value.length); }catch(_){} } return; }
+  const pt = e.target.closest('#fp-portions');
+  if(pt){ fp.portions = parseInt(pt.value, 10) || 0; const b = document.querySelector('[data-fp-add]'); if(b) b.disabled = !(fp.name && fp.portions > 0); return; }
+  const d = e.target.closest('#fp-date');
+  if(d){ fp.date = d.value || ''; }
 });
 function renderStoresPage(){
   if(!state.storesOpen) return '';
