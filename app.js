@@ -1708,6 +1708,22 @@ function recipePhotoHtml(name, editable){
     <div class="recipe-photo-actions">${input('📷 Cambia foto')}<button type="button" class="btn is-chip" data-recipe-photo-remove="${escapeAttr(name)}">Rimuovi foto</button></div>${error}`;
   return `<label class="recipe-photo-drop">+ Aggiungi foto<input type="file" accept="image/*" hidden data-recipe-photo-input="${escapeAttr(name)}"></label>${error}`;
 }
+// Foto di una nota della Spesa: sta insieme alle altre foto della famiglia (photos/), con un nome
+// che non può essere quello di una ricetta; state.ingredientNotePhotos dice per quali note c'è.
+function notePhotoName(key){ return 'nota: ' + key; }
+function notePhotoHas(key){ return !!(state.ingredientNotePhotos && state.ingredientNotePhotos[key]); }
+function notePhotoSrc(key){
+  if(!notePhotoHas(key) || !window.cookpopSync) return '';
+  ensureRecipePhoto(notePhotoName(key));
+  const c = recipePhotoCache[notePhotoName(key)];
+  return c && c.status === 'ok' ? c.src : '';
+}
+function renderNoteImageViewer(){
+  const key = state.noteImageView;
+  if(!key) return '';
+  const src = notePhotoSrc(key);
+  return `<div class="note-image-viewer" data-note-image-close role="dialog" aria-label="Foto della nota">${src ? `<img src="${escapeAttr(src)}" alt="Foto della nota">` : '<p>Carico la foto…</p>'}<button type="button" class="btn is-icon note-image-x" data-note-image-close aria-label="Chiudi">✕</button></div>`;
+}
 function loadImageFile(file){
   return new Promise((resolve, reject)=>{
     const url = URL.createObjectURL(file);
@@ -1752,6 +1768,28 @@ document.addEventListener('change', async e=>{
     recipePhotoCache[name] = Object.assign({}, recipePhotoCache[name], { message: 'Questa immagine non si riesce a leggere: prova con un\'altra foto.' });
     render();
   }
+});
+async function saveNotePhoto(key, dataUrl){
+  await saveRecipePhoto(notePhotoName(key), dataUrl);
+  const c = recipePhotoCache[notePhotoName(key)] || {};
+  if(c.status === 'ok'){ if(!state.ingredientNotePhotos) state.ingredientNotePhotos = {}; state.ingredientNotePhotos[key] = true; persist(); render(); }
+}
+document.addEventListener('pointerdown', e=>{
+  if(state.notePhotoBusy && !(e.target.closest && e.target.closest('[data-note-photo-pick],[data-note-photo-remove]'))) state.notePhotoBusy = false;
+}, true);
+document.addEventListener('change', async e=>{
+  const input = e.target.closest && e.target.closest('#note-photo-file');
+  if(!input || !input.files || !input.files[0]) return;
+  const key = state.notePhotoTarget;
+  if(!key) return;
+  try{
+    const dataUrl = await resizeImageToDataUrl(input.files[0], 900, 160000);
+    await saveNotePhoto(key, dataUrl);
+  }catch(err){
+    recipePhotoCache[notePhotoName(key)] = Object.assign({}, recipePhotoCache[notePhotoName(key)], { message: 'Questa immagine non si riesce a leggere: prova con un\'altra foto.' });
+    render();
+  }
+  state.notePhotoBusy = false;
 });
 document.addEventListener('click', e=>{
   const btn = e.target.closest && e.target.closest('[data-recipe-photo-remove]');
@@ -2184,7 +2222,7 @@ function resolveIngredientName(name, renames){
 //   nessuna), altrimenti resta quella del nome tenuto; unità, categoria,
 //   gruppo e luogo presi dal vecchio solo dove il nuovo non li ha;
 // - Spesa: "da comprare", righe aggiunte a mano e nota passano al nuovo nome.
-const MERGE_SNAPSHOT_FIELDS = ['ingredientRenames','pantryItems','pantryConfirmedShop','shopDismissed','shopExtras','ingredientNotes','pantrySelected'];
+const MERGE_SNAPSHOT_FIELDS = ['ingredientRenames','pantryItems','pantryConfirmedShop','shopDismissed','shopExtras','ingredientNotes','ingredientNotePhotos','pantrySelected'];
 function mergeIngredientInto(fromName, toName){
   const fromKey = (fromName||'').trim().toLowerCase();
   const to = (toName||'').trim();
@@ -2551,7 +2589,11 @@ const state = {
   mealDetailMenuOpen: false, // ephemeral: menù ⋯ (porzioni) del dettaglio del pasto
   recipeIngredients: JSON.parse(JSON.stringify(DATA.recipeIngredientsInitial)),
   ingredientRenames: {},
+  ingredientNotePhotos: {}, // chiave della nota (come ingredientNotes) -> true se ha una foto (la foto sta in photos/, come quelle delle ricette)
+  noteImageView: null, // non persistito: foto della nota aperta a tutto schermo
+  notePhotoTarget: null, // non persistito: nota a cui sta per arrivare la foto scelta
   ingredientNotes: {}, // nome ingrediente (minuscolo) -> nota libera, mostrata su ogni occorrenza in Spesa qualunque sia il pasto/settimana
+  notePhotoBusy: false, // non persistito: sta scegliendo la foto di una nota (la nota non si chiude)
   ingNoteEditingKey: null, // ephemeral: nome ingrediente la cui nota è in modifica
   recipeEdits: {},
   recipeEditName: null,
@@ -3781,6 +3823,7 @@ async function loadState(){
         if(saved.pantryItems) saved.pantryItems = decodeKeysFromFirebase(saved.pantryItems);
         if(saved.freezerItems) saved.freezerItems = decodeKeysFromFirebase(saved.freezerItems);
         if(saved.ingredientNotes) saved.ingredientNotes = decodeKeysFromFirebase(saved.ingredientNotes);
+        if(saved.ingredientNotePhotos) saved.ingredientNotePhotos = decodeKeysFromFirebase(saved.ingredientNotePhotos);
         delete saved.shopView;
         delete saved.pantryView;
         // Se nel frattempo (mentre aspettavamo QUESTA risposta) l'utente ha
@@ -3903,7 +3946,7 @@ let lastSyncedCatalog = null;
 // weekTempoBase, extraWeeks...) restano confrontati per intero: sono o
 // scalari o strutture che non hanno una vera "chiave dinamica" di primo
 // livello su cui vale la pena scendere.
-const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','shopUnit','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','mealsDone','pantryItems','recurringItems','barcodes','shopExpiry','expiryEstimates','expiryRules','userColors','prepDay','dishPlan','freezerDishes'];
+const PERSONAL_DICT_FIELDS = ['userEmojis','whatsNewSeenBy','shopChecked','shopDismissed','shopExtras','shopQty','shopUnit','pantryChecked','pantryConfirmedShop','weekOverrides','weekOverridePicked','weekBaseline','weekTempoExceptions','notifDismissed','mealsDoneReminderDismissed','dayLinks','dayLinkNotes','dayPortions','mealLocked','cooks','shopAssignees','ingredientNotes','ingredientNotePhotos','mealsDone','pantryItems','recurringItems','barcodes','shopExpiry','expiryEstimates','expiryRules','userColors','prepDay','dishPlan','freezerDishes'];
 // Il catalogo condiviso è per intero fatto di dizionari a chiave dinamica
 // (nome ricetta/ingrediente, id gruppo dispensa) — vedi CATALOG_FIELDS.
 const CATALOG_DICT_FIELDS = CATALOG_FIELDS;
@@ -4082,6 +4125,7 @@ function buildPersonalPayload(){
     appliedForcedWeekVersion: state.appliedForcedWeekVersion,
     mealsDone: state.mealsDone,
     ingredientNotes: state.ingredientNotes,
+    ingredientNotePhotos: state.ingredientNotePhotos,
     pantryItems: state.pantryItems,
     recurringItems: state.recurringItems,
     barcodes: state.barcodes,
@@ -6095,6 +6139,7 @@ const MODAL_CHECKS = [
   [()=> !!state.gradPicker, ()=>{ state.gradPicker = null; }],
   [()=> !!state.profileOpen, ()=>{ state.profileOpen = false; }],
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
+  [()=> !!state.noteImageView, ()=>{ state.noteImageView = null; }],
   [()=> !!state.storesOpen, ()=>{ state.storesOpen = false; }],
   [()=> !!state.freezerPrep, ()=>{ state.freezerPrep = null; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
@@ -8227,9 +8272,17 @@ function renderSpesa(){
     const ingNoteKey = (ingrediente||'').trim().toLowerCase() + (per ? ' – per ' + String(per).trim().toLowerCase() : '');
     const ingNote = state.ingredientNotes[ingNoteKey] || '';
     const editingIngNote = state.ingNoteEditingKey === ingNoteKey;
+    const noteSrc = notePhotoSrc(ingNoteKey);
+    const notePhotoCache = recipePhotoCache[notePhotoName(ingNoteKey)] || {};
+    const photoTools = editingIngNote ? `<span class="ing-note-photo">
+        ${noteSrc ? `<img class="ing-note-photo-preview" src="${escapeAttr(noteSrc)}" alt="Foto della nota">` : ''}
+        ${notePhotoCache.status === 'saving' ? '<span class="section-sub">Salvo la foto…</span>' : `<button type="button" class="btn is-chip" data-note-photo-pick="${escapeAttr(ingNoteKey)}">${uiIcon('camera')} ${noteSrc ? 'Cambia foto' : 'Aggiungi foto'}</button>${noteSrc ? `<button type="button" class="btn is-chip" data-note-photo-remove="${escapeAttr(ingNoteKey)}">Rimuovi foto</button>` : ''}`}
+        ${notePhotoCache.message ? `<span class="recipe-photo-error">${escapeHtml(notePhotoCache.message)}</span>` : ''}
+      </span>` : '';
+    const noteThumb = !editingIngNote && notePhotoHas(ingNoteKey) ? `<button type="button" class="ing-note-thumb" data-note-photo-view="${escapeAttr(ingNoteKey)}" aria-label="Apri la foto della nota">${noteSrc ? `<img src="${escapeAttr(noteSrc)}" alt="">` : uiIcon('photo')}</button>` : '';
     const ingNoteHtml = editingIngNote
-      ? `<span class="ing-note-row"><input type="text" class="ing-note-input" placeholder="Nota per questo ingrediente…" value="${escapeAttr(ingNote)}" data-ing-note="${escapeAttr(ingNoteKey)}"></span>`
-      : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">${escapeHtml(ingNote)}</span><button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Modifica la nota">${PENCIL_ICON_SVG}</button>` : ''}</span>`;
+      ? `<span class="ing-note-row"><input type="text" class="ing-note-input" placeholder="Nota per questo ingrediente…" value="${escapeAttr(ingNote)}" data-ing-note="${escapeAttr(ingNoteKey)}">${photoTools}</span>`
+      : `<span class="ing-note-row">${ingNote ? `<span class="ing-note-text" data-ing-note-show="${escapeAttr(ingNoteKey)}">${escapeHtml(ingNote)}</span><button type="button" class="ing-note-pencil" data-ing-note-show="${escapeAttr(ingNoteKey)}" aria-label="Modifica la nota">${PENCIL_ICON_SVG}</button>` : ''}${noteThumb}</span>`;
     return `
     <div class="swipe-wrap" data-swipe-id="shop:${escapeAttr(rowKey)}" data-swipe-shop="${escapeAttr(rowKey)}" data-swipe-label="${escapeAttr(ingrediente)}">
     <button type="button" class="swipe-trash" tabindex="-1" aria-label="Elimina ${escapeAttr(ingrediente)}">${TRASH_ICON_SVG}</button>
@@ -8666,6 +8719,8 @@ function renderSpesa(){
   ${renderExpiryConfirmModal()}
   ${renderMoveModal()}
   ${renderShopScanSheet()}
+  ${renderNoteImageViewer()}
+  <input type="file" accept="image/*" hidden id="note-photo-file">
     <div class="buttons-fixed is-center"><button class="btn is-fixed" id="spesa-scan" type="button" data-shop-scan-open aria-label="Scansiona il codice a barre">${uiIcon('barcode')}</button></div>
     <div class="buttons-fixed">
       ${`<button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
@@ -11072,6 +11127,31 @@ function attachHandlers(){
       render();
     });
   });
+  // Foto della nota: i tasti stanno dentro il <label> della riga, quindi senza preventDefault spunterebbero la riga.
+  // Toccandoli la casella di testo perde il fuoco: si segna "sto scegliendo la foto" per non chiudere la nota.
+  document.querySelectorAll('[data-note-photo-pick],[data-note-photo-remove]').forEach(el=>{
+    el.addEventListener('pointerdown', ()=>{ state.notePhotoBusy = true; });
+    el.addEventListener('click', e=>{
+      e.preventDefault();
+      if(el.dataset.notePhotoPick){
+        state.notePhotoTarget = el.dataset.notePhotoPick;
+        const f = document.getElementById('note-photo-file'); if(f){ f.value = ''; f.click(); }
+        return;
+      }
+      const key = el.dataset.notePhotoRemove;
+      const prev = notePhotoSrc(key);
+      saveRecipePhoto(notePhotoName(key), null).then(()=>{
+        delete state.ingredientNotePhotos[key]; state.notePhotoBusy = false; persist(); render();
+        if(prev) showUndoToast('Foto rimossa', ()=> saveNotePhoto(key, prev));
+      });
+    });
+  });
+  document.querySelectorAll('[data-note-photo-view]').forEach(el=>{
+    el.addEventListener('click', e=>{ e.preventDefault(); state.noteImageView = el.dataset.notePhotoView; render(); });
+  });
+  document.querySelectorAll('[data-note-image-close]').forEach(el=>{
+    el.addEventListener('click', e=>{ e.stopPropagation(); state.noteImageView = null; render(); });
+  });
   const ingNoteInput = document.querySelector('[data-ing-note]');
   if(ingNoteInput){
     ingNoteInput.addEventListener('click', e=> e.preventDefault());
@@ -11081,6 +11161,8 @@ function attachHandlers(){
       const key = ingNoteInput.dataset.ingNote;
       const val = ingNoteInput.value.trim();
       if(val) state.ingredientNotes[key] = val; else delete state.ingredientNotes[key];
+      // Sta scegliendo una foto: il testo si salva ma la nota resta aperta.
+      if(state.notePhotoBusy){ persist(); return; }
       state.ingNoteEditingKey = null;
       persist(); render();
     };

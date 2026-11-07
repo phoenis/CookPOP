@@ -4925,6 +4925,39 @@ test('Zuppa peruviana di quinoa: ricetta del catalogo (primo) con ingredienti, p
   assert(/^https:\/\/peruvianimport\.com\//.test(r.link), 'fonte');
 });
 
+test('Spesa: una foto per la nota di un ingrediente — si aggiunge dentro la nota, compare la miniatura, si apre a tutto schermo, si toglie', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    const store = {};
+    const oldSync = window.cookpopSync;
+    window.cookpopSync = { load: p => Promise.resolve(store[p] === undefined ? null : store[p]), save: (p, v) => { if(v === null) delete store[p]; else store[p] = v; return Promise.resolve(); }, patch: () => Promise.resolve(), onChange: () => () => {} };
+    for(const k of Object.keys(recipePhotoCache)) delete recipePhotoCache[k];
+    state.shopExtras = { a: { ingrediente: 'Latte', qta: '1' }, b: { ingrediente: 'Latte', qta: '1', per: 'Papà' } };
+    state.ingredientNotes = { 'latte': 'fresco' }; state.ingredientNotePhotos = {}; state.pantryItems = {};
+    state.tab = 'spesa'; state.shopView = 'reparto'; state.ingNoteEditingKey = 'latte'; render();
+    const out = { tasto: !!document.querySelector('[data-note-photo-pick="latte"]'), senzaFoto: !document.querySelector('.ing-note-thumb') };
+    await saveNotePhoto('latte', 'data:image/jpeg;base64,AAAA');
+    out.flag = state.ingredientNotePhotos.latte === true;
+    out.path = Object.keys(store).length === 1;
+    state.ingNoteEditingKey = null; render();
+    out.miniatura = !!document.querySelector('[data-note-photo-view="latte"] img');
+    out.papaSeparata = !document.querySelector('[data-note-photo-view="latte – per papà"]');
+    document.querySelector('[data-note-photo-view="latte"]').click();
+    out.viewer = !!document.querySelector('.note-image-viewer img');
+    document.querySelector('.note-image-viewer').click();
+    out.chiuso = !state.noteImageView;
+    state.ingNoteEditingKey = 'latte'; render();
+    document.querySelector('[data-note-photo-remove="latte"]').click();
+    await new Promise(res => setTimeout(res, 100));
+    out.tolta = !state.ingredientNotePhotos.latte && Object.keys(store).length === 0;
+    window.cookpopSync = oldSync;
+    return out;
+  });
+  assert(r.tasto && r.senzaFoto, 'tasto foto nella nota: ' + JSON.stringify(r));
+  assert(r.flag && r.path, 'foto salvata'); assert(r.miniatura && r.papaSeparata, 'miniatura solo sulla nota giusta');
+  assert(r.viewer && r.chiuso, 'visualizzatore'); assert(r.tolta, 'foto tolta');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
