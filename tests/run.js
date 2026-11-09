@@ -4958,6 +4958,15 @@ test('Spesa: una foto per la nota di un ingrediente — si aggiunge dentro la no
   assert(r.viewer && r.chiuso, 'visualizzatore'); assert(r.tolta, 'foto tolta');
 });
 
+test('Cavolo cappuccio e carote con frittata: contorno del catalogo con ingredienti e passaggi', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const m = getRecipeMeta('Cavolo cappuccio e carote con frittata'), d = getRecipeDetails('Cavolo cappuccio e carote con frittata');
+    return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.map(i => i.ingrediente), uova: d.ingredienti.find(i => i.ingrediente === 'Uova').qta, passi: d.procedimento.length };
+  });
+  eq(r.cat, ['verdure', 'contorno']); eq(r.passi, 5); eq(r.uova, '2');
+  assert(['Cavolo cappuccio', 'Carota', 'Cipolla', 'Sedano', 'Salsa di soia'].every(n => r.ing.includes(n)), 'ingredienti: ' + r.ing.join(', '));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
