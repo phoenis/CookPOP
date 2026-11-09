@@ -2866,3 +2866,16 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Nota di un ingrediente in Spesa: campo di testo con lo stile degli altri campi dell'app. */
 .ing-note-row .ing-note-input{ box-sizing:border-box; width:100%; max-width:none; min-height:2.75rem; margin-top:var(--s2, 0.5rem); font-family:var(--font-family); font-size:var(--text-body); font-style:normal; color:var(--ink); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:0 var(--space-xsmall); background:var(--form-background); }
 .ing-note-row .ing-note-input:focus{ outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+
+/* Dettatura della lista di Spesa. */
+.buttons-fixed.is-left{ left:1rem; right:auto; }
+#spesa-mic{ width:56px; height:56px; box-shadow:var(--shadow-2); }
+#spesa-mic svg{ width:1.5rem; height:1.5rem; }
+.dict-text{ box-sizing:border-box; width:100%; min-height:5rem; margin-top:var(--s3); font-family:var(--font-family); font-size:var(--text-body); border:1px solid var(--line); border-radius:var(--form-border-radius); padding:var(--space-xsmall); background:var(--form-background); resize:vertical; }
+.dict-items{ display:flex; flex-direction:column; margin-top:var(--s3); }
+.dict-item{ display:flex; align-items:center; gap:var(--s3); padding:var(--s2) 0; border-bottom:1px solid var(--line); }
+.dict-name{ flex:1; min-width:0; font-weight:var(--weight-bold); }
+.dict-qty{ color:var(--ink-light); }
+.dict-live{ animation:dict-pulse 1.2s ease-in-out infinite; }
+@keyframes dict-pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(217,59,31,0.45); } 50%{ box-shadow:0 0 0 10px rgba(217,59,31,0); } }
+@media (prefers-reduced-motion:reduce){ .dict-live{ animation:none; } }

@@ -4967,6 +4967,52 @@ test('Cavolo cappuccio e carote con frittata: contorno del catalogo con ingredie
   assert(['Cavolo cappuccio', 'Carota', 'Cipolla', 'Sedano', 'Salsa di soia'].every(n => r.ing.includes(n)), 'ingredienti: ' + r.ing.join(', '));
 });
 
+test('Dettatura della lista: il testo si divide in articoli con quantità e unità; il foglio aggiunge tutto (somma a quello che c\'è) e la voce arriva dal riconoscimento del browser', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const f = t => parseShoppingDictation(t).map(i => i.nome + ':' + i.qty + (i.unit || ''));
+    const out = {
+      base: f('latte, pane e due chili di mele'),
+      misure: f('mezzo chilo di farina, 500 grammi di pasta, 2 etti di prosciutto, un litro di latte, 1,5 kg di patate'),
+      attaccata: f('500g di riso e 2kg di arance'),
+      verbi: f('aggiungi latte alla lista, mi servono tre zucchine'),
+      confezioni: f('un pacco di pasta, due bottiglie di acqua, una zucca'),
+      paio: f('un paio di limoni'),
+      vuoto: f('  ')
+    };
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.shopExtras = { a: { ingrediente: 'Latte', qta: '1 l' } }; state.shopQty = {}; state.shopUnit = {}; state.shopChecked = {}; state.shopDismissed = {}; state.pantryItems = {}; state.pantryConfirmedShop = {};
+    state.tab = 'spesa'; state.shopView = 'reparto'; render();
+    out.mic = !!document.getElementById('spesa-mic');
+    // riconoscimento finto: due frasi separate da una pausa
+    let rec;
+    const Fake = function(){ rec = this; this.start = () => {}; this.stop = () => {}; };
+    window.SpeechRecognition = Fake; window.webkitSpeechRecognition = Fake;
+    document.getElementById('spesa-mic').click();
+    out.foglio = !!document.getElementById('dict-text');
+    document.querySelector('[data-dict-mic]').click();
+    out.ascolta = state.dictation.listening;
+    rec.onresult({ results: [[{ transcript: 'latte' }], [{ transcript: 'due chili di mele' }]] });
+    out.testo = state.dictation.text;
+    out.elenco = dictationItems().map(i => i.nome + ':' + i.qty);
+    document.querySelector('[data-dict-drop="mele"]').click();
+    out.dopoTolto = dictationItems().map(i => i.nome);
+    document.querySelector('[data-dict-add]').click();
+    out.extras = Object.values(state.shopExtras).map(e => e.ingrediente + ':' + e.qta);
+    out.chiuso = !state.dictation;
+    return out;
+  });
+  eq(r.base, ['Latte:0', 'Pane:0', 'Mele:2kg']);
+  eq(r.misure, ['Farina:0.5kg', 'Pasta:500g', 'Prosciutto:200g', 'Latte:1l', 'Patate:1.5kg']);
+  eq(r.attaccata, ['Riso:500g', 'Arance:2kg']);
+  eq(r.verbi, ['Latte:0', 'Zucchine:3']);
+  eq(r.confezioni, ['Pasta:1', 'Acqua:2', 'Zucca:1']);
+  eq(r.paio, ['Limoni:2']); eq(r.vuoto, []);
+  assert(r.mic && r.foglio && r.ascolta, 'microfono: ' + JSON.stringify(r));
+  eq(r.testo, 'latte, due chili di mele'); eq(r.elenco, ['Latte:0', 'Mele:2']);
+  eq(r.dopoTolto, ['Latte']);
+  eq(r.extras, ['Latte:1 l']); assert(r.chiuso, 'foglio chiuso');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
