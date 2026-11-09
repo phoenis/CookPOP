@@ -2457,6 +2457,7 @@ const state = {
   cookbookOpenId: null, cookbookPickOpen: false, cookbookUseOpen: false, cookbookMenuOpen: false, cookbookPickSearch: '', cookbookNameDraft: null, albumForRecipe: null, // non persistiti: pagine/modali del Libro di cucina
   shopStores: [], // negozi della Spesa: [{id, label, depts:[reparti], rest:true se prende tutto il resto}]; vuoto = una lista sola
   shopStore: '', // non persistito: scheda negozio aperta in Spesa ('' = Tutti)
+  dictation: null, // non persistito: foglio "Detta la lista" ({text, listening, msg, dropped:[nomi tolti]})
   freezerPrep: null, // non persistito: foglio "Preparazione pronta in freezer" ({search, name, portions, date})
   storesOpen: false, // non persistito: pagina "Negozi"
   shopOrderCustom: [], // ordine "Ordine spesa" scelto a mano: nomi (minuscoli) degli ingredienti, anche di quelli non più in lista (vedi shopOrderApply)
@@ -5829,6 +5830,7 @@ const CLEAR_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" heig
 const UI_ICONS = {
   'palette': '<path d="M12 21a9 9 0 0 1 0-18c4.97 0 9 3.582 9 8c0 1.06-.474 2.078-1.318 2.828c-.844.75-1.989 1.172-3.182 1.172h-2.5a2 2 0 0 0-1 3.75a1.3 1.3 0 0 1-1 2.25"/><path d="M8.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3-3a1 1 0 1 0 2 0a1 1 0 1 0-2 0m3 3a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/>',
   'plus': '<path d="M12 5v14M5 12h14"/>',
+  'mic': '<path d="M9 5a3 3 0 0 1 3-3a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3a3 3 0 0 1-3-3z"/><path d="M5 10a7 7 0 0 0 14 0M8 21h8m-4-4v4"/>',
   'barcode': '<path d="M4 7V6a2 2 0 0 1 2-2h2M4 17v1a2 2 0 0 0 2 2h2m8-16h2a2 2 0 0 1 2 2v1m-4 13h2a2 2 0 0 0 2-2v-1M8 8v8m3-8v8m3-8v8m3-8v8"/>',
   'lock': '<path d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 1 0-2 0m-3-5V7a4 4 0 1 1 8 0v4"/>',
   'download': '<path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="m7 11l5 5l5-5M12 4v12"/>',
@@ -6141,6 +6143,7 @@ const MODAL_CHECKS = [
   [()=> !!state.aisleOrderOpen, ()=>{ state.aisleOrderOpen = false; }],
   [()=> !!state.noteImageView, ()=>{ state.noteImageView = null; }],
   [()=> !!state.storesOpen, ()=>{ state.storesOpen = false; }],
+  [()=> !!state.dictation, ()=>{ stopDictation(); state.dictation = null; }],
   [()=> !!state.freezerPrep, ()=>{ state.freezerPrep = null; }],
   [()=> state.cardsOpen === 'form', ()=>{ closeCardForm(); }],
   [()=> !!state.cardsOpen, ()=>{ state.cardsOpen = null; state.cardsListUnder = false; state.cardDraft = null; }],
@@ -8719,8 +8722,10 @@ function renderSpesa(){
   ${renderExpiryConfirmModal()}
   ${renderMoveModal()}
   ${renderShopScanSheet()}
+  ${renderDictationSheet()}
   ${renderNoteImageViewer()}
   <input type="file" accept="image/*" hidden id="note-photo-file">
+    <div class="buttons-fixed is-left"><button class="btn is-fixed" id="spesa-mic" type="button" data-dict-open aria-label="Detta la lista">${uiIcon('mic')}</button></div>
     <div class="buttons-fixed is-center"><button class="btn is-fixed" id="spesa-scan" type="button" data-shop-scan-open aria-label="Scansiona il codice a barre">${uiIcon('barcode')}</button></div>
     <div class="buttons-fixed">
       ${`<button class="btn is-fixed" id="spesa-fab" type="button" aria-label="Aggiungi ingrediente"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ph" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 256"><path fill="currentColor" d="M228 128a12 12 0 0 1-12 12h-76v76a12 12 0 0 1-24 0v-76H40a12 12 0 0 1 0-24h76V40a12 12 0 0 1 24 0v76h76a12 12 0 0 1 12 12"></path></svg></button>`}
@@ -14878,6 +14883,156 @@ document.addEventListener('input', e=>{
   if(pt){ fp.portions = parseInt(pt.value, 10) || 0; const b = document.querySelector('[data-fp-add]'); if(b) b.disabled = !(fp.name && fp.portions > 0); return; }
   const d = e.target.closest('#fp-date');
   if(d){ fp.date = d.value || ''; }
+});
+// --- Dettatura della lista -------------------------------------------------------
+// Si detta (o si scrive) "latte, due chili di mele e un pacco di pasta": il testo si divide in articoli
+// con la quantità, si controlla l'elenco e si aggiunge tutto alla lista. La voce usa il riconoscimento
+// del browser (Chrome del telefono, serve internet); il testo resta modificabile.
+const DICT_NUMS = { un:1, uno:1, una:1, due:2, tre:3, quattro:4, cinque:5, sei:6, sette:7, otto:8, nove:9, dieci:10, undici:11, dodici:12, mezzo:0.5, mezza:0.5, paio:2 };
+const DICT_UNITS = { kg:['kg',1], chilo:['kg',1], chili:['kg',1], chilogrammo:['kg',1], chilogrammi:['kg',1], g:['g',1], gr:['g',1], grammo:['g',1], grammi:['g',1], etto:['g',100], etti:['g',100], ettogrammo:['g',100], ettogrammi:['g',100], l:['l',1], litro:['l',1], litri:['l',1], ml:['ml',1], millilitri:['ml',1], cl:['ml',10], centilitri:['ml',10] };
+const DICT_CONTAINERS = ['confezione','confezioni','pacco','pacchi','pacchetto','pacchetti','bottiglia','bottiglie','lattina','lattine','barattolo','barattoli','vasetto','vasetti','scatola','scatole','scatoletta','scatolette','busta','buste','mazzo','mazzi','cartone','cartoni','pezzo','pezzi'];
+function parseShoppingDictation(text){
+  const src = String(text || '').toLowerCase().replace(/\r/g, '\n');
+  const parts = src.split(/\n|;|,(?!\d)|(?<!\d),|\s+(?:e poi|e anche|poi|inoltre|più)\s+|\s+e\s+/);
+  const out = [];
+  parts.forEach(raw => {
+    let c = raw.replace(/[.!?]/g, ' ').replace(/\s+/g, ' ').trim();
+    let guard = 0;
+    while(guard++ < 4 && /^(?:aggiungi|aggiungere|aggiungimi|metti|mettimi|mettere|mi serve|mi servono|servono|serve|comprare|compra|devo comprare|ho bisogno di|anche|ancora|poi|e)\s+/.test(c)) c = c.replace(/^(?:aggiungi|aggiungere|aggiungimi|metti|mettimi|mettere|mi serve|mi servono|servono|serve|comprare|compra|devo comprare|ho bisogno di|anche|ancora|poi|e)\s+/, '');
+    c = c.replace(/\s+(?:alla|nella|in) lista(?: della spesa)?$/, '').replace(/\s+per favore$/, '').trim();
+    if(!c) return;
+    const toks = c.split(' ');
+    let i = 0, qty = 0, unit = '';
+    const glued = toks[0].match(/^(\d+(?:[.,]\d+)?)(kg|g|gr|ml|l|cl)$/);
+    if(glued){ qty = parseFloat(glued[1].replace(',', '.')); const u = DICT_UNITS[glued[2]]; qty *= u[1]; unit = u[0]; i = 1; }
+    else if(/^\d+(?:[.,]\d+)?$/.test(toks[0]) || DICT_NUMS[toks[0]] !== undefined){
+      qty = /^\d/.test(toks[0]) ? parseFloat(toks[0].replace(',', '.')) : DICT_NUMS[toks[0]];
+      i = 1;
+      if(toks[0] === 'un' && toks[1] === 'paio'){ qty = 2; i = 2; }
+      const nx = toks[i];
+      if(nx && DICT_UNITS[nx]){ qty *= DICT_UNITS[nx][1]; unit = DICT_UNITS[nx][0]; i++; }
+      else if(nx && DICT_CONTAINERS.includes(nx)) i++;
+    }
+    while(toks[i] && /^(?:di|d'|del|dello|della|dei|degli|delle|dell'|un|uno|una)$/.test(toks[i]) && toks.length - i > 1) i++;
+    let name = toks.slice(i).join(' ').replace(/^(?:d'|dell')/, '').trim();
+    if(!name) return;
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    out.push({ nome: name, qty: Math.round(qty * 100) / 100, unit });
+  });
+  return out;
+}
+let dictationRec = null;
+function stopDictation(){
+  if(dictationRec){ try{ dictationRec.onend = null; dictationRec.stop(); }catch(e){} dictationRec = null; }
+  if(state.dictation) state.dictation.listening = false;
+}
+function startDictation(){
+  const d = state.dictation; if(!d) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ d.msg = 'Questo browser non ha la dettatura. Scrivi qui sotto, oppure usa il microfono della tastiera del telefono.'; render(); return; }
+  stopDictation();
+  const rec = new SR();
+  rec.lang = 'it-IT'; rec.continuous = true; rec.interimResults = true;
+  const base = (d.text || '').trim();
+  rec.onresult = ev => {
+    const segs = [];
+    for(let k = 0; k < ev.results.length; k++) segs.push(ev.results[k][0].transcript.trim());
+    // Ogni pausa fa un risultato a parte: li separo con una virgola, così ogni articolo resta a sé.
+    d.text = (base ? base + ', ' : '') + segs.filter(Boolean).join(', ');
+    d.msg = ''; render();
+  };
+  rec.onerror = ev => {
+    d.msg = ev.error === 'not-allowed' || ev.error === 'service-not-allowed' ? 'Serve il permesso di usare il microfono (nelle impostazioni del sito).'
+      : ev.error === 'no-speech' ? 'Non ho sentito niente: riprova.' : ev.error === 'network' ? 'Serve internet per la dettatura.' : 'Dettatura non riuscita: riprova o scrivi a mano.';
+    d.listening = false; render();
+  };
+  rec.onend = () => { d.listening = false; dictationRec = null; render(); };
+  try{ rec.start(); dictationRec = rec; d.listening = true; d.msg = ''; }catch(e){ d.msg = 'Non riesco ad avviare il microfono.'; }
+  render();
+}
+function dictationItems(){
+  const d = state.dictation; if(!d) return [];
+  return parseShoppingDictation(d.text).filter(it => !(d.dropped || []).includes(it.nome.toLowerCase()));
+}
+function renderDictationSheet(){
+  const d = state.dictation;
+  if(!d) return '';
+  const items = dictationItems();
+  const rows = items.map(it => `<div class="dict-item"><span class="dict-name">${escapeHtml(it.nome)}</span><span class="dict-qty">${it.qty > 0 ? escapeHtml(formatQtyNumber(it.qty) + (it.unit ? ' ' + (UNIT_SHORT[it.unit] || it.unit) : '')) : '–'}</span><button type="button" class="btn is-icon" data-dict-drop="${escapeAttr(it.nome.toLowerCase())}" aria-label="Togli ${escapeAttr(it.nome)}">✕</button></div>`).join('');
+  return `
+  <div class="move-backdrop" data-dict-back>
+    <div class="move-sheet dict-sheet" role="dialog" aria-label="Detta la lista" data-stop-close>
+      <div class="move-handle" aria-hidden="true"></div>
+      <div class="dsh-head"><div class="dsh-head-text"><span class="dsh-kicker">${uiIcon('mic')} Dettatura</span><h2 class="move-title">Detta la lista</h2></div></div>
+      <div class="gen-body">
+        <p class="gen-note">Di' un articolo alla volta, con una pausa tra uno e l'altro, ad esempio «latte», «due chili di mele», «un pacco di pasta». Puoi correggere il testo qui sotto.</p>
+        <button type="button" class="btn ${d.listening ? 'is-solid dict-live' : 'is-outline'} is-block" data-dict-mic>${uiIcon('mic')} ${d.listening ? 'Ti ascolto… tocca per fermare' : 'Tocca e parla'}</button>
+        ${d.msg ? `<p class="edit-ing-hint dict-msg">${escapeHtml(d.msg)}</p>` : ''}
+        <textarea id="dict-text" class="edit-ing-name dict-text" rows="3" placeholder="latte, pane, due chili di mele…" autocomplete="off">${escapeHtml(d.text || '')}</textarea>
+        <div class="dict-items">${rows || '<p class="edit-ing-hint">Gli articoli capiti compariranno qui.</p>'}</div>
+      </div>
+      <div class="edit-ing-footer"><button type="button" class="btn is-text" data-dict-cancel>Annulla</button><button type="button" class="btn is-solid" data-dict-add ${items.length ? '' : 'disabled'}>Aggiungi ${items.length || ''} alla lista</button></div>
+    </div>
+  </div>`;
+}
+function addDictatedItems(items){
+  const snap = JSON.parse(JSON.stringify({ e: state.shopExtras, d: state.shopDismissed, p: state.pantryConfirmedShop, i: state.pantryItems, q: state.shopQty, u: state.shopUnit, c: state.shopChecked }));
+  items.forEach(it => {
+    const nome = it.nome, key = nome.toLowerCase();
+    const qta = it.qty > 0 ? `${formatQtyNumber(it.qty)}${it.unit ? ' ' + it.unit : ''}` : '';
+    const sameLine = Object.keys(state.shopExtras).find(id => {
+      const e = state.shopExtras[id];
+      return !e.per && !state.shopDismissed[id] && (e.ingrediente || '').trim().toLowerCase() === key;
+    });
+    const pantryIt = state.pantryItems[key];
+    if(sameLine){
+      const e = state.shopExtras[sameLine];
+      if(typeof state.shopQty[sameLine] === 'number' && it.qty > 0){ state.shopQty[sameLine] = Math.round((state.shopQty[sameLine] + it.qty) * 100) / 100; }
+      else e.qta = combineQtyTexts([e.qta, qta]);
+      state.shopChecked[sameLine] = false;
+    } else if(pantryIt && typeof pantryIt.qty === 'number' && pantryIt.qty <= 0){
+      const prevQ = state.pantryConfirmedShop[key];
+      state.pantryConfirmedShop[key] = (typeof prevQ === 'string' && prevQ && qta) ? combineQtyTexts([prevQ, qta]) : (qta || prevQ || true);
+      delete state.shopDismissed[`oos_${key}`];
+    } else {
+      const id = 'extra_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      state.shopExtras[id] = { ingrediente: nome, qta };
+      if(!pantryIt){ upsertPantryItem(nome, 'dispensa', 0, it.unit || ''); state.shopDismissed[`oos_${key}`] = true; }
+    }
+  });
+  persist(); render();
+  showUndoToast(items.length === 1 ? `${items[0].nome} aggiunto alla lista` : `${items.length} articoli aggiunti alla lista`, ()=>{
+    state.shopExtras = snap.e; state.shopDismissed = snap.d; state.pantryConfirmedShop = snap.p; state.pantryItems = snap.i; state.shopQty = snap.q; state.shopUnit = snap.u; state.shopChecked = snap.c;
+    persist(); render();
+  });
+}
+document.addEventListener('click', e=>{
+  const t = e.target;
+  if(t.closest('[data-dict-open]')){ state.dictation = { text: '', listening: false, msg: '', dropped: [] }; render(); return; }
+  const d = state.dictation;
+  if(!d) return;
+  const back = t.closest('[data-dict-back]');
+  if(back && !t.closest('[data-stop-close]')){ stopDictation(); state.dictation = null; render(); return; }
+  if(t.closest('[data-dict-cancel]')){ stopDictation(); state.dictation = null; render(); return; }
+  if(t.closest('[data-dict-mic]')){ if(d.listening){ stopDictation(); render(); } else startDictation(); return; }
+  const drop = t.closest('[data-dict-drop]');
+  if(drop){ d.dropped = (d.dropped || []).concat([drop.dataset.dictDrop]); render(); return; }
+  if(t.closest('[data-dict-add]')){
+    const items = dictationItems();
+    if(!items.length) return;
+    stopDictation(); state.dictation = null;
+    addDictatedItems(items);
+  }
+}, true);
+document.addEventListener('input', e=>{
+  const d = state.dictation;
+  if(!d || !e.target.closest) return;
+  const ta = e.target.closest('#dict-text');
+  if(!ta) return;
+  d.text = ta.value; d.dropped = [];
+  const pos = ta.selectionStart;
+  render();
+  const el = document.getElementById('dict-text'); if(el){ el.focus(); try{ el.setSelectionRange(pos, pos); }catch(_){} }
 });
 function renderStoresPage(){
   if(!state.storesOpen) return '';
