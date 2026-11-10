@@ -5013,6 +5013,21 @@ test('Dettatura della lista: il testo si divide in articoli con quantità e unit
   eq(r.extras, ['Latte:1 l']); assert(r.chiuso, 'foglio chiuso');
 });
 
+test('Pan di Spagna e Crema pasticcera classica: dolci del catalogo con ingredienti, passaggi e fonte; il pan di Spagna ha quantità fisse', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const out = {};
+    ['Pan di Spagna', 'Crema pasticcera classica'].forEach(n => {
+      const m = getRecipeMeta(n), d = getRecipeDetails(n);
+      out[n] = { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.length, passi: d.procedimento.length, link: d.link, fisse: fixedQtyRecipe(n) };
+    });
+    return out;
+  });
+  eq(r['Pan di Spagna'].cat, ['dolci', 'dolce']); eq(r['Pan di Spagna'].ing, 7); eq(r['Pan di Spagna'].passi, 8); eq(r['Pan di Spagna'].fisse, true);
+  assert(/^https:\/\/www\.misya\.info\//.test(r['Pan di Spagna'].link), 'fonte misya');
+  eq(r['Crema pasticcera classica'].cat, ['dolci', 'dolce']); eq(r['Crema pasticcera classica'].ing, 6); eq(r['Crema pasticcera classica'].passi, 6); eq(r['Crema pasticcera classica'].fisse, false);
+  assert(/^https:\/\/www\.buttalapasta\.it\//.test(r['Crema pasticcera classica'].link), 'fonte buttalapasta');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
