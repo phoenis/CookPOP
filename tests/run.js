@@ -2898,10 +2898,16 @@ test('dettaglio ricetta: tempi, "Uova · tuorli", titolo del pasto, "Metti nel m
   // "Metti nel menù": scelgo un pasto e la ricetta ci va (come "Cambia piatto")
   await page.click('[data-recipe-to-menu]');
   await page.waitForSelector('.menu-pick-chip');
-  const key = await page.evaluate(() => document.querySelector('.menu-pick-chip:not(.active)').dataset.swapDay);
-  await page.click(`.menu-pick-chip[data-swap-day="${key}"]`);
-  const after = await page.evaluate(k => { const { weekIdx, i, meal } = parseMealKey(k); return { sheet: !!document.querySelector('.menu-pick-chip'), name: effectiveMeal(weekIdx, i, meal).principale }; }, key);
-  eq(after, { sheet: false, name: 'Carbonara' }, 'messa nel menù, foglio chiuso');
+  const key = await page.evaluate(() => document.querySelector('.menu-pick-chip:not(.active)').dataset.menuDay);
+  const before = await page.evaluate(k => { const { weekIdx, i, meal } = parseMealKey(k); return mealDishes(weekIdx, i, meal).map(d => d.name); }, key);
+  const principaleBefore = await page.evaluate(k => { const { weekIdx, i, meal } = parseMealKey(k); return effectiveMeal(weekIdx, i, meal).principale; }, key);
+  const adding = before.length > 0;
+  await page.click(`.menu-pick-chip[data-menu-day="${key}"]`);
+  const after = await page.evaluate(k => { const { weekIdx, i, meal } = parseMealKey(k); return { sheet: !!document.querySelector('.menu-pick-chip'), names: mealDishes(weekIdx, i, meal).map(d => d.name), principale: effectiveMeal(weekIdx, i, meal).principale }; }, key);
+  eq(after.sheet, false, 'foglio chiuso');
+  assert(after.names.includes('Carbonara'), 'la ricetta è nel pasto');
+  assert(before.every(n => after.names.includes(n)), 'quello che c\'era resta: ' + JSON.stringify([before, after.names]));
+  if(adding) eq(after.principale, principaleBefore, 'il piatto principale resta com\'era');
   // Ingredienti | Passaggi sono tab vere; lo swipe a sinistra/destra le cambia
   const sw = dx => page.evaluate(dx => {
     const rd = document.querySelector('.rd');
