@@ -1089,8 +1089,10 @@ function renderMenuPickSheet(){
       const i = WEEK_DISPLAY_ORDER[pos];
       const label = date.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '');
       const chips = ['pranzo', 'cena'].map(meal => {
-        const cur = effectiveMeal(weekIdx, i, meal).principale || '';
-        return `<button type="button" class="menu-pick-chip${cur === name ? ' active' : ''}" data-swap-pick="${escapeAttr(name)}" data-swap-day="${mealKey(weekIdx, i, meal)}"><b>${MEAL_LABEL[meal]}</b><small>${cur ? escapeHtml(cur) : 'vuoto'}</small></button>`;
+        const names = mealDishes(weekIdx, i, meal).map(d => d.name);
+        const has = names.includes(name);
+        // Si aggiunge ai piatti del pasto: sotto si vede cosa c'è già (o "vuoto").
+        return `<button type="button" class="menu-pick-chip${has ? ' active' : ''}" data-menu-add="${escapeAttr(name)}" data-menu-day="${mealKey(weekIdx, i, meal)}"><b>${MEAL_LABEL[meal]}</b><small>${has ? 'già nel pasto' : (names.length ? escapeHtml(names.join(' + ')) : 'vuoto')}</small></button>`;
       }).join('');
       rows.push(`<div class="menu-pick-row"><span class="menu-pick-day">${escapeHtml(label.charAt(0).toUpperCase() + label.slice(1))}</span>${chips}</div>`);
     });
@@ -1100,7 +1102,7 @@ function renderMenuPickSheet(){
     <div class="move-sheet" role="dialog" aria-label="Metti nel menù" data-stop-close>
       <div class="move-handle" aria-hidden="true"></div>
       <h2 class="move-title">Metti nel menù</h2>
-      <p class="move-sub">${escapeHtml(name)} · scegli il pasto. Prende il posto di quello che c'è.</p>
+      <p class="move-sub">${escapeHtml(name)} · scegli il pasto. Si aggiunge ai piatti che ci sono.</p>
       <div class="move-list menu-pick-list">${rows.join('')}</div>
       <div class="move-footer"><button type="button" class="btn is-outline" data-menu-pick-close>Indietro</button></div>
     </div>
@@ -1110,8 +1112,20 @@ document.addEventListener('click', e=>{
   const open = e.target.closest && e.target.closest('[data-recipe-to-menu]');
   if(open){ state.menuPick = open.dataset.recipeToMenu; render(); return; }
   if(!state.menuPick) return;
-  const pick = e.target.closest('[data-swap-pick]');
-  if(pick){ state.menuPick = null; return; } // il gestore del pick ridisegna
+  const add = e.target.closest('[data-menu-add]');
+  if(add){
+    // Si aggiunge ai piatti del pasto (non sostituisce); Annulla rimette com'era.
+    const recipeName = add.dataset.menuAdd;
+    const { weekIdx, i, meal } = parseMealKey(add.dataset.menuDay);
+    state.menuPick = null;
+    if(mealDishes(weekIdx, i, meal).some(d => d.name === recipeName)){ render(); return; }
+    const snap = snapshotMealDishes(weekIdx, i, meal);
+    const wasEmpty = !effectiveMeal(weekIdx, i, meal).principale;
+    addMealDish(weekIdx, i, meal, recipeName);
+    persist(); render();
+    showUndoToast(wasEmpty ? `${recipeName} messa nel menù` : `${recipeName} aggiunta al pasto`, ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
+    return;
+  }
   const close = e.target.closest('[data-menu-pick-close]');
   if(close && !(e.target.closest('[data-stop-close]') && !close.matches('.btn'))){ state.menuPick = null; render(); }
 }, true);
