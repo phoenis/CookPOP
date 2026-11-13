@@ -5032,6 +5032,15 @@ test('Pan di Spagna e Crema pasticcera classica: dolci del catalogo con ingredie
   assert(/^https:\/\/www\.buttalapasta\.it\//.test(r['Crema pasticcera classica'].link), 'fonte buttalapasta');
 });
 
+test('Chantilly al mascarpone: dolce del catalogo con ingredienti, passaggio, conservazione e note', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const m = getRecipeMeta('Chantilly al mascarpone'), d = getRecipeDetails('Chantilly al mascarpone');
+    return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.map(i => i.ingrediente + ':' + i.qta), passi: d.procedimento.length, avanzi: d.avanzi, link: d.link };
+  });
+  eq(r.cat, ['dolci', 'dolce']); eq(r.ing, ['Panna fresca:250 g', 'Mascarpone:250 g', 'Zucchero a velo:40 g']); eq(r.passi, 1);
+  assert(/2–3 giorni in frigo/.test(r.avanzi) && /^https:\/\/www\.instagram\.com\/reels\/DU27lvyCHrc/.test(r.link), 'conservazione e fonte');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
