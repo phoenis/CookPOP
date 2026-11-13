@@ -449,8 +449,10 @@ test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finch�
 test('generatore: usa gli ingredienti in scadenza in tempo, senza perdere equilibrio', async ({ page }) => {
   const r = await page.evaluate(() => {
     // La scadenza guida la scelta solo entro 7 giorni: nei primi giorni della settimana si usa la corrente, poi la prossima (scadenza al suo quarto giorno, che rientra nei 7 giorni).
-    const pos0 = WEEK_DISPLAY_ORDER.indexOf(new Date().getDay());
-    const W = pos0 + 3 <= 6 ? 0 : 1, expPos = (pos0 + 3) % 7; // scade fra 3 giorni, dentro la settimana W
+    const pos0 = WEEK_DISPLAY_ORDER.indexOf((new Date().getDay() + 6) % 7); // i giorni dell'app partono da lunedì (0), quelli di JS da domenica
+    // Nei primi giorni della settimana si usa la corrente (scade 3 giorni dopo oggi); dal quarto giorno in poi la prossima,
+    // con la scadenza al suo quarto giorno (sempre entro i 7 giorni): ci sono così abbastanza pasti prima della scadenza.
+    const W = pos0 >= 3 ? 1 : 0, expPos = pos0 >= 3 ? 3 : pos0 + 3;
     state.extraWeeks = [];
     const slots = weekPlanSlots(W), seq = weekEatenSequence(slots, W);
     const run = withExpiry => {
@@ -4496,10 +4498,11 @@ test('Lomo saltado: ricetta del catalogo (piatto unico, carne) con fonte, e fini
     const meta = getRecipeMeta('Lomo saltado'), det = getRecipeDetails('Lomo saltado');
     out.meta = [meta.categoriaNew, meta.tipologia, meta.proteina, meta.base];
     out.det = [det.porzioni, getIngredientsFor('Lomo saltado').length, det.procedimento.length, /^https:\/\//.test(det.link)];
+    out.risoPrima = /^Per prima cosa metti a cuocere il riso/.test(det.procedimento[0]);
     out.senzaOstriche = !getIngredientsFor('Lomo saltado').some(i => /ostri|ostion/i.test(i.ingrediente));
     const pr = det.procedimento;
-    out.aglioPrima = /aglio/i.test(pr[5]) && !/aglio/i.test(pr[8]) && pr.findIndex(x => /aglio/i.test(x)) < pr.findIndex(x => /Unisci i pomodori/.test(x));
-    out.succo = /succo che ha rilasciato/.test(pr[4]) && /succo della carne/.test(pr[7]);
+    out.aglioPrima = /aglio/i.test(pr[6]) && !/aglio/i.test(pr[9]) && pr.findIndex(x => /aglio/i.test(x)) < pr.findIndex(x => /Unisci i pomodori/.test(x));
+    out.succo = /succo che ha rilasciato/.test(pr[5]) && /succo della carne/.test(pr[8]);
     // migrazione: solo gli album con "compleanni" nel nome
     state.lomoSaltadoAlbum1 = false;
     state.cookbooks = [{ id: 'a', name: 'Compleanni', recipes: ['Tiramisù'] }, { id: 'b', name: 'Estate', recipes: [] }, { id: 'c', name: 'Compleanni 2', recipes: ['Lomo saltado'] }];
@@ -4511,7 +4514,8 @@ test('Lomo saltado: ricetta del catalogo (piatto unico, carne) con fonte, e fini
     return out;
   });
   eq(r.meta, ['carne', 'unico', 'carne-rossa', 'riso']);
-  eq(r.det, ['4 porzioni', 15, 10, true]);
+  eq(r.det, ['4 porzioni', 15, 11, true]);
+  assert(r.risoPrima, 'il riso si mette a cuocere per primo');
   assert(r.aglioPrima && r.succo, 'aglio con cipolla e aji prima dei pomodori, succo della carne nella salsa: ' + JSON.stringify([r.aglioPrima, r.succo]));
   assert(r.senzaOstriche, 'senza salsa di ostriche');
   eq(r.album, ['Tiramisù|Lomo saltado', '', 'Lomo saltado']);
