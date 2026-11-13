@@ -5041,6 +5041,15 @@ test('Chantilly al mascarpone: dolce del catalogo con ingredienti, passaggio, co
   assert(/2–3 giorni in frigo/.test(r.avanzi) && /^https:\/\/www\.instagram\.com\/reels\/DU27lvyCHrc/.test(r.link), 'conservazione e fonte');
 });
 
+test('Crema al burro: dolce del catalogo, 8 porzioni, ingredienti e passaggi', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const m = getRecipeMeta('Crema al burro'), d = getRecipeDetails('Crema al burro');
+    return { cat: m && [m.categoriaNew, m.tipologia], porz: d.porzioni, ing: d.ingredienti.map(i => i.ingrediente + ':' + i.qta), passi: d.procedimento.length };
+  });
+  eq(r.cat, ['dolci', 'dolce']); eq(r.porz, '8 porzioni'); eq(r.passi, 5);
+  eq(r.ing, ['Zucchero a velo:250 g', 'Burro:250 g', 'Latte:3 cucchiai', 'Estratto di vaniglia:q.b.']);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
