@@ -449,8 +449,10 @@ test('dispensa: scadenza con scelte rapide, sezione In scadenza, si tiene finch�
 test('generatore: usa gli ingredienti in scadenza in tempo, senza perdere equilibrio', async ({ page }) => {
   const r = await page.evaluate(() => {
     // La scadenza guida la scelta solo entro 7 giorni: nei primi giorni della settimana si usa la corrente, poi la prossima (scadenza al suo quarto giorno, che rientra nei 7 giorni).
-    const pos0 = WEEK_DISPLAY_ORDER.indexOf(new Date().getDay());
-    const W = pos0 + 3 <= 6 ? 0 : 1, expPos = (pos0 + 3) % 7; // scade fra 3 giorni, dentro la settimana W
+    const pos0 = WEEK_DISPLAY_ORDER.indexOf((new Date().getDay() + 6) % 7); // i giorni dell'app partono da lunedì (0), quelli di JS da domenica
+    // Nei primi giorni della settimana si usa la corrente (scade 3 giorni dopo oggi); dal quarto giorno in poi la prossima,
+    // con la scadenza al suo quarto giorno (sempre entro i 7 giorni): ci sono così abbastanza pasti prima della scadenza.
+    const W = pos0 >= 3 ? 1 : 0, expPos = pos0 >= 3 ? 3 : pos0 + 3;
     state.extraWeeks = [];
     const slots = weekPlanSlots(W), seq = weekEatenSequence(slots, W);
     const run = withExpiry => {
