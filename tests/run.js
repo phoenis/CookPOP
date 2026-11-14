@@ -5056,6 +5056,28 @@ test('Crema al burro: dolce del catalogo, 8 porzioni, ingredienti e passaggi', a
   eq(r.ing, ['Zucchero a velo:250 g', 'Burro:250 g', 'Latte:3 cucchiai', 'Estratto di vaniglia:q.b.']);
 });
 
+test('Menù: toccando un piatto nella schedina del pasto il dettaglio si apre su quel piatto (non sempre sul primo)', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'menu'; state.showPastDays = true; state.expandedDay = null; state.dishTab = {};
+    const slot = allMealSlots().find(m => m.weekIdx === 0 && m.meal === 'cena');
+    writeMealDishes(slot.weekIdx, slot.i, slot.meal, 'Carbonara', ['Insalata mista', 'Zucchine gratinate al forno', 'Crema al limone']);
+    render();
+    const mk = mealKey(slot.weekIdx, slot.i, slot.meal);
+    const names = mealDishes(slot.weekIdx, slot.i, slot.meal).map(d => d.name);
+    const out = { names, aperti: [] };
+    names.forEach(n => {
+      state.expandedDay = null; state.dishTab = {}; render();
+      const el = [...document.querySelectorAll(`.meal-block .day-menu[data-toggle-day="${mk}"]`)].find(e => e.textContent.trim() === n);
+      el.click();
+      const tab = document.querySelector('.dish-tab.active');
+      out.aperti.push(tab ? tab.dataset.dishTabName : null);
+    });
+    return out;
+  });
+  eq(r.aperti, r.names, 'ogni piatto apre il proprio dettaglio: ' + JSON.stringify(r));
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

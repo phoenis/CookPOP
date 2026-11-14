@@ -6839,7 +6839,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
         <button type="button" class="dish-ic${dishLockedHas(mk, dsh.name) ? ' is-locked' : ''}" data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(dsh.name)}" aria-pressed="${dishLockedHas(mk, dsh.name)}" aria-label="${dishLockedHas(mk, dsh.name) ? 'Sblocca' : 'Blocca'} ${escapeAttr(dsh.name)}">${dishLockedHas(mk, dsh.name) ? uiIcon('lock') : tipoIcon(dsh.tipo)}</button>
         <div class="dish-text">
           <div class="dish-course">${escapeHtml(courseLabel(dsh.tipo))}<span class="dish-tag">${escapeHtml(dishTag(dsh.name))}</span></div>
-          <span class="day-menu" data-toggle-day="${mk}">${escapeHtml(dsh.name)}</span>
+          <span class="day-menu" data-toggle-day="${mk}" data-open-dish="${escapeAttr(dsh.name)}">${escapeHtml(dsh.name)}</span>
           ${freezerPortionsOf(dsh.name) > 0 && !isFreezerDish(mk, dsh.name) && !fixed ? `<button type="button" class="dish-freezer-hint" data-use-freezer="${mk}" data-use-freezer-name="${escapeAttr(dsh.name)}">❄️ ${freezerPortionsOf(dsh.name)} ${freezerPortionsOf(dsh.name) === 1 ? 'porzione' : 'porzioni'} in freezer · usale</button>` : ''}
         </div>
         ${fixed ? '' : `<div class="dish-actions">
@@ -12251,6 +12251,8 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-day]').forEach(el=>{
     el.addEventListener('click', e=>{
       const key = e.target.dataset.toggleDay;
+      // Toccando il nome di un piatto nella schedina il dettaglio si apre proprio su quel piatto.
+      if(state.expandedDay !== key && e.target.dataset.openDish){ state.dishTab = state.dishTab || {}; state.dishTab[key] = e.target.dataset.openDish; }
       state.expandedDay = state.expandedDay !== key ? key : null;
       render();
     });
