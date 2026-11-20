@@ -5060,7 +5060,7 @@ test('Menù: toccando un piatto nella schedina del pasto il dettaglio si apre su
   const r = await page.evaluate(() => {
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
     state.tab = 'menu'; state.showPastDays = true; state.expandedDay = null; state.dishTab = {};
-    const slot = allMealSlots().find(m => m.weekIdx === 0 && m.meal === 'cena');
+    const slot = allMealSlots().filter(m => m.weekIdx === 0 && m.meal === 'cena').pop(); // l'ultima cena della settimana corrente: oggi o dopo, quindi sempre visibile
     writeMealDishes(slot.weekIdx, slot.i, slot.meal, 'Carbonara', ['Insalata mista', 'Zucchine gratinate al forno', 'Crema al limone']);
     render();
     const mk = mealKey(slot.weekIdx, slot.i, slot.meal);
@@ -5076,6 +5076,16 @@ test('Menù: toccando un piatto nella schedina del pasto il dettaglio si apre su
     return out;
   });
   eq(r.aperti, r.names, 'ogni piatto apre il proprio dettaglio: ' + JSON.stringify(r));
+});
+
+test('Pancake allo sciroppo d\'acero: dolce del catalogo con ingredienti, passaggi e fonte', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const n = 'Pancake allo sciroppo d\'acero', m = getRecipeMeta(n), d = getRecipeDetails(n);
+    return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.slice(0, 5).map(i => i.ingrediente + ':' + i.qta), n: d.ingredienti.length, passi: d.procedimento.length, link: d.link };
+  });
+  eq(r.cat, ['dolci', 'dolce']); eq(r.n, 10); eq(r.passi, 8);
+  eq(r.ing, ['Farina 00:125 g', 'Latte:200 ml', 'Burro:25 g', 'Zucchero:15 g', 'Uova:2']);
+  assert(/^https:\/\/ricette\.giallozafferano\.it\/Pancakes-allo-sciroppo/.test(r.link), 'fonte');
 });
 
 (async () => {
