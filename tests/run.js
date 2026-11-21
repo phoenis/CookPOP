@@ -5100,6 +5100,12 @@ test('Ricette da Instagram (secondo batch): presenti con ingredienti, passaggi e
   for (const [x, m, i, p, l] of res) assert(m && i >= 2 && p > 0 && l, 'Ricetta incompleta: ' + x);
 });
 
+test('Torta girella con crema pasticcera: dolce del catalogo con ingredienti, passaggi e fonte', async ({ page }) => {
+  const r = await page.evaluate(() => { const n = 'Torta girella con crema pasticcera nell’impasto', m = getRecipeMeta(n), d = getRecipeDetails(n); return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.length, passi: d.procedimento.length, porz: d.porzioni, link: d.link }; });
+  eq(r.cat, ['dolci', 'dolce']); eq(r.ing, 9); eq(r.passi, 8); eq(r.porz, '16 fette');
+  assert(/saporediarianna\/torta-girella/.test(r.link), 'fonte');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
