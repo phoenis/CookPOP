@@ -5106,6 +5106,12 @@ test('Torta girella con crema pasticcera: dolce del catalogo con ingredienti, pa
   assert(/saporediarianna\/torta-girella/.test(r.link), 'fonte');
 });
 
+test('Ricette da Instagram (terzo batch): presenti con ingredienti, passaggi e link alla fonte', async ({ page }) => {
+  const names = ['Torta “Rosa Rossa” di crêpes','Bruschetta stracchino e salsiccia (pane cafone)','Marmellata di birra','Cornetti gelato panna e cioccolato','Castagne in friggitrice ad aria','Caviale di Aperol','50 salatini con un impasto','Ghirlanda caprese','Pane a lievito madre con farina integrale e semi di chia','Alberelli di sfoglia e parmigiano','Marshmallow fatti in casa','Torta marmorizzata alla zucca','Cioccolatini con frutta secca','Corona di sfoglia al cioccolato'];
+  const res = await page.evaluate(n => n.map(x => { const m = getRecipeMeta(x), d = getRecipeDetails(x); return [x, !!m, d && d.ingredienti.length, d && d.procedimento.length, d && /instagram\.com/.test(d.link)]; }), names);
+  for (const [x, m, i, p, l] of res) assert(m && i >= 2 && p > 0 && l, 'Ricetta incompleta: ' + x);
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
