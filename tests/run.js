@@ -5133,6 +5133,12 @@ test('Piatto senza ricetta: dalla scelta del piatto si aggiunge «spatzle» al p
   eq(page.errors, [], 'errori JS');
 });
 
+test('Spatzle con panna e speck: primo del catalogo con ingredienti e passaggi', async ({ page }) => {
+  const r = await page.evaluate(() => { const n = 'Spatzle con panna e speck', m = getRecipeMeta(n), d = getRecipeDetails(n); return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.map(i => i.ingrediente + ':' + i.qta), passi: d.procedimento.length, porz: d.porzioni, link: d.link }; });
+  eq(r.cat, ['pasta', 'primo']); eq(r.ing, ['Spatzle:350 g', 'Panna da cucina:200 ml', 'Speck:70 g', 'Burro:q.b.']); eq(r.passi, 5); eq(r.porz, '3 persone');
+  assert(r.link, 'link alla fonte');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
