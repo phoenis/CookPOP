@@ -2879,3 +2879,7 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .dict-live{ animation:dict-pulse 1.2s ease-in-out infinite; }
 @keyframes dict-pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(217,59,31,0.45); } 50%{ box-shadow:0 0 0 10px rgba(217,59,31,0); } }
 @media (prefers-reduced-motion:reduce){ .dict-live{ animation:none; } }
+
+/* "Aggiungi «…» senza ricetta" nella scelta del piatto: stessa riga dei risultati, in evidenza */
+.dish-new-row{ width:100%; border:0; border-bottom:var(--border) solid var(--line); background:transparent; color:var(--accent, inherit); font:inherit; text-align:left; }
+.dish-new-row .swap-result-name{ font-weight:var(--weight-semibold, 600); }

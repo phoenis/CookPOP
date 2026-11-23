@@ -7268,6 +7268,10 @@ function renderDishPickerScreen(){
       <span class="swap-result-name">${escapeHtml(r.nome)}${allergenBadgeHtml(r)}</span>
       <span class="swap-result-time">${dp.tipo === 'suggeriti' && suggestMotivo[r.nome] ? escapeHtml(suggestMotivo[r.nome]) : dp.tipo === 'freezer' ? `❄️ ${freezerPortionsOf(r.nome)} porz.` : escapeHtml(String(TEMPO_LABEL[r.tempoBucket] || '').replace(/^\S+\s/, ''))}${pantryNote(pantryMatches[r.nome])}</span>
     </div>`).join('');
+  // Nessuna ricetta con esattamente questo nome: si può aggiungere comunque come piatto senza ricetta.
+  const typed = search.trim().replace(/\s+/g, ' ');
+  const newDishHtml = (!dp.require && typed && !allRecipeMetas().some(r => r.nome.toLowerCase() === typed.toLowerCase()))
+    ? `<button type="button" class="swap-result dish-new-row" data-dish-new="${escapeAttr(typed)}" data-dish-key="${mk}"><span class="swap-result-icon" aria-hidden="true">＋</span><span class="swap-result-name">Aggiungi «${escapeHtml(typed)}» senza ricetta</span></button>` : '';
   const chips = `<button type="button" class="btn is-chip ${dp.pantry?'active':''}" data-dish-pantry aria-pressed="${!!dp.pantry}">🧺 Con quello che ho</button><span class="dsh-chip-sep" aria-hidden="true"></span>`
     + `<button type="button" class="btn is-chip ${dp.tipo==='all'?'active':''}" data-dish-course="all">Tutte</button>`
     + (canSuggest ? `<button type="button" class="btn is-chip ${dp.tipo==='suggeriti'?'active':''}" data-dish-course="suggeriti">✨ Suggeriti</button>` : '')
@@ -7290,7 +7294,8 @@ function renderDishPickerScreen(){
       <label class="dsh-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" aria-hidden="true"><circle cx="10" cy="10" r="7"></circle><path d="m21 21-6-6"></path></svg><input type="search" class="swap-search" placeholder="Cerca una ricetta…" data-dish-search="${mk}" value="${escapeAttr(search)}" autocomplete="off"></label>
       ${dp.require ? `<p class="gen-note dsh-require">«${escapeHtml(dp.require)}» ha bisogno di un ripieno: scegline uno. Se chiudi, anche l'impasto viene tolto.</p>` : `<div class="dsh-chips dish-course-chips" role="group" aria-label="Portata">${chips}</div>`}
       <div class="swap-results dsh-results">
-        ${resultsHtml || '<div class="ing-empty">Nessuna ricetta trovata.</div>'}
+        ${newDishHtml}
+        ${resultsHtml || (newDishHtml ? '' : '<div class="ing-empty">Nessuna ricetta trovata.</div>')}
         ${results.length > 60 ? `<div class="ing-empty">Altri ${results.length-60} risultati — affina la ricerca.</div>` : ''}
         ${dp.tipo === 'suggeriti' ? `<button type="button" class="btn is-text gen-add-exc dsh-more" data-dish-more-suggest>↻ Un'altra proposta</button>` : ''}
       </div>
@@ -13950,6 +13955,32 @@ document.addEventListener('click', e=>{
   const courseEl = e.target.closest('[data-dish-course]');
   if(courseEl && state.dishPicker){ state.dishPicker.tipo = courseEl.dataset.dishCourse; state.dishPicker.suggestNow = null; render(); return; }
   if(e.target.closest('[data-dish-more-suggest]') && state.dishPicker){ state.dishPicker.suggestNow = null; render(); return; }
+  // Piatto senza ricetta (es. "spatzle"): nasce come ricetta col solo nome
+  // (come "Aggiungi ricetta") e si mette subito nel pasto; Annulla toglie
+  // sia il piatto sia la ricetta appena creata.
+  const newEl = e.target.closest('[data-dish-new]');
+  if(newEl && state.dishPicker){
+    const raw = (newEl.dataset.dishNew || '').trim().replace(/\s+/g, ' ');
+    if(!raw) return;
+    const name = raw.charAt(0).toUpperCase() + raw.slice(1);
+    const existing = allRecipeMetas().find(r => r.nome.toLowerCase() === name.toLowerCase());
+    const tipo = state.dishPicker.tipo;
+    const created = !existing;
+    if(created) state.customRecipes[name] = Object.assign({ nome: name }, COURSE_ORDER.includes(tipo) ? { tipologia: tipo } : {});
+    const finalName = existing ? existing.nome : name;
+    const { weekIdx, i, meal } = parseMealKey(newEl.dataset.dishKey);
+    const oldName = state.dishPicker.replace;
+    const snap = snapshotMealDishes(weekIdx, i, meal);
+    if(oldName) replaceMealDish(weekIdx, i, meal, oldName, finalName); else addMealDish(weekIdx, i, meal, finalName);
+    state.dishPicker = null;
+    persist(); render();
+    showUndoToast(created ? `${finalName} aggiunto al pasto (senza ricetta)` : `${finalName} aggiunto al pasto`, ()=>{
+      restoreMealDishes(weekIdx, i, meal, snap);
+      if(created) delete state.customRecipes[finalName];
+      persist(); render();
+    });
+    return;
+  }
   const pickEl = e.target.closest('[data-dish-pick]');
   if(pickEl && state.dishPicker){
     const { weekIdx, i, meal } = parseMealKey(pickEl.dataset.dishKey);

@@ -5112,6 +5112,27 @@ test('Ricette da Instagram (terzo batch): presenti con ingredienti, passaggi e l
   for (const [x, m, i, p, l] of res) assert(m && i >= 2 && p > 0 && l, 'Ricetta incompleta: ' + x);
 });
 
+test('Piatto senza ricetta: dalla scelta del piatto si aggiunge «spatzle» al pasto, con Annulla che toglie anche la ricetta', async ({ page }) => {
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'menu'; state.dishPicker = { key: '0_4_cena', replace: null, tipo: 'all', search: '' }; render();
+  });
+  await page.fill('[data-dish-search]', 'spatzle');
+  const label = await page.locator('[data-dish-new]').first().textContent();
+  assert(/Aggiungi «spatzle» senza ricetta/.test(label), 'riga per aggiungere senza ricetta: ' + label);
+  await page.click('[data-dish-new]');
+  const r = await page.evaluate(() => ({ dishes: mealDishes(0, 4, 'cena').map(d => d.name), custom: !!state.customRecipes['Spatzle'], picker: state.dishPicker }));
+  assert(r.dishes.includes('Spatzle') && r.custom && r.picker === null, 'piatto aggiunto: ' + JSON.stringify(r));
+  await page.click('.toast button, [data-undo], .undo-toast button');
+  const u = await page.evaluate(() => ({ dishes: mealDishes(0, 4, 'cena').map(d => d.name), custom: !!state.customRecipes['Spatzle'] }));
+  assert(!u.dishes.includes('Spatzle') && !u.custom, 'Annulla toglie piatto e ricetta: ' + JSON.stringify(u));
+  // con un nome già in catalogo non compare la riga
+  await page.evaluate(() => { state.dishPicker = { key: '0_4_cena', replace: null, tipo: 'all', search: '' }; render(); });
+  await page.fill('[data-dish-search]', 'Chantilly al mascarpone');
+  eq(await page.locator('[data-dish-new]').count(), 0, 'nessuna riga se la ricetta esiste');
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
