@@ -4946,6 +4946,11 @@ function expiringUsedByPlan(picks, ctx){
 // "Solo con quello che ho": le ricette (con ingredienti salvati) a cui manca
 // meno, partendo da quelle a cui non manca niente. Se non bastano per i
 // pasti da riempire si allarga a quelle a cui manca 1 cosa, poi 2, ecc.
+// Quante ricette devono almeno entrare nella scelta: con il pool più stretto
+// possibile (tante ricette quanti i pasti) la rigenerazione sceglieva sempre
+// le stesse. Le ricette a cui non manca niente restano comunque quelle
+// preferite dal punteggio della Dispensa.
+function pantryPoolSize(need){ return Math.max(need * 2, need + 6); }
 function pantryOnlyPool(list, need, expiring){
   const scored = list.map(r => ({ r, m: recipePantryMatch(r.nome, expiring) })).filter(x => x.m.total);
   if(!scored.length) return list;
@@ -4979,7 +4984,7 @@ function pickWeekRecipes(fixed, weekIdx){
   if(pantryOnly){
     // Con quello che ho, la stagione conta meno: si parte da tutte le ricette.
     const need = fixedAt.filter(f => !f).length;
-    pool = pantryOnlyPool(dietFilter(allRecipeMetas().filter(isMainDish)).filter(r => !fixedNames.has(r.nome)), need, pantryCtx.expiring);
+    pool = pantryOnlyPool(dietFilter(allRecipeMetas().filter(isMainDish)).filter(r => !fixedNames.has(r.nome)), pantryPoolSize(need), pantryCtx.expiring);
   }
   const recent = recentRecipeNames(weekIdx);
   const recentScore = picks => picks.reduce((sum, r) => sum + (recent.has(r.nome) && !fixedNames.has(r.nome) ? RECENT_PENALTY : 0), 0);
