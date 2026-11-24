@@ -1462,7 +1462,7 @@ test('con quello che ho: genera e cambia un pasto con le ricette per cui hai gli
     const used = generateWeek(0);
     const names = [];
     for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => names.push(effectiveMeal(0, i, m).principale));
-    return { missing: m.missing.length, inPool: pool.some(x => x.nome === target.nome), poolAllComplete: pool.every(x => !recipePantryMatch(x.nome, {}).missing.length), picked: (() => { const p10 = new Set(pantryOnlyPool(allRecipeMetas().filter(isMainDish), weekPlanSlots().length, {}).map(x => x.nome)); return names.filter((n, k) => n && !state.dayLinks['0_' + Math.floor(k / 2) + '_' + (k % 2 ? 'cena' : 'pranzo')]).every(n => p10.has(n)); })(), short: typeof used.pantryShort };
+    return { missing: m.missing.length, inPool: pool.some(x => x.nome === target.nome), poolAllComplete: pool.every(x => !recipePantryMatch(x.nome, {}).missing.length), picked: (() => { const p10 = new Set(pantryOnlyPool(allRecipeMetas().filter(isMainDish), pantryPoolSize(weekPlanSlots().length), {}).map(x => x.nome)); return names.filter((n, k) => n && !state.dayLinks['0_' + Math.floor(k / 2) + '_' + (k % 2 ? 'cena' : 'pranzo')]).every(n => p10.has(n)); })(), short: typeof used.pantryShort };
   });
   eq(r, { missing: 0, inPool: true, poolAllComplete: true, picked: true, short: 'number' });
   await page.evaluate(() => {
@@ -5137,6 +5137,25 @@ test('Spatzle con panna e speck: primo del catalogo con ingredienti e passaggi',
   const r = await page.evaluate(() => { const n = 'Spatzle con panna e speck', m = getRecipeMeta(n), d = getRecipeDetails(n); return { cat: m && [m.categoriaNew, m.tipologia], ing: d.ingredienti.map(i => i.ingrediente + ':' + i.qta), passi: d.procedimento.length, porz: d.porzioni, link: d.link }; });
   eq(r.cat, ['pasta', 'primo']); eq(r.ing, ['Spatzle:350 g', 'Panna da cucina:200 ml', 'Speck:70 g', 'Burro:q.b.']); eq(r.passi, 5); eq(r.porz, '3 persone');
   assert(r.link, 'link alla fonte');
+});
+
+test('con quello che ho: la scelta non è sempre la stessa, anche se per poche ricette hai tutto', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.weekTempoBase = 'progetto'; state.weekTempoExceptions = {};
+    const target = allRecipeMetas().filter(isMainDish).find(x => getIngredientsFor(x.nome).length >= 3);
+    state.pantryItems = {};
+    getIngredientsFor(target.nome).forEach(it => upsertPantryItem(it.ingrediente, 'dispensa', 100));
+    state.genPantryOnly = true;
+    const slots = weekPlanSlots().length;
+    const pool = pantryOnlyPool(allRecipeMetas().filter(isMainDish), pantryPoolSize(slots), {});
+    const seen = new Set();
+    for(let n = 0; n < 6; n++){
+      generateWeek(0);
+      for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => { const p = effectiveMeal(0, i, m).principale; if(p) seen.add(p); });
+    }
+    return { poolBigEnough: pool.length >= pantryPoolSize(slots), varied: seen.size > slots };
+  });
+  eq(r, { poolBigEnough: true, varied: true });
 });
 
 (async () => {
