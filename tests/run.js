@@ -5158,6 +5158,17 @@ test('con quello che ho: la scelta non è sempre la stessa, anche se per poche r
   eq(r, { poolBigEnough: true, varied: true });
 });
 
+test('con quello che ho: l\'ingrediente in scadenza vale per un paio di pasti, dal terzo in poi pesa contro', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const ctx = { active: true, expMax: 1 / 4, slotOffset: [0, 0, 0, 0], recipeInfo: x => ({ cov: 1, exp: x.usa ? [{ key: 'tonno', d: 3 }] : [] }) };
+    const due = pantryPlanScore([{ usa: 1 }, { usa: 1 }, {}, {}], ctx);
+    const quattro = pantryPlanScore([{ usa: 1 }, { usa: 1 }, { usa: 1 }, { usa: 1 }], ctx);
+    const uno = pantryPlanScore([{ usa: 1 }, {}, {}, {}], ctx);
+    return { dueMeglioDiQuattro: due < quattro, unoEDueUguali: Math.abs(due - uno) < 1e-9 };
+  });
+  eq(r, { dueMeglioDiQuattro: true, unoEDueUguali: true });
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();

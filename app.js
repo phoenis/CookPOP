@@ -4924,17 +4924,22 @@ function buildPantryPlanContext(weekIdx, slots){
 function pantryPlanScore(picks, ctx){
   if(!ctx || !ctx.active) return 0;
   const covered = {};
+  const uses = {};
   let cov = 0;
   picks.forEach((r, i)=>{
     const info = ctx.recipeInfo(r);
     cov += info.cov;
     const off = ctx.slotOffset[i];
     info.exp.forEach(e=>{
-      if(off >= 0 && off <= e.d) covered[e.key] = 1 / (1 + e.d);
+      if(off >= 0 && off <= e.d){ covered[e.key] = 1 / (1 + e.d); uses[e.key] = (uses[e.key] || 0) + 1; }
     });
   });
   const expScore = ctx.expMax ? Object.values(covered).reduce((a, b) => a + b, 0) / ctx.expMax : 0;
-  return -(0.6 * expScore + 0.35 * (picks.length ? cov / picks.length : 0));
+  // L'ingrediente in scadenza vale per un paio di pasti: dal terzo in poi chi
+  // lo usa pesa un po' contro, così il resto del menù si sceglie liberamente
+  // (carbonara, minestra…) invece di girare tutto intorno a quello.
+  const extra = Object.values(uses).reduce((a, n) => a + Math.max(0, n - 2), 0);
+  return -(0.6 * expScore + 0.35 * (picks.length ? cov / picks.length : 0)) + 0.15 * extra;
 }
 // Ingredienti in scadenza usati da una settimana già scelta (per dirlo dopo
 // la generazione): nomi delle voci di Dispensa, dalla più urgente.
