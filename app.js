@@ -283,7 +283,7 @@ const DEPT_RULES = [
   ['nocciol','dolci'], ['mandorl','dolci'], ['pistacch','dolci'], ['miele','dolci'], ['marmellat','dolci'], ['confettur','dolci'], ['biscott','dolci'],
   // Pasta, riso e cereali.
   ['gnocchi','pasta'], ['farro','pasta'], ['orzo','pasta'], ['cous cous','pasta'], ['couscous','pasta'], ['quinoa','pasta'], ['semol','pasta'],
-  ['cereali','pasta'], ['riso','pasta'], ['pasta','pasta'], ['spaghetti','pasta'], ['rigatoni','pasta'], ['orecchiette','pasta'], ['trenette','pasta'],
+  ['cereali','pasta'], ['riso','pasta'], ['pasta','pasta'], ['spaghetti','pasta'], ['rigatoni','pasta'], [/^(penne|linguine|bucatini|fusilli|mezze maniche|farfalle)\b/,'pasta'], ['orecchiette','pasta'], ['trenette','pasta'],
   ['trofie','pasta'], ['cannelloni','pasta'], ['sfoglie','pasta'], ['lasagn','pasta'], ['tortellini','pasta'], ['ravioli','pasta'], ['tagliatelle','pasta'], ['vialone','pasta'],
   // Pomodoro e conserve (anche pesce e verdure in scatola o sott'olio).
   ['concentrato','conserve'], ['polpa di pomodoro','conserve'], ['passata','conserve'], ['pelati','conserve'], ['conserva','conserve'],
@@ -1078,6 +1078,44 @@ function recipePersoneHtml(personeRow){ return personeRow ? `<div class="detail-
 // "Metti nel menù" (dal dettaglio di una ricetta in Ricette): sceglie il pasto
 // dei prossimi giorni; la scelta passa dallo stesso gestore di "Cambia piatto"
 // (data-swap-pick), quindi con Annulla.
+// Formato di pasta (dal ⋯ del piatto): sceglie il formato e il piatto diventa
+// la ricetta derivata ("Penne al tonno e pomodoro"), con Annulla.
+function renderFormatPickSheet(){
+  const fp = state.formatPick;
+  if(!fp) return '';
+  const base = baseRecipeName(fp.name), cur = currentPastaFormat(fp.name);
+  const chips = pastaFormatOptions(fp.name).map(f => `<button type="button" class="menu-pick-chip${f === cur ? ' active' : ''}" data-format-pick="${escapeAttr(f)}"><b>${escapeHtml(f)}</b></button>`).join('');
+  return `
+  <div class="move-backdrop" data-format-close>
+    <div class="move-sheet" role="dialog" aria-label="Formato di pasta" data-stop-close>
+      <div class="move-handle" aria-hidden="true"></div>
+      <h2 class="move-title">Formato di pasta</h2>
+      <p class="move-sub">${escapeHtml(base)} · scegli il formato. Cambia il nome del piatto e la pasta nella spesa.</p>
+      <div class="format-pick-list">${chips}</div>
+      <div class="move-footer"><button type="button" class="btn is-outline" data-format-close>Indietro</button></div>
+    </div>
+  </div>`;
+}
+document.addEventListener('click', e=>{
+  const open = e.target.closest && e.target.closest('[data-open-format-pick]');
+  if(open){ state.formatPick = { key: open.dataset.openFormatPick, name: open.dataset.formatName }; render(); return; }
+  const fp = state.formatPick;
+  if(!fp) return;
+  const pick = e.target.closest('[data-format-pick]');
+  if(pick){
+    state.formatPick = null;
+    const newName = pastaFormatName(baseRecipeName(fp.name), pick.dataset.formatPick);
+    if(newName === fp.name || !getRecipeMeta(newName)){ render(); return; }
+    const { weekIdx, i, meal } = parseMealKey(fp.key);
+    const snap = snapshotMealDishes(weekIdx, i, meal);
+    replaceMealDish(weekIdx, i, meal, fp.name, newName);
+    persist(); render();
+    showUndoToast(`Ora: ${newName}`, ()=>{ restoreMealDishes(weekIdx, i, meal, snap); persist(); render(); });
+    return;
+  }
+  const close = e.target.closest('[data-format-close]');
+  if(close && !(e.target.closest('[data-stop-close]') && !close.matches('.btn'))){ state.formatPick = null; render(); }
+}, true);
 function renderMenuPickSheet(){
   const name = state.menuPick;
   if(!name) return '';
@@ -1517,6 +1555,61 @@ function classifyDept(ingrediente){
 const recipeByName = {};
 DATA.recipes.forEach(r=>{ recipeByName[r.nome] = r; });
 
+// --- Formato di pasta -------------------------------------------------------
+// Alcune ricette di pasta vanno bene con più formati (spaghetti, penne,
+// rigatoni…): invece di una ricetta per formato, nel pasto si sceglie il
+// formato e il piatto diventa "Penne al tonno e pomodoro". Sono ricette
+// "derivate": hanno gli stessi dati della ricetta di base (con le sue modifiche),
+// solo l'ingrediente pasta e il nome cambiano. Non compaiono negli elenchi
+// (Ricette, scelta del piatto, generatore): ci si arriva dal formato.
+const PASTA_FORMATS = { lunghe: ['Spaghetti', 'Linguine', 'Bucatini'], corte: ['Penne', 'Rigatoni', 'Fusilli', 'Mezze maniche', 'Farfalle'] };
+PASTA_FORMATS.tutte = PASTA_FORMATS.lunghe.concat(PASTA_FORMATS.corte);
+// ricetta -> [insieme di formati, formato già nella ricetta ('' se è scritto "Pasta")]
+const PASTA_FORMAT_RECIPES = {
+  'Spaghetti al tonno e pomodoro': ['tutte', 'Spaghetti'], 'Pasta tonno e limone': ['tutte', ''], 'Spaghetti con pomodorini': ['tutte', 'Spaghetti'],
+  'Pasta a cacio e pepe': ['tutte', ''], 'Amatriciana': ['tutte', 'Spaghetti'], 'Gricia': ['tutte', ''], 'Carbonara': ['tutte', 'Spaghetti'],
+  'Puttanesca': ['tutte', 'Spaghetti'], 'Pasta con crema di zucchine e parmigiano': ['tutte', ''], 'Pasta alla carrettiera': ['tutte', ''],
+  'Pasta con salsiccia e funghi': ['tutte', ''], 'Pasta salsiccia e broccoli': ['tutte', ''], 'Pasta con zucchine e speck': ['tutte', ''],
+  'Pasta con melanzane e ricotta salata': ['tutte', ''], 'Pasta con ricotta, spinaci e parmigiano': ['tutte', ''], 'Pasta con crema di peperoni': ['tutte', ''],
+  'Pasta con peperoni e salsiccia': ['tutte', ''], 'Pasta con zucca e salsiccia': ['tutte', ''], 'Pasta con zucca e taleggio': ['tutte', ''],
+  'Pasta con broccoli e salsiccia': ['tutte', ''], 'Pasta con cavolfiore, acciughe e pangrattato': ['tutte', ''], 'Pasta con ricotta e pomodoro': ['tutte', ''],
+  'Pasta con crema di melanzane e mozzarella': ['tutte', ''], 'Pasta con stracchino e zucchine': ['tutte', ''], 'Pasta alla Norma': ['tutte', ''],
+  'Pasta alla boscaiola': ['tutte', ''], 'Pasta ricotta limone': ['tutte', ''], 'Pasta cremosa zucchine e speck': ['tutte', ''],
+  'Spaghetti aglio, olio e peperoncino': ['lunghe', 'Spaghetti'], 'Spaghetti alle vongole': ['lunghe', 'Spaghetti'],
+  'Pasta al pomodoro': ['tutte', ''], 'Pasta in bianco con olio e parmigiano': ['tutte', '']
+};
+// Nome del piatto col formato: "Pasta con zucchine…" -> "Penne con zucchine…"; se il nome non
+// comincia così, il formato va tra parentesi ("Carbonara (rigatoni)").
+function pastaFormatName(base, format){
+  const info = PASTA_FORMAT_RECIPES[base];
+  if(!info || !format || format === info[1]) return base;
+  if(/^Spaghetti /.test(base)) return base.replace(/^Spaghetti/, format);
+  if(/^Pasta (con|al|alla|a|ricotta|tonno|salsiccia|in) /.test(base)) return base.replace(/^Pasta/, format);
+  return `${base} (${format.toLowerCase()})`;
+}
+const PASTA_FORMAT_VARIANTS = {}; // nome derivato -> { base, format }
+Object.keys(PASTA_FORMAT_RECIPES).forEach(base=>{
+  if(!recipeByName[base]) return;
+  PASTA_FORMATS[PASTA_FORMAT_RECIPES[base][0]].forEach(f=>{
+    const n = pastaFormatName(base, f);
+    if(n !== base && !recipeByName[n]) PASTA_FORMAT_VARIANTS[n] = { base, format: f };
+  });
+});
+// Ricetta di base di un piatto (uguale al nome se non è una ricetta derivata).
+function baseRecipeName(name){ const v = PASTA_FORMAT_VARIANTS[name]; return v ? v.base : name; }
+// Formati disponibili per un piatto: [] se la ricetta non permette di scegliere.
+function pastaFormatOptions(name){
+  const info = PASTA_FORMAT_RECIPES[baseRecipeName(name)];
+  return info && getRecipeMeta(baseRecipeName(name)) ? PASTA_FORMATS[info[0]].slice() : [];
+}
+// Formato attuale: quello della ricetta derivata o, per la ricetta di base, quello che ha già (può essere '').
+function currentPastaFormat(name){
+  const v = PASTA_FORMAT_VARIANTS[name];
+  if(v) return v.format;
+  const info = PASTA_FORMAT_RECIPES[name];
+  return info ? info[1] : '';
+}
+
 // Catalogo + ricette create a mano (state.customRecipes), unite ovunque prima
 // si usava solo DATA.recipes: ricerca, suggerimenti di scambio, generazione
 // casuale del menù, elenco in Ricette.
@@ -1678,6 +1771,8 @@ function editTimeFromForm(rec){
 }
 function getRecipeMeta(name){
   if(state.hiddenRecipes[name]) return null;
+  const pv = PASTA_FORMAT_VARIANTS[name];
+  if(pv){ const bm = getRecipeMeta(pv.base); return bm && Object.assign({}, bm, { nome: name, variantOf: pv.base }); }
   const base = recipeByName[name] || state.customRecipes[name];
   if(!base) return null;
   const edit = state.recipeEdits[name];
@@ -1955,6 +2050,7 @@ function sourceLinkHtml(det){
   return `<a class="source-link" href="${escapeAttr(det.link)}" target="_blank" rel="noopener">Vedi ricetta <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--ic" width="1em" height="1em" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="currentColor" d="M6 6v2h8.59L5 17.59L6.41 19L16 9.41V18h2V6z"></path></svg></a>`;
 }
 function getRecipeDetails(name){
+  if(PASTA_FORMAT_VARIANTS[name]) return getRecipeDetails(PASTA_FORMAT_VARIANTS[name].base);
   const base = DATA.recipeDetails[name] || null;
   const edit = state.recipeEdits[name];
   if(!edit) return base;
@@ -2156,6 +2252,15 @@ function applyPortionGrams(recipeName, it){
   return Object.assign({}, it, { qta: out >= 1000 ? `${String(out / 1000).replace('.', ',')} kg` : `${out} g` });
 }
 function getIngredientsFor(name){
+  const pv = PASTA_FORMAT_VARIANTS[name];
+  if(pv){
+    let done = false;
+    return getIngredientsFor(pv.base).map(it => {
+      if(done || portionGramsKind(it.ingrediente) !== 'pasta') return it;
+      done = true;
+      return Object.assign({}, it, { ingrediente: pv.format, qual: '', spec: '' });
+    });
+  }
   const edit = state.recipeEdits[name];
   const det = DATA.recipeDetails[name];
   let list;
@@ -2624,6 +2729,7 @@ const state = {
   swapOpenDay: null,
   swapFilters: {},
   mealsDone: {}, // {i: {pranzo:bool, cena:bool}}
+  formatPick: null, // ephemeral: {key: mealKey, name: piatto} per "Cambia formato di pasta"
   menuPick: null, // ephemeral: nome della ricetta per cui è aperto "Metti nel menù"
   doneModalRecipe: null, // ephemeral: { name, ratio } se "Ricetta fatta" è aperta da una ricetta (senza pasto)
   doneGradIdx: 0, // ephemeral: di quale piatto si sta dando il voto nel foglio "Cena fatta"
@@ -5039,7 +5145,26 @@ function pickWeekRecipes(fixed, weekIdx){
     if(!best || res.score < best.score) best = res;
     if(best.score === 0 && !pantryCtx.active) break;
   }
-  const picks = best.picks;
+  // Le ricette che permettono più formati di pasta prendono un formato diverso
+  // (non lo stesso due volte nella settimana, finché ce ne sono): "Penne al
+  // tonno e pomodoro" invece di sempre gli spaghetti. Con "Solo con quello che
+  // ho" si cambia solo se la pasta scelta non fa mancare di più.
+  const fmtUsed = new Set();
+  const picks = best.picks.map((r, i)=>{
+    if(fixedAt[i]) return r;
+    const opts = pastaFormatOptions(r.nome);
+    if(!opts.length) return r;
+    let cands = opts.filter(f => !fmtUsed.has(f));
+    if(!cands.length) cands = opts;
+    if(pantryOnly){
+      const baseMissing = recipePantryMatch(r.nome, pantryCtx.expiring).missing.length;
+      cands = cands.filter(f => recipePantryMatch(pastaFormatName(r.nome, f), pantryCtx.expiring).missing.length <= baseMissing);
+    }
+    if(!cands.length) return r;
+    const f = cands[rand(cands.length)];
+    fmtUsed.add(f);
+    return getRecipeMeta(pastaFormatName(r.nome, f)) || r;
+  });
 
   const days = [];
   for(let day = 0; day < 7; day++) days.push({ cena: null, pranzo: null });
@@ -5514,11 +5639,12 @@ function rememberWeekRecipes(weekStartIso){
 function recentRecipeNames(weekIdx){
   const target = weekIdx || 0;
   const names = new Set();
+  const add = n => names.add(baseRecipeName(n));
   [0, ...state.extraWeeks.map((_, n) => n + 1)].filter(w => w !== target).forEach(w =>
-    WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => { const n = effectiveMeal(w, i, meal).principale; if(n) names.add(n); })));
+    WEEK_DISPLAY_ORDER.forEach(i => ['pranzo','cena'].forEach(meal => { const n = effectiveMeal(w, i, meal).principale; if(n) add(n); })));
   const start = weekDatesFor(target)[0];
   const limit = isoLocalDate(new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7 * RECENT_WEEKS));
-  (state.recipeHistory || []).forEach(h => { if(h.dal >= limit) names.add(h.nome); });
+  (state.recipeHistory || []).forEach(h => { if(h.dal >= limit) add(h.nome); });
   return names;
 }
 // Genera (o rigenera) la settimana weekIdx: 0 è quella corrente (in cima allo
@@ -6127,6 +6253,7 @@ function keepQtyPopVisible(){
 const MODAL_CHECKS = [
   [()=> !!state.shopQtyEditingKey, ()=>{ state.shopQtyEditingKey = null; }],
   [()=> !!state.pantryEditingKey, ()=>{ state.pantryEditingKey = null; }],
+  [()=> !!state.formatPick, ()=>{ state.formatPick = null; }],
   [()=> !!state.menuPick, ()=>{ state.menuPick = null; }],
   [()=> !!state.cookMode, ()=>{ state.cookMode = null; }],
   [()=> !!state.cookbookNameDraft, ()=>{ state.cookbookNameDraft = null; }],
@@ -7105,7 +7232,8 @@ function renderMealDetailScreen(weekIdx, i, meal){
   const menuItems = !act ? [] : [
     fixedDish ? null : { label: `${ICON_SWAP} Cambia piatto`, attrs: `data-open-dish-picker="${mk}" data-dish-replace="${escapeAttr(actName)}"` },
     { label: dishLockedHas(mk, actName) ? `${uiIcon('lock')} Sblocca il piatto` : `${uiIcon('lock')} Blocca il piatto`, attrs: `data-toggle-dish-lock="${mk}" data-dish-name="${escapeAttr(actName)}"` },
-    getRecipeMeta(actName) ? { label: `✏️ Modifica ricetta`, attrs: `data-open-recipe-edit="${escapeAttr(actName)}"` } : null,
+    (!fixedDish && pastaFormatOptions(actName).length) ? { label: `🍝 Cambia formato di pasta`, attrs: `data-open-format-pick="${mk}" data-format-name="${escapeAttr(actName)}"` } : null,
+    getRecipeMeta(actName) ? { label: `✏️ Modifica ricetta`, attrs: `data-open-recipe-edit="${escapeAttr(baseRecipeName(actName))}"` } : null,
     fixedDish ? null : { label: `✕ Togli dal pasto`, attrs: `data-dish-remove="${mk}" data-dish-name="${escapeAttr(actName)}"`, danger: true }
   ].filter(Boolean);
   const menuAction = menuItems.length ? `<button type="button" class="btn is-icon meal-menu-btn" data-meal-menu aria-label="Impostazioni del piatto" aria-expanded="${!!state.mealDetailMenuOpen}">${DOTS_ICON_SVG}</button>` : '';
@@ -8103,6 +8231,7 @@ function renderMenu(){
     ${linkPickerScreen}
     ${avanzoDiPickerScreen}
     ${dishPickerScreen}
+    ${renderFormatPickSheet()}
     <div class="generate-week-block">
       <div class="generate-week-row">
         <button class="btn is-double is-left is-accent" id="add-week">+ Aggiungi settimana</button>
