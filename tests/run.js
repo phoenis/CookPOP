@@ -5225,6 +5225,29 @@ test('Ricette semplici di tutti i giorni: minestrina, pasta al pomodoro, pasta e
   eq(g, ['300 g', '270 g', '160 g']);
 });
 
+test('Formato di pasta: il generatore usa i formati che hai in Dispensa e il foglio li mette per primi', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.genPantryOnly = false; state.pantryItems = {};
+    upsertPantryItem('Rigatoni', 'dispensa', 2000); // kg di rigatoni: abbastanza per tutta la settimana
+    const formats = new Set(); let derived = 0, pastas = 0;
+    for(let n = 0; n < 6; n++){
+      generateWeek(1);
+      for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => {
+        const p = effectiveMeal(1, i, m).principale;
+        if(PASTA_FORMAT_VARIANTS[p]){ formats.add(PASTA_FORMAT_VARIANTS[p].format); derived++; }
+        if(PASTA_FORMAT_RECIPES[p]) pastas++; // ricetta di base: formato scritto nella ricetta
+      });
+    }
+    state.formatPick = { key: '1_1_cena', name: 'Pasta alla Norma' };
+    const order = pastaFormatOptions('Pasta alla Norma').map(f => [f, pastaFormatStock('Pasta alla Norma', f, new Map())]).sort((a, b) => b[1] - a[1])[0][0];
+    return { formats: [...formats], derived, order, stock: pastaFormatStock('Pasta alla Norma', 'Rigatoni', new Map()), stockPenne: pastaFormatStock('Pasta alla Norma', 'Penne', new Map()) };
+  });
+  eq(r.formats, ['Rigatoni'], 'solo rigatoni, quelli che hai: ' + JSON.stringify(r));
+  eq([r.order, r.stock, r.stockPenne], ['Rigatoni', 2, 0]);
+  eq(page.errors, [], 'errori JS');
+});
+
 (async () => {
   const filter = process.argv[2] || '';
   const server = await startServer();
