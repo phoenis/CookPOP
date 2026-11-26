@@ -1084,13 +1084,15 @@ function renderFormatPickSheet(){
   const fp = state.formatPick;
   if(!fp) return '';
   const base = baseRecipeName(fp.name), cur = currentPastaFormat(fp.name);
-  const chips = pastaFormatOptions(fp.name).map(f => `<button type="button" class="menu-pick-chip${f === cur ? ' active' : ''}" data-format-pick="${escapeAttr(f)}"><b>${escapeHtml(f)}</b></button>`).join('');
+  const stockOf = f => pastaFormatStock(base, f, new Map());
+  const chips = pastaFormatOptions(fp.name).map(f => ({ f, st: stockOf(f) })).sort((a, b) => b.st - a.st)
+    .map(({ f, st }) => `<button type="button" class="menu-pick-chip${f === cur ? ' active' : ''}" data-format-pick="${escapeAttr(f)}"><b>${escapeHtml(f)}</b>${st === 2 ? '<small>in casa</small>' : st === 1 ? '<small>poca</small>' : ''}</button>`).join('');
   return `
   <div class="move-backdrop" data-format-close>
     <div class="move-sheet" role="dialog" aria-label="Formato di pasta" data-stop-close>
       <div class="move-handle" aria-hidden="true"></div>
       <h2 class="move-title">Formato di pasta</h2>
-      <p class="move-sub">${escapeHtml(base)} · scegli il formato. Cambia il nome del piatto e la pasta nella spesa.</p>
+      <p class="move-sub">${escapeHtml(base)} · scegli il formato. Cambia il nome del piatto e la pasta nella spesa; quelli che hai in casa sono per primi.</p>
       <div class="format-pick-list">${chips}</div>
       <div class="move-footer"><button type="button" class="btn is-outline" data-format-close>Indietro</button></div>
     </div>
@@ -1601,6 +1603,14 @@ function baseRecipeName(name){ const v = PASTA_FORMAT_VARIANTS[name]; return v ?
 function pastaFormatOptions(name){
   const info = PASTA_FORMAT_RECIPES[baseRecipeName(name)];
   return info && getRecipeMeta(baseRecipeName(name)) ? PASTA_FORMATS[info[0]].slice() : [];
+}
+// Quanto di quel formato c'è in Dispensa per la ricetta: 2 = abbastanza,
+// 1 = ce n'è ma poco, 0 = manca. `used` (Map) tiene il conto di quanto è già
+// stato assegnato ad altri pasti; per sola lettura se ne passa una copia.
+function pastaFormatStock(baseName, format, used){
+  const line = getIngredientsFor(baseName).find(it => portionGramsKind(it.ingrediente) === 'pasta');
+  const st = pantryStatusFor(format, line ? line.qta : '', '', used);
+  return st === 'in-casa' ? 2 : st === 'poco' ? 1 : 0;
 }
 // Formato attuale: quello della ricetta derivata o, per la ricetta di base, quello che ha già (può essere '').
 function currentPastaFormat(name){
@@ -5149,20 +5159,26 @@ function pickWeekRecipes(fixed, weekIdx){
   // (non lo stesso due volte nella settimana, finché ce ne sono): "Penne al
   // tonno e pomodoro" invece di sempre gli spaghetti. Con "Solo con quello che
   // ho" si cambia solo se la pasta scelta non fa mancare di più.
+  // Se in Dispensa ci sono formati di pasta a sufficienza si usano quelli
+  // (tenendo il conto di quanta pasta è già stata assegnata agli altri pasti).
   const fmtUsed = new Set();
+  const pastaUsed = new Map();
   const picks = best.picks.map((r, i)=>{
     if(fixedAt[i]) return r;
     const opts = pastaFormatOptions(r.nome);
     if(!opts.length) return r;
-    let cands = opts.filter(f => !fmtUsed.has(f));
-    if(!cands.length) cands = opts;
-    if(pantryOnly){
+    const inStock = opts.filter(f => pastaFormatStock(r.nome, f, new Map(pastaUsed)) === 2);
+    let cands = inStock.length ? inStock : opts;
+    const fresh = cands.filter(f => !fmtUsed.has(f));
+    if(fresh.length) cands = fresh;
+    if(pantryOnly && !inStock.length){
       const baseMissing = recipePantryMatch(r.nome, pantryCtx.expiring).missing.length;
       cands = cands.filter(f => recipePantryMatch(pastaFormatName(r.nome, f), pantryCtx.expiring).missing.length <= baseMissing);
     }
     if(!cands.length) return r;
     const f = cands[rand(cands.length)];
     fmtUsed.add(f);
+    if(inStock.includes(f)) pastaFormatStock(r.nome, f, pastaUsed); // riserva la pasta per questo pasto
     return getRecipeMeta(pastaFormatName(r.nome, f)) || r;
   });
 
