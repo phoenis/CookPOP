@@ -1462,7 +1462,7 @@ test('con quello che ho: genera e cambia un pasto con le ricette per cui hai gli
     const used = generateWeek(0);
     const names = [];
     for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => names.push(effectiveMeal(0, i, m).principale));
-    return { missing: m.missing.length, inPool: pool.some(x => x.nome === target.nome), poolAllComplete: pool.every(x => !recipePantryMatch(x.nome, {}).missing.length), picked: (() => { const p10 = new Set(pantryOnlyPool(allRecipeMetas().filter(isMainDish), pantryPoolSize(weekPlanSlots().length), {}).map(x => x.nome)); return names.filter((n, k) => n && !state.dayLinks['0_' + Math.floor(k / 2) + '_' + (k % 2 ? 'cena' : 'pranzo')]).every(n => p10.has(n)); })(), short: typeof used.pantryShort };
+    return { missing: m.missing.length, inPool: pool.some(x => x.nome === target.nome), poolAllComplete: pool.every(x => !recipePantryMatch(x.nome, {}).missing.length), picked: (() => { const p10 = new Set(pantryOnlyPool(allRecipeMetas().filter(isMainDish), pantryPoolSize(weekPlanSlots().length), {}).map(x => x.nome)); return names.filter((n, k) => n && !state.dayLinks['0_' + Math.floor(k / 2) + '_' + (k % 2 ? 'cena' : 'pranzo')]).every(n => p10.has(baseRecipeName(n))); })(), short: typeof used.pantryShort };
   });
   eq(r, { missing: 0, inPool: true, poolAllComplete: true, picked: true, short: 'number' });
   await page.evaluate(() => {
@@ -5146,12 +5146,12 @@ test('con quello che ho: la scelta non è sempre la stessa, anche se per poche r
     state.pantryItems = {};
     getIngredientsFor(target.nome).forEach(it => upsertPantryItem(it.ingrediente, 'dispensa', 100));
     state.genPantryOnly = true;
-    const slots = weekPlanSlots().length;
+    const slots = weekPlanSlots(1).length; // la prossima settimana: tutti i pasti, qualunque sia il giorno di oggi
     const pool = pantryOnlyPool(allRecipeMetas().filter(isMainDish), pantryPoolSize(slots), {});
     const seen = new Set();
     for(let n = 0; n < 6; n++){
-      generateWeek(0);
-      for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => { const p = effectiveMeal(0, i, m).principale; if(p) seen.add(p); });
+      generateWeek(1);
+      for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => { const p = effectiveMeal(1, i, m).principale; if(p) seen.add(p); });
     }
     return { poolBigEnough: pool.length >= pantryPoolSize(slots), varied: seen.size > slots };
   });
@@ -5167,6 +5167,62 @@ test('con quello che ho: l\'ingrediente in scadenza vale per un paio di pasti, d
     return { dueMeglioDiQuattro: due < quattro, unoEDueUguali: Math.abs(due - uno) < 1e-9 };
   });
   eq(r, { dueMeglioDiQuattro: true, unoEDueUguali: true });
+});
+
+test('Formato di pasta: ricette derivate (Penne al tonno e pomodoro…) con pasta e nome cambiati, fuori dagli elenchi', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const base = 'Spaghetti al tonno e pomodoro', der = pastaFormatName(base, 'Penne');
+    const ing = getIngredientsFor(der).map(i => i.ingrediente + ':' + i.qta), baseIng = getIngredientsFor(base).map(i => i.ingrediente);
+    const names = allRecipeMetas().map(m => m.nome);
+    const missingBases = Object.keys(PASTA_FORMAT_RECIPES).filter(n => !getRecipeMeta(n));
+    const collisions = Object.keys(PASTA_FORMAT_VARIANTS).filter(n => recipeByName[n]);
+    return {
+      der, meta: !!getRecipeMeta(der), variantOf: getRecipeMeta(der).variantOf, hasPenne: ing.some(x => /^Penne:/.test(x)), noSpaghetti: !ing.some(x => /^Spaghetti/.test(x)), baseHas: baseIng.includes('Spaghetti'),
+      samePasta: ing.find(x => /^Penne:/.test(x)).split(':')[1] === getIngredientsFor(base).find(i => i.ingrediente === 'Spaghetti').qta,
+      hidden: !names.includes(der), basesOk: missingBases.length === 0, noCollisions: collisions.length === 0,
+      sameDetails: getRecipeDetails(der).procedimento.length === getRecipeDetails(base).procedimento.length,
+      carbonara: pastaFormatName('Carbonara', 'Rigatoni'), baseName: baseRecipeName(der), dept: classifyDept('Penne'),
+      opts: pastaFormatOptions(der).includes('Rigatoni'), vongole: pastaFormatOptions('Spaghetti alle vongole').includes('Penne')
+    };
+  });
+  eq(r, { der: 'Penne al tonno e pomodoro', meta: true, variantOf: 'Spaghetti al tonno e pomodoro', hasPenne: true, noSpaghetti: true, baseHas: true, samePasta: true, hidden: true, basesOk: true, noCollisions: true, sameDetails: true, carbonara: 'Carbonara (rigatoni)', baseName: 'Spaghetti al tonno e pomodoro', dept: 'pasta', opts: true, vongole: false });
+  eq(page.errors, [], 'errori JS');
+});
+
+test('Formato di pasta: dal pasto si cambia formato (foglio), con Annulla; il generatore ne usa di diversi', async ({ page }) => {
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'menu';
+    addMealDish(0, 4, 'cena', 'Spaghetti al tonno e pomodoro');
+    state.formatPick = { key: '0_4_cena', name: 'Spaghetti al tonno e pomodoro' }; render();
+  });
+  assert(await page.locator('[data-format-pick="Rigatoni"]').count() === 1, 'il foglio mostra i formati');
+  await page.click('[data-format-pick="Rigatoni"]');
+  const a = await page.evaluate(() => mealDishes(0, 4, 'cena').map(d => d.name));
+  assert(a.includes('Rigatoni al tonno e pomodoro') && !a.includes('Spaghetti al tonno e pomodoro'), 'formato cambiato: ' + a.join(', '));
+  await page.click('.undo-toast-btn');
+  const b = await page.evaluate(() => mealDishes(0, 4, 'cena').map(d => d.name));
+  assert(b.includes('Spaghetti al tonno e pomodoro') && !b.includes('Rigatoni al tonno e pomodoro'), 'Annulla riporta il formato: ' + b.join(', '));
+  const g = await page.evaluate(() => {
+    state.genPantryOnly = false; state.pantryItems = {};
+    const seen = new Set();
+    for(let n = 0; n < 6; n++){
+      generateWeek(1); // la prossima settimana: tutti i pasti si generano
+      for(let i = 0; i < 7; i++) ['pranzo', 'cena'].forEach(m => { const p = effectiveMeal(1, i, m).principale; if(p) seen.add(p); });
+    }
+    const pastaPicked = [...seen].filter(n => PASTA_FORMAT_RECIPES[n] || PASTA_FORMAT_VARIANTS[n]);
+    return { pastaPicked: pastaPicked.length, sample: pastaPicked.slice(0, 6), derived: [...seen].filter(n => PASTA_FORMAT_VARIANTS[n]).length, formats: new Set([...seen].filter(n => PASTA_FORMAT_VARIANTS[n]).map(n => PASTA_FORMAT_VARIANTS[n].format)).size };
+  });
+  assert(g.derived >= 2 && g.formats >= 2, 'il generatore usa formati diversi: ' + JSON.stringify(g));
+  eq(page.errors, [], 'errori JS');
+});
+
+test('Ricette semplici di tutti i giorni: minestrina, pasta al pomodoro, pasta e riso in bianco…', async ({ page }) => {
+  const names = ['Minestrina','Pasta al pomodoro','Pasta in bianco con olio e parmigiano','Riso in bianco','Frittata semplice','Verdure lesse condite','Patate lesse','Pesce al vapore con limone'];
+  const r = await page.evaluate(n => n.map(x => { const m = getRecipeMeta(x), d = getRecipeDetails(x); return [x, !!m, d && d.ingredienti.length, d && d.procedimento.length, !!(d && d.link)]; }), names);
+  for (const [x, m, i, p, l] of r) assert(m && i >= 3 && p >= 3 && l, 'Ricetta incompleta: ' + x);
+  const g = await page.evaluate(() => { state.portionGrams = { pasta: 100, riso: 90 }; return [getIngredientsFor('Pasta al pomodoro').find(i => i.ingrediente === 'Pasta').qta, getIngredientsFor('Riso in bianco').find(i => i.ingrediente === 'Riso').qta, getIngredientsFor('Minestrina').find(i => /Stelline/.test(i.ingrediente)).qta]; });
+  eq(g, ['300 g', '270 g', '160 g']);
 });
 
 (async () => {
