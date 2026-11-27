@@ -7145,7 +7145,7 @@ function renderMealBlock(weekIdx, i, meal, pos, weekDates, isPastCard, d, dateLa
       </div>
     </div>
     ${name ? dishesHtml + (isDone ? '' : mealNotesHtml(weekIdx, i, meal, dishes)) : `
-    <button type="button" class="day-menu-row day-menu-empty" data-open-swap="${mk}">+</button>`}
+    <button type="button" class="day-menu-row day-menu-empty" data-open-swap="${mk}" aria-label="${escapeAttr(MEAL_LABEL[meal])}: niente in programma, tocca per scegliere"><span class="day-menu-empty-text">Niente in programma</span><span class="day-menu-empty-plus" aria-hidden="true">+</span></button>`}
     ${(doneTag || statusBadges.trim()) ? `<div class="recipe-info">
       ${doneTag}
       ${statusBadges}

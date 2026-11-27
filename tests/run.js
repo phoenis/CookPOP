@@ -1609,7 +1609,7 @@ test('Ricettario: dettaglio ricetta come pagina (tab, persone, Aggiungi in alto,
   eq(page.errors, [], 'errori JS');
 });
 
-test('menù: card dei pasti senza bordo e con ombra leggera; le card vuote senza bordo né ombra', async ({ page }) => {
+test('menù: card dei pasti senza bordo e con ombra leggera, anche quelle senza piatti (restano un box)', async ({ page }) => {
   const r = await page.evaluate(() => {
     isMealPast = () => false; findTodayPos = () => 0; generateWeek(0); // "oggi" fisso: il test non dipende dal giorno in cui gira
     state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
@@ -1618,9 +1618,9 @@ test('menù: card dei pasti senza bordo e con ombra leggera; le card vuote senza
     const cs = el => getComputedStyle(el);
     const full = document.querySelector('.meal-block-swipe-wrap .meal-block:not(.is-empty)');
     const empty = document.querySelector('.meal-block.is-empty');
-    return { fullBorder: cs(full).borderTopWidth, fullShadow: cs(full).boxShadow !== 'none', emptyBorder: cs(empty).borderTopWidth, emptyShadow: cs(empty).boxShadow };
+    return { fullBorder: cs(full).borderTopWidth, fullShadow: cs(full).boxShadow !== 'none', emptyBorder: cs(empty).borderTopWidth, emptyShadow: cs(empty).boxShadow !== 'none' };
   });
-  eq(r, { fullBorder: '0px', fullShadow: true, emptyBorder: '0px', emptyShadow: 'none' });
+  eq(r, { fullBorder: '0px', fullShadow: true, emptyBorder: '0px', emptyShadow: true });
 });
 
 test('dispensa: la quantità è rossa solo se la scorta è poca per quell\'unità (0,7 l no, 0,1 l sì, mezzo pezzo sì)', async ({ page }) => {
@@ -5245,6 +5245,22 @@ test('Formato di pasta: il generatore usa i formati che hai in Dispensa e il fog
   });
   eq(r.formats, ['Rigatoni'], 'solo rigatoni, quelli che hai: ' + JSON.stringify(r));
   eq([r.order, r.stock, r.stockPenne], ['Rigatoni', 2, 0]);
+  eq(page.errors, [], 'errori JS');
+});
+
+test('Pasto senza piatti: resta il box con l\'etichetta e "Niente in programma", e il "+" per scegliere', async ({ page }) => {
+  await page.evaluate(() => {
+    state.whatsNewSeenBy = Object.assign({}, state.whatsNewSeenBy, {[whatsNewViewerKey()]: WHATS_NEW.version});
+    state.tab = 'menu'; generateWeek(1); clearMealToEmpty(1, 1, 'pranzo'); render();
+  });
+  const block = page.locator('.meal-block.is-empty[data-week-idx="1"][data-day-index="1"][data-meal="pranzo"]');
+  eq(await block.count(), 1, 'box del pasto vuoto');
+  assert(/Pranzo/i.test(await block.locator('.meal-block-label').textContent()), 'etichetta del pasto');
+  assert(/Niente in programma/.test(await block.locator('.day-menu-empty').textContent()), 'testo: niente in programma');
+  const bg = await block.evaluate(el => getComputedStyle(el).backgroundColor);
+  assert(bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent', 'il box ha lo sfondo: ' + bg);
+  await block.locator('.day-menu-empty').click();
+  assert(await page.evaluate(() => !!state.dishPicker || !!state.swapOpenDay), 'il tocco apre la scelta del piatto');
   eq(page.errors, [], 'errori JS');
 });
 
