@@ -2887,3 +2887,11 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 /* Scelta del formato di pasta */
 .format-pick-list{ display:flex; flex-wrap:wrap; gap:var(--space-xsmall, .5rem); padding:var(--space-xsmall, .5rem) 0; }
 .format-pick-list .menu-pick-chip{ flex:0 0 auto; }
+
+/* Pasto senza piatti: resta il box (come gli altri pasti) con l'etichetta
+   (Pranzo/Cena) e "Niente in programma"; il "+" a destra per scegliere. */
+.meal-block:has(.day-menu-empty){ display:block; padding:var(--card-block); background-color:var(--surface); }
+.meal-block.is-empty{ box-shadow:var(--shadow-card); }
+.day-menu-empty{ position:static; display:flex; align-items:center; justify-content:space-between; gap:var(--space-xsmall); width:100%; margin:0; padding:0; text-align:left; font-family:var(--font-family); font-size:var(--text-medium); line-height:var(--line-height-xsmall); color:var(--ink-light); background:transparent; border:0; cursor:pointer; }
+.day-menu-empty-text{ flex:1; min-width:0; }
+.day-menu-empty-plus{ font-size:var(--text-large); color:var(--gold); flex-shrink:0; }
