@@ -2895,3 +2895,4 @@ html, body, button, .btn, input, select{ touch-action:manipulation; }
 .day-menu-empty{ position:static; display:flex; align-items:center; justify-content:space-between; gap:var(--space-xsmall); width:100%; margin:0; padding:0; text-align:left; font-family:var(--font-family); font-size:var(--text-medium); line-height:var(--line-height-xsmall); color:var(--ink-light); background:transparent; border:0; cursor:pointer; }
 .day-menu-empty-text{ flex:1; min-width:0; }
 .day-menu-empty-plus{ font-size:var(--text-large); color:var(--gold); flex-shrink:0; }
+.day-menu-empty-text{ font-size:var(--text-small); font-style:italic; }
